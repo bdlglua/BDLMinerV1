@@ -64,7 +64,7 @@ struct Settings {
     String mqttUser, mqttPass;
     String peers;  // other miners for the dashboard: "192.168.1.41, miner2.local"
     String webPassword;  // empty = settings and firmware cannot be changed from the web
-    uint8_t githubUpdate = 1;  // 0 off, 1 check and offer, 2 install by itself
+    uint8_t githubUpdate = 2;  // 0 off, 1 check and offer, 2 install by itself
 };
 
 extern Settings settings;

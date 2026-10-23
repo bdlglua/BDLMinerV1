@@ -106,7 +106,7 @@ void settingsSanitize() {
     if (settings.brightness > 100) settings.brightness = 100;
     settings.rotation &= 3;
     if (settings.language > 1) settings.language = 0;
-    if (settings.githubUpdate > 2) settings.githubUpdate = 1;
+    if (settings.githubUpdate > 2) settings.githubUpdate = 2;
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
     if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
@@ -132,6 +132,10 @@ void settingsLoad() {
             case SettingType::Bool: *(bool *)s.value = p.getBool(s.key, *(bool *)s.value); break;
         }
     }
+    // From 1.0.7 every miner installs updates by itself: settings saved before
+    // (every save stored the value) switch to 2; those saved since carry
+    // "updv" and keep their choice.
+    if (!p.isKey("updv")) settings.githubUpdate = 2;
     p.end();
     settingsSanitize();
 }
@@ -152,6 +156,7 @@ void settingsSave() {
             case SettingType::Bool: p.putBool(s.key, *(bool *)s.value); break;
         }
     }
+    p.putUChar("updv", 1);  // see settingsLoad()
     p.end();
 }
 

@@ -85,9 +85,10 @@ that updates from GitHub check.
 
 Two minutes after boot and then every 12 hours (30 minutes after a failed check), the
 miner looks at the latest release of
-this repository. When it is newer than its own firmware, the dashboard shows an
-*Update available* tile with an **Install** button (and a notification is sent); with the
-*Updates from GitHub* setting at `2` it installs it by itself, `0` turns the check off.
+this repository. When it is newer than its own firmware, it installs it by itself (the
+*Updates from GitHub* setting, `2` by default) and the screen shows the progress. At `1`
+it only offers it: an *Update available* tile with an **Install** button on the dashboard
+(and a notification); `0` turns the check off.
 The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
 key built into the firmware (`src/update_key.h`), so a modified file is refused. For that
 reason **Install** works without a web password too (with one set, it is asked). Settings
