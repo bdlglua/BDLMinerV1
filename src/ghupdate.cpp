@@ -245,8 +245,11 @@ void install() {
     core0WdtResume();
     hwsha::release();
 
+    // After a success `installing` stays set: the screen keeps showing the
+    // update window until the restart.
     portENTER_CRITICAL(&stateMux);
-    state.installing = false;
+    if (ok) state.progress = 100;
+    else state.installing = false;
     portEXIT_CRITICAL(&stateMux);
     if (ok) {
         char why[48];

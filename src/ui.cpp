@@ -8,6 +8,7 @@
 
 #include "bg/bg.h"
 #include "core/work.h"
+#include "ghupdate.h"
 #include "i18n.h"
 #include "market.h"
 #include "miner.h"
@@ -620,6 +621,41 @@ void drawRecords() {
     footer(f.c_str());
 }
 
+// While a GitHub update installs: a window over the current screen with the
+// versions and a progress bar, until the restart.
+void drawUpdateWindow(const GithubUpdate &u) {
+    int w = lcd->width() - px(24), pad = px(8), barH = max(4, px(10));
+    LGFX_Sprite s(lcd);
+    s.setColorDepth(16);
+    bodyFont(s);
+    int lh = s.fontHeight() + 2;
+    int h = pad * 3 + lh * 3 + barH;
+    if (!s.createSprite(w, h)) return;
+    bodyFont(s);
+    // The colours of the miner's panels (tools/make_backgrounds.py).
+    const uint32_t panel = 0x1E2432, grey = 0x8C96AA;
+    s.fillRoundRect(0, 0, w, h, px(8), panel);
+    s.drawRoundRect(0, 0, w, h, px(8), grey);
+    s.drawRoundRect(1, 1, w - 2, h - 2, px(8), grey);
+    s.setTextColor(kFg);
+    if (u.progress >= 100) {  // installed: only "Restarting..." until the restart
+        s.setTextDatum(middle_center);
+        s.drawString(tr("Restarting..."), w / 2, h / 2);
+        s.pushSprite((lcd->width() - w) / 2, (lcd->height() - h) / 2);
+        return;
+    }
+    s.setTextDatum(top_center);
+    s.drawString(tr("Automatic update"), w / 2, pad);
+    s.drawString(tr("in progress..."), w / 2, pad + lh);
+    char info[48];
+    snprintf(info, sizeof(info), "%s -> %s   %u%%", FW_VERSION, u.version, (unsigned)u.progress);
+    s.drawString(info, w / 2, pad + lh * 2 + px(2));
+    int barW = w - pad * 2, barY = h - pad - barH;
+    s.drawRect(pad, barY, barW, barH, grey);
+    s.fillRect(pad + 1, barY + 1, (barW - 2) * min<int>(u.progress, 100) / 100, barH - 2, grey);
+    s.pushSprite((lcd->width() - w) / 2, (lcd->height() - h) / 2);
+}
+
 }  // namespace
 
 void begin() {
@@ -771,6 +807,17 @@ void render() {
         if (sampleCount < (int)(sizeof(samples) / sizeof(samples[0]))) sampleCount++;
     }
     if (!lcd || settings.brightness == 0 || backlight == 0) return;
+    static bool updateShown = false;
+    GithubUpdate u = ghUpdateState();
+    if (u.installing) {
+        drawUpdateWindow(u);
+        updateShown = true;
+        return;
+    }
+    if (updateShown) {  // the update failed: redraw the whole screen
+        updateShown = false;
+        shownBg = -1;
+    }
     if (bgSet && screen < kGraphScreen) {
         renderBitmap();
         return;

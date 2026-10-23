@@ -1,6 +1,7 @@
 #include "log.h"
 
 #include <Preferences.h>
+#include <nvs.h>
 #include <esp_system.h>
 #include <stdarg.h>
 
@@ -82,6 +83,12 @@ void logBoot() {
     if (r == ESP_RST_SW && why.length()) snprintf(reason, sizeof(reason), "restarted by the miner: %s", why.c_str());
     else snprintf(reason, sizeof(reason), "%s", resetName(r));
     logf("[boot] last reset: %s\n", reason);
+    // Settings and statistics live in NVS: a full partition would be erased
+    // at boot by the framework, so its fill level is worth seeing.
+    nvs_stats_t st;
+    if (nvs_get_stats(nullptr, &st) == ESP_OK)
+        logf("[boot] NVS: %u of %u entries used, %u namespaces\n", (unsigned)st.used_entries,
+             (unsigned)st.total_entries, (unsigned)st.namespace_count);
 }
 
 const char *bootReason() { return reason; }

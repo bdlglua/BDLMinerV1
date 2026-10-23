@@ -95,6 +95,10 @@ const Pair kTexts[] = {
     {"Invalid BTC address?", "Adresse BTC invalide ?"},
     {"Hold A at boot to fix", "A au demarrage pour corriger"},
     {"Reset", "Reinitialisation"},
+    // GitHub update window
+    {"Automatic update", "Mise a jour automatique"},
+    {"in progress...", "en cours..."},
+    {"Restarting...", "Redemarrage..."},
     {"Erasing settings...", "Effacement..."},
     {"Rebooting into setup", "Redemarrage en config"},
     {"Update", "Mise a jour"},
