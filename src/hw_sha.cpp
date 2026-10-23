@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include <atomic>
+
 #include "core/sha256.h"
 #include "core/work.h"
 #include "log.h"
@@ -22,16 +24,20 @@ uint32_t nonceAt(uint32_t position) { return position; }
 // The SHA/AES lock is recursive, so mbedtls can still take it from the task
 // that holds it here, while the miner sees `held` and hashes in software.
 static volatile bool held = false;
+static int holds = 0;  // hold() nests (an update download around tlsConnect())
 
 void hold() {
+    holds++;
     held = true;
     esp_sha_acquire_hardware();  // waits for the batch in progress
 }
 
 void release() {
     esp_sha_release_hardware();
-    held = false;
+    if (--holds == 0) held = false;
 }
+
+void idle() {}
 
 static inline void waitIdle() {
     while (sha_ll_busy()) {
@@ -470,13 +476,26 @@ bool available() { return true; }
 
 uint32_t nonceAt(uint32_t position) { return __builtin_bswap32(position); }
 
-// Nothing to do: the loops hold all three SHA engines (see lockEngines()), so
-// mbedtls hashes in software and a TLS handshake runs alongside them. (A
-// pause used to be needed while only SHA-256 was locked: mbedtls wrote the
-// shared TEXT registers through the SHA-1 / SHA-384 engines meanwhile, and
-// every handshake failed.)
-void hold() {}
-void release() {}
+// The loops hold all three SHA engines (see lockEngines()), so mbedtls hashes
+// in software and a TLS handshake runs alongside them. But scan() used to
+// free them after every batch, and mbedtls, retrying at each digest, would
+// sooner or later get one in that gap and keep it for the whole handshake
+// (its transcript hash): the hardware loop then stopped for 1.5 s, and the
+// WiFi task, waiting on the TLS task meanwhile, lent it priority 23, which
+// froze everything else on core 0 (screen, web server). Between hold() and
+// release(), scan() keeps the engines from one batch to the next.
+static std::atomic<int> holds{0};  // TLS tasks and an update download may overlap
+static bool minerHolds = false;     // only touched by the mining task
+
+void hold() { holds++; }
+void release() { holds--; }
+
+void idle() {
+    if (minerHolds) {
+        unlockEngines();
+        minerHolds = false;
+    }
+}
 
 bool fillAvailable() { return fillOk; }
 
@@ -510,7 +529,8 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
     if (loop >= kLoopCount) return 0;
     // An open TLS connection can hold the engine for seconds (mbedtls then
     // keeps it for the whole digest); never wait for it.
-    if (!tryLockEngines()) return 0;
+    if (!minerHolds && !tryLockEngines()) return 0;
+    minerHolds = true;
     // Start from a clean peripheral, whatever used it last.
     periph_module_reset(PERIPH_SHA_MODULE);
 
@@ -546,7 +566,7 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
         fill->q = c.q;
         fill->hashes += c.q - q0;
     }
-    unlockEngines();
+    if (!holds) idle();
     return count - c.budget;
 }
 
@@ -560,6 +580,7 @@ bool available() { return false; }
 uint32_t nonceAt(uint32_t position) { return position; }
 void hold() {}
 void release() {}
+void idle() {}
 void prepare(Job &, const uint8_t *) {}
 bool fillAvailable() { return false; }
 void prepareFill(Fill &, const uint8_t *) {}

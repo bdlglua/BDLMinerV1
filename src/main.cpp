@@ -40,6 +40,11 @@ static void logStats() {
 }
 
 void setup() {
+    // Above the tasks that make HTTPS requests (market 2, updates and
+    // notifications 1): a TLS handshake computes for 1.5-2 s without
+    // yielding, which froze the screen and the web server meanwhile. loop()
+    // sleeps 20 ms per pass, so they still get the core.
+    vTaskPrioritySet(nullptr, 3);
     Serial.begin(115200);
     delay(200);
     Serial.println();
@@ -90,8 +95,11 @@ void setup() {
 }
 
 void loop() {
-    static uint32_t lastTick = 0, lastLog = 0;
+    static uint32_t lastTick = 0, lastLog = 0, lastPass = 0;
     uint32_t now = millis();
+    // Screen and web server stand still while this does not run.
+    if (lastPass && now - lastPass > 1000) logf("[loop] stalled %u ms\n", (unsigned)(now - lastPass));
+    lastPass = now;
 
     board::Input input = board::poll();
     if (input != board::Input::None) watchWake();

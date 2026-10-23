@@ -56,6 +56,9 @@ void minerStart();
 // minute), updated by minerTick() once per second.
 uint64_t minerTotalHashes();
 double minerHashrate();
+// Hash rate over the last 10 seconds, for the screen: the 60-second average
+// barely moves and looks frozen.
+double minerHashrateLive();
 // Smoothed hash rate of one engine (stats.engine[i]), H/s.
 double minerEngineRate(int i);
 void minerTick();

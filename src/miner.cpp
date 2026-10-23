@@ -65,7 +65,8 @@ struct RateSample {
 };
 RateSample rateRing[kRateWindow];
 int rateCount = 0, rateHead = 0;
-double hashrate = 0;
+double hashrate = 0, hashrateLive = 0;
+constexpr int kLiveWindow = 10;
 double engineRate[MAX_MINERS];
 uint32_t lastTickMs = 0;
 
@@ -232,11 +233,13 @@ void minerTask(void *arg) {
     for (;;) {
         if (!boardValid) {
             haveWork = false;
+            if (m.hardware) hwsha::idle();
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
         Throttle th = throttle;
         if (th == Throttle::Paused) {
+            if (m.hardware) hwsha::idle();
             vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
@@ -245,7 +248,10 @@ void minerTask(void *arg) {
         if (!haveWork || seq != boardSeq) {
             haveWork = fetchWork(m, seq);
             nonce = 0;
-            if (!haveWork) continue;
+            if (!haveWork) {
+                if (m.hardware) hwsha::idle();
+                continue;
+            }
         }
 
         uint32_t limit = max(m.work.quickLimit, kBestDiffFilter);
@@ -355,6 +361,8 @@ uint64_t minerTotalHashes() { return totalHashes; }
 
 double minerHashrate() { return hashrate; }
 
+double minerHashrateLive() { return hashrateLive; }
+
 double minerEngineRate(int i) { return i >= 0 && i < stats.minerCount ? engineRate[i] : 0; }
 
 void minerTick() {
@@ -387,6 +395,14 @@ void minerTick() {
             }
             hashrate = total;
         }
+        uint32_t liveMs = 0;
+        uint64_t liveSum = 0;
+        for (int k = 1; k <= min(rateCount, kLiveWindow); k++) {
+            const RateSample &s = rateRing[(rateHead - k + kRateWindow) % kRateWindow];
+            liveMs += s.ms;
+            for (int i = 0; i < MAX_MINERS; i++) liveSum += s.hashes[i];
+        }
+        if (liveMs) hashrateLive = liveSum * 1000.0 / liveMs;
     }
     lastTickMs = now;
 

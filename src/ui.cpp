@@ -139,7 +139,7 @@ void row(float x, float y, const char *label, const String &value, uint32_t colo
 }
 
 String hashrateText(const char **unit) {
-    double hr = minerHashrate();
+    double hr = minerHashrateLive();
     *unit = "H/s";
     if (hr >= 1e6) {
         hr /= 1e6;
@@ -149,7 +149,9 @@ String hashrateText(const char **unit) {
         *unit = "kH/s";
     }
     char num[16];
-    snprintf(num, sizeof(num), hr >= 100 ? "%.1f" : "%.2f", hr);
+    // 5 characters: "998.3" kH/s, "1.005" MH/s (2 decimals would only move
+    // in 10 kH/s steps around 1 MH/s).
+    snprintf(num, sizeof(num), hr >= 100 ? "%.1f" : hr >= 10 ? "%.2f" : "%.3f", hr);
     return num;
 }
 
