@@ -2,49 +2,63 @@
 
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
+#include <Update.h>
 #include <WebServer.h>
 #include <WiFi.h>
 
 #include "board.h"
 #include "core/address.h"
+#include "log.h"
 #include "market.h"
 #include "miner.h"
 #include "net.h"
 #include "settings.h"
+#include "watch.h"
 
 namespace {
 
 WebServer server(80);
 String hostName;
+uint32_t restartAt = 0;  // a restart is due at this millis(), 0 = none
+const char *restartWhy = "";
 
-const char kPage[] PROGMEM = R"HTML(<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
+// Shared by the pages.
+const char kStyle[] PROGMEM = R"CSS(<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BDLMiner V1</title>
 <style>
 :root{--bg:#0b0d12;--panel:#161b26;--border:#2b3344;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a;--ok:#38d07a;--bad:#e5484d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif;padding:16px}
-header{display:flex;align-items:center;gap:10px;max-width:960px;margin:0 auto 16px}
+header{display:flex;align-items:center;gap:10px;max-width:960px;margin:0 auto 16px;flex-wrap:wrap}
 .coin{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;font-weight:900;display:grid;place-items:center;transform:rotate(14deg)}
-h1{font-size:20px;margin:0}h1 b{color:var(--accent)}#st{margin-left:auto;font-weight:700;font-size:13px}
-main{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-width:960px;margin:0 auto}
+h1{font-size:20px;margin:0}h1 b{color:var(--accent)}h2{font-size:14px;color:var(--label);text-transform:uppercase;letter-spacing:.06em;max-width:960px;margin:18px auto 8px}
+nav{margin-left:auto;display:flex;gap:14px;align-items:center;font-size:13px}a{color:var(--accent)}
+main,.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-width:960px;margin:0 auto}
 .t{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:0}
 .t.big{grid-column:span 2;border-top:2px solid var(--accent)}
 .l{color:var(--label);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .v{font-size:20px;font-weight:700;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-.big .v{font-size:38px;color:var(--accent)}.s{color:var(--label);font-size:12px}
+.big .v{font-size:38px;color:var(--accent)}.s{color:var(--label);font-size:12px;white-space:pre-line}
 footer{max-width:960px;margin:16px auto 0;color:var(--label);font-size:12px}
+form,.box{max-width:960px;margin:0 auto}label{display:block;margin:8px 0 2px;color:var(--label);font-size:13px}
+input{width:100%;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--fg);font:inherit}
+input[type=checkbox]{width:auto}button{margin:12px 8px 0 0;padding:8px 14px;border:0;border-radius:6px;background:var(--accent);color:#000;font-weight:700;cursor:pointer}
+fieldset{border:1px solid var(--border);border-radius:8px;margin:12px 0;padding:4px 12px 12px}legend{color:var(--accent);font-weight:700}
+pre{max-width:960px;margin:0 auto;white-space:pre-wrap;font-size:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px}
 @media(max-width:460px){.t.big{grid-column:span 1}}
-</style></head><body>
-<header><div class="coin">B</div><h1>BDLMiner <b>V1</b></h1><span id="st">…</span></header>
-<main id="m"></main>
+</style>)CSS";
+
+const char kHeader[] PROGMEM = R"HTML(<header><div class="coin">B</div><h1>BDLMiner <b>V1</b></h1>
+<nav><a href="/">Dashboard</a><a href="/settings">Settings</a><a href="/log">Log</a><span id="st"></span></nav></header>)HTML";
+
+const char kDashboard[] PROGMEM = R"HTML(<main id="m"></main>
+<h2 id="ph" hidden>Miners</h2><div class="grid" id="p"></div>
 <footer id="f"></footer>
 <script>
 const SI=['','k','M','G','T','P','E','Z','Y'];
 function si(v,u=''){if(!v)return'-';let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
 function diff(d){return!d?'-':d<1?d.toFixed(5):si(d)}
-function dur(s){const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+'d ':'')+h+'h '+m+'m'}
-function years(y){const W=[[1e12,'trillion'],[1e9,'billion'],[1e6,'million'],[1e3,'thousand']];for(const[k,w]of W)if(y>=k)return(y/k).toFixed(1)+' '+w+' years';return y>=1?y.toFixed(1)+' years':(y*365).toFixed(1)+' days'}
+function dur(s){if(!isFinite(s))return'-';if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+'d ':'')+(d||h?h+'h ':'')+m+'m'}
+function odds(hr,nd,t){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*t/(nd*4294967296));return'1 in '+si(1/p).replace(' ','')}
 function chart(h){const v=h.hashrate,t=tile('Hashrate history',undefined,v.length?'5-min averages, last '+dur(v.length*h.interval_s)+' · avg '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · range '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):'first point after '+h.interval_s/60+' min of mining',true);
  if(v.length>1){const N='http://www.w3.org/2000/svg',W=300,H=60,lo=Math.min(...v),hi=Math.max(...v),k=(H-4)/((hi-lo)||hi||1),s=document.createElementNS(N,'svg'),p=document.createElementNS(N,'polyline');
   s.setAttribute('viewBox','0 0 '+W+' '+H);s.setAttribute('preserveAspectRatio','none');s.style.cssText='display:block;width:100%;height:60px;margin:6px 0';
@@ -53,34 +67,105 @@ function chart(h){const v=h.hashrate,t=tile('Hashrate history',undefined,v.lengt
   s.appendChild(p);t.insertBefore(s,t.lastChild)}return t}
 function tile(label,value,sub,big){const t=document.createElement('div');t.className='t'+(big?' big':'');
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const e=document.createElement('div');e.className=c;e.textContent=x;t.appendChild(e)}return t}
+const peers={};
+async function peer(h){try{const c=new AbortController();setTimeout(()=>c.abort(),2500);const r=await fetch('http://'+h+'/api/stats',{signal:c.signal});peers[h]=await r.json()}catch(e){peers[h]=null}}
 async function tick(){
- try{const r=await fetch('/api/stats');const j=await r.json();const m=j.market;
+ try{const r=await fetch('/api/stats');const j=await r.json();const m=j.market,pv=j.pool_view;
+  document.documentElement.style.setProperty('--accent',j.accent);
   const st=document.getElementById('st');st.textContent=j.pool.connected?'ONLINE':'OFFLINE';st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';
-  const odds=j.hashrate&&j.network.difficulty?j.network.difficulty*4294967296/j.hashrate/31557600:0;
-  const T=[tile('Hashrate',si(j.hashrate,'H/s'),j.engines.join(' + ')+' engines',true),
+  const state=j.throttle=='paused'?'⚠ paused: too hot':j.throttle=='half'?'battery saver: half speed':'';
+  const T=[tile('Hashrate',si(j.hashrate,'H/s'),j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state:''),true),
    tile('Shares',j.shares.accepted+(j.shares.rejected?' / '+j.shares.rejected+' rejected':''),'pool diff '+diff(j.pool.difficulty)),
    tile('Best difficulty',diff(j.best.session),'best ever '+diff(j.best.ever)),
-   tile('Blocks found',j.blocks,j.over32bits+' hashes ≥ diff 1'),
+   tile('32-bit shares',j.over32bits,'1 every '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' on average'),
+   tile('Block chance',odds(j.hashrate,j.network.difficulty,86400)+' / day',odds(j.hashrate,j.network.difficulty,31557600)+' / year'),
+   tile('Blocks found',j.blocks,'lifetime '+j.lifetime.blocks),
    tile('Total hashes',si(j.total_hashes),'uptime '+dur(j.uptime_s)),
    tile('Block height',j.network.height||'-','net diff '+diff(j.network.difficulty)),
-   tile('Solo odds',odds?'1 block / '+years(odds):'-','at your hash rate'),
-   tile('Lifetime',si(j.lifetime.hashes)+' hashes',j.lifetime.shares+' shares · '+j.lifetime.blocks+' blocks'),
+   tile('Lifetime',si(j.lifetime.hashes)+' hashes',j.lifetime.shares+' shares · running '+dur(j.lifetime.seconds)),
    chart(j.history)];
+  if(pv.updated_s>=0)T.push(tile('Seen by the pool',si(pv.hashrate,'H/s'),'best '+diff(pv.best)+' · '+pv.workers+' worker(s) · '+Math.round(pv.updated_s/60)+' min ago'));
+  else if(!pv.supported)T.push(tile('Seen by the pool','-','no stats API known for this pool'));
+  if(j.top.length)T.push(tile('Best shares',j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
   if(m.updated_s>=0){T.push(tile('BTC price',m.price?Math.round(m.price).toLocaleString()+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString()+' sats / '+m.currency:'',true),
    tile('Fees sat/vB',m.fees.join(' / '),'fast / 30 min / 1 h'),
    tile('Network hashrate',si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' tx in mempool'),
    tile('Next retarget',(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %','in '+m.retarget.blocks+' blocks ('+m.retarget.progress.toFixed(0)+' % done)'))}
   T.push(tile(j.pool.backup?'Pool (backup)':'Pool',j.pool.host+':'+j.pool.port,j.pool.status),
    tile('Payout address',j.address,j.address_type==='invalid'?'⚠ not a valid Bitcoin address':j.address_type),
-   tile('Device',j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB free'),
-   tile('WiFi',j.ip,j.rssi+' dBm'));
+   tile('Device',j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB free'+(j.night?' · night mode':'')+'\nlast reset: '+j.boot_reason),
+   tile('WiFi',j.ip,j.ssid+' · '+j.rssi+' dBm'));
   document.getElementById('m').replaceChildren(...T);
   document.getElementById('f').textContent='Updated '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · market data '+Math.round(m.updated_s/60)+' min old (mempool.space)':'');
+  if(j.peers.length){document.getElementById('ph').hidden=false;j.peers.forEach(peer);let total=j.hashrate;
+   const P=j.peers.map(h=>{const p=peers[h];if(!p)return tile(h,'-','no answer');total+=p.hashrate;return tile(h,si(p.hashrate,'H/s'),(p.pool.connected?'online':'OFFLINE')+' · '+p.shares.accepted+' shares · best '+diff(p.best.ever))});
+   P.unshift(tile('All miners',si(total,'H/s'),(j.peers.length+1)+' miners',true));document.getElementById('p').replaceChildren(...P)}
  }catch(e){document.getElementById('st').textContent='NO CONNECTION';}
 }
 tick();setInterval(tick,3000);
-</script></body></html>
-)HTML";
+</script>)HTML";
+
+const char kSettingsPage[] PROGMEM = R"HTML(<form id="f" class="box" onsubmit="return save()"></form>
+<div class="box"><button onclick="save()">Save and restart</button><button onclick="exp()">Export</button>
+<button onclick="document.getElementById('imp').click()">Import</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)">
+<fieldset><legend>Firmware update</legend><input type="file" id="fw" accept=".bin"><button onclick="upd()">Update</button><div id="up" class="s"></div></fieldset>
+<p class="s" id="msg"></p></div>
+<script>
+let S;const $=id=>document.getElementById(id);
+async function load(){const r=await fetch('/api/settings');if(!r.ok){$('msg').textContent=await r.text();return}S=await r.json();const f=$('f');let g='',fs;
+ for(const[k,type,group,label]of S.schema){if(group!=g){g=group;fs=document.createElement('fieldset');fs.innerHTML='<legend>'+g+'</legend>';f.appendChild(fs)}
+  const l=document.createElement('label'),i=document.createElement('input');l.textContent=label;i.id='k_'+k;
+  if(type=='bool'){i.type='checkbox';i.checked=S.values[k]}else{i.type=type=='secret'?'password':type=='text'?'text':'number';if(type=='decimal')i.step='any';i.value=S.values[k]}
+  fs.append(l,i)}}
+function values(){const v={};for(const[k,type]of S.schema){const i=$('k_'+k);v[k]=type=='bool'?i.checked:type=='number'||type=='decimal'?Number(i.value):i.value}return v}
+async function post(v){const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});$('msg').textContent=r.ok?'Saved, restarting… reload in 15 s':await r.text()}
+function save(){post(values());return false}
+function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(values(),null,1)],{type:'application/json'}));a.download='bdlminer-settings.json';a.click()}
+function imp(i){const r=new FileReader();r.onload=()=>{try{post(JSON.parse(r.result))}catch(e){$('msg').textContent='Not a settings file'}};r.readAsText(i.files[0])}
+function upd(){const f=$('fw').files[0];if(!f)return;const x=new XMLHttpRequest(),d=new FormData();d.append('firmware',f);
+ x.upload.onprogress=e=>$('up').textContent=Math.round(e.loaded*100/e.total)+' %';x.onload=()=>$('up').textContent=x.responseText;x.onerror=()=>$('up').textContent='Upload failed';
+ x.open('POST','/update');x.send(d)}
+load();
+</script>)HTML";
+
+const char kLogPage[] PROGMEM = R"HTML(<pre id="l">…</pre><footer>Refreshes every 5 s. Times are since the last start.</footer>
+<script>async function t(){try{const r=await fetch('/api/log');document.getElementById('l').textContent=await r.text()}catch(e){}}t();setInterval(t,5000)</script>)HTML";
+
+void sendPage(const char *title, const char *body) {
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+    server.sendContent(String("<!doctype html><html lang=\"en\"><head><title>") + title + "</title>");
+    server.sendContent_P(kStyle);
+    server.sendContent("</head><body>");
+    server.sendContent_P(kHeader);
+    server.sendContent_P(body);
+    server.sendContent("</body></html>");
+    server.sendContent("");
+}
+
+// Settings and firmware need the web password (set in the setup portal).
+bool authorized() {
+    if (settings.webPassword.isEmpty()) {
+        server.send(403, "text/plain",
+                    "Set a web password in the setup portal first (hold the main button while the miner starts).");
+        return false;
+    }
+    if (!server.authenticate("admin", settings.webPassword.c_str())) {
+        server.requestAuthentication(BASIC_AUTH, "BDLMiner", "Wrong password");
+        return false;
+    }
+    return true;
+}
+
+void restartSoon(const char *why) {
+    restartWhy = why;
+    restartAt = millis() + 1500;
+}
+
+const char *accentCss() {
+    static const char *kAccent[] = {"#f7931a", "#38d07a", "#3b9cf6", "#a66bf5", "#ec5aa0"};
+    return kAccent[settings.theme % 5];
+}
 
 void handleStats() {
     JsonDocument j;
@@ -90,19 +175,38 @@ void handleStats() {
     j["hashrate"] = minerHashrate();
     j["total_hashes"] = (double)minerTotalHashes();
     JsonArray engines = j["engines"].to<JsonArray>();
-    for (int i = 0; i < stats.minerCount; i++) engines.add(stats.engine[i]);
+    for (int i = 0; i < stats.minerCount; i++) {
+        JsonObject e = engines.add<JsonObject>();
+        e["name"] = stats.engine[i];
+        e["rate"] = minerEngineRate(i);
+    }
     j["shares"]["accepted"] = stats.accepted;
     j["shares"]["rejected"] = stats.rejected;
     j["best"]["session"] = stats.sessionBestDiff;
     j["best"]["ever"] = stats.bestDiff;
     j["blocks"] = stats.blocksFound;
     j["over32bits"] = stats.over32bits;
+    BestShare top[TOP_SHARES];
+    int nt = minerTopShares(top, TOP_SHARES);
+    JsonArray ta = j["top"].to<JsonArray>();
+    for (int i = 0; i < nt; i++) {
+        JsonObject o = ta.add<JsonObject>();
+        o["d"] = top[i].difficulty;
+        o["t"] = top[i].time;
+    }
     j["pool"]["host"] = netPoolHost();
     j["pool"]["port"] = netPoolPort();
     j["pool"]["backup"] = netOnBackup();
     j["pool"]["connected"] = stats.poolConnected;
     j["pool"]["status"] = netStatus();
     j["pool"]["difficulty"] = stats.poolDiff;
+    PoolStats pv = poolStatsGet();
+    j["pool_view"]["updated_s"] = pv.updatedMs ? (long)((millis() - pv.updatedMs) / 1000) : -1;
+    j["pool_view"]["supported"] = pv.supported;
+    j["pool_view"]["hashrate"] = pv.hashrate;
+    j["pool_view"]["best"] = pv.bestEver;
+    j["pool_view"]["shares"] = pv.shares;
+    j["pool_view"]["workers"] = pv.workers;
     j["network"]["height"] = stats.blockHeight;
     j["network"]["difficulty"] = stats.networkDiff;
     j["address"] = settings.btcAddress;
@@ -110,6 +214,7 @@ void handleStats() {
     j["lifetime"]["hashes"] = (double)stats.lifetimeHashes;
     j["lifetime"]["shares"] = stats.lifetimeShares;
     j["lifetime"]["blocks"] = stats.lifetimeBlocks;
+    j["lifetime"]["seconds"] = stats.lifetimeSeconds;
     static float hist[HISTORY_LEN];
     int n = minerHistory(hist, HISTORY_LEN);
     j["history"]["interval_s"] = HISTORY_INTERVAL_S;
@@ -119,8 +224,22 @@ void handleStats() {
     float temp = board::temperature();
     if (isnan(temp)) j["temp_c"] = nullptr;
     else j["temp_c"] = (int)lroundf(temp);
+    j["throttle"] = minerThrottle() == Throttle::Paused ? "paused" : minerThrottle() == Throttle::Half ? "half" : "full";
+    j["night"] = watchNight();
+    j["boot_reason"] = bootReason();
+    j["accent"] = accentCss();
     j["ip"] = WiFi.localIP().toString();
+    j["ssid"] = WiFi.SSID();
     j["rssi"] = WiFi.RSSI();
+    JsonArray peers = j["peers"].to<JsonArray>();
+    for (int from = 0; from < (int)settings.peers.length();) {
+        int comma = settings.peers.indexOf(',', from);
+        if (comma < 0) comma = settings.peers.length();
+        String p = settings.peers.substring(from, comma);
+        p.trim();
+        if (p.length()) peers.add(p);
+        from = comma + 1;
+    }
 
     MarketData m = marketGet();
     JsonObject mk = j["market"].to<JsonObject>();
@@ -140,7 +259,111 @@ void handleStats() {
     String body;
     serializeJson(j, body);
     server.sendHeader("Cache-Control", "no-store");
+    server.sendHeader("Access-Control-Allow-Origin", "*");  // read by the other miners' dashboards
     server.send(200, "application/json", body);
+}
+
+void handleGetSettings() {
+    if (!authorized()) return;
+    static const char *kTypes[] = {"text", "secret", "number", "decimal", "bool"};
+    JsonDocument j;
+    JsonArray schema = j["schema"].to<JsonArray>();
+    JsonObject values = j["values"].to<JsonObject>();
+    for (size_t i = 0; i < kSettingCount; i++) {
+        const SettingInfo &s = kSettings[i];
+        JsonArray row = schema.add<JsonArray>();
+        row.add(s.key);
+        row.add(kTypes[(int)s.type]);
+        row.add(s.group);
+        row.add(s.label);
+        switch (s.type) {
+            case SettingType::Text:
+            case SettingType::Secret: values[s.key] = *(String *)s.value; break;
+            case SettingType::Number:
+                values[s.key] = s.bits == 8 ? *(uint8_t *)s.value : *(uint16_t *)s.value;
+                break;
+            case SettingType::Decimal: values[s.key] = *(double *)s.value; break;
+            case SettingType::Bool: values[s.key] = *(bool *)s.value; break;
+        }
+    }
+    String body;
+    serializeJson(j, body);
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", body);
+}
+
+// Saves the settings present in the JSON body (an export, or the page's form)
+// and restarts, which applies everything the same way as at boot.
+void handlePostSettings() {
+    if (!authorized()) return;
+    JsonDocument j;
+    if (deserializeJson(j, server.arg("plain")) || !j.is<JsonObject>()) {
+        server.send(400, "text/plain", "Not a settings object");
+        return;
+    }
+    int changed = 0;
+    for (size_t i = 0; i < kSettingCount; i++) {
+        const SettingInfo &s = kSettings[i];
+        JsonVariant v = j[s.key];
+        if (v.isNull()) continue;
+        switch (s.type) {
+            case SettingType::Text:
+            case SettingType::Secret: *(String *)s.value = v.as<String>(); break;
+            case SettingType::Number: {
+                long n = v.as<long>();
+                long max = s.bits == 8 ? 255 : 65535;
+                n = n < 0 ? 0 : n > max ? max : n;
+                if (s.bits == 8) *(uint8_t *)s.value = n;
+                else *(uint16_t *)s.value = n;
+                break;
+            }
+            case SettingType::Decimal: *(double *)s.value = v.as<double>(); break;
+            case SettingType::Bool: *(bool *)s.value = v.as<bool>(); break;
+        }
+        changed++;
+    }
+    settingsSanitize();
+    settingsSave();
+    logf("[web] %d settings saved, restarting\n", changed);
+    server.send(200, "text/plain", "Saved, restarting");
+    restartSoon("settings changed from the web page");
+}
+
+// POST /update (multipart): a firmware.bin built for this board.
+bool updateAllowed = false;
+
+void handleUpload() {
+    HTTPUpload &up = server.upload();
+    if (up.status == UPLOAD_FILE_START) {
+        updateAllowed = !settings.webPassword.isEmpty() && server.authenticate("admin", settings.webPassword.c_str());
+        if (!updateAllowed) return;
+        logf("[web] firmware update: %s\n", up.filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) logf("[web] update: %s\n", Update.errorString());
+    } else if (!updateAllowed) {
+        return;
+    } else if (up.status == UPLOAD_FILE_WRITE) {
+        if (Update.isRunning() && Update.write(up.buf, up.currentSize) != up.currentSize)
+            logf("[web] update: %s\n", Update.errorString());
+    } else if (up.status == UPLOAD_FILE_END) {
+        if (Update.isRunning() && Update.end(true)) logf("[web] update: %u bytes written\n", (unsigned)up.totalSize);
+    } else if (up.status == UPLOAD_FILE_ABORTED) {
+        Update.abort();
+    }
+}
+
+void handleUpdateDone() {
+    if (!updateAllowed) {
+        authorized();  // sends the right refusal
+        return;
+    }
+    if (Update.hasError() || !Update.isFinished()) {
+        server.send(500, "text/plain",
+                    String("Update failed: ") + Update.errorString() +
+                        " (boards whose firmware does not fit twice in flash can only be updated by USB)");
+        return;
+    }
+    server.send(200, "text/plain", "Firmware updated, restarting… reload in 20 s");
+    restartSoon("firmware updated from the web page");
 }
 
 // Prometheus text format, for Grafana / Home Assistant scrapers.
@@ -159,8 +382,10 @@ void handleMetrics() {
     metric("bdlminer_blocks_found_total", "counter", stats.blocksFound);
     metric("bdlminer_best_difficulty", "gauge", stats.sessionBestDiff);
     metric("bdlminer_best_difficulty_ever", "gauge", stats.bestDiff);
+    metric("bdlminer_shares_32bit_total", "counter", stats.over32bits);
     metric("bdlminer_lifetime_hashes_total", "counter", (double)stats.lifetimeHashes);
     metric("bdlminer_lifetime_shares_total", "counter", stats.lifetimeShares);
+    metric("bdlminer_lifetime_seconds_total", "counter", stats.lifetimeSeconds);
     metric("bdlminer_pool_connected", "gauge", stats.poolConnected ? 1 : 0);
     metric("bdlminer_pool_backup", "gauge", netOnBackup() ? 1 : 0);
     metric("bdlminer_pool_difficulty", "gauge", stats.poolDiff);
@@ -168,8 +393,14 @@ void handleMetrics() {
     metric("bdlminer_network_difficulty", "gauge", stats.networkDiff);
     metric("bdlminer_uptime_seconds", "gauge", (millis() - stats.startMillis) / 1000);
     if (!isnan(board::temperature())) metric("bdlminer_temperature_celsius", "gauge", board::temperature());
+    metric("bdlminer_throttle", "gauge", (int)minerThrottle());
     metric("bdlminer_wifi_rssi_dbm", "gauge", WiFi.RSSI());
     metric("bdlminer_free_heap_bytes", "gauge", ESP.getFreeHeap());
+    for (int i = 0; i < stats.minerCount; i++) {
+        char labels[40];
+        snprintf(labels, sizeof(labels), "{engine=\"%s\"}", stats.engine[i]);
+        metric("bdlminer_engine_hashrate_hps", "gauge", minerEngineRate(i), labels);
+    }
     char labels[96];
     snprintf(labels, sizeof(labels), "{board=\"%s\",firmware=\"%s\"}", board::modelName(), FW_VERSION);
     metric("bdlminer_info", "gauge", 1, labels);
@@ -185,14 +416,31 @@ void webStart() {
     hostName = name;
     if (MDNS.begin(name)) MDNS.addService("http", "tcp", 80);
 
-    server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", kPage); });
+    server.on("/", HTTP_GET, []() { sendPage("BDLMiner V1", kDashboard); });
+    server.on("/settings", HTTP_GET, []() {
+        if (authorized()) sendPage("BDLMiner settings", kSettingsPage);
+    });
+    server.on("/log", HTTP_GET, []() { sendPage("BDLMiner log", kLogPage); });
     server.on("/api/stats", HTTP_GET, handleStats);
+    server.on("/api/log", HTTP_GET, []() {
+        server.sendHeader("Cache-Control", "no-store");
+        server.send(200, "text/plain", logText());
+    });
+    server.on("/api/settings", HTTP_GET, handleGetSettings);
+    server.on("/api/settings", HTTP_POST, handlePostSettings);
+    server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
     server.on("/metrics", HTTP_GET, handleMetrics);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
     server.begin();
-    Serial.printf("[web] dashboard: http://%s/ or http://%s.local/\n", WiFi.localIP().toString().c_str(), name);
+    logf("[web] dashboard: http://%s/ or http://%s.local/\n", WiFi.localIP().toString().c_str(), name);
 }
 
-void webHandle() { server.handleClient(); }
+void webHandle() {
+    server.handleClient();
+    if (restartAt && (int32_t)(millis() - restartAt) >= 0) {
+        setRestartReason(restartWhy);
+        ESP.restart();
+    }
+}
 
 const String &webHostName() { return hostName; }

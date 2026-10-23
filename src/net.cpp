@@ -5,6 +5,7 @@
 #include <string>
 
 #include "core/stratum.h"
+#include "log.h"
 #include "miner.h"
 #include "settings.h"
 
@@ -23,12 +24,14 @@ volatile bool onBackup = false;
 
 void setStatus(const char *s) {
     strlcpy(status, s, sizeof(status));
-    Serial.printf("[pool] %s\n", s);
+    logf("[pool] %s\n", s);
 }
 
 bool sendLine(WiFiClient &client, const std::string &line) {
     return client.write((const uint8_t *)line.data(), line.size()) == line.size();
 }
+
+bool sessionTimedOut = false;  // the last session ended because of its `maxMs`
 
 // Runs one pool session until the connection drops, or until `maxMs` has
 // elapsed when it is not 0.
@@ -62,8 +65,8 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                         break;
                     case stratum::Event::SubscribeFailed:
                         setStatus("Subscribe refused");
-                        Serial.printf("[pool] subscribe refused: %s (user agent \"%s\")\n",
-                                      proto.lastError().c_str(), settings.userAgent.c_str());
+                        logf("[pool] subscribe refused: %s (user agent \"%s\")\n",
+                             proto.lastError().c_str(), settings.userAgent.c_str());
                         return;
                     case stratum::Event::Authorized:
                         stats.poolConnected = true;
@@ -71,26 +74,26 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                         break;
                     case stratum::Event::AuthFailed:
                         setStatus("Auth failed: check address");
-                        Serial.printf("[pool] error: %s\n", proto.lastError().c_str());
+                        logf("[pool] error: %s\n", proto.lastError().c_str());
                         return;
                     case stratum::Event::NewJob:
                         if (!proto.hasJob()) break;
                         minerPublishJob(proto.job(), proto.job().clean);
-                        Serial.printf("[pool] job %s height=%u clean=%d diff=%g\n", proto.job().id.c_str(),
-                                      proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
+                        logf("[pool] job %s height=%u clean=%d diff=%g\n", proto.job().id.c_str(),
+                             proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
                         break;
                     case stratum::Event::Difficulty:
                         stats.poolDiff = proto.job().difficulty;
                         if (proto.hasJob()) minerPublishJob(proto.job(), false);
-                        Serial.printf("[pool] difficulty %g\n", proto.job().difficulty);
+                        logf("[pool] difficulty %g\n", proto.job().difficulty);
                         break;
                     case stratum::Event::ShareAccepted:
                         stats.accepted++;
-                        Serial.println("[pool] share accepted");
+                        logf("[pool] share accepted\n");
                         break;
                     case stratum::Event::ShareRejected:
                         stats.rejected++;
-                        Serial.printf("[pool] share rejected: %s\n", proto.lastError().c_str());
+                        logf("[pool] share rejected: %s\n", proto.lastError().c_str());
                         break;
                     default:
                         break;
@@ -103,7 +106,8 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
             return;
         }
         if (maxMs && millis() - start > maxMs) {
-            setStatus("Retrying main pool");
+            setStatus("Switching pool");
+            sessionTimedOut = true;
             return;
         }
         // Waiting for a share also paces the socket polling.
@@ -112,11 +116,11 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
             // A clean job voids every older one; shares found on those by a
             // batch still running when it came would only be rejected.
             if (proto.job().clean && strncmp(proto.job().id.c_str(), share.jobId, sizeof(share.jobId) - 1) != 0) {
-                Serial.printf("[pool] stale share dropped (job %s)\n", share.jobId);
+                logf("[pool] stale share dropped (job %s)\n", share.jobId);
                 continue;
             }
-            Serial.printf("[pool] submit nonce=%08x diff=%.4g job=%s\n", (unsigned)share.nonce, share.difficulty,
-                          share.jobId);
+            logf("[pool] submit nonce=%08x diff=%.4g job=%s\n", (unsigned)share.nonce, share.difficulty,
+                 share.jobId);
             if (!sendLine(client, proto.submit(share))) return;
         }
     }
@@ -133,15 +137,21 @@ void netTask(void *) {
             setStatus("WiFi lost, reconnecting");
             // The WiFi driver reconnects by itself; only restart the attempt
             // when it takes too long (restarting cancels one in progress).
-            uint32_t since = millis();
+            // After a minute, also the fallback networks of the settings.
+            uint32_t since = millis(), lost = since;
             while (!WiFi.isConnected()) {
                 if (millis() - since > 30000) {
-                    WiFi.reconnect();
+                    if (millis() - lost > 60000 ? !wifiTryFallbacks() : true) WiFi.reconnect();
                     since = millis();
                 }
                 vTaskDelay(pdMS_TO_TICKS(500));
             }
         }
+
+        // With a rotation period both pools get that long in turn; otherwise
+        // the backup only gets kBackupSessionMs before the main pool is retried.
+        bool rotate = settings.rotateHours && !settings.backupHost.isEmpty();
+        uint32_t maxMs = rotate ? settings.rotateHours * 3600000UL : onBackup ? kBackupSessionMs : 0;
 
         char msg[48];
         snprintf(msg, sizeof(msg), "Connecting %s", netPoolHost().c_str());
@@ -153,7 +163,8 @@ void netTask(void *) {
             proto.setCredentials(settings.btcAddress.c_str(), settings.poolPassword.c_str());
             setStatus("Subscribing");
             uint32_t t0 = millis();
-            session(client, proto, onBackup ? kBackupSessionMs : 0);
+            sessionTimedOut = false;
+            session(client, proto, maxMs);
             client.stop();
             authorized = proto.authorized();
             if (millis() - t0 > 60000) backoffMs = 2000;  // session was healthy
@@ -166,15 +177,20 @@ void netTask(void *) {
         if (strncmp(status, "Mining", 6) == 0) setStatus("Disconnected");
 
         failures = authorized ? 0 : failures + 1;
-        if (onBackup) {
+        if (rotate && sessionTimedOut) {
+            onBackup = !onBackup;
+            failures = 0;
+            backoffMs = 2000;
+            logf("[pool] rotation: switching to %s\n", netPoolHost().c_str());
+        } else if (onBackup) {
             onBackup = false;  // back to the main pool, whatever happened
             failures = 0;
         } else if (failures >= kFailoverAfter && !settings.backupHost.isEmpty()) {
             onBackup = true;
             failures = 0;
             backoffMs = 2000;
-            Serial.printf("[pool] main pool failed %d times, switching to backup %s:%u\n", kFailoverAfter,
-                          settings.backupHost.c_str(), settings.backupPort);
+            logf("[pool] main pool failed %d times, switching to backup %s:%u\n", kFailoverAfter,
+                 settings.backupHost.c_str(), settings.backupPort);
         }
         vTaskDelay(pdMS_TO_TICKS(backoffMs));
         backoffMs = min<uint32_t>(backoffMs * 2, 60000);

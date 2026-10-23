@@ -49,4 +49,16 @@ void beep();
 // Temperature in degrees Celsius, NAN when the board has no usable sensor.
 float temperature();
 
+// 1 = running on battery, 0 = on external power, -1 = unknown or no battery.
+// Boards without a power chip (StickC Plus2) are judged by the battery
+// voltage: below ~4.05 V it is not being held up by USB.
+int onBattery();
+
+// Gravity along the screen's horizontal and vertical axes (rotation 0), in g.
+// False without an accelerometer.
+bool accel(float &x, float &y);
+
+// The M5 power LED, for short flashes (LED_PIN boards use it for the pool state).
+void flashLed(bool on);
+
 }  // namespace board

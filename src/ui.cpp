@@ -17,7 +17,7 @@ namespace ui {
 
 namespace {
 
-const uint32_t kOrange = 0xF7931A;
+const uint32_t kOrange = 0xF7931A;  // Bitcoin orange: the backgrounds' accent
 const uint32_t kGrey = 0x8A8A8A;
 const uint32_t kGreen = 0x38D07A;
 const uint32_t kRed = 0xE5484D;
@@ -26,10 +26,25 @@ const uint32_t kFg = 0xFFFFFF;
 
 const uint8_t kBrightnessSteps[] = {100, 60, 30, 10, 0};
 
+// Accent colours of settings.theme: orange, green, blue, purple, pink.
+const uint32_t kThemes[] = {kOrange, 0x38D07A, 0x3B9CF6, 0xA66BF5, 0xEC5AA0};
+uint32_t accent() { return kThemes[settings.theme % (sizeof(kThemes) / sizeof(kThemes[0]))]; }
+
 lgfx::LovyanGFX *lcd = nullptr;
 LGFX_Sprite *canvas = nullptr;
 int screen = 0;
-const int kScreens = 5;  // mining, clock, global, network, info
+uint32_t screenSince = 0;
+// mining, clock, global, network, info (bitmap or drawn), then graph and
+// records (always drawn).
+const int kScreens = 7;
+const int kGraphScreen = 5, kRecordsScreen = 6;
+uint8_t backlight = 255;  // what the panel is set to; 0 = off (nothing drawn)
+uint32_t flashUntil = 0;  // "+1 share" shown in the header until then
+
+// Hashrate every 10 s for the graph screen (~40 minutes).
+float samples[240];
+int sampleCount = 0, sampleHead = 0;
+uint32_t lastSample = 0;
 
 // Bitmap backgrounds (NerdMinerV2 style) when the panel size has a set.
 const bg::Set *bgSet = nullptr;
@@ -85,9 +100,9 @@ String diffText(double d) {
 void header(const char *title) {
     auto &d = g();
     int h = px(18);
-    d.fillRect(0, 0, d.width(), h, kOrange);
+    d.fillRect(0, 0, d.width(), h, accent());
     bodyFont(d);
-    d.setTextColor(kBg, kOrange);
+    d.setTextColor(kBg, accent());
     d.setTextDatum(middle_left);
     d.drawString(title, px(4), h / 2 + 1);
 
@@ -98,7 +113,7 @@ void header(const char *title) {
     d.setTextDatum(middle_right);
     int x = d.width() - px(4);
     int r = max(3, px(4));
-    d.fillCircle(x - r, h / 2, r, stats.poolConnected ? kGreen : kRed);
+    d.fillCircle(x - r, h / 2, r, millis() < flashUntil ? 0xFFE14D : stats.poolConnected ? kGreen : kRed);
     if (right.length()) d.drawString(right, x - 2 * r - px(4), h / 2 + 1);
 }
 
@@ -253,6 +268,7 @@ void fitFont(LGFX_Sprite &s, bg::Role role, const char *text, int w, int h) {
 // values update without flicker and without a full-screen buffer.
 void drawField(bg::Field f, const String &text, uint32_t color = 0xFFFFFFFF) {
     if (color == 0xFFFFFFFF) color = bg::kColor[f];
+    if (color == kOrange) color = accent();
     if (fieldText[f] == text && fieldColor[f] == color) return;
     fieldText[f] = text;
     fieldColor[f] = color;
@@ -287,7 +303,8 @@ void drawField(bg::Field f, const String &text, uint32_t color = 0xFFFFFFFF) {
 void drawHeaderFields() {
     int bat = board::batteryLevel();
     drawField(bg::HDR_BATTERY, bat >= 0 ? String(bat) + "%" : String());
-    drawField(bg::HDR_STATUS, stats.poolConnected ? "ONLINE" : "OFFLINE", stats.poolConnected ? kGreen : kRed);
+    if (millis() < flashUntil) drawField(bg::HDR_STATUS, "+1 SHARE", 0xFFE14D);
+    else drawField(bg::HDR_STATUS, stats.poolConnected ? "ONLINE" : "OFFLINE", stats.poolConnected ? kGreen : kRed);
 }
 
 void renderBitmap() {
@@ -301,7 +318,7 @@ void renderBitmap() {
             drawField(bg::MINING_SHARES, sharesText());
             drawField(bg::MINING_BEST, diffText(stats.sessionBestDiff));
             drawField(bg::MINING_POOLDIFF, diffText(stats.poolDiff));
-            drawField(bg::MINING_BLOCKS, String(stats.blocksFound), stats.blocksFound ? kOrange : kFg);
+            drawField(bg::MINING_BLOCKS, String(stats.blocksFound), stats.blocksFound ? accent() : kFg);
             drawField(bg::MINING_BITS32, String(stats.over32bits));
             float t = board::temperature();
             drawField(bg::MINING_TEMP, isnan(t) ? String("--") : String((int)lroundf(t)) + " C");
@@ -353,7 +370,7 @@ void renderBitmap() {
             drawField(bg::NET_HALVING, h ? "halving in " + String(halving - h) + " blocks" : String());
             drawField(bg::NET_DIFF, diffText(stats.networkDiff));
             drawField(bg::NET_HASHES, work::formatSI((double)minerTotalHashes(), 2).c_str());
-            drawField(bg::NET_POOL, netPoolHost() + ":" + netPoolPort(), netOnBackup() ? kOrange : bg::kColor[bg::NET_POOL]);
+            drawField(bg::NET_POOL, netPoolHost() + ":" + netPoolPort(), netOnBackup() ? accent() : bg::kColor[bg::NET_POOL]);
             drawField(bg::NET_BESTEVER, diffText(stats.bestDiff));
             drawField(bg::NET_IP, "IP " + WiFi.localIP().toString());
             drawField(bg::NET_RSSI, String(WiFi.RSSI()) + " dBm");
@@ -396,7 +413,7 @@ void drawMining() {
     d.setFont(&fonts::Font7);
     d.setTextSize(scale() * 0.85f);
     d.setTextDatum(top_left);
-    d.setTextColor(kOrange, kBg);
+    d.setTextColor(accent(), kBg);
     d.drawString(num, px(6), px(24));
     int numRight = px(6) + d.textWidth(num);
 
@@ -409,7 +426,7 @@ void drawMining() {
     row(6, 72, "Shares", sharesText(), kGreen);
     row(124, 72, "Best", diffText(stats.sessionBestDiff));
     row(6, 92, "Diff", diffText(stats.poolDiff));
-    row(124, 92, "Blocks", String(stats.blocksFound), stats.blocksFound ? kOrange : kFg);
+    row(124, 92, "Blocks", String(stats.blocksFound), stats.blocksFound ? accent() : kFg);
 
     String f = String(netStatus()) + "  " + uptime();
     footer(f.c_str());
@@ -428,7 +445,7 @@ void drawClock() {
     bodyFont(d);
     d.setTextColor(kGrey, kBg);
     d.drawString(dateText(), d.width() / 2, px(70));
-    row(6, 92, "BTC", m.price > 0 ? priceText(m.price, true) + " " + settings.currency : String("-"), kOrange);
+    row(6, 92, "BTC", m.price > 0 ? priceText(m.price, true) + " " + settings.currency : String("-"), accent());
     row(124, 92, "Fee", m.feeFast ? String(m.feeFast) + " sat/vB" : String("-"));
     String f = "Block " + (stats.blockHeight ? String(stats.blockHeight) : String("-")) + "  " + uptime();
     footer(f.c_str());
@@ -437,7 +454,7 @@ void drawClock() {
 void drawGlobal() {
     header("Global");
     MarketData m = marketGet();
-    row(6, 22, "BTC", m.price > 0 ? priceText(m.price, true) + " " + settings.currency : String("-"), kOrange);
+    row(6, 22, "BTC", m.price > 0 ? priceText(m.price, true) + " " + settings.currency : String("-"), accent());
     row(6, 40, "Fees", feesText(m) + " sat/vB");
     row(6, 58, "Net", m.networkHashrate > 0 ? String(work::formatSI(m.networkHashrate, 0).c_str()) + "H/s" : String("-"));
     row(124, 58, "Mempool", m.mempoolTx ? priceText(m.mempoolTx, true) : String("-"));
@@ -449,7 +466,7 @@ void drawGlobal() {
 
 void drawNetwork() {
     header("Network");
-    row(6, 22, "Block", stats.blockHeight ? String(stats.blockHeight) : String("-"), kOrange);
+    row(6, 22, "Block", stats.blockHeight ? String(stats.blockHeight) : String("-"), accent());
     row(6, 40, "Net diff", diffText(stats.networkDiff));
     row(6, 58, netOnBackup() ? "Backup" : "Pool", netPoolHost() + ":" + netPoolPort());
     row(6, 76, "IP", WiFi.localIP().toString() + "  " + String(WiFi.RSSI()) + "dBm");
@@ -484,6 +501,74 @@ void drawInfo() {
     footer("A:next  B:light  hold A 5s:reset");
 }
 
+// "1 in 2.3M" chance of finding a block within `seconds` at the current rate.
+String blockOdds(double seconds) {
+    double hr = minerHashrate();
+    if (hr <= 0 || stats.networkDiff <= 0) return "-";
+    double p = -expm1(-hr * seconds / (stats.networkDiff * 4294967296.0));
+    if (p <= 0) return "-";
+    return String("1 in ") + work::formatSI(1 / p, 1).c_str();
+}
+
+String duration(double s) {
+    char buf[24];
+    if (!(s < 1e12)) return "-";
+    if (s < 60) snprintf(buf, sizeof(buf), "%.0fs", s);
+    else if (s < 3600) snprintf(buf, sizeof(buf), "%.0fmin", s / 60);
+    else if (s < 86400) snprintf(buf, sizeof(buf), "%.0fh%02.0f", floor(s / 3600), fmod(s / 60, 60));
+    else snprintf(buf, sizeof(buf), "%.0fd %.0fh", floor(s / 86400), fmod(s / 3600, 24));
+    return buf;
+}
+
+void drawGraph() {
+    auto &d = g();
+    header("Hashrate");
+    int x0 = px(6), y0 = px(24), w = d.width() - px(12), h = d.height() - px(24) - px(16);
+    d.drawRect(x0 - 1, y0 - 1, w + 2, h + 2, kGrey);
+    if (sampleCount < 2) {
+        footer("one point every 10 s");
+        return;
+    }
+    const int n = sizeof(samples) / sizeof(samples[0]);
+    auto at = [&](int i) { return samples[(sampleHead - sampleCount + i + n) % n]; };
+    float lo = at(0), hi = lo, sum = 0;
+    for (int i = 0; i < sampleCount; i++) {
+        lo = min(lo, at(i));
+        hi = max(hi, at(i));
+        sum += at(i);
+    }
+    float span = hi - lo > hi * 0.002f ? hi - lo : hi * 0.002f + 1;  // keep a flat line mid-height
+    float base = hi - lo > hi * 0.002f ? lo : lo - span / 2;
+    int px0 = 0, py0 = 0;
+    for (int i = 0; i < sampleCount; i++) {
+        int x = x0 + i * (w - 1) / (sampleCount - 1);
+        int y = y0 + h - 1 - (int)((at(i) - base) * (h - 1) / span);
+        if (i) d.drawLine(px0, py0, x, y, accent());
+        px0 = x;
+        py0 = y;
+    }
+    String f = "min " + String(work::formatSI(lo, 1).c_str()) + "  avg " + work::formatSI(sum / sampleCount, 1).c_str() +
+               "  max " + work::formatSI(hi, 1).c_str() + "H/s  " + duration(sampleCount * 10.0);
+    footer(f.c_str());
+}
+
+void drawRecords() {
+    header("Records");
+    double hr = minerHashrate();
+    row(6, 22, "Best ever", diffText(stats.bestDiff), accent());
+    row(124, 22, "Session", diffText(stats.sessionBestDiff));
+    row(6, 40, "32-bit", String(stats.over32bits) + "  1 per " + (hr > 0 ? duration(4294967296.0 / hr) : String("-")));
+    row(6, 58, "Block/day", blockOdds(86400));
+    row(6, 76, "Block/year", blockOdds(31557600));
+    row(6, 94, "Running", duration(stats.lifetimeSeconds));
+    row(124, 94, "Blocks", String(stats.lifetimeBlocks), stats.lifetimeBlocks ? accent() : kFg);
+    BestShare top[3];
+    int n = minerTopShares(top, 3);
+    String f = String("Hashes ") + work::formatSI((double)stats.lifetimeHashes, 2).c_str() + "  top";
+    for (int i = 0; i < n; i++) f += " " + diffText(top[i].difficulty);
+    footer(f.c_str());
+}
+
 }  // namespace
 
 void begin() {
@@ -491,6 +576,8 @@ void begin() {
     if (!lcd) return;
     lcd->setRotation(settings.rotation);
     board::setBrightness(settings.brightness);
+    backlight = settings.brightness;
+    screenSince = millis();
 
     int w = lcd->width(), h = lcd->height();
     bgSet = bg::find(w, h);
@@ -523,7 +610,7 @@ void showSplash() {
     d.setFont(&fonts::Font4);
     d.setTextSize(scale());
     d.setTextDatum(middle_center);
-    d.setTextColor(kOrange, kBg);
+    d.setTextColor(accent(), kBg);
     d.drawString("BDLMiner V1", d.width() / 2, d.height() / 2 - px(12));
     d.setFont(&fonts::Font2);
     d.setTextColor(kGrey, kBg);
@@ -548,7 +635,7 @@ void showPortal(const String &apName, const char *apPassword) {
     int x = q + px(10);
     bodyFont(d);
     d.setTextDatum(top_left);
-    d.setTextColor(kOrange, kBg);
+    d.setTextColor(accent(), kBg);
     d.drawString("WiFi setup", x, px(6));
     d.setFont(&fonts::Font0);
     d.setTextColor(kFg, kBg);
@@ -585,6 +672,8 @@ void showMessage(const char *title, const char *line1, const char *line2) {
 
 void nextScreen() {
     screen = (screen + 1) % kScreens;
+    screenSince = millis();
+    shownBg = -1;
     render();
 }
 
@@ -592,15 +681,53 @@ void cycleBrightness() {
     size_t i = 0;
     while (i < sizeof(kBrightnessSteps) && kBrightnessSteps[i] != settings.brightness) i++;
     settings.brightness = kBrightnessSteps[(i + 1) % sizeof(kBrightnessSteps)];
-    board::setBrightness(settings.brightness);
+    setBacklight(settings.brightness);
     settingsSave();
 }
 
+void setBacklight(uint8_t percent) {
+    if (!lcd || percent == backlight) return;
+    bool wasOff = backlight == 0;
+    backlight = percent;
+    board::setBrightness(percent);
+    if (wasOff && percent) {
+        shownBg = -1;  // nothing was drawn while off
+        render();
+    }
+}
+
+void setRotation(uint8_t r) {
+    // Only between the two landscape (or portrait) ways: same panel size.
+    if (!lcd || r == lcd->getRotation() || (r & 1) != (lcd->getRotation() & 1)) return;
+    lcd->setRotation(r);
+    shownBg = -1;
+    render();
+}
+
+void flashShare() { flashUntil = millis() + 900; }
+
+uint32_t screenAge() { return millis() - screenSince; }
+
 void render() {
-    if (!lcd || settings.brightness == 0) return;
-    if (bgSet) {
+    uint32_t now = millis();
+    if (now - lastSample >= 10000 || !lastSample) {
+        lastSample = now;
+        samples[sampleHead] = minerHashrate();
+        sampleHead = (sampleHead + 1) % (sizeof(samples) / sizeof(samples[0]));
+        if (sampleCount < (int)(sizeof(samples) / sizeof(samples[0]))) sampleCount++;
+    }
+    if (!lcd || settings.brightness == 0 || backlight == 0) return;
+    if (bgSet && screen < kGraphScreen) {
         renderBitmap();
         return;
+    }
+    if (bgSet) {
+        // Drawn straight on the panel (no full-screen buffer with bitmap
+        // screens): redraw every 10 s only, which keeps the flicker down.
+        static uint32_t drawnAt = 0;
+        if (shownBg == -2 && now - drawnAt < 10000) return;
+        shownBg = -2;
+        drawnAt = now;
     }
     g().fillScreen(kBg);
     switch (screen) {
@@ -608,7 +735,9 @@ void render() {
         case 1: drawClock(); break;
         case 2: drawGlobal(); break;
         case 3: drawNetwork(); break;
-        default: drawInfo(); break;
+        case 4: drawInfo(); break;
+        case kGraphScreen: drawGraph(); break;
+        default: drawRecords(); break;
     }
     flush();
 }
@@ -624,6 +753,10 @@ void showPortal(const String &, const char *) {}
 void showMessage(const char *, const char *, const char *) {}
 void nextScreen() {}
 void cycleBrightness() {}
+void setBacklight(uint8_t) {}
+void setRotation(uint8_t) {}
+void flashShare() {}
+uint32_t screenAge() { return 0; }
 void render() {}
 }  // namespace ui
 

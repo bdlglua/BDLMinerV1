@@ -5,8 +5,11 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
-#include "hw_sha.h"
+#include "log.h"
+#include "miner.h"
+#include "net.h"
 #include "settings.h"
+#include "tls.h"
 
 namespace {
 
@@ -17,29 +20,20 @@ constexpr uint32_t kRetryMs = 30 * 1000;
 // A TLS session needs ~45 KB; never starve the miner and the pool socket.
 constexpr uint32_t kMinHeapForTls = 70 * 1024;
 
+constexpr uint32_t kPoolStatsMs = 10 * 60 * 1000;
+constexpr uint32_t kPoolStatsRetryMs = 60 * 60 * 1000;  // unknown API: try again hourly
+
 MarketData data;
+PoolStats pool;
 portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 
 // GET `path` on the TLS connection shared by one refresh and parse the JSON
 // body through `filter` (keeps RAM low: large arrays such as the mempool fee
 // histogram are skipped). The bodies are a few hundred bytes.
 bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocument &doc, const JsonDocument &filter) {
-    if (!tls.connected()) {
-        // The TLS handshake is done here, HTTPClient then reuses the
-        // connection (keep-alive), so a refresh needs one. It keeps the
-        // hardware SHA loop away (see hwsha::hold()), and its key exchange
-        // runs for seconds without yielding: with core 1 left to the hardware
-        // miner nothing else can feed core 0's idle task meanwhile, so the
-        // idle task watchdog is off for it.
-        hwsha::hold();
-        disableCore0WDT();
-        bool connected = tls.connect(kHost, 443);
-        enableCore0WDT();
-        hwsha::release();
-        if (!connected) {
-            Serial.printf("[market] %s: cannot connect\n", path);
-            return false;
-        }
+    if (!tls.connected() && !tlsConnect(tls, kHost)) {
+        logf("[market] %s: cannot connect\n", path);
+        return false;
     }
 
     String url = String(kApi) + path;
@@ -53,9 +47,9 @@ bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocume
         String body = http.getString();  // also undoes chunked encoding
         DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
         ok = !err;
-        if (err) Serial.printf("[market] %s: %s\n", path, err.c_str());
+        if (err) logf("[market] %s: %s\n", path, err.c_str());
     } else {
-        Serial.printf("[market] %s: HTTP %d\n", path, code);
+        logf("[market] %s: HTTP %d\n", path, code);
     }
     http.end();  // keeps the connection open when the server allows it
     return ok;
@@ -64,12 +58,11 @@ bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocume
 // One refresh of every endpoint. Fields that fail keep their previous value.
 bool refresh() {
     if (ESP.getFreeHeap() < kMinHeapForTls) {
-        Serial.printf("[market] skipped, low memory (%u bytes free)\n", (unsigned)ESP.getFreeHeap());
+        logf("[market] skipped, low memory (%u bytes free)\n", (unsigned)ESP.getFreeHeap());
         return false;
     }
     uint32_t t0 = millis();
     WiFiClientSecure tls;
-    tls.setInsecure();  // public read-only data, no secret is sent
     HTTPClient http;    // one for the refresh: destroying it closes the connection
     http.setReuse(true);
     http.setTimeout(10000);
@@ -129,16 +122,91 @@ bool refresh() {
     portENTER_CRITICAL(&dataMux);
     data = d;
     portEXIT_CRITICAL(&dataMux);
-    Serial.printf("[market] %d/5 ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
-                  ok, (unsigned)(millis() - t0), d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour,
-                  d.networkHashrate, d.retargetChange, (unsigned)d.retargetBlocks);
+    logf("[market] %d/5 ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
+         ok, (unsigned)(millis() - t0), d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour,
+         d.networkHashrate, d.retargetChange, (unsigned)d.retargetBlocks);
     return ok == 5;
 }
 
+// "856K" (ckpool hash rates) -> 856000
+double parseRate(const char *s) {
+    if (!s) return 0;
+    char *end;
+    double v = strtod(s, &end);
+    const char *units = "KMGTPE";
+    const char *u = *end ? strchr(units, *end) : nullptr;
+    return u ? v * pow(1000.0, u - units + 1) : v;
+}
+
+// GET https://host:port/path with its own TLS connection; the body as JSON
+// through `filter`. Returns the HTTP code (or a negative error).
+int fetchJson(const String &host, uint16_t port, const String &path, JsonDocument &doc, const JsonDocument &filter) {
+    WiFiClientSecure tls;
+    if (!tlsConnect(tls, host.c_str(), port)) return -1;
+    HTTPClient http;
+    http.setTimeout(10000);
+    if (!http.begin(tls, "https://" + host + ":" + port + path)) return -2;
+    int code = http.GET();
+    if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter)))
+        code = -3;
+    http.end();
+    return code;
+}
+
+// Refreshes PoolStats for the pool in use; false when it could not.
+bool refreshPoolStats() {
+    if (ESP.getFreeHeap() < kMinHeapForTls) return false;
+    String host = netPoolHost();
+    String addr = settings.btcAddress.substring(0, settings.btcAddress.indexOf('.') < 0 ? settings.btcAddress.length()
+                                                                                       : settings.btcAddress.indexOf('.'));
+    PoolStats p = poolStatsGet();
+    JsonDocument filter, doc;
+    int code;
+    if (host.endsWith("public-pool.io")) {
+        filter["bestDifficulty"] = true;
+        filter["workersCount"] = true;
+        filter["workers"][0]["hashRate"] = true;
+        filter["accounting"]["totalAcceptedShares"] = true;
+        code = fetchJson("public-pool.io", 40557, "/api/client/" + addr, doc, filter);
+        if (code == HTTP_CODE_OK) {
+            p.bestEver = atof(doc["bestDifficulty"] | "0");
+            p.workers = doc["workersCount"] | 0;
+            p.shares = doc["accounting"]["totalAcceptedShares"] | 0.0;
+            p.hashrate = 0;
+            for (JsonVariant w : doc["workers"].as<JsonArray>()) p.hashrate += w["hashRate"] | 0.0;
+        }
+    } else {
+        // ckpool: https://<pool>/users/<address>
+        for (const char *k : {"hashrate1hr", "hashrate5m", "bestever", "shares", "workers"}) filter[k] = true;
+        code = fetchJson(host, 443, "/users/" + addr, doc, filter);
+        if (code == HTTP_CODE_OK) {
+            p.hashrate = parseRate(doc["hashrate1hr"] | doc["hashrate5m"] | "0");
+            p.bestEver = doc["bestever"] | 0.0;
+            p.shares = doc["shares"] | 0.0;
+            p.workers = doc["workers"] | 0;
+        }
+    }
+    p.supported = code == HTTP_CODE_OK || code < 0;  // 404 etc.: no such API (or address unknown there)
+    if (code == HTTP_CODE_OK) p.updatedMs = millis();
+    portENTER_CRITICAL(&dataMux);
+    pool = p;
+    portEXIT_CRITICAL(&dataMux);
+    if (code == HTTP_CODE_OK)
+        logf("[market] pool sees %.3g H/s, best %.4g, %u worker(s)\n", p.hashrate, p.bestEver, (unsigned)p.workers);
+    else
+        logf("[market] pool stats from %s: HTTP %d\n", host.c_str(), code);
+    return code == HTTP_CODE_OK;
+}
+
 void marketTask(void *) {
+    uint32_t nextMarket = 0, nextPool = 60000;  // pool stats once mining for a minute
     for (;;) {
-        bool full = WiFi.isConnected() && refresh();
-        vTaskDelay(pdMS_TO_TICKS(full ? kRefreshMs : kRetryMs));
+        uint32_t now = millis();
+        if (WiFi.isConnected() && (int32_t)(now - nextMarket) >= 0)
+            nextMarket = now + (refresh() ? kRefreshMs : kRetryMs);
+        if (WiFi.isConnected() && stats.poolConnected && (int32_t)(now - nextPool) >= 0)
+            nextPool = now + (refreshPoolStats() ? kPoolStatsMs : kPoolStatsRetryMs);
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
@@ -147,6 +215,13 @@ void marketTask(void *) {
 void marketStart() {
     configTzTime(settings.timezone.c_str(), "pool.ntp.org", "time.cloudflare.com");
     xTaskCreatePinnedToCore(marketTask, "market", 10240, nullptr, 2, nullptr, 0);
+}
+
+PoolStats poolStatsGet() {
+    portENTER_CRITICAL(&dataMux);
+    PoolStats p = pool;
+    portEXIT_CRITICAL(&dataMux);
+    return p;
 }
 
 MarketData marketGet() {

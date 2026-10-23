@@ -112,7 +112,9 @@ Boards without a display report everything on the serial monitor and the
    * **Timezone**: POSIX TZ string, defaults to Paris time
      `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…);
    * **Price currency**: currency for the BTC price, `USD` by default
-     (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`).
+     (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`);
+   * **Web password**: lets the [web dashboard](#web-dashboard) change every setting and
+     update the firmware (user `admin`). Empty = read-only dashboard.
 3. The board restarts and begins mining automatically. Stats can be viewed on
    https://web.public-pool.io by searching for your address.
 
@@ -127,7 +129,8 @@ To erase everything (Wi‑Fi + settings): **hold A for 5 s** while running.
 When a backup pool is set and the main pool fails **3 times in a row** (unreachable,
 or the connection drops before authorization), the miner switches to the backup with
 the same address and password. After **30 minutes** on the backup it tries the main
-pool again. While on the backup, the Network screen highlights it (orange pool name,
+pool again. With **Alternate main / backup pool every N hours** (web settings) both
+pools get N hours in turn instead. While on the backup, the Network screen highlights it (orange pool name,
 or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard shows
 *Pool (backup)*.
 
@@ -150,7 +153,16 @@ Screens, in order:
    transactions, fees (fast / 30 min / 1 h), next difficulty adjustment, and the average time
    it would take *your* miner to find a block on its own;
 4. **Network**: block height, next halving, network difficulty, total hashes, pool, IP/RSSI;
-5. **Info**: board, firmware, engines, free RAM, address.
+5. **Info**: board, firmware, engines, free RAM, address;
+6. **Graph**: hashrate over the last ~40 minutes (one point every 10 s), min / avg / max;
+7. **Records**: best difficulty ever and this session, 32‑bit shares and the average time
+   between two, the chance of finding a block within a day and a year at the current
+   hashrate, lifetime running time, blocks, hashes and the 3 best shares ever.
+
+Accepted shares flash `+1 SHARE` in the header (and the power LED on M5 devices).
+Web settings add: 5 colour themes, automatic screen change every N seconds, rotation
+following the accelerometer (M5 devices with an IMU: the two landscape ways), and a night
+mode (screen off, no beep, from one hour to another; a button press lights it for 30 s).
 
 Clock / Global data comes from the public [mempool.space](https://mempool.space) API
 (refreshed every 5 minutes over HTTPS) and the time from `pool.ntp.org`.
@@ -181,52 +193,73 @@ python3 tools/make_backgrounds.py
 
 ## Web dashboard
 
-Once connected, the board serves a read-only status page, mostly useful for
-boards without a display:
+Once connected, the board serves a dashboard at **http://<board IP>/** or
+**http://bdlminer-xxxx.local/** (mDNS; `xxxx` = last digits of the MAC address, shown in
+the serial monitor):
 
-* **http://<board IP>/** or **http://bdlminer-xxxx.local/** (mDNS; `xxxx` = last digits of
-  the MAC address, shown in the serial monitor);
-* **/api/stats**: the same data as JSON, for Home Assistant, a script, etc.;
-* **/metrics**: the main counters in Prometheus text format, for Prometheus / Grafana.
-
-The page also shows lifetime totals and a 24‑hour hashrate chart (5‑minute averages,
-kept in RAM, so it restarts empty after a reboot).
+* **Dashboard**: hashrate per engine, shares, best difficulties, 32‑bit shares and their
+  average interval, block chance per day and per year, the 10 best shares ever with
+  their date, what the pool sees (hashrate, best share, workers: public-pool.io and
+  ckpool-style pools such as pool.nerdminers.org and solo.ckpool.org), market data,
+  lifetime totals, a 24‑hour chart, the reason of the last restart, and night / heat /
+  battery state. With **Other miners** set, a *Miners* section shows each of them and the
+  total hashrate (each miner's `/api/stats` allows other pages to read it).
+* **Settings** (needs the web password set in the portal; user `admin`): every setting,
+  grouped (pool, display, notifications, safety, network); *Save and restart*;
+  **Export** downloads them as a JSON file (passwords included: keep it private),
+  **Import** loads such a file, for example into a second miner. **Firmware update**
+  takes the `firmware.bin` of this board (`.pio/build/<env>/firmware.bin`): no cable
+  needed. Boards whose firmware does not fit twice in flash (M5Stack Core,
+  ESP32-2432S028R CYD) can only be updated by USB.
+* **Log**: the last few KB of the serial log, refreshed every 5 s.
+* **/api/stats** (JSON), **/api/log** (text) and **/metrics** (Prometheus).
 
 ```sh
 curl http://bdlminer-xxxx.local/api/stats
 curl http://bdlminer-xxxx.local/metrics
 ```
 
-Example response (hashrates in H/s, fees in sat/vB, `retarget.change` and
-`retarget.progress` in percent, `market.updated_s` = seconds since the last
-mempool.space refresh, `-1` if none yet; `history.hashrate` holds up to 288 values,
-oldest first; `address_type` is `P2PKH`, `P2SH`, `P2WPKH`, `P2WSH`, `P2TR`,
-`SegWit` or `invalid`; `temp_c` is `null` when the board has no usable sensor):
+`/api/stats` fields: hashrates in H/s (`engines`: `hw`, `sw`, and `fill` for the
+idle-cycle software hash), fees in sat/vB, `market.updated_s` / `pool_view.updated_s` =
+seconds since the last refresh (`-1` if none yet), `history.hashrate` up to 288
+5‑minute averages, `top` = best shares (`d` difficulty, `t` Unix time or 0),
+`throttle` = `full`, `half` (battery saver) or `paused` (too hot), `temp_c` = `null`
+without a usable sensor.
 
-```json
-{
-  "board": "M5StickC-Plus2", "firmware": "1.0.0", "uptime_s": 3600,
-  "hashrate": 48120, "total_hashes": 173232000, "engines": ["sw", "sw"],
-  "shares": { "accepted": 0, "rejected": 0 },
-  "best": { "session": 0.0213, "ever": 0.0213 },
-  "blocks": 0, "over32bits": 0,
-  "pool": { "host": "public-pool.io", "port": 21496, "backup": false,
-            "connected": true, "status": "Mining", "difficulty": 1 },
-  "network": { "height": 972641, "difficulty": 1.27e14 },
-  "address": "bc1q...", "address_type": "P2WPKH",
-  "lifetime": { "hashes": 81000000000, "shares": 14, "blocks": 0 },
-  "history": { "interval_s": 300, "hashrate": [47210, 48302, 48120] },
-  "heap": 142000, "temp_c": 48,
-  "ip": "192.168.1.20", "rssi": -61,
-  "market": { "updated_s": 42, "currency": "EUR", "price": 72543,
-              "fees": [3, 2, 1], "hashrate": 1.04e21, "mempool_tx": 23000,
-              "retarget": { "change": 3.5, "progress": 47.1, "blocks": 1067 } }
-}
-```
+> **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
+> your local network can read them (your BTC address is public on the pool anyway).
+> Settings and firmware updates need the web password, sent with HTTP basic
+> authentication, which is not encrypted on the local network.
 
-> **Security:** the dashboard and the API have no authentication. Anyone on your local
-> network can read them, including your BTC address (which is public on the pool anyway).
-> They are read-only: settings can only be changed through the setup portal.
+## Notifications
+
+Install the [ntfy](https://ntfy.sh) app, subscribe to a topic of your own (a long,
+hard-to-guess name: anyone who knows it can read it) and enter it in the web settings
+(*ntfy topic*; another ntfy server can be set). The miner then sends: block found,
+new best difficulty ever (from difficulty 1, at most every 10 minutes), offline for
+10 minutes and back online, too hot / cooled down, restarted after a crash or a
+watchdog, and optionally every 32‑bit share.
+
+## Home Assistant
+
+Set an MQTT broker in the web settings (host, port, user, password). The miner announces
+itself through MQTT discovery (device *BDLMiner bdlminer-xxxx*: hashrate, temperature,
+shares, best difficulties, 32‑bit shares, blocks, uptime, pool status) and publishes
+every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` /
+`offline`. `/metrics` serves Prometheus scrapers.
+
+## Safety, power and networks
+
+* **Too hot**: above *Pause mining above this temperature* (web settings, 0 = off) the
+  miners pause until 5 °C below.
+* **Battery saver**: on battery the screen dims to 20 % and the miners work half of the
+  time. Boards without a power chip (StickC Plus2) are judged by the battery voltage
+  (below ~4.05 V: on battery), so it can also kick in while a low battery charges.
+* **Watchdogs**: the board restarts after 30 minutes without a pool connection, and,
+  if set, after N hours without an accepted share. The reason is shown after the
+  restart (dashboard, log, notification).
+* **Fallback WiFi**: two more networks can be set in the web settings; they are tried
+  when the portal's network cannot be joined, at boot and after a minute of lost WiFi.
 
 ## Serial monitor (115200 baud)
 
@@ -282,8 +315,13 @@ src/
   core/fill.*      data for that software hash (portable, tested on a PC)
   miner.*          FreeRTOS mining tasks, share queue, statistics, hashrate history
   net.*            network task: pool connection, reconnection, backup pool, share submission
-  market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment)
-  web.*            HTTP dashboard + /api/stats + /metrics, mDNS
+  market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment) + pool stats
+  web.*            HTTP dashboard, settings page, firmware update, log, /api/stats, /metrics, mDNS
+  watch.*          once-a-second supervision: heat / battery, night mode, notifications, watchdogs
+  notify.*         ntfy push notifications
+  mqtt.*           Home Assistant (MQTT discovery)
+  tls.*            TLS connections that pause the hardware SHA loop for the handshake
+  log.*            log ring buffer (web page) and reason of the last restart
   settings.*       NVS + WiFiManager portal
   board.*          per-board display / buttons / LED / battery
   ui.*             screens (bitmap backgrounds + fields, or procedural rendering)

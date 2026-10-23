@@ -360,6 +360,37 @@ void setLed(bool on) {
 #endif
 }
 
+int onBattery() {
+#ifdef DISPLAY_M5UNIFIED
+    int vbus = M5.Power.getVBUSVoltage();  // power chips only, else negative
+    if (vbus >= 0) return vbus < 4000 ? 1 : 0;
+    int mv = M5.Power.getBatteryVoltage();
+    if (mv <= 0) return -1;
+    return mv < 4050 ? 1 : 0;
+#else
+    return -1;
+#endif
+}
+
+bool accel(float &x, float &y) {
+#ifdef DISPLAY_M5UNIFIED
+    float z;
+    return M5.Imu.isEnabled() && M5.Imu.getAccel(&x, &y, &z);
+#else
+    (void)x;
+    (void)y;
+    return false;
+#endif
+}
+
+void flashLed(bool on) {
+#if defined(DISPLAY_M5UNIFIED)
+    M5.Power.setLed(on ? 255 : 0);
+#else
+    (void)on;  // LED_PIN already shows the pool state
+#endif
+}
+
 void beep() {
 #if defined(DISPLAY_M5UNIFIED)
     M5.Speaker.tone(4000, 150);

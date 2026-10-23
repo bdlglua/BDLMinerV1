@@ -29,6 +29,7 @@ struct MinerStats {
     uint64_t lifetimeHashes;
     uint32_t lifetimeShares;
     uint32_t lifetimeBlocks;
+    uint32_t lifetimeSeconds;  // time spent running
 
     // Job info for the UI.
     volatile uint32_t blockHeight;
@@ -55,11 +56,27 @@ void minerStart();
 // hash rate in H/s, updated by minerTick() once per second.
 uint64_t minerTotalHashes();
 double minerHashrate();
+// Smoothed hash rate of one engine (stats.engine[i]), H/s.
+double minerEngineRate(int i);
 void minerTick();
 
 // Copies the hash rate history (H/s, oldest first) and returns its length.
 int minerHistory(float *out, int capacity);
 
-// Persist best difficulty and lifetime totals across reboots.
+// Persist best difficulty, the best shares and lifetime totals across reboots.
 void minerLoadStats();
 void minerSaveStats();
+
+// The best shares ever found (any difficulty, not only those sent to the
+// pool), best first. `time` is a Unix time, 0 when the clock was not set yet.
+struct BestShare {
+    double difficulty;
+    uint32_t time;
+};
+#define TOP_SHARES 10
+int minerTopShares(BestShare *out, int capacity);
+
+// Slows the miners down: Full speed, Half (on battery) or Paused (too hot).
+enum class Throttle : uint8_t { Full, Half, Paused };
+void minerSetThrottle(Throttle t);
+Throttle minerThrottle();

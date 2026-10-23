@@ -4,6 +4,7 @@
 
 #include "core/sha256.h"
 #include "core/work.h"
+#include "log.h"
 #include "sdkconfig.h"
 #include "soc/soc_caps.h"
 
@@ -289,7 +290,7 @@ uint32_t timeLoop(Loop fn, uint32_t n, uint32_t *fillNonces) {
 // Uses idle-cycle hashing only when it is correct and makes the total faster.
 void pickFill() {
     if (!fillSelfTest() && !fillSelfTest()) {
-        Serial.println("[miner] idle-cycle software hashing failed its self-test, disabled");
+        logf("[miner] idle-cycle software hashing failed its self-test, disabled\n");
         return;
     }
     const uint32_t n = 131072;
@@ -300,8 +301,8 @@ void pickFill() {
     double hwPlain = n * mhz * 1e3 / plain, hwMixed = n * mhz * 1e3 / mixed;  // kH/s
     double extra = fillNonces * mhz * 1e3 / mixed;
     fillOk = hwMixed + extra > hwPlain * 1.002;
-    Serial.printf("[miner] idle-cycle software hashing: %s (hardware %.1f -> %.1f kH/s, +%.1f kH/s software)\n",
-                  fillOk ? "on" : "off, no gain", hwPlain, hwMixed, extra);
+    logf("[miner] idle-cycle software hashing: %s (hardware %.1f -> %.1f kH/s, +%.1f kH/s software)\n",
+         fillOk ? "on" : "off, no gain", hwPlain, hwMixed, extra);
 }
 
 // Picks the fastest loop this chip runs correctly.
@@ -312,8 +313,8 @@ bool pickLoop() {
     esp_chip_info_t chip;
     esp_chip_info(&chip);
     if (chip.full_revision / 100 < 3) {
-        Serial.printf("[miner] ESP32 revision %u.%u: the hardware SHA loop needs revision 3\n",
-                      chip.full_revision / 100, chip.full_revision % 100);
+        logf("[miner] ESP32 revision %u.%u: the hardware SHA loop needs revision 3\n",
+             chip.full_revision / 100, chip.full_revision % 100);
         return false;
     }
 
@@ -323,11 +324,11 @@ bool pickLoop() {
     // Best of three: one stray misread must not cost the fast loop for good.
     while (pick < kLoopCount && !knownAnswer(kLoops[pick].fn) && !knownAnswer(kLoops[pick].fn) &&
            !knownAnswer(kLoops[pick].fn)) {
-        Serial.printf("[miner] hardware SHA loop '%s' failed its self-test\n", kLoops[pick].name);
+        logf("[miner] hardware SHA loop '%s' failed its self-test\n", kLoops[pick].name);
         pick++;
     }
     current = pick;
-    if (pick < kLoopCount) Serial.printf("[miner] hardware SHA loop: %s\n", kLoops[pick].name);
+    if (pick < kLoopCount) logf("[miner] hardware SHA loop: %s\n", kLoops[pick].name);
     if (pick == 0) pickFill();  // built on the fast loop only
     esp_sha_unlock_engine(SHA2_256);
     return pick < kLoopCount;
@@ -344,8 +345,8 @@ void health(bool confirmed) {
     if (hits < 256) return;
     if (wrong >= 8) {
         int next = current + 1;
-        Serial.printf("[miner] %u of %u hardware SHA candidates were wrong, switching to: %s\n", (unsigned)wrong,
-                      (unsigned)hits, next < kLoopCount ? kLoops[next].name : "software");
+        logf("[miner] %u of %u hardware SHA candidates were wrong, switching to: %s\n", (unsigned)wrong,
+             (unsigned)hits, next < kLoopCount ? kLoops[next].name : "software");
         current = next;
     }
     hits = wrong = 0;
@@ -391,7 +392,7 @@ void fillHit(Ctx &c, Fill &f, uint32_t limit, void (*hit)(uint32_t, const uint8_
     uint8_t hash[32];
     if (!sha::scan(f.check, nonce, 0x0000FFFF, hash)) {
         fillOk = false;
-        Serial.println("[miner] idle-cycle software hashing reported a wrong candidate, disabled");
+        logf("[miner] idle-cycle software hashing reported a wrong candidate, disabled\n");
         return;
     }
     uint32_t top = (uint32_t)hash[28] | (uint32_t)hash[29] << 8 | (uint32_t)hash[30] << 16 | (uint32_t)hash[31] << 24;

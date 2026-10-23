@@ -4,56 +4,56 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 
+#include "log.h"
+
 Settings settings;
 
 static const char *kNamespace = "bdlminer";
 
-void settingsLoad() {
-    Preferences p;
-    p.begin(kNamespace, true);
-    settings.poolHost = p.getString("pool", DEFAULT_POOL_HOST);
-    settings.poolPort = p.getUShort("port", DEFAULT_POOL_PORT);
-    settings.backupHost = p.getString("pool2", "");
-    settings.backupPort = p.getUShort("port2", DEFAULT_BACKUP_PORT);
-    settings.btcAddress = p.getString("addr", "");
-    settings.poolPassword = p.getString("pass", DEFAULT_POOL_PASSWORD);
-    settings.suggestedDifficulty = p.getDouble("diff", DEFAULT_DIFFICULTY);
-    settings.userAgent = p.getString("ua", DEFAULT_USER_AGENT);
-    settings.beep = p.getBool("beep", true);
-    settings.brightness = p.getUChar("bright", 80);
-    settings.rotation = p.getUChar("rot", 1);
-    settings.timezone = p.getString("tz", DEFAULT_TIMEZONE);
-    settings.currency = p.getString("fiat", DEFAULT_CURRENCY);
-    p.end();
-}
+#define S(key, type, field, group, label) {key, SettingType::type, &settings.field, 0, group, label}
+#define N(key, field, group, label) {key, SettingType::Number, &settings.field, 8 * sizeof(settings.field), group, label}
 
-void settingsSave() {
-    Preferences p;
-    p.begin(kNamespace, false);
-    p.putString("pool", settings.poolHost);
-    p.putUShort("port", settings.poolPort);
-    p.putString("pool2", settings.backupHost);
-    p.putUShort("port2", settings.backupPort);
-    p.putString("addr", settings.btcAddress);
-    p.putString("pass", settings.poolPassword);
-    p.putDouble("diff", settings.suggestedDifficulty);
-    p.putString("ua", settings.userAgent);
-    p.putBool("beep", settings.beep);
-    p.putUChar("bright", settings.brightness);
-    p.putUChar("rot", settings.rotation);
-    p.putString("tz", settings.timezone);
-    p.putString("fiat", settings.currency);
-    p.end();
-}
+const SettingInfo kSettings[] = {
+    S("pool", Text, poolHost, "Pool", "Pool host"),
+    N("port", poolPort, "Pool", "Pool port"),
+    S("addr", Text, btcAddress, "Pool", "BTC address (optionally address.worker)"),
+    S("pass", Text, poolPassword, "Pool", "Pool password"),
+    S("diff", Decimal, suggestedDifficulty, "Pool", "Suggested share difficulty"),
+    S("ua", Text, userAgent, "Pool", "User agent (pool.nerdminers.org needs NerdMinerV2)"),
+    S("pool2", Text, backupHost, "Pool", "Backup pool host (empty = none)"),
+    N("port2", backupPort, "Pool", "Backup pool port"),
+    N("rotateh", rotateHours, "Pool", "Alternate main / backup pool every N hours (0 = only on failure)"),
+    N("bright", brightness, "Display", "Brightness (%)"),
+    N("rot", rotation, "Display", "Rotation (0-3)"),
+    S("autorot", Bool, autoRotate, "Display", "Rotate with the accelerometer (M5 devices)"),
+    N("theme", theme, "Display", "Colour theme (0 orange, 1 green, 2 blue, 3 purple, 4 pink)"),
+    N("cycle", cycleSeconds, "Display", "Next screen every N seconds (0 = off)"),
+    N("nightfrom", nightFrom, "Display", "Night mode from hour (0-23, 255 = off)"),
+    N("nightto", nightTo, "Display", "Night mode until hour (0-23)"),
+    S("beep", Bool, beep, "Display", "Beep on a 32-bit share"),
+    S("tz", Text, timezone, "Display", "Timezone (POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0)"),
+    S("fiat", Text, currency, "Display", "Price currency (USD, EUR, GBP, CAD, CHF, AUD, JPY)"),
+    S("ntfy", Text, ntfyTopic, "Notifications", "ntfy topic (empty = off)"),
+    S("ntfysrv", Text, ntfyServer, "Notifications", "ntfy server"),
+    S("notify32", Bool, notify32, "Notifications", "Also notify every 32-bit share"),
+    N("maxtemp", maxTemp, "Safety", "Pause mining above this temperature in C (0 = off)"),
+    N("rebooth", rebootHours, "Safety", "Restart after N hours without an accepted share (0 = off)"),
+    S("saver", Bool, batterySaver, "Safety", "Battery saver: dim and mine at half speed on battery"),
+    S("wifi2", Text, wifi2Ssid, "Network", "Fallback WiFi 1 name"),
+    S("wpass2", Secret, wifi2Pass, "Network", "Fallback WiFi 1 password"),
+    S("wifi3", Text, wifi3Ssid, "Network", "Fallback WiFi 2 name"),
+    S("wpass3", Secret, wifi3Pass, "Network", "Fallback WiFi 2 password"),
+    S("mqtt", Text, mqttHost, "Network", "MQTT broker for Home Assistant (empty = off)"),
+    N("mqttport", mqttPort, "Network", "MQTT port"),
+    S("mqttuser", Text, mqttUser, "Network", "MQTT user"),
+    S("mqttpass", Secret, mqttPass, "Network", "MQTT password"),
+    S("peers", Text, peers, "Network", "Other miners on the dashboard (comma separated IPs or names)"),
+    S("webpass", Secret, webPassword, "Network", "Web password (settings and firmware update from the dashboard)"),
+};
+const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
-String portalApName() {
-    uint64_t mac = ESP.getEfuseMac();
-    char buf[24];
-    snprintf(buf, sizeof(buf), "BDLMinerV1-%04X", (unsigned)((mac >> 32) & 0xFFFF));
-    return buf;
-}
-
-static bool shouldSave = false;
+#undef S
+#undef N
 
 // Currencies quoted by mempool.space/api/v1/prices.
 static const char *const kCurrencies[] = {"USD", "EUR", "GBP", "CAD", "CHF", "AUD", "JPY"};
@@ -66,9 +66,120 @@ static String normalizeCurrency(String c) {
     return DEFAULT_CURRENCY;
 }
 
+void settingsSanitize() {
+    for (size_t i = 0; i < kSettingCount; i++)
+        if (kSettings[i].type == SettingType::Text) ((String *)kSettings[i].value)->trim();
+    if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
+    if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
+    if (!(settings.suggestedDifficulty > 0)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
+    if (settings.userAgent.isEmpty()) settings.userAgent = DEFAULT_USER_AGENT;
+    if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;
+    if (settings.ntfyServer.isEmpty()) settings.ntfyServer = DEFAULT_NTFY_SERVER;
+    settings.currency = normalizeCurrency(settings.currency);
+    if (settings.brightness > 100) settings.brightness = 100;
+    settings.rotation &= 3;
+    if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
+    if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
+}
+
+void settingsLoad() {
+    Preferences p;
+    p.begin(kNamespace, true);
+    for (size_t i = 0; i < kSettingCount; i++) {
+        const SettingInfo &s = kSettings[i];
+        switch (s.type) {
+            case SettingType::Text:
+            case SettingType::Secret: {
+                String *v = (String *)s.value;
+                *v = p.getString(s.key, *v);
+                break;
+            }
+            case SettingType::Number:
+                if (s.bits == 8) *(uint8_t *)s.value = p.getUChar(s.key, *(uint8_t *)s.value);
+                else *(uint16_t *)s.value = p.getUShort(s.key, *(uint16_t *)s.value);
+                break;
+            case SettingType::Decimal: *(double *)s.value = p.getDouble(s.key, *(double *)s.value); break;
+            case SettingType::Bool: *(bool *)s.value = p.getBool(s.key, *(bool *)s.value); break;
+        }
+    }
+    p.end();
+    settingsSanitize();
+}
+
+void settingsSave() {
+    Preferences p;
+    p.begin(kNamespace, false);
+    for (size_t i = 0; i < kSettingCount; i++) {
+        const SettingInfo &s = kSettings[i];
+        switch (s.type) {
+            case SettingType::Text:
+            case SettingType::Secret: p.putString(s.key, *(String *)s.value); break;
+            case SettingType::Number:
+                if (s.bits == 8) p.putUChar(s.key, *(uint8_t *)s.value);
+                else p.putUShort(s.key, *(uint16_t *)s.value);
+                break;
+            case SettingType::Decimal: p.putDouble(s.key, *(double *)s.value); break;
+            case SettingType::Bool: p.putBool(s.key, *(bool *)s.value); break;
+        }
+    }
+    p.end();
+}
+
+String portalApName() {
+    uint64_t mac = ESP.getEfuseMac();
+    char buf[24];
+    snprintf(buf, sizeof(buf), "BDLMinerV1-%04X", (unsigned)((mac >> 32) & 0xFFFF));
+    return buf;
+}
+
+static bool shouldSave = false;
+
+// The portal's network, read once connected: fallbacks are joined without
+// saving them, so this is how to get back to it.
+static String mainSsid, mainPass;
+
+static bool waitConnected(uint32_t ms) {
+    for (uint32_t t0 = millis(); millis() - t0 < ms;) {
+        if (WiFi.isConnected()) return true;
+        delay(100);
+    }
+    return WiFi.isConnected();
+}
+
+bool wifiTryFallbacks() {
+    const String *nets[][2] = {{&mainSsid, &mainPass},
+                               {&settings.wifi2Ssid, &settings.wifi2Pass},
+                               {&settings.wifi3Ssid, &settings.wifi3Pass}};
+    WiFi.persistent(false);  // never replace the portal's network in flash
+    bool ok = false;
+    for (auto &n : nets) {
+        if (n[0]->isEmpty()) continue;
+        logf("[wifi] trying \"%s\"\n", n[0]->c_str());
+        WiFi.disconnect();
+        WiFi.begin(n[0]->c_str(), n[1]->c_str());
+        if ((ok = waitConnected(15000))) break;
+    }
+    WiFi.persistent(true);
+    return ok;
+}
+
 void wifiSetup(bool forcePortal, void (*onPortal)()) {
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);
+
+    // Without a payout address there is nothing useful to mine for.
+    if (settings.btcAddress.isEmpty()) forcePortal = true;
+
+    if (!forcePortal) {
+        WiFi.begin();  // the network saved by the portal
+        if (waitConnected(15000) || wifiTryFallbacks()) {
+            if (mainSsid.isEmpty() && WiFi.SSID() != settings.wifi2Ssid && WiFi.SSID() != settings.wifi3Ssid) {
+                mainSsid = WiFi.SSID();
+                mainPass = WiFi.psk();
+            }
+            return;
+        }
+    }
 
     WiFiManager wm;
     wm.setDebugOutput(false);
@@ -101,6 +212,10 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                              settings.timezone.c_str(), 48);
     WiFiManagerParameter pFiat("fiat", "Price currency (USD, EUR, GBP, CAD, CHF, AUD, JPY)",
                                settings.currency.c_str(), 4);
+    WiFiManagerParameter pWeb("webpass",
+                              "Web password: lets the dashboard change settings and update the firmware "
+                              "(empty = read-only dashboard)",
+                              settings.webPassword.c_str(), 40, "type='password'");
     wm.addParameter(&pHost);
     wm.addParameter(&pPort);
     wm.addParameter(&pHost2);
@@ -112,9 +227,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pBeep);
     wm.addParameter(&pTz);
     wm.addParameter(&pFiat);
-
-    // Without a payout address there is nothing useful to mine for.
-    if (settings.btcAddress.isEmpty()) forcePortal = true;
+    wm.addParameter(&pWeb);
 
     String ap = portalApName();
     bool connected;
@@ -126,35 +239,29 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
 
     if (shouldSave) {
         settings.poolHost = pHost.getValue();
-        settings.poolHost.trim();
-        int p = atoi(pPort.getValue());
-        if (p > 0 && p < 65536) settings.poolPort = p;
+        settings.poolPort = atoi(pPort.getValue());
         settings.backupHost = pHost2.getValue();
-        settings.backupHost.trim();
-        p = atoi(pPort2.getValue());
-        if (p > 0 && p < 65536) settings.backupPort = p;
+        settings.backupPort = atoi(pPort2.getValue());
         settings.btcAddress = pAddr.getValue();
-        settings.btcAddress.trim();
         settings.poolPassword = pPass.getValue();
-        double d = atof(pDiff.getValue());
-        if (d > 0) settings.suggestedDifficulty = d;
+        settings.suggestedDifficulty = atof(pDiff.getValue());
         settings.userAgent = pUa.getValue();
-        settings.userAgent.trim();
-        if (settings.userAgent.isEmpty()) settings.userAgent = DEFAULT_USER_AGENT;
         settings.beep = atoi(pBeep.getValue()) != 0;
         settings.timezone = pTz.getValue();
-        settings.timezone.trim();
-        if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;
-        settings.currency = normalizeCurrency(pFiat.getValue());
+        settings.currency = pFiat.getValue();
+        settings.webPassword = pWeb.getValue();
+        settingsSanitize();
         settingsSave();
-        Serial.println("[cfg] settings saved");
+        logf("[cfg] settings saved\n");
     }
 
     if (!connected || settings.btcAddress.isEmpty()) {
-        Serial.println("[wifi] not configured, restarting");
+        logf("[wifi] not configured, restarting\n");
         delay(1000);
         ESP.restart();
     }
+    mainSsid = WiFi.SSID();
+    mainPass = WiFi.psk();
 }
 
 void settingsFactoryReset() {

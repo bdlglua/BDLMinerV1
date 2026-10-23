@@ -6,17 +6,21 @@
 
 #include "board.h"
 #include "core/address.h"
+#include "log.h"
 #include "market.h"
 #include "miner.h"
+#include "mqtt.h"
 #include "net.h"
+#include "notify.h"
 #include "settings.h"
 #include "ui.h"
+#include "watch.h"
 #include "web.h"
 
 static void onPortalStarted() {
     String ap = portalApName();
-    Serial.printf("[wifi] setup portal: join \"%s\" (password %s), then open http://192.168.4.1\n", ap.c_str(),
-                  PORTAL_AP_PASSWORD);
+    logf("[wifi] setup portal: join \"%s\" (password %s), then open http://192.168.4.1\n", ap.c_str(),
+         PORTAL_AP_PASSWORD);
     ui::showPortal(ap, PORTAL_AP_PASSWORD);
 }
 
@@ -35,15 +39,17 @@ static void logStats() {
     for (int i = 0; i < stats.minerCount; i++) lastHashes[i] = stats.hashes[i];
     lastMs = now;
 
-    Serial.printf("[stats] %.2f kH/s%s | shares %u ok / %u rejected | best %.6g (ever %.6g) | blocks %u | %s\n",
-                  minerHashrate() / 1000.0, engines, (unsigned)stats.accepted, (unsigned)stats.rejected,
-                  stats.sessionBestDiff, stats.bestDiff, (unsigned)stats.blocksFound, netStatus());
+    logf("[stats] %.2f kH/s%s | shares %u ok / %u rejected | best %.6g (ever %.6g) | blocks %u | %s\n",
+         minerHashrate() / 1000.0, engines, (unsigned)stats.accepted, (unsigned)stats.rejected,
+         stats.sessionBestDiff, stats.bestDiff, (unsigned)stats.blocksFound, netStatus());
 }
 
 void setup() {
     Serial.begin(115200);
     delay(200);
-    Serial.printf("\nBDLMiner V1 %s on %s\n", FW_VERSION, BOARD_NAME);
+    Serial.println();
+    logf("BDLMiner V1 %s on %s\n", FW_VERSION, BOARD_NAME);
+    logBoot();
 
     board::begin();
     settingsLoad();
@@ -59,45 +65,41 @@ void setup() {
 
     ui::showMessage("WiFi", "Connecting...");
     wifiSetup(forcePortal, onPortalStarted);
-    Serial.printf("[wifi] connected, IP %s\n", WiFi.localIP().toString().c_str());
-    Serial.printf("[cfg] pool %s:%u user %s\n", settings.poolHost.c_str(), settings.poolPort,
-                  settings.btcAddress.c_str());
+    logf("[wifi] connected, IP %s\n", WiFi.localIP().toString().c_str());
+    logf("[cfg] pool %s:%u user %s\n", settings.poolHost.c_str(), settings.poolPort,
+         settings.btcAddress.c_str());
     if (!settings.backupHost.isEmpty())
-        Serial.printf("[cfg] backup pool %s:%u\n", settings.backupHost.c_str(), settings.backupPort);
+        logf("[cfg] backup pool %s:%u\n", settings.backupHost.c_str(), settings.backupPort);
 
     // Some pools use account names, so a bad address is only a warning.
     address::Info addr = address::parse(settings.btcAddress.c_str());
     if (addr.valid()) {
-        Serial.printf("[cfg] address type %s%s\n", address::typeName(addr.type),
-                      addr.network == address::Network::Main ? "" : " (testnet)");
+        logf("[cfg] address type %s%s\n", address::typeName(addr.type),
+             addr.network == address::Network::Main ? "" : " (testnet)");
     } else {
-        Serial.println("[cfg] WARNING: not a valid Bitcoin address, rewards may be lost. "
-                       "Hold the main button at boot to fix it.");
+        logf("[cfg] WARNING: not a valid Bitcoin address, rewards may be lost. "
+             "Hold the main button at boot to fix it.\n");
         ui::showMessage("Warning", "Invalid BTC address?", "Hold A at boot to fix");
         delay(5000);
     }
 
     minerLoadStats();
     minerStart();
+    notifyStart();
     netStart();
     marketStart();
     webStart();
+    mqttStart();
     ui::render();
 }
 
 void loop() {
-    static uint32_t lastTick = 0, lastLog = 0, lastOver32 = 0;
+    static uint32_t lastTick = 0, lastLog = 0;
     uint32_t now = millis();
 
-    // A hash with 32 leading zero bits (difficulty >= 1), counted by the miners.
-    uint32_t over32 = stats.over32bits;
-    if (over32 != lastOver32) {
-        lastOver32 = over32;
-        Serial.printf("[miner] 32-bit share found (%u so far)\n", (unsigned)over32);
-        if (settings.beep) board::beep();
-    }
-
-    switch (board::poll()) {
+    board::Input input = board::poll();
+    if (input != board::Input::None) watchWake();
+    switch (input) {
         case board::Input::Next:
             ui::nextScreen();
             break;
@@ -107,7 +109,7 @@ void loop() {
             break;
         case board::Input::FactoryReset:
             ui::showMessage("Reset", "Erasing settings...", "Rebooting into setup");
-            Serial.println("[cfg] factory reset");
+            logf("[cfg] factory reset\n");
             delay(1500);
             settingsFactoryReset();
             break;
@@ -118,6 +120,7 @@ void loop() {
     if (now - lastTick >= 1000) {
         lastTick = now;
         minerTick();
+        watchTick();
         ui::render();
         // Headless status LED: steady while connecting, blinking while mining.
         board::setLed(stats.poolConnected ? (now / 1000) % 2 : true);
