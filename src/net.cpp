@@ -109,6 +109,12 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
         // Waiting for a share also paces the socket polling.
         stratum::Share share;
         if (minerNextShare(share, 20)) {
+            // A clean job voids every older one; shares found on those by a
+            // batch still running when it came would only be rejected.
+            if (proto.job().clean && strncmp(proto.job().id.c_str(), share.jobId, sizeof(share.jobId) - 1) != 0) {
+                Serial.printf("[pool] stale share dropped (job %s)\n", share.jobId);
+                continue;
+            }
             Serial.printf("[pool] submit nonce=%08x diff=%.4g job=%s\n", (unsigned)share.nonce, share.difficulty,
                           share.jobId);
             if (!sendLine(client, proto.submit(share))) return;
