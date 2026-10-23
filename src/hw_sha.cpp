@@ -215,9 +215,19 @@ bool available() { return true; }
 uint32_t nonceAt(uint32_t position) { return __builtin_bswap32(position); }
 
 // mbedtls only ever try-locks the engine and falls back to software SHA, so
-// holding it here never blocks a TLS session.
-void hold() { esp_sha_lock_engine(SHA2_256); }
-void release() { esp_sha_unlock_engine(SHA2_256); }
+// holding it here never blocks a TLS session. `held` keeps the miner from
+// taking the engine back between two batches before hold() gets it.
+static volatile bool held = false;
+
+void hold() {
+    held = true;
+    esp_sha_lock_engine(SHA2_256);  // waits for the batch in progress
+}
+
+void release() {
+    esp_sha_unlock_engine(SHA2_256);
+    held = false;
+}
 
 void prepare(Job &job, const uint8_t header[80]) {
     for (int i = 0; i < 20; i++)
@@ -229,7 +239,7 @@ void prepare(Job &job, const uint8_t header[80]) {
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
     int loop = current;
-    if (loop >= kLoopCount) return 0;
+    if (loop >= kLoopCount || held) return 0;
     // An open TLS connection can hold the engine for seconds (mbedtls then
     // keeps it for the whole digest); never wait for it.
     if (!esp_sha_try_lock_engine(SHA2_256)) return 0;

@@ -10,6 +10,7 @@
 
 namespace {
 
+constexpr const char *kHost = "mempool.space";
 constexpr const char *kApi = "https://mempool.space/api";
 constexpr uint32_t kRefreshMs = 5 * 60 * 1000;
 constexpr uint32_t kRetryMs = 30 * 1000;
@@ -22,25 +23,30 @@ portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 // GET `path` and parse the JSON body through `filter` (keeps RAM low: large
 // arrays such as the mempool fee histogram are skipped while streaming).
 bool fetch(WiFiClientSecure &tls, const char *path, JsonDocument &doc, const JsonDocument &filter) {
-    // Keeps the hardware SHA loop out of the way of the TLS session. The
-    // handshake's key exchange runs for seconds without yielding, and with
-    // core 1 left to the hardware miner nothing else can feed core 0's idle
-    // task meanwhile: the idle task watchdog is off for the request.
-    struct Hold {
-        Hold() {
-            hwsha::hold();
-            disableCore0WDT();
-        }
-        ~Hold() {
-            enableCore0WDT();
-            hwsha::release();
-        }
-    } hold;
+    // The TLS handshake is done here, HTTPClient then reuses the connection.
+    // It keeps the hardware SHA loop away (see hwsha::hold()), and its key
+    // exchange runs for seconds without yielding: with core 1 left to the
+    // hardware miner nothing else can feed core 0's idle task meanwhile, so
+    // the idle task watchdog is off for it. The rest of the request needs
+    // neither and the miner gets the engine back at once.
+    hwsha::hold();
+    disableCore0WDT();
+    bool connected = tls.connect(kHost, 443);
+    enableCore0WDT();
+    hwsha::release();
+    if (!connected) {
+        Serial.printf("[market] %s: cannot connect\n", path);
+        return false;
+    }
+
     HTTPClient http;
     String url = String(kApi) + path;
     http.useHTTP10(true);  // no chunked encoding: the body can be parsed as a stream
     http.setTimeout(10000);
-    if (!http.begin(tls, url)) return false;
+    if (!http.begin(tls, url)) {
+        tls.stop();
+        return false;
+    }
     int code = http.GET();
     bool ok = false;
     if (code == HTTP_CODE_OK) {

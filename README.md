@@ -44,11 +44,11 @@ Hashing engines:
     slower loop with more timing margin takes over, then software alone. Older revisions
     mine in software only (a silicon bug makes the fast loop unsafe there);
   * the engine is checked against known answers at boot; if the check fails, software
-    takes over. During the mempool.space HTTPS requests (a few seconds every 5 minutes)
+    takes over. During the TLS handshakes of the mempool.space requests (5 every 5 minutes)
     the hardware loop pauses and that core mines in software: on the original ESP32 the
-    loop saturates the bus the RSA accelerator also uses, and a TLS handshake would
-    otherwise trip the task watchdog. Core 0's idle-task watchdog is also paused for each
-    request: the key exchange runs for seconds without yielding on a fully loaded core 0.
+    loop saturates the bus the RSA accelerator also uses, and a handshake would otherwise
+    trip the task watchdog. Core 0's idle-task watchdog is also paused for each handshake:
+    the key exchange runs for seconds without yielding on a fully loaded core 0.
 
 ## Build and flash
 
