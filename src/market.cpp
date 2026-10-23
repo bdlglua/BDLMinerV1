@@ -15,7 +15,7 @@ namespace {
 
 constexpr const char *kHost = "mempool.space";
 constexpr const char *kApi = "https://mempool.space/api";
-// Each refresh pauses the hardware SHA loop for a TLS handshake (~1.5 s).
+// Each refresh costs a TLS handshake: ~1.5 s of core 0.
 constexpr uint32_t kRefreshMs = 10 * 60 * 1000;
 constexpr uint32_t kRetryMs = 30 * 1000;
 // A TLS session needs ~45 KB; never starve the miner and the pool socket.

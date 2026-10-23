@@ -55,12 +55,12 @@ Hashing engines:
     boot, the hardware known-answer test still passes with it, its software hash finds a
     known candidate, and it measures faster; each of its candidates is checked again;
   * the engine is checked against known answers at boot; if the check fails, software
-    takes over. During the TLS handshake of the mempool.space refresh (one every
-    10 minutes, the 5 requests share the connection) and of the pool stats (every 30 minutes) the hardware loop pauses and that
-    core mines in software: on the original ESP32 the loop saturates the bus the RSA
-    accelerator also uses, and a handshake would otherwise trip the task watchdog.
-    Core 0's idle-task watchdog is also paused for each handshake: the key exchange
-    runs for seconds without yielding on a fully loaded core 0.
+    takes over. The hardware loops lock all three SHA engines of the
+    original ESP32 (SHA-1, SHA-256, SHA-384/512 share the input registers), so TLS
+    hashes in software and HTTPS requests run while the engine keeps mining (on
+    S2/S3/C3 the hardware loop pauses for the handshake instead). Core 0's idle-task
+    watchdog is paused for each handshake: the key exchange runs for a second or two
+    without yielding on a fully loaded core 0.
 
 ## Build and flash
 

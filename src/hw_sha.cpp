@@ -185,6 +185,30 @@ bool knownAnswer(Loop fn) {
     return found == n && c.budget == 0;
 }
 
+// The ESP32's SHA-1, SHA-256 and SHA-384/512 engines are locked one by one
+// but share the TEXT registers the loops write: all three are taken while a
+// loop runs, so mbedtls (TLS) hashes in software meanwhile instead of writing
+// TEXT under the loop (which made every TLS handshake fail). Always in this
+// order: no deadlock with code that takes them one at a time.
+const esp_sha_type kEngines[] = {SHA1, SHA2_256, SHA2_384};
+
+bool tryLockEngines() {
+    for (int i = 0; i < 3; i++)
+        if (!esp_sha_try_lock_engine(kEngines[i])) {
+            while (i--) esp_sha_unlock_engine(kEngines[i]);
+            return false;
+        }
+    return true;
+}
+
+void lockEngines() {
+    for (esp_sha_type e : kEngines) esp_sha_lock_engine(e);
+}
+
+void unlockEngines() {
+    for (esp_sha_type e : kEngines) esp_sha_unlock_engine(e);
+}
+
 // ---------------------------------------------------------------------------
 // Idle-cycle software hashing (hw_sha_fill.S)
 // ---------------------------------------------------------------------------
@@ -406,7 +430,7 @@ bool pickLoop() {
         return false;
     }
 
-    esp_sha_lock_engine(SHA2_256);
+    lockEngines();
     periph_module_reset(PERIPH_SHA_MODULE);
     int pick = 0;
     // Best of three: one stray misread must not cost the fast loop for good.
@@ -418,7 +442,7 @@ bool pickLoop() {
     current = pick;
     if (pick < kLoopCount) logf("[miner] hardware SHA loop: %s\n", kLoops[pick].name);
     if (pick == 0) pickFill();  // built on the fast loop only
-    esp_sha_unlock_engine(SHA2_256);
+    unlockEngines();
     return pick < kLoopCount;
 }
 
@@ -446,20 +470,13 @@ bool available() { return true; }
 
 uint32_t nonceAt(uint32_t position) { return __builtin_bswap32(position); }
 
-// mbedtls only ever try-locks the engine and falls back to software SHA, so
-// holding it here never blocks a TLS session. `held` keeps the miner from
-// taking the engine back between two batches before hold() gets it.
-static volatile bool held = false;
-
-void hold() {
-    held = true;
-    esp_sha_lock_engine(SHA2_256);  // waits for the batch in progress
-}
-
-void release() {
-    esp_sha_unlock_engine(SHA2_256);
-    held = false;
-}
+// Nothing to do: the loops hold all three SHA engines (see lockEngines()), so
+// mbedtls hashes in software and a TLS handshake runs alongside them. (A
+// pause used to be needed while only SHA-256 was locked: mbedtls wrote the
+// shared TEXT registers through the SHA-1 / SHA-384 engines meanwhile, and
+// every handshake failed.)
+void hold() {}
+void release() {}
 
 bool fillAvailable() { return fillOk; }
 
@@ -490,10 +507,10 @@ void fillHit(Ctx &c, Fill &f, uint32_t limit, void (*hit)(uint32_t, const uint8_
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *fill) {
     int loop = current;
-    if (loop >= kLoopCount || held) return 0;
+    if (loop >= kLoopCount) return 0;
     // An open TLS connection can hold the engine for seconds (mbedtls then
     // keeps it for the whole digest); never wait for it.
-    if (!esp_sha_try_lock_engine(SHA2_256)) return 0;
+    if (!tryLockEngines()) return 0;
     // Start from a clean peripheral, whatever used it last.
     periph_module_reset(PERIPH_SHA_MODULE);
 
@@ -529,7 +546,7 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
         fill->q = c.q;
         fill->hashes += c.q - q0;
     }
-    esp_sha_unlock_engine(SHA2_256);
+    unlockEngines();
     return count - c.budget;
 }
 
