@@ -159,7 +159,8 @@ Screens, in order:
    between two, the chance of finding a block within a day and a year at the current
    hashrate, lifetime running time, blocks, hashes and the 3 best shares ever.
 
-Accepted shares flash `+1 SHARE` in the header (and the power LED on M5 devices).
+Accepted shares flash `+1 SHARE` in the header; 32‑bit shares also light the red LED of M5
+devices for a second (not in night mode).
 Web settings add: 5 colour themes, automatic screen change every N seconds, rotation
 following the accelerometer (M5 devices with an IMU: the two landscape ways), and a night
 mode (screen off, no beep, from one hour to another; a button press lights it for 30 s).

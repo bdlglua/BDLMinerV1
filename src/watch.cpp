@@ -86,10 +86,13 @@ void events(uint32_t now) {
         notify("BLOCK FOUND", msg, 5, "tada,moneybag");
     }
 
+    // The red LED lights for a second on each 32-bit share (not at night).
+    bool led = false;
     if (stats.over32bits != lastOver32) {
         lastOver32 = stats.over32bits;
         logf("[miner] 32-bit share found (%u so far)\n", (unsigned)lastOver32);
         if (settings.beep && !night) board::beep();
+        led = !night;
         if (settings.notify32) {
             snprintf(msg, sizeof(msg), "%u so far", (unsigned)lastOver32);
             notify("32-bit share", msg, 2, "sparkles");
@@ -108,10 +111,8 @@ void events(uint32_t now) {
         lastAccepted = stats.accepted;
         acceptedAt = now;
         ui::flashShare();
-        board::flashLed(true);
-    } else {
-        board::flashLed(false);
     }
+    board::flashLed(led);
 
     if (stats.poolConnected) {
         lastConnected = now;
