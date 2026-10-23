@@ -10,10 +10,11 @@ MinerStats stats;
 
 namespace {
 
-// Hashes done between two looks at the job board. Sized for ~0.1-0.3 s of
-// work so new jobs are picked up quickly while the overhead stays tiny.
+// Hashes done between two looks at the job board. Sized for ~0.1 s of work
+// so new jobs are picked up quickly while the overhead stays tiny. Both
+// divide 2^32, so a work's nonce space always ends on a batch boundary.
 constexpr uint32_t kBatchSw = 4096;
-constexpr uint32_t kBatchHw = 16384;
+constexpr uint32_t kBatchHw = 65536;
 
 // Candidates under this top-32-bit value (diff >= ~1.5e-5) are fully
 // evaluated, which is what feeds the "best difficulty" statistic.
@@ -99,7 +100,6 @@ bool fetchWork(Miner &m, uint32_t &seq) {
 
 void minerTask(void *arg) {
     Miner &m = *(Miner *)arg;
-    const uint32_t batch = m.hardware ? kBatchHw : kBatchSw;
     uint32_t seq = 0;
     uint32_t nonce = 0;
     bool haveWork = false;
@@ -118,17 +118,24 @@ void minerTask(void *arg) {
         }
 
         uint32_t limit = max(m.work.quickLimit, kBestDiffFilter);
-        if (m.hardware) {
-            hwsha::scan(m.hwJob, nonce, batch, limit, onCandidate, &m);
-        } else {
+        // Never run past the end of the nonce space (after software batches
+        // `nonce` is only a multiple of kBatchSw).
+        uint32_t left = 0u - nonce;
+        uint32_t hwBatch = left && left < kBatchHw ? left : kBatchHw;
+        uint32_t done = m.hardware ? hwsha::scan(m.hwJob, nonce, hwBatch, limit, onCandidate, &m) : 0;
+        if (!done) {
+            // Software kernel. A hardware miner whose engine is busy (TLS)
+            // keeps to the engine's nonce order so no nonce is hashed twice.
             uint8_t hash[32];
             const sha::MidState &mid = m.work.mid;
-            for (uint32_t n = nonce, end = nonce + batch; n != end; n++) {
+            for (uint32_t p = nonce, end = nonce + kBatchSw; p != end; p++) {
+                uint32_t n = m.hardware ? hwsha::nonceAt(p) : p;
                 if (sha::scan(mid, n, limit, hash)) onCandidate(n, hash, &m);
             }
+            done = kBatchSw;
         }
-        stats.hashes[m.index] += batch;
-        nonce += batch;
+        stats.hashes[m.index] += done;
+        nonce += done;
         if (nonce == 0) haveWork = false;  // wrapped: 2^32 nonces exhausted
 
         // Let the idle task run (task watchdog) and same-priority tasks share.

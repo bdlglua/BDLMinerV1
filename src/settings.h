@@ -29,6 +29,7 @@ struct Settings {
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
     String userAgent = DEFAULT_USER_AGENT;
+    bool beep = true;  // beep when a 32-bit share (difficulty >= 1) is found
     uint8_t brightness = 80;  // percent
     uint8_t rotation = 1;     // 0..3, display orientation
     String timezone = DEFAULT_TIMEZONE;

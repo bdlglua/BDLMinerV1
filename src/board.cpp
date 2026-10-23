@@ -235,10 +235,11 @@ void begin() {
     auto cfg = M5.config();
     cfg.serial_baudrate = 0;  // Serial is started by main
     cfg.clear_display = true;
-    cfg.internal_imu = false;
+    cfg.internal_imu = true;  // its die temperature is the board's thermometer
     cfg.internal_mic = false;
-    cfg.internal_spk = false;
+    cfg.internal_spk = true;  // StickC Plus2: buzzer on GPIO2
     M5.begin(cfg);  // also latches the power-hold pin on the StickC Plus2
+    M5.Speaker.setVolume(160);
 #else
 #ifdef BUTTON_A_PIN
     btnA.begin(BUTTON_A_PIN);
@@ -357,6 +358,34 @@ void setLed(bool on) {
 #else
     (void)on;
 #endif
+}
+
+void beep() {
+#if defined(DISPLAY_M5UNIFIED)
+    M5.Speaker.tone(4000, 150);
+#elif defined(BUZZER_PIN)
+    tone(BUZZER_PIN, 4000, 150);
+#endif
+}
+
+float temperature() {
+    // Sensors are slow (I2C, ADC): read at most every 2 s.
+    static uint32_t lastMs = 0;
+    static float cached = NAN;
+    uint32_t now = millis();
+    if (lastMs && now - lastMs < 2000) return cached;
+    lastMs = now;
+#ifdef DISPLAY_M5UNIFIED
+    float t;
+    if (M5.Imu.isEnabled() && M5.Imu.getTemp(&t)) return cached = t;
+#endif
+    cached = temperatureRead();
+#if CONFIG_IDF_TARGET_ESP32
+    // The original ESP32's sensor is undocumented and missing on most chips,
+    // which then always read a raw 128, i.e. 53.3 C.
+    if (fabsf(cached - (128 - 32) / 1.8f) < 0.01f) cached = NAN;
+#endif
+    return cached;
 }
 
 }  // namespace board

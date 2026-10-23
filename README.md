@@ -5,7 +5,8 @@ It connects to a Stratum V1 pool (`public-pool.io:21496` by default), computes
 SHA‑256d hashes and, with an enormous amount of luck, may find a full block whose reward
 is paid to **your** address.
 
-> For scale: an ESP32 does ~50 to 300 kH/s, the Bitcoin network ~10^21 H/s.
+> For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
+> engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
 > **Status:** the firmware builds for every board below and the portable core is tested
@@ -31,10 +32,17 @@ Hashing engines:
 
 * **Software** on each core, optimized SHA‑256d (midstate, first 3 rounds and
   `W[16..17]` precomputed per job, early rejection at round 61).
-* **Hardware** on ESP32‑S2/S3/C3 (SHA accelerator with state resume). It is
-  verified at boot against the genesis block; if the check fails, software takes over.
-  The original ESP32 (including the M5StickC Plus2) does not support state resume, so it
-  mines in software on both cores.
+* **Hardware** on one core, software on the other:
+  * ESP32‑S2/S3/C3: SHA accelerator with state resume (two blocks per nonce);
+  * original ESP32 revision 3 and later (M5StickC Plus2, most current ESP32 boards): the
+    accelerator cannot resume, so a nonce costs three blocks, but a cycle-counted assembly
+    loop keeps it busy without a gap (~247 cycles per nonce, about 1 MH/s at 240 MHz).
+    Ported from [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded).
+    Each of its candidates is recomputed in software; if more than a few are wrong, a
+    slower loop with more timing margin takes over, then software alone. Older revisions
+    mine in software only (a silicon bug makes the fast loop unsafe there);
+  * the engine is checked against known answers at boot; if the check fails, software
+    takes over. While an HTTPS request holds the engine, that core mines in software.
 
 ## Build and flash
 
@@ -79,6 +87,10 @@ Boards without a display report everything on the serial monitor and the
    * **User agent**: miner name sent to the pool, `BDLMinerV1/<version>` by default.
      Some pools only accept known miners: `pool.nerdminers.org` requires `NerdMinerV2`
      and otherwise refuses the connection (status *Subscribe refused*);
+   * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
+     bits (difficulty ≥ 1) is found, `0` stays silent. M5 devices use their buzzer or
+     speaker (StickC Plus2: GPIO2); on other boards add `-DBUZZER_PIN=<gpio>` to
+     `build_flags` for a passive buzzer;
    * **Timezone**: POSIX TZ string, defaults to Paris time
      `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…);
    * **Price currency**: currency for the BTC price, `USD` by default
@@ -112,7 +124,9 @@ or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard 
 
 Screens, in order:
 
-1. **Mining**: hashrate, shares, best difficulty, pool difficulty, blocks, 32‑bit, temperature;
+1. **Mining**: hashrate, shares, best difficulty, pool difficulty, blocks, 32‑bit, temperature
+   (IMU sensor on M5 devices, chip sensor on S2/S3/C3; `--` on an original ESP32 without
+   IMU, whose built-in sensor is missing on most chips and reads a constant 53 °C);
 2. **Clock**: time (NTP), date, BTC price, hashrate, block height, fast fees, shares;
 3. **Global**: BTC price and sats per currency unit, network hashrate, pending
    transactions, fees (fast / 30 min / 1 h), next difficulty adjustment, and the average time
@@ -169,7 +183,7 @@ Example response (hashrates in H/s, fees in sat/vB, `retarget.change` and
 `retarget.progress` in percent, `market.updated_s` = seconds since the last
 mempool.space refresh, `-1` if none yet; `history.hashrate` holds up to 288 values,
 oldest first; `address_type` is `P2PKH`, `P2SH`, `P2WPKH`, `P2WSH`, `P2TR`,
-`SegWit` or `invalid`):
+`SegWit` or `invalid`; `temp_c` is `null` when the board has no usable sensor):
 
 ```json
 {
@@ -200,8 +214,10 @@ oldest first; `address_type` is `P2PKH`, `P2SH`, `P2WPKH`, `P2WSH`, `P2TR`,
 
 ```
 [cfg] address type P2WPKH
-[miner] hardware SHA: not supported
-[miner] miner0 engine=sw core=1
+[miner] hardware SHA loop: fast
+[miner] hardware SHA: self-test OK
+[miner] miner0 engine=hw core=1
+[miner] miner1 engine=sw core=0
 [pool] job 265612f height=972641 clean=1 diff=1
 [web] dashboard: http://192.168.1.20/ or http://bdlminer-a1b2.local/
 [market] 5/5 ok | 1 BTC = 72543 EUR | fees 3/2/1 | net 1.04e+21 H/s | retarget +3.50% in 1067
@@ -220,7 +236,7 @@ oldest first; `address_type` is `P2PKH`, `P2SH`, `P2WPKH`, `P2WSH`, `P2TR`,
 | No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
 | `bdlminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
 | Clock / Global screens stay empty | The board needs Internet access to `mempool.space` (HTTPS) and `pool.ntp.org`. The `[market]` serial line shows how many requests succeeded (`5/5 ok`). |
-| `hardware SHA: self-test FAILED, disabled` on an S2/S3/C3 | The board fell back to software mining; it still works, just slower. Please report it with your board model. |
+| `hardware SHA: self-test FAILED, disabled` | The board fell back to software mining; it still works, just slower. Please report it with your board model and the `[miner]` lines. |
 
 ## Good to know
 
@@ -241,7 +257,8 @@ src/
     work.*         Stratum job -> 80-byte header, coinbase, merkle, difficulties
     stratum.*      Stratum V1 state machine (subscribe/authorize/notify/submit)
     address.*      payout address check (Base58Check, Bech32, Bech32m)
-  hw_sha.*         ESP32-S2/S3/C3 hardware engine + self-test
+  hw_sha.*         hardware engine (S2/S3/C3, original ESP32) + self-test
+  hw_sha_classic.S cycle-counted SHA256d loop for the original ESP32 (MIT, NerdMiner Modded)
   miner.*          FreeRTOS mining tasks, share queue, statistics, hashrate history
   net.*            network task: pool connection, reconnection, backup pool, share submission
   market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment)
@@ -267,6 +284,9 @@ and address validation):
 
 * The screen design (full-screen bitmap backgrounds with values painted on top) is
   inspired by [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).
+* The original-ESP32 hardware SHA loop (`src/hw_sha_classic.S`) comes from
+  [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded) by HenrysCat,
+  MIT License, Copyright (c) 2023 Bitmaker, (c) 2026 HenrysCat.
 * Libraries: [M5Unified / M5GFX](https://github.com/m5stack/M5Unified) (LovyanGFX),
   [WiFiManager](https://github.com/tzapu/WiFiManager),
   [ArduinoJson](https://arduinojson.org/).

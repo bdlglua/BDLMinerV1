@@ -72,7 +72,7 @@ async function tick(){
    tile('Next retarget',(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %','in '+m.retarget.blocks+' blocks ('+m.retarget.progress.toFixed(0)+' % done)'))}
   T.push(tile(j.pool.backup?'Pool (backup)':'Pool',j.pool.host+':'+j.pool.port,j.pool.status),
    tile('Payout address',j.address,j.address_type==='invalid'?'⚠ not a valid Bitcoin address':j.address_type),
-   tile('Device',j.board,'v'+j.firmware+' · '+j.temp_c+' °C · '+Math.round(j.heap/1024)+' KB free'),
+   tile('Device',j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB free'),
    tile('WiFi',j.ip,j.rssi+' dBm'));
   document.getElementById('m').replaceChildren(...T);
   document.getElementById('f').textContent='Updated '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · market data '+Math.round(m.updated_s/60)+' min old (mempool.space)':'');
@@ -116,7 +116,9 @@ void handleStats() {
     JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
     for (int i = 0; i < n; i++) hr.add((long)hist[i]);
     j["heap"] = ESP.getFreeHeap();
-    j["temp_c"] = (int)temperatureRead();
+    float temp = board::temperature();
+    if (isnan(temp)) j["temp_c"] = nullptr;
+    else j["temp_c"] = (int)lroundf(temp);
     j["ip"] = WiFi.localIP().toString();
     j["rssi"] = WiFi.RSSI();
 
@@ -165,7 +167,7 @@ void handleMetrics() {
     metric("bdlminer_block_height", "gauge", stats.blockHeight);
     metric("bdlminer_network_difficulty", "gauge", stats.networkDiff);
     metric("bdlminer_uptime_seconds", "gauge", (millis() - stats.startMillis) / 1000);
-    metric("bdlminer_temperature_celsius", "gauge", temperatureRead());
+    if (!isnan(board::temperature())) metric("bdlminer_temperature_celsius", "gauge", board::temperature());
     metric("bdlminer_wifi_rssi_dbm", "gauge", WiFi.RSSI());
     metric("bdlminer_free_heap_bytes", "gauge", ESP.getFreeHeap());
     char labels[96];

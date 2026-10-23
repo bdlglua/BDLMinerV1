@@ -19,6 +19,7 @@ void settingsLoad() {
     settings.poolPassword = p.getString("pass", DEFAULT_POOL_PASSWORD);
     settings.suggestedDifficulty = p.getDouble("diff", DEFAULT_DIFFICULTY);
     settings.userAgent = p.getString("ua", DEFAULT_USER_AGENT);
+    settings.beep = p.getBool("beep", true);
     settings.brightness = p.getUChar("bright", 80);
     settings.rotation = p.getUChar("rot", 1);
     settings.timezone = p.getString("tz", DEFAULT_TIMEZONE);
@@ -37,6 +38,7 @@ void settingsSave() {
     p.putString("pass", settings.poolPassword);
     p.putDouble("diff", settings.suggestedDifficulty);
     p.putString("ua", settings.userAgent);
+    p.putBool("beep", settings.beep);
     p.putUChar("bright", settings.brightness);
     p.putUChar("rot", settings.rotation);
     p.putString("tz", settings.timezone);
@@ -78,7 +80,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         if (onPortal) onPortal();
     });
 
-    char port[8], port2[8], diff[16];
+    char port[8], port2[8], diff[16], beep[2] = {settings.beep ? '1' : '0', 0};
     snprintf(port, sizeof(port), "%u", settings.poolPort);
     snprintf(port2, sizeof(port2), "%u", settings.backupPort);
     snprintf(diff, sizeof(diff), "%g", settings.suggestedDifficulty);
@@ -92,6 +94,8 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                                settings.btcAddress.c_str(), 100);
     WiFiManagerParameter pPass("pass", "Pool password", settings.poolPassword.c_str(), 40);
     WiFiManagerParameter pDiff("diff", "Suggested share difficulty", diff, 15);
+    WiFiManagerParameter pBeep("beep", "Beep on a 32-bit share (1 = on, 0 = off)", beep, 1,
+                               "type='number' min='0' max='1'");
     WiFiManagerParameter pUa("ua", "User agent (pool.nerdminers.org needs NerdMinerV2)", settings.userAgent.c_str(), 40);
     WiFiManagerParameter pTz("tz", "Timezone (POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0)",
                              settings.timezone.c_str(), 48);
@@ -105,6 +109,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pPass);
     wm.addParameter(&pDiff);
     wm.addParameter(&pUa);
+    wm.addParameter(&pBeep);
     wm.addParameter(&pTz);
     wm.addParameter(&pFiat);
 
@@ -136,6 +141,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.userAgent = pUa.getValue();
         settings.userAgent.trim();
         if (settings.userAgent.isEmpty()) settings.userAgent = DEFAULT_USER_AGENT;
+        settings.beep = atoi(pBeep.getValue()) != 0;
         settings.timezone = pTz.getValue();
         settings.timezone.trim();
         if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;

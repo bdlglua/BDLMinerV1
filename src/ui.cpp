@@ -303,7 +303,8 @@ void renderBitmap() {
             drawField(bg::MINING_POOLDIFF, diffText(stats.poolDiff));
             drawField(bg::MINING_BLOCKS, String(stats.blocksFound), stats.blocksFound ? kOrange : kFg);
             drawField(bg::MINING_BITS32, String(stats.over32bits));
-            drawField(bg::MINING_TEMP, String((int)temperatureRead()) + " C");
+            float t = board::temperature();
+            drawField(bg::MINING_TEMP, isnan(t) ? String("--") : String((int)lroundf(t)) + " C");
             drawField(bg::MINING_STATE, netStatus());
             drawField(bg::MINING_UPTIME, uptime());
             break;

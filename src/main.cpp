@@ -72,8 +72,16 @@ void setup() {
 }
 
 void loop() {
-    static uint32_t lastTick = 0, lastLog = 0;
+    static uint32_t lastTick = 0, lastLog = 0, lastOver32 = 0;
     uint32_t now = millis();
+
+    // A hash with 32 leading zero bits (difficulty >= 1), counted by the miners.
+    uint32_t over32 = stats.over32bits;
+    if (over32 != lastOver32) {
+        lastOver32 = over32;
+        Serial.printf("[miner] 32-bit share found (%u so far)\n", (unsigned)over32);
+        if (settings.beep) board::beep();
+    }
 
     switch (board::poll()) {
         case board::Input::Next:

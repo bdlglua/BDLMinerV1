@@ -1,4 +1,4 @@
-// Board abstraction: display, buttons, status LED, battery.
+// Board abstraction: display, buttons, status LED, battery, buzzer, temperature.
 // The concrete board is selected at build time (see platformio.ini).
 #pragma once
 
@@ -41,5 +41,12 @@ void setBrightness(uint8_t percent);
 int batteryLevel();
 
 void setLed(bool on);
+
+// Short beep on M5 devices with a speaker or buzzer, or on a passive buzzer
+// wired to BUZZER_PIN. Does nothing elsewhere.
+void beep();
+
+// Temperature in degrees Celsius, NAN when the board has no usable sensor.
+float temperature();
 
 }  // namespace board
