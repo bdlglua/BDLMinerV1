@@ -33,6 +33,14 @@ bool sendLine(WiFiClient &client, const std::string &line) {
 
 bool sessionTimedOut = false;  // the last session ended because of its `maxMs`
 
+// Some pools only let known miners subscribe (pool.nerdminers.org:
+// "Only allowed user agents may subscribe"). After such a refusal the
+// following sessions present themselves as NerdMinerV2, until a restart.
+constexpr const char *kFallbackAgent = "NerdMinerV2";
+bool useFallbackAgent = false;
+
+const char *userAgent() { return useFallbackAgent ? kFallbackAgent : settings.userAgent.c_str(); }
+
 // Runs one pool session until the connection drops, or until `maxMs` has
 // elapsed when it is not 0.
 void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
@@ -41,7 +49,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
     uint32_t start = millis();
     uint32_t lastRx = start;
 
-    if (!sendLine(client, proto.subscribe(settings.userAgent.c_str()))) return;
+    if (!sendLine(client, proto.subscribe(userAgent()))) return;
 
     while (client.connected() && WiFi.isConnected()) {
         int n;
@@ -65,8 +73,13 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                         break;
                     case stratum::Event::SubscribeFailed:
                         setStatus("Subscribe refused");
-                        logf("[pool] subscribe refused: %s (user agent \"%s\")\n",
-                             proto.lastError().c_str(), settings.userAgent.c_str());
+                        logf("[pool] subscribe refused: %s (user agent \"%s\")\n", proto.lastError().c_str(),
+                             userAgent());
+                        if (!useFallbackAgent && strcasestr(proto.lastError().c_str(), "agent") &&
+                            settings.userAgent != kFallbackAgent) {
+                            useFallbackAgent = true;
+                            logf("[pool] retrying with user agent \"%s\"\n", kFallbackAgent);
+                        }
                         return;
                     case stratum::Event::Authorized:
                         stats.poolConnected = true;
