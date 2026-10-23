@@ -27,6 +27,7 @@ const SettingInfo kSettings[] = {
     N("bright", brightness, "Display", "Brightness (%)"),
     N("rot", rotation, "Display", "Rotation (0-3)"),
     S("autorot", Bool, autoRotate, "Display", "Rotate with the accelerometer (M5 devices)"),
+    N("lang", language, "Display", "Language: 0 English, 1 French"),
     N("theme", theme, "Display", "Colour theme (0 orange, 1 green, 2 blue, 3 purple, 4 pink)"),
     N("cycle", cycleSeconds, "Display", "Next screen every N seconds (0 = off)"),
     N("nightfrom", nightFrom, "Display", "Night mode from hour (0-23, 255 = off)"),
@@ -50,6 +51,7 @@ const SettingInfo kSettings[] = {
     S("mqttpass", Secret, mqttPass, "Network", "MQTT password"),
     S("peers", Text, peers, "Network", "Other miners on the dashboard (comma separated IPs or names)"),
     S("webpass", Secret, webPassword, "Network", "Web password (settings and firmware update from the dashboard)"),
+    N("update", githubUpdate, "Network", "Updates from GitHub: 0 off, 1 check and offer, 2 install automatically"),
 };
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
@@ -100,6 +102,8 @@ void settingsSanitize() {
     settings.currency = normalizeCurrency(settings.currency);
     if (settings.brightness > 100) settings.brightness = 100;
     settings.rotation &= 3;
+    if (settings.language > 1) settings.language = 0;
+    if (settings.githubUpdate > 2) settings.githubUpdate = 1;
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
     if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
@@ -218,7 +222,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         if (onPortal) onPortal();
     });
 
-    char port[8], port2[8], diff[16], beep[2] = {settings.beep ? '1' : '0', 0};
+    char port[8], port2[8], diff[16], beep[2] = {settings.beep ? '1' : '0', 0}, lang[2] = {char('0' + settings.language), 0};
     snprintf(port, sizeof(port), "%u", settings.poolPort);
     snprintf(port2, sizeof(port2), "%u", settings.backupPort);
     snprintf(diff, sizeof(diff), "%g", settings.suggestedDifficulty);
@@ -239,6 +243,8 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                              settings.timezone.c_str(), 48);
     WiFiManagerParameter pFiat("fiat", "Price currency (USD, EUR, GBP, CAD, CHF, AUD, JPY)",
                                settings.currency.c_str(), 4);
+    WiFiManagerParameter pLang("lang", "Language: 0 English, 1 French (Francais)", lang, 1,
+                               "type='number' min='0' max='1'");
     WiFiManagerParameter pWeb("webpass",
                               "Web password: lets the dashboard change settings and update the firmware "
                               "(empty = read-only dashboard)",
@@ -254,6 +260,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pBeep);
     wm.addParameter(&pTz);
     wm.addParameter(&pFiat);
+    wm.addParameter(&pLang);
     wm.addParameter(&pWeb);
 
     String ap = portalApName();
@@ -277,6 +284,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.timezone = pTz.getValue();
         settings.currency = pFiat.getValue();
         settings.webPassword = pWeb.getValue();
+        settings.language = atoi(pLang.getValue());
         settingsSanitize();
         settingsSave();
         logf("[cfg] settings saved\n");

@@ -21,6 +21,10 @@
 // pool.nerdminers.org requires "NerdMinerV2").
 #define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
 #define DEFAULT_NTFY_SERVER "ntfy.sh"
+// Firmware updates come from the releases of this GitHub repository.
+#ifndef GITHUB_REPO
+#define GITHUB_REPO "bdlglua/BDLMinerV1"
+#endif
 #define HOUR_OFF 255  // nightFrom / nightTo: no night mode
 
 struct Settings {
@@ -39,6 +43,7 @@ struct Settings {
     uint8_t rotation = 1;     // 0..3, display orientation
     bool autoRotate = false;  // follow the accelerometer (M5 devices with an IMU)
     uint8_t theme = 0;        // accent colour, see ui.cpp
+    uint8_t language = 0;     // 0 English, 1 French (screen and dashboard)
     uint8_t cycleSeconds = 0; // > 0: next screen every N seconds
     uint8_t nightFrom = HOUR_OFF, nightTo = HOUR_OFF;  // screen off and no beep
     bool beep = true;  // beep when a 32-bit share (difficulty >= 1) is found
@@ -59,6 +64,7 @@ struct Settings {
     String mqttUser, mqttPass;
     String peers;  // other miners for the dashboard: "192.168.1.41, miner2.local"
     String webPassword;  // empty = settings and firmware cannot be changed from the web
+    uint8_t githubUpdate = 1;  // 0 off, 1 check and offer, 2 install by itself
 };
 
 extern Settings settings;

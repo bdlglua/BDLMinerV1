@@ -1,0 +1,48 @@
+# Host tests and a build of every board, on each push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+      - run: pip install platformio
+      - run: ./test/host/run.sh
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [m5stickc-plus2, m5stack-esp32, m5stack-s3, lilygo-t-display, lilygo-t-display-s3,
+              esp32-2432s028r, esp32-headless, esp32s3-headless, esp32s2-headless, esp32c3-headless]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
+      - run: pip install platformio
+      - run: pio run -e ${{ matrix.env }}

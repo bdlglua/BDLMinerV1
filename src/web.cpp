@@ -8,6 +8,7 @@
 
 #include "board.h"
 #include "core/address.h"
+#include "ghupdate.h"
 #include "log.h"
 #include "market.h"
 #include "miner.h"
@@ -47,98 +48,147 @@ pre{max-width:960px;margin:0 auto;white-space:pre-wrap;font-size:12px;background
 @media(max-width:460px){.t.big{grid-column:span 1}}
 </style>)CSS";
 
+// Translations for the pages: t('English') gives the French text when the
+// miner's language is French (LANG is set by sendPage()).
+const char kI18n[] PROGMEM = R"JS(<script>
+const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','Hashrate':'Hashrate','Shares':'Shares',
+'rejected':'rejetées','pool diff':'diff pool','Best difficulty':'Meilleure difficulté','best ever':'record','32-bit shares':'Shares 32 bits',
+'1 every':'1 toutes les','on average':'en moyenne','Block chance':'Chance de bloc','day':'jour','year':'an','Blocks found':'Blocs trouvés',
+'lifetime':'depuis le début','Total hashes':'Hashes totaux','uptime':'en marche depuis','Block height':'Hauteur de bloc','net diff':'diff réseau',
+'Lifetime':'Depuis le début','hashes':'hashes','shares':'shares','running':'en marche','Hashrate history':'Historique du hashrate',
+'5-min averages, last':'moyennes sur 5 min, depuis','avg':'moy.','range':'de','first point after':'premier point après','min of mining':'min de minage',
+'Seen by the pool':'Vu par la pool','best':'meilleure','worker(s)':'worker(s)','min ago':'min','no stats API known for this pool':'pas d\'API de statistiques connue pour cette pool',
+'Best shares':'Meilleures shares','BTC price':'Prix du BTC','sats':'sats','Fees sat/vB':'Frais sat/vB','fast / 30 min / 1 h':'rapide / 30 min / 1 h',
+'Network hashrate':'Hashrate du réseau','tx in mempool':'tx dans la mempool','Next retarget':'Prochain ajustement','in':'dans','blocks':'blocs','done':'fait',
+'Pool (backup)':'Pool (secours)','Pool':'Pool','Payout address':'Adresse de paiement','not a valid Bitcoin address':'adresse Bitcoin invalide',
+'Device':'Appareil','night mode':'mode nuit','last reset':'dernier redémarrage','WiFi':'WiFi','Miners':'Miners','All miners':'Tous les miners',
+'miners':'miners','no answer':'pas de réponse','online':'en ligne','ONLINE':'EN LIGNE','OFFLINE':'HORS LIGNE','NO CONNECTION':'PAS DE CONNEXION',
+'Updated':'Mis à jour','market data':'données marché','min old':'min','paused: too hot':'en pause : trop chaud','battery saver: half speed':'économie de batterie : mi-régime',
+'Recent blocks':'Derniers blocs','mining now':'en cours de minage','your best':'ta meilleure','ago':'il y a','Firmware update':'Mise à jour du firmware',
+'Update available':'Mise à jour disponible','Install':'Installer','up to date':'à jour',
+'Save and restart':'Enregistrer et redémarrer','Backup':'Sauvegarde','Download a backup':'Télécharger une sauvegarde','Restore a backup':'Restaurer une sauvegarde',
+'Update':'Mettre à jour','Not a backup file':'Ce n\'est pas un fichier de sauvegarde','Restore this backup? The miner restarts afterwards.':'Restaurer cette sauvegarde ? Le miner redémarre ensuite.',
+'Saved, restarting… reload in 15 s':'Enregistré, redémarrage… recharge dans 15 s','Upload failed':'Échec de l\'envoi',
+'Refreshes every 5 s. Times are since the last start.':'Actualisé toutes les 5 s. Heures depuis le dernier démarrage.',
+'backup_help':'Le fichier de sauvegarde contient tous les réglages (mots de passe compris : garde-le privé) et les statistiques à vie : meilleure difficulté, les 10 meilleures shares, hashes, shares, blocs, durée de fonctionnement. Le restaurer sur un autre miner lui donne aussi ces statistiques.',
+'Display':'Affichage','Notifications':'Notifications','Safety':'Sécurité','Network':'Réseau'};
+// Settings labels by key.
+const FR_SET={pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
+diff:'Difficulté de share suggérée',ua:'User agent (pool.nerdminers.org demande NerdMinerV2)',pool2:'Pool de secours (vide = aucune)',port2:'Port de la pool de secours',
+rotateh:'Alterner pool principale / secours toutes les N heures (0 = seulement en cas de panne)',bright:'Luminosité (%)',rot:'Rotation (0-3)',
+autorot:'Rotation avec l\'accéléromètre (appareils M5)',lang:'Langue : 0 anglais, 1 français',theme:'Thème (0 orange, 1 vert, 2 bleu, 3 violet, 4 rose)',
+cycle:'Écran suivant toutes les N secondes (0 = non)',nightfrom:'Mode nuit à partir de (heure 0-23, 255 = non)',nightto:'Mode nuit jusqu\'à (heure 0-23)',
+beep:'Bip à chaque share 32 bits',tz:'Fuseau horaire (POSIX TZ, ex. CET-1CEST,M3.5.0,M10.5.0/3 ou UTC0)',fiat:'Devise du prix (USD, EUR, GBP, CAD, CHF, AUD, JPY)',
+ntfy:'Sujet ntfy (vide = non)',ntfysrv:'Serveur ntfy',notify32:'Notifier aussi chaque share 32 bits',maxtemp:'Pause du minage au-dessus de cette température en °C (0 = non)',
+rebooth:'Redémarrer après N heures sans share acceptée (0 = non)',saver:'Économie de batterie : écran faible et minage à mi-régime sur batterie',
+wifi2:'WiFi de secours 1 : nom',wpass2:'WiFi de secours 1 : mot de passe',wifi3:'WiFi de secours 2 : nom',wpass3:'WiFi de secours 2 : mot de passe',
+mqtt:'Serveur MQTT pour Home Assistant (vide = non)',mqttport:'Port MQTT',mqttuser:'Utilisateur MQTT',mqttpass:'Mot de passe MQTT',
+peers:'Autres miners du tableau de bord (IP ou noms, séparés par des virgules)',webpass:'Mot de passe web (réglages et mise à jour depuis le tableau de bord)',
+update:'Mises à jour depuis GitHub : 0 non, 1 vérifier et proposer, 2 installer automatiquement'};
+function t(s){return LANG=='fr'&&FR[s]||s}
+document.addEventListener('DOMContentLoaded',()=>{document.documentElement.lang=LANG;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t))});
+</script>)JS";
+
 const char kHeader[] PROGMEM = R"HTML(<header><div class="coin">B</div><h1>BDLMiner <b>V1</b></h1>
-<nav><a href="/">Dashboard</a><a href="/settings">Settings</a><a href="/log">Log</a><span id="st"></span></nav></header>)HTML";
+<nav><a href="/" data-t="Dashboard">Dashboard</a><a href="/settings" data-t="Settings">Settings</a><a href="/log" data-t="Log">Log</a><span id="st"></span></nav></header>)HTML";
 
 const char kDashboard[] PROGMEM = R"HTML(<main id="m"></main>
-<h2 id="ph" hidden>Miners</h2><div class="grid" id="p"></div>
+<h2 id="ph" hidden data-t="Miners">Miners</h2><div class="grid" id="p"></div>
 <footer id="f"></footer>
 <script>
 const SI=['','k','M','G','T','P','E','Z','Y'];
 function si(v,u=''){if(!v)return'-';let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
 function diff(d){return!d?'-':d<1?d.toFixed(5):si(d)}
-function dur(s){if(!isFinite(s))return'-';if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+'d ':'')+(d||h?h+'h ':'')+m+'m'}
-function odds(hr,nd,t){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*t/(nd*4294967296));return'1 in '+si(1/p).replace(' ','')}
-function chart(h){const v=h.hashrate,t=tile('Hashrate history',undefined,v.length?'5-min averages, last '+dur(v.length*h.interval_s)+' · avg '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · range '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):'first point after '+h.interval_s/60+' min of mining',true);
+function dur(s){if(!isFinite(s))return'-';if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+(LANG=='fr'?'j ':'d '):'')+(d||h?h+'h ':'')+m+'m'}
+function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*4294967296));return(LANG=='fr'?'1 sur ':'1 in ')+si(1/p).replace(' ','')}
+function chart(h){const v=h.hashrate,t0=tile(t('Hashrate history'),undefined,v.length?t('5-min averages, last')+' '+dur(v.length*h.interval_s)+' · '+t('avg')+' '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · '+t('range')+' '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):t('first point after')+' '+h.interval_s/60+' '+t('min of mining'),true);
  if(v.length>1){const N='http://www.w3.org/2000/svg',W=300,H=60,lo=Math.min(...v),hi=Math.max(...v),k=(H-4)/((hi-lo)||hi||1),s=document.createElementNS(N,'svg'),p=document.createElementNS(N,'polyline');
   s.setAttribute('viewBox','0 0 '+W+' '+H);s.setAttribute('preserveAspectRatio','none');s.style.cssText='display:block;width:100%;height:60px;margin:6px 0';
   p.setAttribute('points',v.map((y,i)=>(i*W/(v.length-1)).toFixed(1)+','+(H-2-(y-lo)*k).toFixed(1)).join(' '));
   p.setAttribute('vector-effect','non-scaling-stroke');p.style.cssText='fill:none;stroke:var(--accent);stroke-width:2';
-  s.appendChild(p);t.insertBefore(s,t.lastChild)}return t}
-function tile(label,value,sub,big){const t=document.createElement('div');t.className='t'+(big?' big':'');
- for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const e=document.createElement('div');e.className=c;e.textContent=x;t.appendChild(e)}return t}
+  s.appendChild(p);t0.insertBefore(s,t0.lastChild)}return t0}
+function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
+ for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
+function upd(u){if(!u||!u.available)return;const e=tile(t('Update available'),u.version,u.notes||'',true),b=document.createElement('button');b.textContent=t('Install');
+ b.onclick=async()=>{b.disabled=true;const r=await fetch('/api/github-update',{method:'POST'});b.textContent=await r.text()};e.appendChild(b);return e}
 const peers={};
 async function peer(h){try{const c=new AbortController();setTimeout(()=>c.abort(),2500);const r=await fetch('http://'+h+'/api/stats',{signal:c.signal});peers[h]=await r.json()}catch(e){peers[h]=null}}
 async function tick(){
  try{const r=await fetch('/api/stats');const j=await r.json();const m=j.market,pv=j.pool_view;
   document.documentElement.style.setProperty('--accent',j.accent);
-  const st=document.getElementById('st');st.textContent=j.pool.connected?'ONLINE':'OFFLINE';st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';
-  const state=j.throttle=='paused'?'⚠ paused: too hot':j.throttle=='half'?'battery saver: half speed':'';
-  const T=[tile('Hashrate',si(j.hashrate,'H/s'),j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state:''),true),
-   tile('Shares',j.shares.accepted+(j.shares.rejected?' / '+j.shares.rejected+' rejected':''),'pool diff '+diff(j.pool.difficulty)),
-   tile('Best difficulty',diff(j.best.session),'best ever '+diff(j.best.ever)),
-   tile('32-bit shares',j.over32bits,'1 every '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' on average'),
-   tile('Block chance',odds(j.hashrate,j.network.difficulty,86400)+' / day',odds(j.hashrate,j.network.difficulty,31557600)+' / year'),
-   tile('Blocks found',j.blocks,'lifetime '+j.lifetime.blocks),
-   tile('Total hashes',si(j.total_hashes),'uptime '+dur(j.uptime_s)),
-   tile('Block height',j.network.height||'-','net diff '+diff(j.network.difficulty)),
-   tile('Lifetime',si(j.lifetime.hashes)+' hashes',j.lifetime.shares+' shares · running '+dur(j.lifetime.seconds)),
+  const st=document.getElementById('st');st.textContent=t(j.pool.connected?'ONLINE':'OFFLINE');st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';
+  const state=j.throttle=='paused'?'⚠ '+t('paused: too hot'):j.throttle=='half'?t('battery saver: half speed'):'';
+  const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state:''),true),
+   tile(t('Shares'),j.shares.accepted+(j.shares.rejected?' / '+j.shares.rejected+' '+t('rejected'):''),t('pool diff')+' '+diff(j.pool.difficulty)),
+   tile(t('Best difficulty'),diff(j.best.session),t('best ever')+' '+diff(j.best.ever)),
+   tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
+   tile(t('Block chance'),odds(j.hashrate,j.network.difficulty,86400)+' / '+t('day'),odds(j.hashrate,j.network.difficulty,31557600)+' / '+t('year')),
+   tile(t('Blocks found'),j.blocks,t('lifetime')+' '+j.lifetime.blocks),
+   tile(t('Total hashes'),si(j.total_hashes),t('uptime')+' '+dur(j.uptime_s)),
+   tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
+   tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds)),
    chart(j.history)];
-  if(pv.updated_s>=0)T.push(tile('Seen by the pool',si(pv.hashrate,'H/s'),'best '+diff(pv.best)+' · '+pv.workers+' worker(s) · '+Math.round(pv.updated_s/60)+' min ago'));
-  else if(!pv.supported)T.push(tile('Seen by the pool','-','no stats API known for this pool'));
-  if(j.top.length)T.push(tile('Best shares',j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
-  if(m.updated_s>=0){T.push(tile('BTC price',m.price?Math.round(m.price).toLocaleString()+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString()+' sats / '+m.currency:'',true),
-   tile('Fees sat/vB',m.fees.join(' / '),'fast / 30 min / 1 h'),
-   tile('Network hashrate',si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' tx in mempool'),
-   tile('Next retarget',(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %','in '+m.retarget.blocks+' blocks ('+m.retarget.progress.toFixed(0)+' % done)'))}
-  T.push(tile(j.pool.backup?'Pool (backup)':'Pool',j.pool.host+':'+j.pool.port,j.pool.status),
-   tile('Payout address',j.address,j.address_type==='invalid'?'⚠ not a valid Bitcoin address':j.address_type),
-   tile('Device',j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB free'+(j.night?' · night mode':'')+'\nlast reset: '+j.boot_reason),
-   tile('WiFi',j.ip,j.ssid+' · '+j.rssi+' dBm'));
+  const u=upd(j.github_update);if(u)T.unshift(u);
+  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')));
+  else if(!pv.supported)T.push(tile(t('Seen by the pool'),'-',t('no stats API known for this pool')));
+  const now=Date.now()/1e3,B=j.blocks_recent||[];
+  if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+': '+t('your best')+' '+diff(B[0].best):''),true));
+  if(j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
+  if(m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString()+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString()+' '+t('sats')+' / '+m.currency:'',true),
+   tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),
+   tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' '+t('tx in mempool')),
+   tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+m.retarget.progress.toFixed(0)+' % '+t('done')+')'))}
+  T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,j.pool.status),
+   tile(t('Payout address'),j.address,j.address_type==='invalid'?'⚠ '+t('not a valid Bitcoin address'):j.address_type),
+   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB'+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason),
+   tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
   document.getElementById('m').replaceChildren(...T);
-  document.getElementById('f').textContent='Updated '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · market data '+Math.round(m.updated_s/60)+' min old (mempool.space)':'');
+  document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
   if(j.peers.length){document.getElementById('ph').hidden=false;j.peers.forEach(peer);let total=j.hashrate;
-   const P=j.peers.map(h=>{const p=peers[h];if(!p)return tile(h,'-','no answer');total+=p.hashrate;return tile(h,si(p.hashrate,'H/s'),(p.pool.connected?'online':'OFFLINE')+' · '+p.shares.accepted+' shares · best '+diff(p.best.ever))});
-   P.unshift(tile('All miners',si(total,'H/s'),(j.peers.length+1)+' miners',true));document.getElementById('p').replaceChildren(...P)}
- }catch(e){document.getElementById('st').textContent='NO CONNECTION';}
+   const P=j.peers.map(h=>{const p=peers[h];if(!p)return tile(h,'-',t('no answer'));total+=p.hashrate;return tile(h,si(p.hashrate,'H/s'),(p.pool.connected?t('online'):t('OFFLINE'))+' · '+p.shares.accepted+' '+t('shares')+' · '+t('best')+' '+diff(p.best.ever))});
+   P.unshift(tile(t('All miners'),si(total,'H/s'),(j.peers.length+1)+' '+t('miners'),true));document.getElementById('p').replaceChildren(...P)}
+ }catch(e){document.getElementById('st').textContent=t('NO CONNECTION');}
 }
 tick();setInterval(tick,3000);
 </script>)HTML";
 
 const char kSettingsPage[] PROGMEM = R"HTML(<form id="f" class="box" onsubmit="return save()"></form>
-<div class="box"><button onclick="save()">Save and restart</button>
-<fieldset><legend>Backup</legend><p class="s">The backup file holds every setting (passwords included: keep it private) and the lifetime statistics: best difficulty, the 10 best shares, hashes, shares, blocks, running time. Restoring it on another miner also gives that one these statistics.</p>
-<button onclick="location.href='/api/backup'">Download a backup</button>
-<button onclick="document.getElementById('imp').click()">Restore a backup</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)"></fieldset>
-<fieldset><legend>Firmware update</legend><input type="file" id="fw" accept=".bin"><button onclick="upd()">Update</button><div id="up" class="s"></div></fieldset>
+<div class="box"><button onclick="save()" data-t="Save and restart">Save and restart</button>
+<fieldset><legend data-t="Backup">Backup</legend><p class="s" id="bh">The backup file holds every setting (passwords included: keep it private) and the lifetime statistics: best difficulty, the 10 best shares, hashes, shares, blocks, running time. Restoring it on another miner also gives that one these statistics.</p>
+<button onclick="location.href='/api/backup'" data-t="Download a backup">Download a backup</button>
+<button onclick="document.getElementById('imp').click()" data-t="Restore a backup">Restore a backup</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)"></fieldset>
+<fieldset><legend data-t="Firmware update">Firmware update</legend><input type="file" id="fw" accept=".bin"><button onclick="upd()" data-t="Update">Update</button><div id="up" class="s"></div></fieldset>
 <p class="s" id="msg"></p></div>
 <script>
 let S;const $=id=>document.getElementById(id);
+if(LANG=='fr')$('bh').textContent=t('backup_help');
 async function load(){const r=await fetch('/api/settings');if(!r.ok){$('msg').textContent=await r.text();return}S=await r.json();const f=$('f');let g='',fs;
- for(const[k,type,group,label]of S.schema){if(group!=g){g=group;fs=document.createElement('fieldset');fs.innerHTML='<legend>'+g+'</legend>';f.appendChild(fs)}
-  const l=document.createElement('label'),i=document.createElement('input');l.textContent=label;i.id='k_'+k;
+ for(const[k,type,group,label]of S.schema){if(group!=g){g=group;fs=document.createElement('fieldset');const lg=document.createElement('legend');lg.textContent=t(g);fs.appendChild(lg);f.appendChild(fs)}
+  const l=document.createElement('label'),i=document.createElement('input');l.textContent=LANG=='fr'&&FR_SET[k]||label;i.id='k_'+k;
   if(type=='bool'){i.type='checkbox';i.checked=S.values[k]}else{i.type=type=='secret'?'password':type=='text'?'text':'number';if(type=='decimal')i.step='any';i.value=S.values[k]}
   fs.append(l,i)}}
 function values(){const v={};for(const[k,type]of S.schema){const i=$('k_'+k);v[k]=type=='bool'?i.checked:type=='number'||type=='decimal'?Number(i.value):i.value}return v}
-async function post(v){const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});$('msg').textContent=r.ok?'Saved, restarting… reload in 15 s':await r.text()}
+async function post(v){const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});$('msg').textContent=r.ok?t('Saved, restarting… reload in 15 s'):await r.text()}
 function save(){post(values());return false}
-function imp(i){const r=new FileReader();r.onload=async()=>{try{JSON.parse(r.result)}catch(e){$('msg').textContent='Not a backup file';return}
- if(!confirm('Restore this backup? The miner restarts afterwards.'))return;
+function imp(i){const r=new FileReader();r.onload=async()=>{try{JSON.parse(r.result)}catch(e){$('msg').textContent=t('Not a backup file');return}
+ if(!confirm(t('Restore this backup? The miner restarts afterwards.')))return;
  const x=await fetch('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:r.result});$('msg').textContent=await x.text()};r.readAsText(i.files[0])}
 function upd(){const f=$('fw').files[0];if(!f)return;const x=new XMLHttpRequest(),d=new FormData();d.append('firmware',f);
- x.upload.onprogress=e=>$('up').textContent=Math.round(e.loaded*100/e.total)+' %';x.onload=()=>$('up').textContent=x.responseText;x.onerror=()=>$('up').textContent='Upload failed';
+ x.upload.onprogress=e=>$('up').textContent=Math.round(e.loaded*100/e.total)+' %';x.onload=()=>$('up').textContent=x.responseText;x.onerror=()=>$('up').textContent=t('Upload failed');
  x.open('POST','/update');x.send(d)}
 load();
 </script>)HTML";
 
-const char kLogPage[] PROGMEM = R"HTML(<pre id="l">…</pre><footer>Refreshes every 5 s. Times are since the last start.</footer>
-<script>async function t(){try{const r=await fetch('/api/log');document.getElementById('l').textContent=await r.text()}catch(e){}}t();setInterval(t,5000)</script>)HTML";
+const char kLogPage[] PROGMEM = R"HTML(<pre id="l">…</pre><footer data-t="Refreshes every 5 s. Times are since the last start.">Refreshes every 5 s. Times are since the last start.</footer>
+<script>async function r(){try{const x=await fetch('/api/log');document.getElementById('l').textContent=await x.text()}catch(e){}}r();setInterval(r,5000)</script>)HTML";
 
 void sendPage(const char *title, const char *body) {
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "text/html", "");
     server.sendContent(String("<!doctype html><html lang=\"en\"><head><title>") + title + "</title>");
     server.sendContent_P(kStyle);
+    server.sendContent(String("<script>const LANG='") + (settings.language == 1 ? "fr" : "en") + "';</script>");
+    server.sendContent_P(kI18n);
     server.sendContent("</head><body>");
     server.sendContent_P(kHeader);
     server.sendContent_P(body);
@@ -258,6 +308,38 @@ void handleStats() {
     mk["retarget"]["change"] = m.retargetChange;
     mk["retarget"]["progress"] = m.retargetProgress;
     mk["retarget"]["blocks"] = m.retargetBlocks;
+    // Latest blocks, with your best share while each was the one to find
+    // (the first entry is the block being mined, not found yet).
+    BlockBest bb[BLOCK_BESTS];
+    int nb = minerBlockBests(bb, BLOCK_BESTS);
+    auto bestFor = [&](uint32_t h, JsonObject o) {
+        for (int i = 0; i < nb; i++)
+            if (bb[i].height == h) o["best"] = bb[i].best;
+    };
+    JsonArray blocks = j["blocks_recent"].to<JsonArray>();
+    if (stats.blockHeight) {
+        JsonObject o = blocks.add<JsonObject>();
+        o["h"] = stats.blockHeight;
+        o["mining"] = true;
+        bestFor(stats.blockHeight, o);
+    }
+    for (int i = 0; i < m.blockCount; i++) {
+        JsonObject o = blocks.add<JsonObject>();
+        o["h"] = m.blocks[i].height;
+        o["t"] = m.blocks[i].time;
+        o["pool"] = m.blocks[i].pool;
+        o["tx"] = m.blocks[i].txs;
+        bestFor(m.blocks[i].height, o);
+    }
+    j["lang"] = settings.language == 1 ? "fr" : "en";
+    GithubUpdate gu = ghUpdateState();
+    JsonObject up = j["github_update"].to<JsonObject>();
+    up["available"] = gu.available;
+    up["version"] = gu.version;
+    up["installing"] = gu.installing;
+    up["progress"] = gu.progress;
+    up["error"] = gu.error;
+    up["notes"] = gu.installing ? String(gu.progress) + " %" : String(gu.error);
 
     String body;
     serializeJson(j, body);
@@ -523,6 +605,11 @@ void webStart() {
     server.on("/api/backup", HTTP_GET, handleGetBackup);
     server.on("/api/backup", HTTP_POST, handlePostBackup);
     server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
+    server.on("/api/github-update", HTTP_POST, []() {
+        if (!authorized()) return;
+        if (ghUpdateInstall()) server.send(200, "text/plain", "Installing, the miner restarts by itself");
+        else server.send(409, "text/plain", "No update to install");
+    });
     server.on("/metrics", HTTP_GET, handleMetrics);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
     server.begin();

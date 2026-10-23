@@ -52,8 +52,11 @@ bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocume
     }
     bool ok = false;
     if (code == HTTP_CODE_OK) {
-        String body = http.getString();  // also undoes chunked encoding
-        DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
+        // Parsed as it arrives when the length is known (the block list is
+        // ~30 KB); a chunked body is read whole first.
+        DeserializationError err =
+            http.getSize() > 0 ? deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter))
+                               : deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter));
         ok = !err;
         if (err) logf("[market] %s: %s\n", path, err.c_str());
     } else {
@@ -125,15 +128,35 @@ bool refresh() {
             ok++;
         }
     }
+    {
+        JsonDocument filter, doc;
+        JsonObject b = filter.add<JsonObject>();
+        b["height"] = true;
+        b["timestamp"] = true;
+        b["tx_count"] = true;
+        b["extras"]["pool"]["name"] = true;
+        if (fetch(tls, http, "/v1/blocks", doc, filter)) {
+            d.blockCount = 0;
+            for (JsonObject o : doc.as<JsonArray>()) {
+                if (d.blockCount == sizeof(d.blocks) / sizeof(d.blocks[0])) break;
+                MarketData::Block &k = d.blocks[d.blockCount++];
+                k.height = o["height"] | 0;
+                k.time = o["timestamp"] | 0;
+                k.txs = o["tx_count"] | 0;
+                strlcpy(k.pool, o["extras"]["pool"]["name"] | "", sizeof(k.pool));
+            }
+            ok++;
+        }
+    }
 
     if (ok) d.updatedMs = millis();
     portENTER_CRITICAL(&dataMux);
     data = d;
     portEXIT_CRITICAL(&dataMux);
-    logf("[market] %d/5 ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
+    logf("[market] %d/6 ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
          ok, (unsigned)(millis() - t0), d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour,
          d.networkHashrate, d.retargetChange, (unsigned)d.retargetBlocks);
-    return ok == 5;
+    return ok == 6;
 }
 
 // "856K" (ckpool hash rates) -> 856000

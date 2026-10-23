@@ -16,6 +16,12 @@ struct MarketData {
     double retargetProgress = 0;  // percent of the current epoch done
     uint32_t retargetBlocks = 0;  // blocks until the next adjustment
     uint32_t mempoolTx = 0;       // unconfirmed transactions
+    struct Block {
+        uint32_t height, time;  // Unix time
+        uint32_t txs;
+        char pool[20];          // who mined it, "" when unknown
+    } blocks[8];                // newest first
+    uint8_t blockCount = 0;
 };
 
 // What the pool says about this miner's address (public-pool and ckpool

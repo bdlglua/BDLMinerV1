@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BDLMiner V1 installer</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+:root{--bg:#0b0d12;--panel:#161b26;--border:#2b3344;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;padding:16px}
+main{max-width:640px;margin:0 auto}
+header{display:flex;align-items:center;gap:10px;margin:8px 0 20px}
+.coin{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:900;display:grid;place-items:center;transform:rotate(14deg)}
+h1{font-size:22px;margin:0}h1 b{color:var(--accent)}
+#lang{margin-left:auto;background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer}
+.box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px}
+label{display:block;color:var(--label);font-size:13px;margin-bottom:6px}
+select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font:inherit}
+esp-web-install-button{display:block;margin-top:14px}
+esp-web-install-button button,.btn{background:var(--accent);color:#000;border:0;border-radius:8px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}
+ol{padding-left:20px;margin:0}li{margin:6px 0}a{color:var(--accent)}.s{color:var(--label);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<header><div class="coin">B</div><h1>BDLMiner <b>V1</b></h1><button id="lang">Français</button></header>
+
+<div class="box">
+<label for="board" data-t="board">Your board</label>
+<select id="board"></select>
+<esp-web-install-button id="install">
+  <button slot="activate" class="btn" data-t="install">Install</button>
+  <span slot="unsupported" data-t="unsupported">Your browser cannot install: use Chrome or Edge on a computer.</span>
+  <span slot="not-allowed" data-t="notallowed">The page must be opened over HTTPS.</span>
+</esp-web-install-button>
+<p class="s" data-t="version">Version __VERSION__. The first install erases the board (settings and statistics).</p>
+</div>
+
+<div class="box">
+<ol>
+<li data-t="s1">Plug the board into this computer with a USB cable that carries data.</li>
+<li data-t="s2">Pick the board above, click Install and choose its serial port.</li>
+<li data-t="s3">When it restarts, join the WiFi network BDLMinerV1-XXXX (password MineYourCoins) and enter your WiFi, pool and BTC address.</li>
+</ol>
+<p class="s"><a href="https://github.com/bdlglua/BDLMinerV1" data-t="source">Source code and documentation</a></p>
+</div>
+</main>
+<script>
+const BOARDS=__BOARDS__;
+const FR={board:'Ta carte',install:'Installer',unsupported:'Ce navigateur ne peut pas installer : utilise Chrome ou Edge sur un ordinateur.',
+notallowed:'La page doit être ouverte en HTTPS.',version:'Version __VERSION__. La première installation efface la carte (réglages et statistiques).',
+s1:'Branche la carte à cet ordinateur avec un câble USB qui transmet les données.',
+s2:'Choisis la carte ci-dessus, clique sur Installer et sélectionne son port série.',
+s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV1-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
+source:'Code source et documentation'};
+const EN={};document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
+let lang=(navigator.language||'').startsWith('fr')?'fr':'en';
+function apply(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=(lang=='fr'?FR:EN)[e.dataset.t]);
+ document.getElementById('lang').textContent=lang=='fr'?'English':'Français'}
+document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';apply()};
+const sel=document.getElementById('board'),btn=document.getElementById('install');
+for(const b of BOARDS){const o=document.createElement('option');o.value=b.env;o.textContent=b.name;sel.appendChild(o)}
+sel.onchange=()=>btn.manifest='manifest-'+sel.value+'.json';sel.onchange();apply();
+</script>
+</body>
+</html>

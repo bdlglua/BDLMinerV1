@@ -79,6 +79,15 @@ struct BestShare {
 #define TOP_SHARES 10
 int minerTopShares(BestShare *out, int capacity);
 
+// Your best share while mining on each recent block height, newest first
+// (the first one is the block being mined now).
+struct BlockBest {
+    uint32_t height;
+    double best;
+};
+#define BLOCK_BESTS 16
+int minerBlockBests(BlockBest *out, int capacity);
+
 // Lifetime statistics, for a backup.
 struct StatsSnapshot {
     double bestDiff;

@@ -49,6 +49,8 @@ QueueHandle_t shareQueue;
 portMUX_TYPE statsMux = portMUX_INITIALIZER_UNLOCKED;
 bool bestDirty = false;
 BestShare top[TOP_SHARES];  // best first, difficulty 0 = empty
+BlockBest blockBests[BLOCK_BESTS];  // ring, blockHead = the height mined now
+int blockHead = 0;
 volatile Throttle throttle = Throttle::Full;
 
 uint32_t lastHashes[MAX_MINERS];
@@ -112,6 +114,7 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         bestDirty = true;
     }
     if (d >= 1.0) stats.over32bits++;
+    if (d > blockBests[blockHead].best) blockBests[blockHead].best = d;
     if (d > top[TOP_SHARES - 1].difficulty) {
         int i = TOP_SHARES - 1;
         for (; i > 0 && top[i - 1].difficulty < d; i--) top[i] = top[i - 1];
@@ -288,6 +291,12 @@ void minerPublishJob(const work::Job &job, bool clean) {
     xSemaphoreGive(jobMutex);
 
     stats.blockHeight = job.blockHeight();
+    if (stats.blockHeight && stats.blockHeight != blockBests[blockHead].height) {
+        portENTER_CRITICAL(&statsMux);
+        blockHead = (blockHead + 1) % BLOCK_BESTS;
+        blockBests[blockHead] = {stats.blockHeight, 0};
+        portEXIT_CRITICAL(&statsMux);
+    }
     stats.networkDiff = work::difficultyFromBits(job.nbits);
     stats.poolDiff = job.difficulty;
     if (clean) xQueueReset(shareQueue);  // shares for stale jobs would be rejected
@@ -404,6 +413,17 @@ void minerTick() {
         lastSave = now;
         minerSaveStats();
     }
+}
+
+int minerBlockBests(BlockBest *out, int capacity) {
+    int n = 0;
+    portENTER_CRITICAL(&statsMux);
+    for (int i = 0; i < BLOCK_BESTS && n < capacity; i++) {
+        const BlockBest &b = blockBests[(blockHead - i + BLOCK_BESTS) % BLOCK_BESTS];
+        if (b.height) out[n++] = b;
+    }
+    portEXIT_CRITICAL(&statsMux);
+    return n;
 }
 
 int minerTopShares(BestShare *out, int capacity) {

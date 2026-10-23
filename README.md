@@ -64,7 +64,11 @@ Hashing engines:
 
 ## Install a release (no build tools)
 
-Each release has two files per board (`<board>` = the environment name of the table
+**Easiest:** open **https://bdlglua.github.io/BDLMinerV1/** in Chrome or Edge on a
+computer, plug the board in with a data USB cable, pick it in the list and click
+*Install* (it flashes the latest release; the first install erases the board).
+
+Each [release](https://github.com/bdlglua/BDLMinerV1/releases) also has two files per board (`<board>` = the environment name of the table
 above, e.g. `m5stickc-plus2`):
 
 * **`<board>-factory.bin`**: complete image for a first install, flashed at address
@@ -74,8 +78,41 @@ above, e.g. `m5stickc-plus2`):
 * **`<board>-firmware.bin`**: update keeping settings and statistics: on the dashboard
   (*Settings* → *Firmware update*), or `esptool.py write_flash 0x10000 <board>-firmware.bin`.
 
-`SHA256SUMS.txt` lists their checksums. To make a release: `python3 tools/make_release.py`
-(writes `release/<version>/`).
+`SHA256SUMS.txt` lists their checksums, and `<board>-firmware.bin.sig` the signature
+that updates from GitHub check.
+
+### Updates from GitHub
+
+Two minutes after boot and then every 12 hours, the miner looks at the latest release of
+this repository. When it is newer than its own firmware, the dashboard shows an
+*Update available* tile with an **Install** button (and a notification is sent); with the
+*Updates from GitHub* setting at `2` it installs it by itself, `0` turns the check off.
+The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
+key built into the firmware (`src/update_key.h`), so a modified file is refused. Settings
+and statistics are kept. Like web updates, it needs a board with room for two firmwares
+(not M5Stack Core or CYD).
+
+### Making a release
+
+Pushing a tag **`vX.Y.Z`** runs the *Release* workflow (`.github/workflows/release.yml`):
+host tests, firmware `X.Y.Z` for every board (the version comes from the tag), signatures,
+the GitHub release with all the files, and the web installer on GitHub Pages.
+
+```sh
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
+`keys/release-signing-key.pem` (`gh secret set RELEASE_SIGNING_KEY < keys/release-signing-key.pem`),
+and *Settings → Pages → Source: GitHub Actions*. The private key is not in the repository
+(`keys/` is ignored): **keep a copy of it somewhere safe**. Without it, miners already
+installed will refuse every future update from GitHub (they would need a USB or web update
+with a firmware carrying a new key).
+
+Locally, `python3 tools/make_release.py [--version X.Y.Z] [board...]` writes
+`release/<version>/` (signed when `keys/release-signing-key.pem` exists) and
+`python3 tools/make_installer.py release/<version> site` the installer site. The *CI*
+workflow runs the host tests and builds every board on each push and pull request.
 
 ## Build and flash
 
@@ -129,6 +166,7 @@ Boards without a display report everything on the serial monitor and the
      `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…);
    * **Price currency**: currency for the BTC price, `USD` by default
      (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`);
+   * **Language**: `0` English (default), `1` French, for the screen and the web dashboard;
    * **Web password**: lets the [web dashboard](#web-dashboard) change every setting and
      update the firmware (user `admin`). Empty = read-only dashboard.
 3. The board restarts and begins mining automatically. Stats can be viewed on
@@ -173,7 +211,9 @@ Screens, in order:
 6. **Graph**: hashrate over the last ~40 minutes (one point every 10 s), min / avg / max;
 7. **Records**: best difficulty ever and this session, 32‑bit shares and the average time
    between two, the chance of finding a block within a day and a year at the current
-   hashrate, lifetime running time, blocks, hashes and the 3 best shares ever.
+   hashrate, lifetime running time, blocks, hashes and the 3 best shares ever;
+8. **Blocks**: the block being mined, then the last 4 blocks found on the network, with
+   their pool, age and your best share while each one was being mined.
 
 Accepted shares flash `+1 SHARE` in the header; 32‑bit shares also light the red LED of M5
 devices for a second (not in night mode).
@@ -218,7 +258,9 @@ the serial monitor):
   average interval, block chance per day and per year, the 10 best shares ever with
   their date, what the pool sees (hashrate, best share, workers: public-pool.io and
   ckpool-style pools such as pool.nerdminers.org and solo.ckpool.org), market data,
-  lifetime totals, a 24‑hour chart, the reason of the last restart, and night / heat /
+  lifetime totals, the last blocks of the network (pool, transactions, your best share
+  for each), a 24‑hour chart, an *Update available* tile (see
+  [Updates from GitHub](#updates-from-github)), the reason of the last restart, and night / heat /
   battery state. With **Other miners** set, a *Miners* section shows each of them and the
   total hashrate (each miner's `/api/stats` allows other pages to read it).
 * **Settings** (needs the web password set in the portal; user `admin`): every setting,

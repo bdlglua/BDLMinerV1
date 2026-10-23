@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Generates the BDLMiner V1 screen backgrounds.
 
-Like NerdMinerV2, every screen is a full-screen bitmap with the labels and
-panels already drawn; the firmware only paints the live values into the field
-rectangles defined here. One set of images is produced per panel resolution.
+Like NerdMinerV2, every screen is a full-screen bitmap with the panels already
+drawn; the firmware paints the live values into the field rectangles defined
+here, and the panel labels too (fields of role LABEL, with their English text),
+so that they can be shown in the selected language. One set of images is
+produced per panel resolution.
 
 Outputs (committed, so building the firmware does not need Python):
   src/bg/bg_layout.h        field ids, roles and colors (shared)
@@ -65,7 +67,8 @@ def font(kind, px):
 
 SCREENS = ["SPLASH", "MINING", "CLOCK", "GLOBAL", "NETWORK", "INFO"]
 PAGES = len(SCREENS) - 1  # every screen but the splash has a page dot
-ROLES = ["NUM", "TEXT", "WRAP"]
+ROLES = ["NUM", "TEXT", "WRAP", "LABEL"]
+LABEL_COLOR = 0x8C96AA  # LABEL as RGB888
 ALIGNS = ["LEFT", "CENTER", "RIGHT"]
 
 FIELDS = [
@@ -115,6 +118,27 @@ FIELDS = [
     ("INFO_HEAP",       "TEXT", "CENTER", VALUE_WHITE),
     ("INFO_ADDRESS",    "WRAP", "CENTER", VALUE_WHITE),
 ]
+
+# Texts the firmware writes (translated): panel labels ("L_" + the panel's
+# first field), the splash tagline and the info screen's button help.
+LABELS = [
+    ("L_MINING_HASHRATE", "HASHRATE"), ("L_MINING_SHARES", "SHARES"), ("L_MINING_BEST", "BEST DIFF"),
+    ("L_MINING_POOLDIFF", "POOL DIFF"), ("L_MINING_BLOCKS", "BLOCKS"), ("L_MINING_BITS32", "32-BIT"),
+    ("L_MINING_TEMP", "TEMP"),
+    ("L_CLOCK_TIME", "TIME"), ("L_CLOCK_PRICE", "BTC PRICE"), ("L_CLOCK_HASHRATE", "HASHRATE"),
+    ("L_CLOCK_HEIGHT", "BLOCK"), ("L_CLOCK_FEE", "FEE sat/vB"), ("L_CLOCK_SHARES", "SHARES"),
+    ("L_CLOCK_BEST", "BEST DIFF"),
+    ("L_GLB_PRICE", "BITCOIN PRICE"), ("L_GLB_NETHASH", "NET HASHRATE"), ("L_GLB_MEMPOOL", "MEMPOOL TX"),
+    ("L_GLB_FEES", "FEES sat/vB  FAST / 30M / 1H"), ("L_GLB_RETARGET", "NEXT RETARGET"),
+    ("L_NET_HEIGHT", "BLOCK HEIGHT"), ("L_NET_DIFF", "NETWORK DIFF"), ("L_NET_HASHES", "TOTAL HASHES"),
+    ("L_NET_POOL", "POOL"), ("L_NET_BESTEVER", "BEST EVER"),
+    ("L_INFO_BOARD", "BOARD"), ("L_INFO_FIRMWARE", "FIRMWARE"), ("L_INFO_ENGINES", "MINING ENGINES"),
+    ("L_INFO_HEAP", "FREE RAM"), ("L_INFO_ADDRESS", "PAYOUT ADDRESS"),
+    ("SPLASH_TAGLINE", "BITCOIN  LOTTERY  MINER"),
+    ("INFO_HELP", "A: next screen   B: brightness   hold A 5s: reset"),
+]
+LABEL_TEXT = dict(LABELS)
+FIELDS += [(n, "LABEL", "LEFT" if n.startswith("L_") else "CENTER", LABEL_COLOR) for n, _ in LABELS]
 FIELD_NAMES = [f[0] for f in FIELDS]
 
 
@@ -128,6 +152,7 @@ class Canvas:
         self.img = Image.new("RGB", (w * SS, h * SS))
         self.d = ImageDraw.Draw(self.img)
         self.fields = {}
+        self.screen = None  # set while a screen is drawn
 
     def X(self, x):
         return x * self.sx * SS
@@ -142,7 +167,7 @@ class Canvas:
         assert name in FIELD_NAMES, name
         x0, y0 = round(x * self.sx), round(y * self.sy)
         x1, y1 = round((x + w) * self.sx), round((y + h) * self.sy)
-        self.fields[name] = (x0, y0, x1 - x0, y1 - y0)
+        self.fields[name] = (x0, y0, x1 - x0, y1 - y0, self.screen)
 
     def text(self, xy, s, size, color, kind="bold", anchor="la"):
         x, y = xy
@@ -218,6 +243,7 @@ class Canvas:
         self.field("HDR_STATUS", 164, 3, 73, 13)
 
     def panel(self, x, y, w, h, label, accent=False):
+        """`label`: the LABEL field (its text is written by the firmware)."""
         rad = self.S(4)
         box = (self.X(x), self.Y(y), self.X(x + w), self.Y(y + h))
         self.vgradient(box, PANEL_TOP, PANEL_BOTTOM, radius=int(rad))
@@ -226,11 +252,11 @@ class Canvas:
         if accent:
             self.d.rounded_rectangle((box[0] + rad, box[1], box[2] - rad, box[1] + self.S(1.6)), radius=self.S(0.8),
                                      fill=ORANGE)
-        self.text((x + 5, y + 3), label, 7, LABEL, "bold", "lt")
+        self.field(label, x + 4, y + 2, w - 8, 8)
 
-    def value_panel(self, name, x, y, w, h, label, accent=False):
-        """Panel with its label on top and one value field below it."""
-        self.panel(x, y, w, h, label, accent)
+    def value_panel(self, name, x, y, w, h, accent=False):
+        """Panel with its label (field "L_" + name) on top and one value field below it."""
+        self.panel(x, y, w, h, "L_" + name, accent)
         self.field(name, x + 3, y + 11, w - 6, h - 13)
 
     def footer_line(self):
@@ -247,23 +273,21 @@ def draw_splash(c):
     c.text((120, 84), "BDLMiner", 21, WHITE, "black", "mm")
     tw = c.d.textlength("BDLMiner", font=font("black", c.S(21))) / c.sx / SS
     c.text((120 + tw / 2 + 3, 84), "V1", 21, ORANGE, "black", "lm")
-    c.text((120, 102), "BITCOIN  LOTTERY  MINER", 7.5, LABEL, "bold", "mm")
+    c.field("SPLASH_TAGLINE", 20, 97, 200, 10)
     c.field("SPLASH_INFO", 4, 117, 232, 14)
 
 
 def draw_mining(c):
     c.background()
     c.header(0)
-    c.panel(4, 24, 146, 67, "HASHRATE", accent=True)
+    c.panel(4, 24, 146, 67, "L_MINING_HASHRATE", accent=True)
     c.field("MINING_HASHRATE", 8, 35, 138, 38)
     c.field("MINING_UNIT", 8, 74, 138, 15)
-    c.value_panel("MINING_SHARES", 154, 24, 82, 33, "SHARES")
-    c.value_panel("MINING_BEST", 154, 59, 82, 32, "BEST DIFF")
-    labels = [("MINING_POOLDIFF", "POOL DIFF"), ("MINING_BLOCKS", "BLOCKS"), ("MINING_BITS32", "32-BIT"),
-              ("MINING_TEMP", "TEMP")]
+    c.value_panel("MINING_SHARES", 154, 24, 82, 33)
+    c.value_panel("MINING_BEST", 154, 59, 82, 32)
     w = (232 - 3 * 4) / 4
-    for i, (name, label) in enumerate(labels):
-        c.value_panel(name, 4 + i * (w + 4), 94, w, 25, label)
+    for i, name in enumerate(["MINING_POOLDIFF", "MINING_BLOCKS", "MINING_BITS32", "MINING_TEMP"]):
+        c.value_panel(name, 4 + i * (w + 4), 94, w, 25)
     c.footer_line()
     c.field("MINING_STATE", 4, 122, 150, 12)
     c.field("MINING_UPTIME", 150, 122, 86, 12)
@@ -272,16 +296,14 @@ def draw_mining(c):
 def draw_clock(c):
     c.background()
     c.header(1)
-    c.panel(4, 24, 146, 67, "TIME", accent=True)
+    c.panel(4, 24, 146, 67, "L_CLOCK_TIME", accent=True)
     c.field("CLOCK_TIME", 8, 35, 138, 38)
     c.field("CLOCK_DATE", 8, 74, 138, 15)
-    c.value_panel("CLOCK_PRICE", 154, 24, 82, 33, "BTC PRICE")
-    c.value_panel("CLOCK_HASHRATE", 154, 59, 82, 32, "HASHRATE")
-    labels = [("CLOCK_HEIGHT", "BLOCK"), ("CLOCK_FEE", "FEE sat/vB"), ("CLOCK_SHARES", "SHARES"),
-              ("CLOCK_BEST", "BEST DIFF")]
+    c.value_panel("CLOCK_PRICE", 154, 24, 82, 33)
+    c.value_panel("CLOCK_HASHRATE", 154, 59, 82, 32)
     w = (232 - 3 * 4) / 4
-    for i, (name, label) in enumerate(labels):
-        c.value_panel(name, 4 + i * (w + 4), 94, w, 25, label)
+    for i, name in enumerate(["CLOCK_HEIGHT", "CLOCK_FEE", "CLOCK_SHARES", "CLOCK_BEST"]):
+        c.value_panel(name, 4 + i * (w + 4), 94, w, 25)
     c.footer_line()
     c.field("CLOCK_STATE", 4, 122, 150, 12)
     c.field("CLOCK_UPTIME", 150, 122, 86, 12)
@@ -290,13 +312,13 @@ def draw_clock(c):
 def draw_global(c):
     c.background()
     c.header(2)
-    c.panel(4, 24, 146, 67, "BITCOIN PRICE", accent=True)
+    c.panel(4, 24, 146, 67, "L_GLB_PRICE", accent=True)
     c.field("GLB_PRICE", 8, 35, 138, 38)
     c.field("GLB_SATS", 8, 74, 138, 15)
-    c.value_panel("GLB_NETHASH", 154, 24, 82, 33, "NET HASHRATE")
-    c.value_panel("GLB_MEMPOOL", 154, 59, 82, 32, "MEMPOOL TX")
-    c.value_panel("GLB_FEES", 4, 94, 146, 25, "FEES sat/vB  FAST / 30M / 1H")
-    c.value_panel("GLB_RETARGET", 154, 94, 82, 25, "NEXT RETARGET")
+    c.value_panel("GLB_NETHASH", 154, 24, 82, 33)
+    c.value_panel("GLB_MEMPOOL", 154, 59, 82, 32)
+    c.value_panel("GLB_FEES", 4, 94, 146, 25)
+    c.value_panel("GLB_RETARGET", 154, 94, 82, 25)
     c.footer_line()
     c.field("GLB_EPOCH", 4, 122, 116, 12)
     c.field("GLB_ODDS", 120, 122, 116, 12)
@@ -305,13 +327,13 @@ def draw_global(c):
 def draw_network(c):
     c.background()
     c.header(3)
-    c.panel(4, 24, 146, 67, "BLOCK HEIGHT", accent=True)
+    c.panel(4, 24, 146, 67, "L_NET_HEIGHT", accent=True)
     c.field("NET_HEIGHT", 8, 35, 138, 38)
     c.field("NET_HALVING", 8, 74, 138, 15)
-    c.value_panel("NET_DIFF", 154, 24, 82, 33, "NETWORK DIFF")
-    c.value_panel("NET_HASHES", 154, 59, 82, 32, "TOTAL HASHES")
-    c.value_panel("NET_POOL", 4, 94, 146, 25, "POOL")
-    c.value_panel("NET_BESTEVER", 154, 94, 82, 25, "BEST EVER")
+    c.value_panel("NET_DIFF", 154, 24, 82, 33)
+    c.value_panel("NET_HASHES", 154, 59, 82, 32)
+    c.value_panel("NET_POOL", 4, 94, 146, 25)
+    c.value_panel("NET_BESTEVER", 154, 94, 82, 25)
     c.footer_line()
     c.field("NET_IP", 4, 122, 150, 12)
     c.field("NET_RSSI", 150, 122, 86, 12)
@@ -320,14 +342,14 @@ def draw_network(c):
 def draw_info(c):
     c.background()
     c.header(4)
-    c.value_panel("INFO_BOARD", 4, 24, 146, 33, "BOARD", accent=True)
-    c.value_panel("INFO_FIRMWARE", 154, 24, 82, 33, "FIRMWARE")
-    c.value_panel("INFO_ENGINES", 4, 59, 146, 32, "MINING ENGINES")
-    c.value_panel("INFO_HEAP", 154, 59, 82, 32, "FREE RAM")
-    c.panel(4, 94, 232, 26, "PAYOUT ADDRESS")
+    c.value_panel("INFO_BOARD", 4, 24, 146, 33, accent=True)
+    c.value_panel("INFO_FIRMWARE", 154, 24, 82, 33)
+    c.value_panel("INFO_ENGINES", 4, 59, 146, 32)
+    c.value_panel("INFO_HEAP", 154, 59, 82, 32)
+    c.panel(4, 94, 232, 26, "L_INFO_ADDRESS")
     c.field("INFO_ADDRESS", 8, 103, 224, 16)
     c.footer_line()
-    c.text((120, 128.5), "A: next screen   B: brightness   hold A 5s: reset", 6.5, LABEL, "bold", "mm")
+    c.field("INFO_HELP", 4, 123, 232, 11)
 
 
 DRAW = {"SPLASH": draw_splash, "MINING": draw_mining, "CLOCK": draw_clock, "GLOBAL": draw_global,
@@ -354,6 +376,9 @@ def to_rgb565(img):
     return px.flatten(), Image.fromarray(preview)
 
 
+FIELD_SCREEN = {}  # filled while drawing the first resolution
+
+
 def write_layout():
     lines = [
         "// Generated by tools/make_backgrounds.py - do not edit.",
@@ -374,6 +399,11 @@ def write_layout():
     lines.append("constexpr Role kRole[FIELD_COUNT] = {" + ", ".join("ROLE_" + f[1] for f in FIELDS) + "};")
     lines.append("constexpr Align kAlign[FIELD_COUNT] = {" + ", ".join("ALIGN_" + f[2] for f in FIELDS) + "};")
     lines.append("constexpr uint32_t kColor[FIELD_COUNT] = {" + ", ".join(f"0x{f[3]:06X}" for f in FIELDS) + "};")
+    lines.append("// English text of the LABEL fields (nullptr for the others).")
+    lines.append("constexpr const char *kLabel[FIELD_COUNT] = {" +
+                 ", ".join(f'"{LABEL_TEXT[n]}"' if n in LABEL_TEXT else "nullptr" for n in FIELD_NAMES) + "};")
+    lines.append("// Screen of each field; SCREEN_COUNT for the header fields, on every screen.")
+    lines.append("constexpr Screen kScreen[FIELD_COUNT] = {" + ", ".join(FIELD_SCREEN[n] for n in FIELD_NAMES) + "};")
     lines += ["", "}  // namespace bg", ""]
     with open(os.path.join(OUT_DIR, "bg_layout.h"), "w") as fh:
         fh.write("\n".join(lines))
@@ -385,6 +415,7 @@ def write_resolution(w, h):
     arrays = []
     for screen in SCREENS:
         c = Canvas(w, h)
+        c.screen = screen
         DRAW[screen](c)
         img = c.img.resize((w, h), Image.LANCZOS)
         px, preview = to_rgb565(img)
@@ -396,7 +427,9 @@ def write_resolution(w, h):
 
     missing = [n for n in FIELD_NAMES if n not in fields]
     assert not missing, missing
-    rects = "\n".join(f"    {{{x}, {y}, {fw}, {fh}}},  // {n}" for n in FIELD_NAMES for (x, y, fw, fh) in [fields[n]])
+    for n in FIELD_NAMES:
+        FIELD_SCREEN.setdefault(n, "SCREEN_COUNT" if n.startswith("HDR_") else fields[n][4])
+    rects = "\n".join(f"    {{{x}, {y}, {fw}, {fh}}},  // {n}" for n in FIELD_NAMES for (x, y, fw, fh, _) in [fields[n]])
     src = f"""// Generated by tools/make_backgrounds.py - do not edit.
 #include "bg.h"
 
@@ -426,9 +459,9 @@ extern const Set set_{tag} = {{{w}, {h}, {{{", ".join("px_" + s.lower() for s in
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(PREVIEW_DIR, exist_ok=True)
-    write_layout()
     for w, h in RESOLUTIONS:
         write_resolution(w, h)
+    write_layout()  # after drawing: needs the screen of every field
 
 
 if __name__ == "__main__":

@@ -1,0 +1,80 @@
+# Pushing a tag vX.Y.Z builds firmware X.Y.Z for every board, signs it,
+# publishes it as a GitHub release (which miners update from) and puts the
+# web installer on GitHub Pages.
+#
+# Needs the secret RELEASE_SIGNING_KEY (the content of
+# keys/release-signing-key.pem) and Pages set to "GitHub Actions".
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-release-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-release-${{ runner.os }}-
+      - run: pip install platformio
+
+      - name: Version from the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$' || { echo "tag must be vX.Y.Z"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - run: ./test/host/run.sh
+
+      - name: Signing key
+        env:
+          KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          [ -n "$KEY" ] || { echo "secret RELEASE_SIGNING_KEY is missing: miners would refuse this release"; exit 1; }
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/release-signing-key.pem"
+          echo "RELEASE_SIGNING_KEY_FILE=$RUNNER_TEMP/release-signing-key.pem" >> "$GITHUB_ENV"
+
+      - run: python3 tools/make_release.py --version "$VERSION"
+
+      - name: Every firmware is signed
+        run: |
+          for f in release/$VERSION/*-firmware.bin; do [ -f "$f.sig" ] || { echo "missing $f.sig"; exit 1; }; done
+
+      - run: rm -f "$RELEASE_SIGNING_KEY_FILE"
+        if: always()
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: BDLMiner V1 ${{ env.VERSION }}
+          generate_release_notes: true
+          files: release/${{ env.VERSION }}/*
+
+      - run: python3 tools/make_installer.py "release/$VERSION" site
+      - uses: actions/configure-pages@v5
+        id: pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4

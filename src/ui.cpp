@@ -8,6 +8,7 @@
 
 #include "bg/bg.h"
 #include "core/work.h"
+#include "i18n.h"
 #include "market.h"
 #include "miner.h"
 #include "net.h"
@@ -34,10 +35,10 @@ lgfx::LovyanGFX *lcd = nullptr;
 LGFX_Sprite *canvas = nullptr;
 int screen = 0;
 uint32_t screenSince = 0;
-// mining, clock, global, network, info (bitmap or drawn), then graph and
-// records (always drawn).
-const int kScreens = 7;
-const int kGraphScreen = 5, kRecordsScreen = 6;
+// mining, clock, global, network, info (bitmap or drawn), then graph,
+// records and blocks (always drawn).
+const int kScreens = 8;
+const int kGraphScreen = 5, kRecordsScreen = 6, kBlocksScreen = 7;
 uint8_t backlight = 255;  // what the panel is set to; 0 = off (nothing drawn)
 uint32_t flashUntil = 0;  // "+1 share" shown in the header until then
 
@@ -178,16 +179,17 @@ String timeText(bool seconds) {
 
 String dateText() {
     struct tm t;
-    if (!clockNow(t)) return "waiting for NTP";
-    char buf[24];
-    strftime(buf, sizeof(buf), "%a %d %b %Y", &t);
-    return buf;
+    if (!clockNow(t)) return tr("waiting for NTP");
+    return trDate(t);
 }
 
 String marketAge(const MarketData &m) {
-    if (!m.updatedMs) return "waiting for prices";
-    uint32_t min = (millis() - m.updatedMs) / 60000;
-    return "prices " + (min ? String(min) + " min ago" : String("just now"));
+    if (!m.updatedMs) return tr("waiting for prices");
+    unsigned min = (millis() - m.updatedMs) / 60000;
+    if (!min) return tr("prices just now");
+    char buf[40];
+    snprintf(buf, sizeof(buf), tr("prices %u min ago"), min);
+    return buf;
 }
 
 String feesText(const MarketData &m) {
@@ -210,13 +212,20 @@ String soloOddsText() {
     double years = stats.networkDiff * 4294967296.0 / hr / 31557600.0;
     char buf[32];
     if (years < 1) {
-        snprintf(buf, sizeof(buf), "%.0f d/block", years * 365.25);
+        snprintf(buf, sizeof(buf), tr("%.0f d/block"), years * 365.25);
     } else if (years < 1e4) {
-        snprintf(buf, sizeof(buf), "%.0f yr/block", years);
+        snprintf(buf, sizeof(buf), tr("%.0f yr/block"), years);
     } else {
         int e = (int)floor(log10(years));
-        snprintf(buf, sizeof(buf), "%.1fe%d yr/block", years / pow(10, e), e);
+        snprintf(buf, sizeof(buf), tr("%.1fe%d yr/block"), years / pow(10, e), e);
     }
+    return buf;
+}
+
+// A translated printf format, filled.
+String trf(const char *en, unsigned v) {
+    char buf[48];
+    snprintf(buf, sizeof(buf), tr(en), v);
     return buf;
 }
 
@@ -229,11 +238,16 @@ String sharesText() {
 // Bitmap background screens
 // ---------------------------------------------------------------------------
 
+void drawField(bg::Field f, const String &text, uint32_t color = 0xFFFFFFFF);
+
 void showBackground(bg::Screen s) {
     if (shownBg == s) return;
     lcd->pushImage(0, 0, bgSet->width, bgSet->height, (const lgfx::rgb565_t *)bgSet->pixels[s]);
     shownBg = s;
     for (auto &t : fieldText) t = "\x01";  // force every field to redraw
+    // The panel labels, in the selected language.
+    for (int f = 0; f < bg::FIELD_COUNT; f++)
+        if (bg::kLabel[f] && bg::kScreen[f] == s) drawField((bg::Field)f, tr(bg::kLabel[f]));
 }
 
 bool isNumeric(const char *t) {
@@ -255,6 +269,15 @@ void fitFont(LGFX_Sprite &s, bg::Role role, const char *text, int w, int h) {
             return;
         }
     }
+    if (role == bg::ROLE_LABEL) {
+        // Small proportional fonts, like the ones the backgrounds were drawn
+        // with; squeezed a little when a translation is longer.
+        s.setFont(h >= 12 ? &fonts::DejaVu12 : &fonts::DejaVu9);
+        s.setTextSize(1);
+        int tw = s.textWidth(text);
+        if (tw > w) s.setTextSize(max(0.7f, (float)w / tw), 1);
+        return;
+    }
     static const lgfx::IFont *bySize[] = {&fonts::Font4, &fonts::Font2, &fonts::Font0};
     for (const lgfx::IFont *f : bySize) {
         s.setFont(f);
@@ -266,7 +289,7 @@ void fitFont(LGFX_Sprite &s, bg::Role role, const char *text, int w, int h) {
 // Paints `text` into a field: the background under the field is copied into
 // a small sprite, the text drawn on it, and the sprite pushed in one go, so
 // values update without flicker and without a full-screen buffer.
-void drawField(bg::Field f, const String &text, uint32_t color = 0xFFFFFFFF) {
+void drawField(bg::Field f, const String &text, uint32_t color) {
     if (color == 0xFFFFFFFF) color = bg::kColor[f];
     if (color == kOrange) color = accent();
     if (fieldText[f] == text && fieldColor[f] == color) return;
@@ -303,8 +326,8 @@ void drawField(bg::Field f, const String &text, uint32_t color = 0xFFFFFFFF) {
 void drawHeaderFields() {
     int bat = board::batteryLevel();
     drawField(bg::HDR_BATTERY, bat >= 0 ? String(bat) + "%" : String());
-    if (millis() < flashUntil) drawField(bg::HDR_STATUS, "+1 SHARE", 0xFFE14D);
-    else drawField(bg::HDR_STATUS, stats.poolConnected ? "ONLINE" : "OFFLINE", stats.poolConnected ? kGreen : kRed);
+    if (millis() < flashUntil) drawField(bg::HDR_STATUS, tr("+1 SHARE"), 0xFFE14D);
+    else drawField(bg::HDR_STATUS, tr(stats.poolConnected ? "ONLINE" : "OFFLINE"), stats.poolConnected ? kGreen : kRed);
 }
 
 void renderBitmap() {
@@ -322,7 +345,7 @@ void renderBitmap() {
             drawField(bg::MINING_BITS32, String(stats.over32bits));
             float t = board::temperature();
             drawField(bg::MINING_TEMP, isnan(t) ? String("--") : String((int)lroundf(t)) + " C");
-            drawField(bg::MINING_STATE, netStatus());
+            drawField(bg::MINING_STATE, trStatus(netStatus()));
             drawField(bg::MINING_UPTIME, uptime());
             break;
         }
@@ -357,7 +380,7 @@ void renderBitmap() {
             drawField(bg::GLB_FEES, feesText(m));
             drawField(bg::GLB_RETARGET, retargetText(m),
                       !m.updatedMs ? kFg : m.retargetChange >= 0 ? kGreen : kRed);
-            drawField(bg::GLB_EPOCH, m.retargetBlocks ? "retarget: " + String(m.retargetBlocks) + " blk" : marketAge(m));
+            drawField(bg::GLB_EPOCH, m.retargetBlocks ? trf("retarget: %u blk", m.retargetBlocks) : marketAge(m));
             drawField(bg::GLB_ODDS, soloOddsText());
             break;
         }
@@ -367,7 +390,7 @@ void renderBitmap() {
             uint32_t h = stats.blockHeight;
             drawField(bg::NET_HEIGHT, h ? String(h) : String("-"));
             uint32_t halving = (h / 210000 + 1) * 210000;
-            drawField(bg::NET_HALVING, h ? "halving in " + String(halving - h) + " blocks" : String());
+            drawField(bg::NET_HALVING, h ? trf("halving in %u blocks", halving - h) : String());
             drawField(bg::NET_DIFF, diffText(stats.networkDiff));
             drawField(bg::NET_HASHES, work::formatSI((double)minerTotalHashes(), 2).c_str());
             drawField(bg::NET_POOL, netPoolHost() + ":" + netPoolPort(), netOnBackup() ? accent() : bg::kColor[bg::NET_POOL]);
@@ -387,8 +410,8 @@ void renderBitmap() {
                 else fill = true;  // "fill": software in the hardware loop's idle cycles
             }
             String engines;
-            if (hw) engines = String(hw) + "x hardware" + (fill ? "+" : "");
-            if (sw) engines += String(hw ? " + " : "") + sw + "x software";
+            if (hw) engines = String(hw) + tr("x hardware") + (fill ? "+" : "");
+            if (sw) engines += String(hw ? " + " : "") + sw + tr("x software");
             drawField(bg::INFO_BOARD, board::modelName());
             drawField(bg::INFO_FIRMWARE, "v" FW_VERSION);
             drawField(bg::INFO_ENGINES, engines);
@@ -423,18 +446,18 @@ void drawMining() {
     d.setTextColor(kFg, kBg);
     d.drawString(unit, numRight + px(6), px(24 + 41));
 
-    row(6, 72, "Shares", sharesText(), kGreen);
-    row(124, 72, "Best", diffText(stats.sessionBestDiff));
+    row(6, 72, tr("Shares"), sharesText(), kGreen);
+    row(124, 72, tr("Best"), diffText(stats.sessionBestDiff));
     row(6, 92, "Diff", diffText(stats.poolDiff));
-    row(124, 92, "Blocks", String(stats.blocksFound), stats.blocksFound ? accent() : kFg);
+    row(124, 92, tr("Blocks"), String(stats.blocksFound), stats.blocksFound ? accent() : kFg);
 
-    String f = String(netStatus()) + "  " + uptime();
+    String f = trStatus(netStatus()) + "  " + uptime();
     footer(f.c_str());
 }
 
 void drawClock() {
     auto &d = g();
-    header("Clock");
+    header(tr("Clock"));
     d.setFont(&fonts::Font7);
     d.setTextSize(scale() * 0.85f);
     d.setTextDatum(top_center);
@@ -446,8 +469,8 @@ void drawClock() {
     d.setTextColor(kGrey, kBg);
     d.drawString(dateText(), d.width() / 2, px(70));
     row(6, 92, "BTC", m.price > 0 ? priceText(m.price, true) + " " + settings.currency : String("-"), accent());
-    row(124, 92, "Fee", m.feeFast ? String(m.feeFast) + " sat/vB" : String("-"));
-    String f = "Block " + (stats.blockHeight ? String(stats.blockHeight) : String("-")) + "  " + uptime();
+    row(124, 92, tr("Fee"), m.feeFast ? String(m.feeFast) + " sat/vB" : String("-"));
+    String f = String(tr("Block")) + " " + (stats.blockHeight ? String(stats.blockHeight) : String("-")) + "  " + uptime();
     footer(f.c_str());
 }
 
@@ -455,23 +478,23 @@ void drawGlobal() {
     header("Global");
     MarketData m = marketGet();
     row(6, 22, "BTC", m.price > 0 ? priceText(m.price, true) + " " + settings.currency : String("-"), accent());
-    row(6, 40, "Fees", feesText(m) + " sat/vB");
-    row(6, 58, "Net", m.networkHashrate > 0 ? String(work::formatSI(m.networkHashrate, 0).c_str()) + "H/s" : String("-"));
+    row(6, 40, tr("Fees"), feesText(m) + " sat/vB");
+    row(6, 58, tr("Net"), m.networkHashrate > 0 ? String(work::formatSI(m.networkHashrate, 0).c_str()) + "H/s" : String("-"));
     row(124, 58, "Mempool", m.mempoolTx ? priceText(m.mempoolTx, true) : String("-"));
-    row(6, 76, "Retarget", retargetText(m) + (m.retargetBlocks ? " in " + String(m.retargetBlocks) : String()),
+    row(6, 76, tr("Retarget"), retargetText(m) + (m.retargetBlocks ? tr(" in ") + String(m.retargetBlocks) : String()),
         m.retargetChange >= 0 ? kGreen : kRed);
     row(6, 94, "Solo", soloOddsText());
     footer(marketAge(m).c_str());
 }
 
 void drawNetwork() {
-    header("Network");
-    row(6, 22, "Block", stats.blockHeight ? String(stats.blockHeight) : String("-"), accent());
-    row(6, 40, "Net diff", diffText(stats.networkDiff));
-    row(6, 58, netOnBackup() ? "Backup" : "Pool", netPoolHost() + ":" + netPoolPort());
+    header(tr("Network"));
+    row(6, 22, tr("Block"), stats.blockHeight ? String(stats.blockHeight) : String("-"), accent());
+    row(6, 40, tr("Net diff"), diffText(stats.networkDiff));
+    row(6, 58, netOnBackup() ? tr("Backup") : "Pool", netPoolHost() + ":" + netPoolPort());
     row(6, 76, "IP", WiFi.localIP().toString() + "  " + String(WiFi.RSSI()) + "dBm");
-    row(6, 94, "Hashes", work::formatSI((double)minerTotalHashes(), 2).c_str());
-    row(124, 94, "Best", diffText(stats.bestDiff));
+    row(6, 94, tr("Hashes"), work::formatSI((double)minerTotalHashes(), 2).c_str());
+    row(124, 94, tr("Best"), diffText(stats.bestDiff));
     String f = String("32-bit shares: ") + stats.over32bits;
     footer(f.c_str());
 }
@@ -479,17 +502,17 @@ void drawNetwork() {
 void drawInfo() {
     auto &d = g();
     header("Info");
-    row(6, 22, "Board", board::modelName());
+    row(6, 22, tr("Board"), board::modelName());
 
     String engines;
     for (int i = 0; i < stats.minerCount; i++) engines += String(i ? "+" : "") + stats.engine[i];
-    row(6, 40, "Engines", engines + "  FW " FW_VERSION);
+    row(6, 40, tr("Engines"), engines + "  FW " FW_VERSION);
 
     d.setFont(&fonts::Font0);
     d.setTextSize(scale() < 1 ? 1 : scale());
     d.setTextDatum(top_left);
     d.setTextColor(kGrey, kBg);
-    d.drawString("Address", px(6), px(60));
+    d.drawString(tr("Address"), px(6), px(60));
     d.setTextColor(kFg, kBg);
     // Wrap the address on as many lines as needed.
     String a = settings.btcAddress;
@@ -498,7 +521,7 @@ void drawInfo() {
     for (int i = 0; i < (int)a.length() && y < d.height() - px(12); i += perLine, y += d.fontHeight() + 2)
         d.drawString(a.substring(i, i + perLine), px(6), y);
 
-    footer("A:next  B:light  hold A 5s:reset");
+    footer(tr("A:next  B:light  hold A 5s:reset"));
 }
 
 // "1 in 2.3M" chance of finding a block within `seconds` at the current rate.
@@ -507,7 +530,7 @@ String blockOdds(double seconds) {
     if (hr <= 0 || stats.networkDiff <= 0) return "-";
     double p = -expm1(-hr * seconds / (stats.networkDiff * 4294967296.0));
     if (p <= 0) return "-";
-    return String("1 in ") + work::formatSI(1 / p, 1).c_str();
+    return String(tr("1 in ")) + work::formatSI(1 / p, 1).c_str();
 }
 
 String duration(double s) {
@@ -516,7 +539,7 @@ String duration(double s) {
     if (s < 60) snprintf(buf, sizeof(buf), "%.0fs", s);
     else if (s < 3600) snprintf(buf, sizeof(buf), "%.0fmin", s / 60);
     else if (s < 86400) snprintf(buf, sizeof(buf), "%.0fh%02.0f", floor(s / 3600), fmod(s / 60, 60));
-    else snprintf(buf, sizeof(buf), "%.0fd %.0fh", floor(s / 86400), fmod(s / 3600, 24));
+    else snprintf(buf, sizeof(buf), tr("%.0fd %.0fh"), floor(s / 86400), fmod(s / 3600, 24));
     return buf;
 }
 
@@ -526,7 +549,7 @@ void drawGraph() {
     int x0 = px(6), y0 = px(24), w = d.width() - px(12), h = d.height() - px(24) - px(16);
     d.drawRect(x0 - 1, y0 - 1, w + 2, h + 2, kGrey);
     if (sampleCount < 2) {
-        footer("one point every 10 s");
+        footer(tr("one point every 10 s"));
         return;
     }
     const int n = sizeof(samples) / sizeof(samples[0]);
@@ -547,24 +570,50 @@ void drawGraph() {
         px0 = x;
         py0 = y;
     }
-    String f = "min " + String(work::formatSI(lo, 1).c_str()) + "  avg " + work::formatSI(sum / sampleCount, 1).c_str() +
-               "  max " + work::formatSI(hi, 1).c_str() + "H/s  " + duration(sampleCount * 10.0);
-    footer(f.c_str());
+    char f[96];
+    snprintf(f, sizeof(f), tr("min %s  avg %s  max %sH/s  %s"), work::formatSI(lo, 1).c_str(),
+             work::formatSI(sum / sampleCount, 1).c_str(), work::formatSI(hi, 1).c_str(),
+             duration(sampleCount * 10.0).c_str());
+    footer(f);
+}
+
+// The block being mined, then the latest blocks found (mempool.space), each
+// with the best share you found while it was the one to find.
+void drawBlocks() {
+    header(tr("Blocks"));
+    MarketData m = marketGet();
+    BlockBest bb[BLOCK_BESTS];
+    int nb = minerBlockBests(bb, BLOCK_BESTS);
+    auto best = [&](uint32_t h) -> String {
+        for (int i = 0; i < nb; i++)
+            if (bb[i].height == h) return String("  ") + tr("you") + " " + diffText(bb[i].best);
+        return String();
+    };
+    time_t now = time(nullptr);
+    String mining = stats.blockHeight ? String(stats.blockHeight) : String("-");
+    row(6, 22, mining.c_str(), String(tr("mining")) + best(stats.blockHeight), accent());
+    for (int i = 0; i < m.blockCount && i < 4; i++) {
+        const MarketData::Block &k = m.blocks[i];
+        String ago = now > 1700000000 && k.time ? duration(max<double>(0, now - (double)k.time)) : String("-");
+        String pool = String(k.pool[0] ? k.pool : "?").substring(0, 12);
+        row(6, 40 + i * 18, String(k.height).c_str(), pool + "  " + ago + best(k.height));
+    }
+    if (!m.blockCount) footer(tr("no block yet"));
 }
 
 void drawRecords() {
     header("Records");
     double hr = minerHashrate();
-    row(6, 22, "Best ever", diffText(stats.bestDiff), accent());
+    row(6, 22, tr("Best ever"), diffText(stats.bestDiff), accent());
     row(124, 22, "Session", diffText(stats.sessionBestDiff));
-    row(6, 40, "32-bit", String(stats.over32bits) + "  1 per " + (hr > 0 ? duration(4294967296.0 / hr) : String("-")));
-    row(6, 58, "Block/day", blockOdds(86400));
-    row(6, 76, "Block/year", blockOdds(31557600));
-    row(6, 94, "Running", duration(stats.lifetimeSeconds));
-    row(124, 94, "Blocks", String(stats.lifetimeBlocks), stats.lifetimeBlocks ? accent() : kFg);
+    row(6, 40, "32-bit", String(stats.over32bits) + "  " + tr("1 per ") + (hr > 0 ? duration(4294967296.0 / hr) : String("-")));
+    row(6, 58, tr("Block/day"), blockOdds(86400));
+    row(6, 76, tr("Block/year"), blockOdds(31557600));
+    row(6, 94, tr("Running"), duration(stats.lifetimeSeconds));
+    row(124, 94, tr("Blocks"), String(stats.lifetimeBlocks), stats.lifetimeBlocks ? accent() : kFg);
     BestShare top[3];
     int n = minerTopShares(top, 3);
-    String f = String("Hashes ") + work::formatSI((double)stats.lifetimeHashes, 2).c_str() + "  top";
+    String f = String(tr("Hashes")) + " " + work::formatSI((double)stats.lifetimeHashes, 2).c_str() + "  " + tr("top");
     for (int i = 0; i < n; i++) f += " " + diffText(top[i].difficulty);
     footer(f.c_str());
 }
@@ -602,7 +651,7 @@ void showSplash() {
     if (!lcd) return;
     if (bgSet) {
         showBackground(bg::SPLASH);
-        drawField(bg::SPLASH_INFO, String(board::modelName()) + "  v" FW_VERSION "  -  hold A: setup");
+        drawField(bg::SPLASH_INFO, String(board::modelName()) + "  v" FW_VERSION + tr("  -  hold A: setup"));
         return;
     }
     auto &d = g();
@@ -615,7 +664,7 @@ void showSplash() {
     d.setFont(&fonts::Font2);
     d.setTextColor(kGrey, kBg);
     d.drawString(String(board::modelName()) + "  v" FW_VERSION, d.width() / 2, d.height() / 2 + px(14));
-    d.drawString("Hold A at boot: setup", d.width() / 2, d.height() - px(10));
+    d.drawString(tr("Hold A at boot: setup"), d.width() / 2, d.height() - px(10));
     flush();
 }
 
@@ -636,20 +685,23 @@ void showPortal(const String &apName, const char *apPassword) {
     bodyFont(d);
     d.setTextDatum(top_left);
     d.setTextColor(accent(), kBg);
-    d.drawString("WiFi setup", x, px(6));
+    d.drawString(tr("WiFi setup"), x, px(6));
     d.setFont(&fonts::Font0);
     d.setTextColor(kFg, kBg);
     int lh = d.fontHeight() + px(4);
     int y = px(30);
-    d.drawString("Join WiFi:", x, y);
+    d.drawString(tr("Join WiFi:"), x, y);
     d.drawString(apName, x, y += lh);
-    d.drawString(String("Pass: ") + apPassword, x, y += lh);
-    d.drawString("Then open", x, y += lh * 1.5f);
+    d.drawString(String(tr("Pass: ")) + apPassword, x, y += lh);
+    d.drawString(tr("Then open"), x, y += lh * 1.5f);
     d.drawString("192.168.4.1", x, y += lh);
     flush();
 }
 
 void showMessage(const char *title, const char *line1, const char *line2) {
+    title = tr(title);
+    line1 = tr(line1);
+    line2 = tr(line2);
     if (!lcd) return;
     if (bgSet) {
         showBackground(bg::SPLASH);
@@ -737,7 +789,8 @@ void render() {
         case 3: drawNetwork(); break;
         case 4: drawInfo(); break;
         case kGraphScreen: drawGraph(); break;
-        default: drawRecords(); break;
+        case kRecordsScreen: drawRecords(); break;
+        default: drawBlocks(); break;
     }
     flush();
 }
