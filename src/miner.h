@@ -52,8 +52,8 @@ bool minerNextShare(stratum::Share &share, uint32_t waitMs);
 // Starts one mining task per available engine/core.
 void minerStart();
 
-// Total hashes since boot and an exponentially smoothed
-// hash rate in H/s, updated by minerTick() once per second.
+// Total hashes since boot and the hash rate in H/s (average of the last
+// minute), updated by minerTick() once per second.
 uint64_t minerTotalHashes();
 double minerHashrate();
 // Smoothed hash rate of one engine (stats.engine[i]), H/s.

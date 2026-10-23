@@ -53,6 +53,16 @@ volatile Throttle throttle = Throttle::Full;
 
 uint32_t lastHashes[MAX_MINERS];
 uint64_t totalHashes = 0;
+// Hash rates are averages over the last 60 one-second ticks (like a pool's
+// "1m" rate): the second or two the hardware loop pauses for a TLS handshake
+// then costs a few percent for a minute instead of a dip to two thirds.
+constexpr int kRateWindow = 60;
+struct RateSample {
+    uint32_t ms;
+    uint32_t hashes[MAX_MINERS];
+};
+RateSample rateRing[kRateWindow];
+int rateCount = 0, rateHead = 0;
 double hashrate = 0;
 double engineRate[MAX_MINERS];
 uint32_t lastTickMs = 0;
@@ -349,14 +359,24 @@ void minerTick() {
     }
     totalHashes += delta;
     if (lastTickMs) {
-        double dt = (now - lastTickMs) / 1000.0;
-        if (dt > 0) {
-            double inst = delta / dt;
-            hashrate = hashrate == 0 ? inst : hashrate * 0.8 + inst * 0.2;
-            for (int i = 0; i < stats.minerCount; i++) {
-                double r = engineDelta[i] / dt;
-                engineRate[i] = engineRate[i] == 0 ? r : engineRate[i] * 0.8 + r * 0.2;
+        RateSample &r = rateRing[rateHead];
+        r.ms = now - lastTickMs;
+        for (int i = 0; i < MAX_MINERS; i++) r.hashes[i] = i < stats.minerCount ? engineDelta[i] : 0;
+        rateHead = (rateHead + 1) % kRateWindow;
+        if (rateCount < kRateWindow) rateCount++;
+        uint32_t ms = 0;
+        uint64_t sum[MAX_MINERS] = {0};
+        for (int k = 0; k < rateCount; k++) {
+            ms += rateRing[k].ms;
+            for (int i = 0; i < MAX_MINERS; i++) sum[i] += rateRing[k].hashes[i];
+        }
+        if (ms) {
+            double total = 0;
+            for (int i = 0; i < MAX_MINERS; i++) {
+                engineRate[i] = sum[i] * 1000.0 / ms;
+                total += engineRate[i];
             }
+            hashrate = total;
         }
     }
     lastTickMs = now;

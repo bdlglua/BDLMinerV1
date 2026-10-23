@@ -56,7 +56,7 @@ Hashing engines:
     known candidate, and it measures faster; each of its candidates is checked again;
   * the engine is checked against known answers at boot; if the check fails, software
     takes over. During the TLS handshake of the mempool.space refresh (one every
-    5 minutes, the 5 requests share the connection) the hardware loop pauses and that
+    10 minutes, the 5 requests share the connection) and of the pool stats (every 30 minutes) the hardware loop pauses and that
     core mines in software: on the original ESP32 the loop saturates the bus the RSA
     accelerator also uses, and a handshake would otherwise trip the task watchdog.
     Core 0's idle-task watchdog is also paused for each handshake: the key exchange
@@ -166,7 +166,7 @@ following the accelerometer (M5 devices with an IMU: the two landscape ways), an
 mode (screen off, no beep, from one hour to another; a button press lights it for 30 s).
 
 Clock / Global data comes from the public [mempool.space](https://mempool.space) API
-(refreshed every 5 minutes over HTTPS) and the time from `pool.ntp.org`.
+(refreshed every 10 minutes over HTTPS) and the time from `pool.ntp.org`.
 
 ### Backgrounds (NerdMinerV2 style)
 

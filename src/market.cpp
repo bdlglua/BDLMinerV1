@@ -15,12 +15,13 @@ namespace {
 
 constexpr const char *kHost = "mempool.space";
 constexpr const char *kApi = "https://mempool.space/api";
-constexpr uint32_t kRefreshMs = 5 * 60 * 1000;
+// Each refresh pauses the hardware SHA loop for a TLS handshake (~1.5 s).
+constexpr uint32_t kRefreshMs = 10 * 60 * 1000;
 constexpr uint32_t kRetryMs = 30 * 1000;
 // A TLS session needs ~45 KB; never starve the miner and the pool socket.
 constexpr uint32_t kMinHeapForTls = 70 * 1024;
 
-constexpr uint32_t kPoolStatsMs = 10 * 60 * 1000;
+constexpr uint32_t kPoolStatsMs = 30 * 60 * 1000;
 constexpr uint32_t kPoolStatsRetryMs = 60 * 60 * 1000;  // unknown API: try again hourly
 
 MarketData data;
