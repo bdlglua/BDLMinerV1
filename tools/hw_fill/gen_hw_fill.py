@@ -7,9 +7,11 @@ PL_MINE macro expands with the "fast" schedule; every `nop` it waits with is a
 slot. Software instructions only replace slots, one for one, so the hardware
 timing can only get longer, never shorter, which the loop tolerates (its
 delays are minimums). They use registers a9..a15 and SAR only (the loop uses
-a2..a8), never touch the SHA peripheral, and never store to memory in the 3
-instructions before a store to the peripheral (so the store buffer cannot
-bunch peripheral stores together).
+a2..a8), never touch the SHA peripheral, and never store to memory within 3
+instructions of a store to the peripheral, before or after: on the chip
+(M5StickC Plus2, ESP32 rev 3), stores right after a peripheral store made the
+engine hash wrong (3 of 6 known-answer candidates missing), the store buffer
+presumably bunching the stores together.
 
 The software hash (see src/core/fill.h) moves on 2 rounds per hardware nonce,
 a nonce takes 62 + 62 rounds plus 2 transition iterations (64 hardware nonces).
@@ -258,10 +260,13 @@ def transition_b():
 # ---------------------------------------------------------------------------
 
 
+STORE_GAP = 3  # no software store within this many instructions of a peripheral store
+
+
 def store_ok(body, pos):
-    """No store to the peripheral in the 3 instructions after `pos` (the
-    iteration ends with one, and the next starts with slots)."""
-    for j in range(pos + 1, min(pos + 4, len(body))):
+    """No store to the peripheral in the STORE_GAP instructions around `pos`
+    (the iteration ends with one, and the next starts with slots)."""
+    for j in range(max(0, pos - STORE_GAP), min(pos + STORE_GAP + 1, len(body))):
         if body[j][0] == "hw" and body[j][2]:
             return False
     return True
@@ -297,7 +302,7 @@ def place(body, start, filler, tag):
                     run += 1
                 if run >= len(group) and all(not g[2] or store_ok(body, pos + j) for j, g in enumerate(group)):
                     break
-                pos += max(run, 1)
+                pos += 1
             for g in group:
                 put(pos, g[1])
                 pos += 1

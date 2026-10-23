@@ -247,20 +247,107 @@ bool fillSelfTest() {
     c.run = 1;
     c.pad = 0x80000000u;
     size_t found = 0;
-    int fillHits = 0;
-    bool ok = true;
+    int fillHits = 0, wrongHw = 0;
+    uint32_t firstHit = 0, q0 = c.q;
     while (c.budget > 0) {
         bool hw = hwsha_classic_fill(text(), &c);
         if (c.hitF) {
-            ok &= c.hitQ == 0x1000 + 0xa94c;
-            fillHits++;
+            if (!fillHits++) firstHit = c.hitQ;
             c.hitF = 0;
         }
         if (!hw) break;
-        ok &= found < 6 && c.nonce - 1 - 0x1000 == expected[found];
+        if (found >= 6 || c.nonce - 1 - 0x1000 != expected[found]) wrongHw++;
         found++;
     }
-    return ok && found == 6 && c.budget == 0 && fillHits == 1;
+    bool ok = !wrongHw && found == 6 && c.budget == 0 && fillHits == 1 && firstHit == 0x1000 + 0xa94c;
+    if (!ok)
+        logf("[fill] self-test: hardware %u candidates (%d wrong, want 6), budget left %u; software %u nonces, "
+             "%d candidates (first %08x, want 0000b94c)\n",
+             (unsigned)found, wrongHw, (unsigned)c.budget, (unsigned)(c.q - q0), fillHits, (unsigned)firstHit);
+    return ok;
+}
+
+// After a failed self-test: runs the software hash for exactly one nonce (64
+// hardware nonces) and compares every round with a reference computed here.
+void fillDiagnose() {
+    auto rotr = [](uint32_t x, int n) { return (x >> n) | (x << (32 - n)); };
+    auto rounds = [&](const uint32_t st[8], const uint32_t w[64], uint32_t A[65], uint32_t E[65]) {
+        uint32_t a = st[0], b = st[1], c = st[2], d = st[3], e = st[4], f = st[5], g = st[6], h = st[7];
+        for (int i = 0; i <= 64; i++) {
+            A[i] = a;
+            E[i] = e;
+            if (i == 64) break;
+            uint32_t t1 = h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + (g ^ (e & (f ^ g))) + sha::K[i] + w[i];
+            uint32_t t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) | (c & (a | b)));
+            h = g; g = f; f = e; e = d + t1;
+            d = c; c = b; b = a; a = t1 + t2;
+        }
+    };
+    auto expand = [&](uint32_t w[64]) {
+        for (int i = 16; i < 64; i++)
+            w[i] = (rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10)) + w[i - 7] +
+                   (rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3)) + w[i - 16];
+    };
+
+    uint8_t header[80];
+    Ctx c{};
+    kat(c.hdr, header);
+    const uint32_t q = 0x1000 + 0xa94c;  // a candidate
+    Fill fl;
+    fillStart(fl, header, q);
+    fillLoad(c, fl);
+    c.nonce = 0x40000000u;
+    c.budget = 64;  // transition B, 31 iterations, transition A, 31 iterations
+    c.run = 1;
+    c.pad = 0x80000000u;
+    while (c.budget > 0 && hwsha_classic_fill(text(), &c)) {
+    }
+    logf("[fill] after 64 iterations: q %08x (want %08x), P %d records from the end of hash 2 (want 0)\n",
+         (unsigned)c.q, (unsigned)q, ((int)c.fillP - (int)c.end2) / fill::kRecordBytes);
+
+    sha::MidState ms;
+    sha::prepare(ms, header);
+    uint32_t w[64] = {ms.w[0], ms.w[1], ms.w[2], q, 0x80000000};
+    w[15] = 640;
+    expand(w);
+    uint32_t A[65], E[65];
+    rounds(ms.mid, w, A, E);
+    const uint32_t *b1 = fillBuf.b1;
+    int bad = -1;
+    for (int k = 3; k < 64 && bad < 0; k++)
+        if (b1[k * 5 + 2] != w[k]) bad = k;
+    logf("[fill] hash 1 message words: %s %d\n", bad < 0 ? "all right" : "first wrong at", bad);
+    bad = -1;
+    for (int k = 4; k <= 64 && bad < 0; k++)
+        if (b1[k * 5] != A[k] || b1[k * 5 + 1] != E[k]) bad = k;
+    if (bad >= 0)
+        logf("[fill] hash 1 state: first wrong before round %d: a %08x/%08x e %08x/%08x\n", bad,
+             (unsigned)b1[bad * 5], (unsigned)A[bad], (unsigned)b1[bad * 5 + 1], (unsigned)E[bad]);
+    else
+        logf("[fill] hash 1 state: all right\n");
+
+    uint32_t h1[8] = {A[64], A[63], A[62], A[61], E[64], E[63], E[62], E[61]};
+    uint32_t w2[64] = {0};
+    for (int k = 0; k < 8; k++) w2[k] = ms.mid[k] + h1[k];
+    w2[8] = 0x80000000;
+    w2[15] = 256;
+    expand(w2);
+    uint32_t A2[65], E2[65];
+    rounds(sha::IV, w2, A2, E2);
+    const uint32_t *b2 = fillBuf.b2;  // record k at k + 3
+    bad = -1;
+    for (int k = 0; k < 62 && bad < 0; k++)
+        if (b2[(k + 3) * 5 + 2] != w2[k]) bad = k;
+    logf("[fill] hash 2 message words: %s %d\n", bad < 0 ? "all right" : "first wrong at", bad);
+    bad = -1;
+    for (int k = 1; k <= 62 && bad < 0; k++)
+        if (b2[(k + 3) * 5] != A2[k] || b2[(k + 3) * 5 + 1] != E2[k]) bad = k;
+    if (bad >= 0)
+        logf("[fill] hash 2 state: first wrong before round %d: a %08x/%08x e %08x/%08x\n", bad,
+             (unsigned)b2[(bad + 3) * 5], (unsigned)A2[bad], (unsigned)b2[(bad + 3) * 5 + 1], (unsigned)E2[bad]);
+    else
+        logf("[fill] hash 2 state: all right (candidate: %s)\n",
+             ((E2[61] + sha::IV[7]) & 0xFFFF) == 0 ? "yes" : "no");
 }
 
 // Cycles for `n` hardware nonces with `fn`, the best of two runs.
@@ -291,6 +378,7 @@ uint32_t timeLoop(Loop fn, uint32_t n, uint32_t *fillNonces) {
 void pickFill() {
     if (!fillSelfTest() && !fillSelfTest()) {
         logf("[miner] idle-cycle software hashing failed its self-test, disabled\n");
+        fillDiagnose();
         return;
     }
     const uint32_t n = 131072;

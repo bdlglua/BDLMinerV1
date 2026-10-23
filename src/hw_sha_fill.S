@@ -145,11 +145,17 @@ hwsha_classic_fill:
     nop.n
     movi    a7, 640
     s32i.n  a7, a2, 60
+    nop.n
+    nop.n
+    nop.n
+    nop.n
+    s32i    a6, a2, 148
+    nop.n
+    nop.n
+    nop.n
     s32i    a12, a11, 68              // FA007
     l32i    a13, a11, 76              // FA008
     add     a14, a14, a15             // FA009
-    nop.n
-    s32i    a6, a2, 148
     s32i    a14, a11, 88              // FA010
     l32i    a15, a11, 96              // FA011
     add     a12, a12, a13             // FA012
@@ -160,20 +166,19 @@ hwsha_classic_fill:
     l32i    a13, a3, 152              // FA017
     l32i    a14, a10, 0               // FA018
     l32i    a15, a3, 156              // FA019
-    add     a12, a12, a13             // FA020
-    s32i    a12, a11, 108             // FA021
-    l32i    a13, a11, 116             // FA022
-    add     a14, a14, a15             // FA023
-    nop.n
-    nop.n
     l32i    a7, a3, 92
     s32i.n  a7, a2, 32
-    nop.n
+    add     a12, a12, a13             // FA020
     movi    a7, 256
     s32i.n  a7, a2, 60
     j       .Lw2b_a
     .balign 4
 .Lw2b_a:
+    nop.n
+    nop.n
+    s32i    a12, a11, 108             // FA021
+    l32i    a13, a11, 116             // FA022
+    add     a14, a14, a15             // FA023
     s32i    a14, a11, 128             // FA024
     l32i    a15, a11, 136             // FA025
     add     a12, a12, a13             // FA026
@@ -207,19 +212,14 @@ hwsha_classic_fill:
     add     a12, a12, a13             // FA054
     s32i    a12, a11, 192             // FA055
     add     a14, a14, a15             // FA056
-    s32i    a14, a11, 212             // FA057
-    mov     a9, a11                   // FA058
-    nop.n
-    nop.n
-    nop.n
     nop.n
     nop.n
     s32i    a6, a2, 152
     nop.n
     nop.n
     nop.n
-    nop.n
-    nop.n
+    s32i    a14, a11, 212             // FA057
+    mov     a9, a11                   // FA058
     nop.n
     nop.n
     nop.n
@@ -333,6 +333,11 @@ hwsha_classic_fill:
 
     .balign 4
 .Lw2b_m:
+    xor     a14, a12, a13             // FM042
+    and     a14, a14, a10             // FM043
+    xor     a14, a14, a13             // FM044
+    l32i    a15, a9, 4                // FM045
+    add     a11, a11, a14             // FM046
     l32i    a14, a9, 72               // FM047
     add     a11, a11, a15             // FM048
     l32i    a15, a9, 0                // FM049
@@ -368,23 +373,21 @@ hwsha_classic_fill:
     srli    a13, a10, 10              // FM079
     xor     a11, a11, a13             // FM080
     ssai    7                         // FM081
+    s32i    a6, a2, 152
     src     a13, a12, a12             // FM082
     ssai    18                        // FM083
     src     a14, a12, a12             // FM084
     xor     a13, a13, a14             // FM085
     srli    a14, a12, 3               // FM086
-    s32i    a6, a2, 152
     xor     a13, a13, a14             // FM087
     l32i    a14, a9, 248              // FM088
     add     a11, a11, a13             // FM089
     l32i    a15, a9, 68               // FM090
     add     a11, a11, a14             // FM091
+    s32i    a6, a2, 144
     l32i    a13, a9, 396              // FM092
     add     a11, a11, a15             // FM093
     nop.n
-    nop.n
-    nop.n
-    s32i    a6, a2, 144
     s32i    a11, a9, 388              // FM094
     add     a11, a11, a13             // FM095
     s32i    a11, a9, 392              // FM096
@@ -396,32 +399,32 @@ hwsha_classic_fill:
     ssai    11                        // FM102
     src     a14, a10, a10             // FM103
     xor     a11, a11, a14             // FM104
-    ssai    25                        // FM105
-    src     a14, a10, a10             // FM106
-    xor     a11, a11, a14             // FM107
     l32i    a7, a3, 32
     s32i.n  a7, a2, 32
-    xor     a14, a12, a13             // FM108
+    ssai    25                        // FM105
     l32i    a7, a3, 36
     s32i.n  a7, a2, 36
-    and     a14, a14, a10             // FM109
+    src     a14, a10, a10             // FM106
     l32i    a7, a3, 40
     s32i.n  a7, a2, 40
-    xor     a14, a14, a13             // FM110
+    xor     a11, a11, a14             // FM107
     l32i    a7, a3, 44
     s32i.n  a7, a2, 44
-    l32i    a15, a9, 4                // FM111
+    xor     a14, a12, a13             // FM108
     l32i    a7, a3, 48
     s32i.n  a7, a2, 48
-    add     a11, a11, a14             // FM112
+    and     a14, a14, a10             // FM109
     l32i    a7, a3, 52
     s32i.n  a7, a2, 52
-    l32i    a14, a9, 72               // FM113
+    xor     a14, a14, a13             // FM110
     l32i    a7, a3, 56
     s32i.n  a7, a2, 56
-    add     a11, a11, a15             // FM114
+    l32i    a15, a9, 4                // FM111
     l32i    a7, a3, 60
     s32i.n  a7, a2, 60
+    add     a11, a11, a14             // FM112
+    l32i    a14, a9, 72               // FM113
+    add     a11, a11, a15             // FM114
     l32i    a15, a9, 0                // FM115
     add     a11, a11, a14             // FM116
     l32i    a10, a9, 60               // FM117
@@ -445,9 +448,6 @@ hwsha_classic_fill:
     add     a13, a13, a11             // FM135
     s32i    a13, a9, 80               // FM136
     addi    a9, a9, 20                // FM137
-    nop.n
-    nop.n
-    nop.n
     nop.n
     nop.n
     s32i    a6, a2, 152
@@ -548,11 +548,16 @@ hwsha_classic_fill:
     nop.n
     movi    a7, 640
     s32i.n  a7, a2, 60
-    s32i    a11, a9, 388              // FM028
-    add     a11, a11, a13             // FM029
+    nop.n
+    nop.n
     nop.n
     nop.n
     s32i    a6, a2, 148
+    nop.n
+    nop.n
+    nop.n
+    s32i    a11, a9, 388              // FM028
+    add     a11, a11, a13             // FM029
     s32i    a11, a9, 392              // FM030
     l32i    a10, a9, 64               // FM031
     l32i    a12, a9, 44               // FM032
@@ -564,14 +569,9 @@ hwsha_classic_fill:
     xor     a11, a11, a14             // FM038
     ssai    25                        // FM039
     src     a14, a10, a10             // FM040
-    xor     a11, a11, a14             // FM041
-    xor     a14, a12, a13             // FM042
-    and     a14, a14, a10             // FM043
-    xor     a14, a14, a13             // FM044
-    l32i    a15, a9, 4                // FM045
     l32i    a7, a3, 92
     s32i.n  a7, a2, 32
-    add     a11, a11, a14             // FM046
+    xor     a11, a11, a14             // FM041
     movi    a7, 256
     s32i.n  a7, a2, 60
     j       .Lw2b_m
@@ -628,6 +628,8 @@ hwsha_classic_fill:
     nop.n
     nop.n
     s32i    a6, a2, 148
+    nop.n
+    nop.n
     bnez    a10, .Lnohit_B              // FB005
     s32i    a13, a3, 108              // FB006
     movi.n  a12, 1                    // FB007
@@ -643,16 +645,16 @@ hwsha_classic_fill:
     xor     a10, a10, a11             // FB017
     srli    a11, a13, 3               // FB018
     xor     a10, a10, a11             // FB019
-    l32i    a11, a3, 140              // FB020
-    l32i    a15, a14, 76              // FB021
     l32i    a7, a3, 92
     s32i.n  a7, a2, 32
-    nop.n
+    l32i    a11, a3, 140              // FB020
     movi    a7, 256
     s32i.n  a7, a2, 60
     j       .Lw2b_b
     .balign 4
 .Lw2b_b:
+    l32i    a15, a14, 76              // FB021
+    nop.n
     s32i    a13, a14, 68              // FB022
     add     a10, a10, a11             // FB023
     add     a15, a15, a13             // FB024
@@ -662,8 +664,6 @@ hwsha_classic_fill:
     add     a10, a10, a11             // FB028
     s32i    a10, a14, 372             // FB029
     mov     a9, a14                   // FB030
-    nop.n
-    nop.n
     nop.n
     nop.n
     nop.n
