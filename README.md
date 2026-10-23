@@ -18,10 +18,10 @@ is paid to **your** address.
 | `lilygo-t-display` | LilyGO TTGO T‑Display (ESP32) | ST7789 135×240 |
 | `lilygo-t-display-s3` | LilyGO T‑Display‑S3 | ST7789 170×320 (parallel) |
 | `esp32-2432s028r` | ESP32‑2432S028R "Cheap Yellow Display" | ILI9341 320×240 |
-| `esp32-headless` | any ESP32 board (LED on GPIO2) | — (serial) |
-| `esp32s3-headless` | any ESP32‑S3 board | — |
-| `esp32s2-headless` | any ESP32‑S2 board | — |
-| `esp32c3-headless` | any ESP32‑C3 board | — |
+| `esp32-headless` | any ESP32 board (LED on GPIO2) | — (serial + web) |
+| `esp32s3-headless` | any ESP32‑S3 board | — (serial + web) |
+| `esp32s2-headless` | any ESP32‑S2 board | — (serial + web) |
+| `esp32c3-headless` | any ESP32‑C3 board | — (serial + web) |
 
 Hashing engines:
 
@@ -42,7 +42,19 @@ pio run -e esp32-headless -t upload -t monitor   # any ESP32
 pio run                                          # build all boards
 ```
 
-Headless board: add `-DLED_PIN=<gpio>` to `build_flags` if your LED is not on GPIO2.
+### Headless boards
+
+Boards without a display report everything on the serial monitor and the
+[web dashboard](#web-dashboard):
+
+* **Setup**: the serial monitor prints the access point name and password to join
+  (no QR code); then follow [First-time setup](#first-time-setup).
+* **Button**: BOOT (GPIO0, GPIO9 on ESP32‑C3). Hold it during boot to reopen the
+  portal, or for 5 s while running to erase all settings.
+* **Status LED**: steady while connecting to the pool, blinking once per second while
+  mining. Only `esp32-headless` defines one by default (GPIO2); for the other boards,
+  or if your LED is elsewhere, add `-DLED_PIN=<gpio>` to `build_flags`
+  (plus `-DLED_ACTIVE_LOW` if it lights when the pin is low).
 
 ## First-time setup
 
@@ -65,11 +77,12 @@ To erase everything (Wi‑Fi + settings): **hold A for 5 s** while running.
 
 ## Buttons
 
-| | M5StickC Plus2 | T‑Display / T‑Display‑S3 | CYD / headless |
-|---|---|---|---|
-| Next screen | A (front) | right button (GPIO35 / GPIO14) | BOOT |
-| Brightness 100→60→30→10→off | B (side) or Power | BOOT button | — |
-| Reset (5 s) | A | right button | BOOT |
+| | M5StickC Plus2 | T‑Display / T‑Display‑S3 | CYD | headless |
+|---|---|---|---|---|
+| Next screen | A (front) | right button (GPIO35 / GPIO14) | BOOT | — |
+| Brightness 100→60→30→10→off | B (side) or Power | BOOT button | — | — |
+| Setup portal (hold at boot) | A | right button | BOOT | BOOT |
+| Reset (5 s) | A | right button | BOOT | BOOT |
 
 Screens, in order:
 
