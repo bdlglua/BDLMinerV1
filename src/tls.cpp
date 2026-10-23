@@ -4,6 +4,8 @@
 #include <freertos/semphr.h>
 #include <mbedtls/platform.h>
 
+#include <atomic>
+
 #include "hw_sha.h"
 #include "log.h"
 
@@ -33,6 +35,16 @@ void *tlsCalloc(size_t n, size_t size) {
     return heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 }
 
+static std::atomic<int> wdtPauses{0};
+
+void core0WdtPause() {
+    if (wdtPauses++ == 0) disableCore0WDT();
+}
+
+void core0WdtResume() {
+    if (--wdtPauses == 0) enableCore0WDT();
+}
+
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     tls.setInsecure();
     xSemaphoreTake(lock, portMAX_DELAY);
@@ -47,7 +59,7 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     // left to the hardware miner nothing else can feed core 0's idle task
     // meanwhile, hence the watchdog pause.
     hwsha::hold();
-    disableCore0WDT();
+    core0WdtPause();
     uint32_t t0 = millis();
     bool ok = tls.connect(host, port);
     char why[80] = "";
@@ -57,7 +69,7 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     }
     logf("[tls] %s: handshake %s in %u ms%s (heap %u, largest block %u)\n", host, ok ? "done" : "failed",
          (unsigned)(millis() - t0), why, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
-    enableCore0WDT();
+    core0WdtResume();
     hwsha::release();
     xSemaphoreGive(lock);
     return ok;

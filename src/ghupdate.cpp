@@ -176,7 +176,9 @@ void install() {
     portEXIT_CRITICAL(&stateMux);
     logf("[update] installing %s\n", state.version);
     hwsha::hold();  // S2/S3/C3: TLS would wait for every mining batch
-    disableCore0WDT();
+    // The download keeps core 0 busy along with the software miner: its idle
+    // task, starved, would trip the watchdog (it did, mid-download).
+    core0WdtPause();
 
     WiFiClientSecure tls;
     HTTPClient http;
@@ -218,6 +220,7 @@ void install() {
             if (Update.write(buf, n) != (size_t)n) break;
             done += n;
             state.progress = (uint64_t)done * 100 / size;
+            vTaskDelay(1);  // the screen and web server keep running
         }
         http.end();
         if (done != size) {
@@ -239,7 +242,7 @@ void install() {
         ok = true;
     } while (false);
     mbedtls_sha256_free(&sha);
-    enableCore0WDT();
+    core0WdtResume();
     hwsha::release();
 
     portENTER_CRITICAL(&stateMux);
@@ -260,7 +263,14 @@ void install() {
 
 void ghUpdatePoll() {
     if (!settings.githubUpdate || !(installRequested || (int32_t)(millis() - nextCheck) >= 0)) return;
-    if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) return;
+    if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) {
+        static uint32_t lastLog = 0;
+        if (installRequested && millis() - lastLog > 60000) {
+            lastLog = millis();
+            logf("[update] install waiting: %s\n", WiFi.isConnected() ? "low memory" : "no WiFi");
+        }
+        return;
+    }
     if (!installRequested) nextCheck = millis() + (check() ? kCheckMs : kRetryMs);
     if ((installRequested || settings.githubUpdate == 2) && state.available) install();
     installRequested = false;

@@ -607,7 +607,10 @@ void webStart() {
     server.on("/api/backup", HTTP_POST, handlePostBackup);
     server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
     server.on("/api/github-update", HTTP_POST, []() {
-        if (!authorized()) return;
+        // Only installs the latest release, and only when it carries the
+        // release key's signature: without a web password (read-only
+        // dashboard) it is still allowed.
+        if (!settings.webPassword.isEmpty() && !authorized()) return;
         if (ghUpdateInstall()) server.send(200, "text/plain", "Installing, the miner restarts by itself");
         else server.send(409, "text/plain", "No update to install");
     });

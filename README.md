@@ -89,7 +89,8 @@ this repository. When it is newer than its own firmware, the dashboard shows an
 *Update available* tile with an **Install** button (and a notification is sent); with the
 *Updates from GitHub* setting at `2` it installs it by itself, `0` turns the check off.
 The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
-key built into the firmware (`src/update_key.h`), so a modified file is refused. Settings
+key built into the firmware (`src/update_key.h`), so a modified file is refused. For that
+reason **Install** works without a web password too (with one set, it is asked). Settings
 and statistics are kept. Like web updates, it needs a board with room for two firmwares
 (not M5Stack Core or CYD).
 
