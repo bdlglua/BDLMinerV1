@@ -104,7 +104,8 @@ git tag v1.0.1 && git push origin v1.0.1
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
 `keys/release-signing-key.pem` (`gh secret set RELEASE_SIGNING_KEY < keys/release-signing-key.pem`),
-and *Settings → Pages → Source: GitHub Actions*. The private key is not in the repository
+*Settings → Pages → Source: GitHub Actions*, and in *Settings → Environments →
+github-pages*, the tag rule `v*` next to `main` (otherwise the installer is not deployed). The private key is not in the repository
 (`keys/` is ignored): **keep a copy of it somewhere safe**. Without it, miners already
 installed will refuse every future update from GitHub (they would need a USB or web update
 with a firmware carrying a new key).

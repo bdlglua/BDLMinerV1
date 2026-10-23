@@ -3,7 +3,8 @@
 # web installer on GitHub Pages.
 #
 # Needs the secret RELEASE_SIGNING_KEY (the content of
-# keys/release-signing-key.pem) and Pages set to "GitHub Actions".
+# keys/release-signing-key.pem), Pages set to "GitHub Actions" and the
+# github-pages environment allowing the tags v* to deploy.
 name: Release
 
 on:
@@ -22,9 +23,6 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -72,9 +70,18 @@ jobs:
           files: release/${{ env.VERSION }}/*
 
       - run: python3 tools/make_installer.py "release/$VERSION" site
-      - uses: actions/configure-pages@v5
-        id: pages
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
+  # Separate job: a Pages problem must not keep the release from being
+  # published (the github-pages environment has to allow v* tags).
+  pages:
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - uses: actions/deploy-pages@v4
+        id: deploy
