@@ -96,7 +96,10 @@ void settingsSanitize() {
     if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
     if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
     if (!(settings.suggestedDifficulty > 0)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
-    if (settings.userAgent.isEmpty()) settings.userAgent = DEFAULT_USER_AGENT;
+    // "BDLMinerV1/x.y.z" was the default before 1.0.4: saved settings still
+    // carry it, and pool.nerdminers.org refuses it.
+    if (settings.userAgent.isEmpty() || settings.userAgent.startsWith("BDLMinerV1/"))
+        settings.userAgent = DEFAULT_USER_AGENT;
     if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;
     if (settings.ntfyServer.isEmpty()) settings.ntfyServer = DEFAULT_NTFY_SERVER;
     settings.currency = normalizeCurrency(settings.currency);

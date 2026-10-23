@@ -17,9 +17,9 @@
 #ifndef FW_VERSION
 #define FW_VERSION "dev"
 #endif
-// Sent in mining.subscribe. Some pools only accept known miners (e.g.
-// pool.nerdminers.org requires "NerdMinerV2").
-#define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
+// Sent in mining.subscribe. Some pools only accept known miners
+// (pool.nerdminers.org requires "NerdMinerV2"), and the others take it too.
+#define DEFAULT_USER_AGENT "NerdMinerV2"
 #define DEFAULT_NTFY_SERVER "ntfy.sh"
 // Firmware updates come from the releases of this GitHub repository.
 #ifndef GITHUB_REPO

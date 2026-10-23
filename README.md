@@ -157,9 +157,9 @@ Boards without a display report everything on the serial monitor and the
    * **Pool password**: usually `x`;
    * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
      (the pool may enforce a higher minimum);
-   * **User agent**: miner name sent to the pool, `BDLMinerV1/<version>` by default.
+   * **User agent**: miner name sent to the pool, `NerdMinerV2` by default.
      Some pools only accept known miners: `pool.nerdminers.org` requires `NerdMinerV2`
-     and otherwise refuses the connection (status *Subscribe refused*);
+     (with another name, after its refusal the miner reconnects as `NerdMinerV2`);
    * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
      bits (difficulty ≥ 1) is found, `0` stays silent. M5 devices use their buzzer or
      speaker (StickC Plus2: GPIO2); on other boards add `-DBUZZER_PIN=<gpio>` to
