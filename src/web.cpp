@@ -289,6 +289,9 @@ int applySettings(JsonObjectConst values) {
         const SettingInfo &s = kSettings[i];
         JsonVariantConst v = values[s.key];
         if (v.isNull()) continue;
+        // An empty web password from the web would lock the page out for good
+        // (it can still be cleared in the setup portal).
+        if (s.value == &settings.webPassword && v.as<String>().isEmpty()) continue;
         switch (s.type) {
             case SettingType::Text:
             case SettingType::Secret: *(String *)s.value = v.as<String>(); break;

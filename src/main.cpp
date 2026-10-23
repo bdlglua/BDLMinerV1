@@ -25,19 +25,13 @@ static void onPortalStarted() {
 }
 
 static void logStats() {
-    // Per-engine average since the previous log line ("hw 970.1 + sw 25.3").
-    static uint32_t lastHashes[MAX_MINERS], lastMs = 0;
-    uint32_t now = millis();
+    // Per-engine rates, the same 1-minute averages as the total ("hw 948.2 + sw 41.0").
     char engines[64] = "";
-    if (lastMs) {
-        size_t len = 0;
-        for (int i = 0; i < stats.minerCount && len < sizeof(engines); i++)
-            len += snprintf(engines + len, sizeof(engines) - len, "%s%s %.1f", i ? " + " : " (", stats.engine[i],
-                            (uint32_t)(stats.hashes[i] - lastHashes[i]) / (double)(now - lastMs));
-        if (len < sizeof(engines)) strlcat(engines, ")", sizeof(engines));
-    }
-    for (int i = 0; i < stats.minerCount; i++) lastHashes[i] = stats.hashes[i];
-    lastMs = now;
+    size_t len = 0;
+    for (int i = 0; i < stats.minerCount && len < sizeof(engines); i++)
+        len += snprintf(engines + len, sizeof(engines) - len, "%s%s %.1f", i ? " + " : " (", stats.engine[i],
+                        minerEngineRate(i) / 1000.0);
+    if (len && len < sizeof(engines)) strlcat(engines, ")", sizeof(engines));
 
     logf("[stats] %.2f kH/s%s | shares %u ok / %u rejected | best %.6g (ever %.6g) | blocks %u | %s\n",
          minerHashrate() / 1000.0, engines, (unsigned)stats.accepted, (unsigned)stats.rejected,

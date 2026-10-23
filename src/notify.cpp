@@ -21,8 +21,16 @@ QueueHandle_t queue;
 constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
 
 bool send(const Message &m) {
+    // "ntfy.sh", or a self-hosted "ntfy.example.com:8443"
+    String host = settings.ntfyServer;
+    uint16_t port = 443;
+    int colon = host.lastIndexOf(':');
+    if (colon > 0) {
+        port = host.substring(colon + 1).toInt() ?: 443;
+        host.remove(colon);
+    }
     WiFiClientSecure tls;
-    if (!tlsConnect(tls, settings.ntfyServer.c_str())) return false;
+    if (!tlsConnect(tls, host.c_str(), port)) return false;
     HTTPClient http;
     http.setTimeout(10000);
     if (!http.begin(tls, "https://" + settings.ntfyServer + "/" + settings.ntfyTopic)) return false;

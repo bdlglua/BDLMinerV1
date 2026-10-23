@@ -43,6 +43,13 @@ bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocume
         return false;
     }
     int code = http.GET();
+    if (code < 0) {
+        // The shared connection was lost (the server closed it, or right
+        // after the handshake, seen on mempool.space): one more go on a new one.
+        http.end();
+        tls.stop();
+        if (tlsConnect(tls, kHost) && http.begin(tls, url)) code = http.GET();
+    }
     bool ok = false;
     if (code == HTTP_CODE_OK) {
         String body = http.getString();  // also undoes chunked encoding

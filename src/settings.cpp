@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <esp_wifi.h>
 
 #include "log.h"
 
@@ -66,9 +67,30 @@ static String normalizeCurrency(String c) {
     return DEFAULT_CURRENCY;
 }
 
+// "stratum+tcp://pool.example.com:3333/" -> host "pool.example.com", port 3333
+// (with `port`; without it a ":port" stays in `host`). Pool addresses are
+// often pasted that way.
+static void cleanHost(String &host, uint16_t *port) {
+    host.trim();
+    int scheme = host.indexOf("://");
+    if (scheme >= 0) host.remove(0, scheme + 3);
+    int slash = host.indexOf('/');
+    if (slash >= 0) host.remove(slash);
+    int colon = host.lastIndexOf(':');
+    if (port && colon > 0 && host.indexOf(':') == colon) {  // not an IPv6 address
+        long p = host.substring(colon + 1).toInt();
+        if (port && p > 0 && p < 65536) *port = p;
+        host.remove(colon);
+    }
+}
+
 void settingsSanitize() {
     for (size_t i = 0; i < kSettingCount; i++)
         if (kSettings[i].type == SettingType::Text) ((String *)kSettings[i].value)->trim();
+    cleanHost(settings.poolHost, &settings.poolPort);
+    cleanHost(settings.backupHost, &settings.backupPort);
+    cleanHost(settings.ntfyServer, nullptr);
+    cleanHost(settings.mqttHost, &settings.mqttPort);
     if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
     if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
     if (!(settings.suggestedDifficulty > 0)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
@@ -78,6 +100,7 @@ void settingsSanitize() {
     settings.currency = normalizeCurrency(settings.currency);
     if (settings.brightness > 100) settings.brightness = 100;
     settings.rotation &= 3;
+    if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
     if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
 }
@@ -170,15 +193,19 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     // Without a payout address there is nothing useful to mine for.
     if (settings.btcAddress.isEmpty()) forcePortal = true;
 
+    // The network saved by the portal, also when a fallback ends up joined.
+    wifi_config_t saved;
+    if (esp_wifi_get_config(WIFI_IF_STA, &saved) == ESP_OK && saved.sta.ssid[0]) {
+        char ssid[33] = {0}, pass[65] = {0};
+        memcpy(ssid, saved.sta.ssid, sizeof(saved.sta.ssid));
+        memcpy(pass, saved.sta.password, sizeof(saved.sta.password));
+        mainSsid = ssid;
+        mainPass = pass;
+    }
+
     if (!forcePortal) {
         WiFi.begin();  // the network saved by the portal
-        if (waitConnected(15000) || wifiTryFallbacks()) {
-            if (mainSsid.isEmpty() && WiFi.SSID() != settings.wifi2Ssid && WiFi.SSID() != settings.wifi3Ssid) {
-                mainSsid = WiFi.SSID();
-                mainPass = WiFi.psk();
-            }
-            return;
-        }
+        if (waitConnected(15000) || wifiTryFallbacks()) return;
     }
 
     WiFiManager wm;

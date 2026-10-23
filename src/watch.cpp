@@ -39,6 +39,7 @@ bool nightNow() {
 }
 
 void throttle() {
+    board::sampleTemperature();
     float t = board::temperature();
     if (settings.maxTemp && !isnan(t)) {
         if (!hot && t >= settings.maxTemp) {

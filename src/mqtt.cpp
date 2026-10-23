@@ -89,7 +89,7 @@ void mqttTask(void *) {
             lastTry = millis();
             base = "bdlminer/" + webHostName();
             mqtt.setServer(settings.mqttHost.c_str(), settings.mqttPort);
-            mqtt.setBufferSize(768);
+            mqtt.setBufferSize(1024);
             String will = base + "/status";
             bool ok = settings.mqttUser.isEmpty()
                           ? mqtt.connect(webHostName().c_str(), will.c_str(), 0, true, "offline")

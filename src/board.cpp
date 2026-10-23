@@ -399,24 +399,24 @@ void beep() {
 #endif
 }
 
-float temperature() {
-    // Sensors are slow (I2C, ADC): read at most every 2 s.
-    static uint32_t lastMs = 0;
-    static float cached = NAN;
-    uint32_t now = millis();
-    if (lastMs && now - lastMs < 2000) return cached;
-    lastMs = now;
+static volatile float lastTemperature = NAN;
+
+void sampleTemperature() {
+    float t = NAN;
 #ifdef DISPLAY_M5UNIFIED
-    float t;
-    if (M5.Imu.isEnabled() && M5.Imu.getTemp(&t)) return cached = t;
+    if (!M5.Imu.isEnabled() || !M5.Imu.getTemp(&t)) t = NAN;
 #endif
-    cached = temperatureRead();
+    if (isnan(t)) {
+        t = temperatureRead();
 #if CONFIG_IDF_TARGET_ESP32
-    // The original ESP32's sensor is undocumented and missing on most chips,
-    // which then always read a raw 128, i.e. 53.3 C.
-    if (fabsf(cached - (128 - 32) / 1.8f) < 0.01f) cached = NAN;
+        // The original ESP32's sensor is undocumented and missing on most
+        // chips, which then always read a raw 128, i.e. 53.3 C.
+        if (fabsf(t - (128 - 32) / 1.8f) < 0.01f) t = NAN;
 #endif
-    return cached;
+    }
+    lastTemperature = t;
 }
+
+float temperature() { return lastTemperature; }
 
 }  // namespace board

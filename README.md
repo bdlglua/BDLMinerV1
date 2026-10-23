@@ -92,7 +92,8 @@ Boards without a display report everything on the serial monitor and the
    **`BDLMinerV1-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
    * **Pool host / port**: `public-pool.io` / `21496` by default
-     (others: `solo.ckpool.org` / `3333`, or your own pool);
+     (others: `solo.ckpool.org` / `3333`, or your own pool). A pasted
+     `stratum+tcp://host:port` is accepted: the prefix is dropped and the port taken;
    * **Backup pool host / port** (optional): used when the main pool fails, see
      [Backup pool](#backup-pool);
    * **BTC address**: your payout address, optionally followed by `.workerName`.
