@@ -561,7 +561,7 @@ void showMessage(const char *title, const char *line1, const char *line2) {
     if (!lcd) return;
     if (bgSet) {
         showBackground(bg::SPLASH);
-        drawField(bg::SPLASH_INFO, String(title) + ": " + line1, kFg);
+        drawField(bg::SPLASH_INFO, String(title) + ": " + line1 + (line2 ? String(" - ") + line2 : String()), kFg);
         return;
     }
     auto &d = g();

@@ -113,6 +113,26 @@ static void testSubscribeRefused() {
     CHECK(p.lastError() == "Other error");
 }
 
+// Malformed or early messages must not crash or start mining on nothing.
+static void testStratumRobustness() {
+    stratum::Protocol p;
+    // set_extranonce before any job: no job to publish.
+    CHECK(p.handleLine(R"({"id":null,"method":"mining.set_extranonce","params":["aabb",4]})") == stratum::Event::None);
+    CHECK(!p.hasJob());
+    CHECK(p.handleLine(R"({"id":null,"method":"mining.set_extranonce","params":["zz",4]})") == stratum::Event::Error);
+    CHECK(p.job().extranonce1.size() == 2);  // the bad one did not overwrite it
+    CHECK(p.handleLine(R"({"id":null,"method":"mining.set_extranonce","params":["aabb",0]})") == stratum::Event::Error);
+    // Unusable extranonce2 sizes are refused at subscribe time.
+    CHECK(p.handleLine(R"({"id":1,"result":[[],"08000002",-1],"error":null})") == stratum::Event::SubscribeFailed);
+    CHECK(p.handleLine(R"({"id":1,"result":[[],"08000002",64],"error":null})") == stratum::Event::SubscribeFailed);
+    // A job id that is not a string.
+    const char *notify =
+        R"({"params":[12,"ab02cd818b9e567ee21793cddef299feb29ad444a41b85b8000008a300000000",)"
+        R"("01000000","00000000",[],"00000001","1a44b9f2","4dd7f5c7",true],"id":null,"method":"mining.notify"})";
+    CHECK(p.handleLine(notify) == stratum::Event::NewJob);
+    CHECK(p.job().id.empty());
+}
+
 static void testStratumJob() {
     stratum::Protocol p;
     p.setCredentials("addr.worker", "x");
@@ -209,6 +229,7 @@ static void testAddress() {
 int main() {
     testSha();
     testSubscribeRefused();
+    testStratumRobustness();
     testStratumJob();
     testAddress();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);

@@ -17,8 +17,20 @@ namespace hwsha {
 bool available() { return true; }
 
 uint32_t nonceAt(uint32_t position) { return position; }
-void hold() {}
-void release() {}
+
+// The SHA/AES lock is recursive, so mbedtls can still take it from the task
+// that holds it here, while the miner sees `held` and hashes in software.
+static volatile bool held = false;
+
+void hold() {
+    held = true;
+    esp_sha_acquire_hardware();  // waits for the batch in progress
+}
+
+void release() {
+    esp_sha_release_hardware();
+    held = false;
+}
 
 static inline void waitIdle() {
     while (sha_ll_busy()) {
@@ -48,6 +60,7 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
     second[15] = 0x00010000;  // 256 bits, big-endian length
     volatile uint32_t *h7 = (volatile uint32_t *)(SHA_H_BASE + 28);
 
+    if (held) return 0;
     esp_sha_acquire_hardware();
     uint32_t nonce = first;
     for (uint32_t i = 0; i < count; i++, nonce++) {

@@ -25,7 +25,7 @@ enum class Event {
 
 struct Share {
     char jobId[64];
-    char extranonce2[20];
+    char extranonce2[40];  // up to 16 bytes, hex
     uint32_t ntime;
     uint32_t nonce;
     double difficulty;

@@ -22,6 +22,11 @@ portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 // GET `path` and parse the JSON body through `filter` (keeps RAM low: large
 // arrays such as the mempool fee histogram are skipped while streaming).
 bool fetch(WiFiClientSecure &tls, const char *path, JsonDocument &doc, const JsonDocument &filter) {
+    // Keeps the hardware SHA loop out of the way of the TLS session.
+    struct Hold {
+        Hold() { hwsha::hold(); }
+        ~Hold() { hwsha::release(); }
+    } hold;
     HTTPClient http;
     String url = String(kApi) + path;
     http.useHTTP10(true);  // no chunked encoding: the body can be parsed as a stream
@@ -47,11 +52,6 @@ bool refresh() {
         Serial.printf("[market] skipped, low memory (%u bytes free)\n", (unsigned)ESP.getFreeHeap());
         return false;
     }
-    // Keeps the hardware SHA loop off the DPORT bus for the handshakes.
-    struct Hold {
-        Hold() { hwsha::hold(); }
-        ~Hold() { hwsha::release(); }
-    } hold;
     WiFiClientSecure tls;
     tls.setInsecure();  // public read-only data, no secret is sent
     MarketData d = marketGet();

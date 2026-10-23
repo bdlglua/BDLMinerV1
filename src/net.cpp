@@ -74,6 +74,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                         Serial.printf("[pool] error: %s\n", proto.lastError().c_str());
                         return;
                     case stratum::Event::NewJob:
+                        if (!proto.hasJob()) break;
                         minerPublishJob(proto.job(), proto.job().clean);
                         Serial.printf("[pool] job %s height=%u clean=%d diff=%g\n", proto.job().id.c_str(),
                                       proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
@@ -124,9 +125,15 @@ void netTask(void *) {
     for (;;) {
         if (!WiFi.isConnected()) {
             setStatus("WiFi lost, reconnecting");
+            // The WiFi driver reconnects by itself; only restart the attempt
+            // when it takes too long (restarting cancels one in progress).
+            uint32_t since = millis();
             while (!WiFi.isConnected()) {
-                WiFi.reconnect();
-                vTaskDelay(pdMS_TO_TICKS(5000));
+                if (millis() - since > 30000) {
+                    WiFi.reconnect();
+                    since = millis();
+                }
+                vTaskDelay(pdMS_TO_TICKS(500));
             }
         }
 

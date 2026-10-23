@@ -36,11 +36,12 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t nonce, const uint8_t hash[32], void *ctx), void *ctx);
 
 // Keeps the mining loop off the peripheral until release(), waiting for the
-// batch in progress to end. On the original ESP32 the loop saturates the DPORT
-// bus, which slows the RSA accelerator down so much that a TLS handshake on
-// the other core starves its idle task (task watchdog reset): HTTPS requests
-// run inside hold()/release(). The miner hashes in software meanwhile.
-// Called from one task at a time; a no-op on the other chips.
+// batch in progress to end; the miner hashes in software meanwhile. HTTPS
+// requests run inside hold()/release(): on the original ESP32 the loop
+// saturates the DPORT bus, which slows the RSA accelerator down so much that
+// a TLS handshake on the other core starves its idle task (task watchdog
+// reset); on the other chips TLS would wait for a whole batch at every SHA
+// or AES operation. Called from one task at a time.
 void hold();
 void release();
 

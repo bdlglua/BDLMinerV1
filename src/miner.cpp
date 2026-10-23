@@ -70,7 +70,9 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
 
     bool block = work::meetsTarget(hash, w.networkTarget);
     if (block) {
+        portENTER_CRITICAL(&statsMux);
         stats.blocksFound++;
+        portEXIT_CRITICAL(&statsMux);
         Serial.printf("\n!!!!! BLOCK FOUND !!!!! nonce=%08x job=%s\n", nonce, w.jobId.c_str());
     }
     if (d >= w.shareDifficulty || block) {
@@ -80,7 +82,11 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         s.ntime = w.ntime;
         s.nonce = nonce;
         s.difficulty = d;
-        if (xQueueSend(shareQueue, &s, 0) == pdTRUE) stats.sharesFound++;
+        if (xQueueSend(shareQueue, &s, 0) == pdTRUE) {
+            portENTER_CRITICAL(&statsMux);
+            stats.sharesFound++;
+            portEXIT_CRITICAL(&statsMux);
+        }
     }
 }
 

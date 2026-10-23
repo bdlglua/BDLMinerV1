@@ -22,6 +22,9 @@ std::string serialize(JsonDocument &doc) {
 
 uint32_t parseHex32(const char *s) { return s ? (uint32_t)strtoul(s, nullptr, 16) : 0; }
 
+// extranonce2 sizes we can serialize (Share::extranonce2 holds 16 bytes).
+bool validExtranonce2Size(int n) { return n >= 1 && n <= 16; }
+
 // ArduinoJson keeps numbers like 0.0005 as a 32-bit float, which reads back
 // as 0.00049999997. Restore the decimal value the pool actually sent so that
 // shares are never checked against a slightly-too-easy target.
@@ -105,7 +108,7 @@ Event Protocol::handleLine(const char *line) {
         if (!strcmp(method, "mining.notify")) {
             if (params.size() < 9) return Event::Error;
             work::Job j;
-            j.id = params[0].as<const char *>();
+            j.id = params[0] | "";
 
             // prevhash: eight 32-bit words, each byte-swapped vs header order.
             uint8_t prev[32];
@@ -139,9 +142,13 @@ Event Protocol::handleLine(const char *line) {
             return Event::Difficulty;
         }
         if (!strcmp(method, "mining.set_extranonce")) {
-            work::fromHex(params[0] | "", job_.extranonce1);
-            job_.extranonce2Size = params[1] | job_.extranonce2Size;
-            return Event::NewJob;
+            std::vector<uint8_t> en1;
+            int size = params[1] | job_.extranonce2Size;
+            if (!validExtranonce2Size(size) || !work::fromHex(params[0] | "", en1)) return Event::Error;
+            job_.extranonce1 = en1;
+            job_.extranonce2Size = size;
+            // Before the first notify there is no job to restart yet.
+            return hasJob_ ? Event::NewJob : Event::None;
         }
         return Event::None;  // client.reconnect, client.show_message...
     }
@@ -167,6 +174,10 @@ Event Protocol::handleLine(const char *line) {
         }
         if (!work::fromHex(result[1] | "", job_.extranonce1)) return Event::Error;
         job_.extranonce2Size = result[2] | 4;
+        if (!validExtranonce2Size(job_.extranonce2Size)) {
+            lastError_ = "unsupported extranonce2 size";
+            return Event::SubscribeFailed;
+        }
         return Event::Subscribed;
     }
     if (id == kIdAuthorize) {
