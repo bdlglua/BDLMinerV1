@@ -8,6 +8,10 @@ is paid to **your** address.
 > For scale: an ESP32 does ~50 to 300 kH/s, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
+> **Status:** the firmware builds for every board below and the portable core is tested
+> on PC (SHA‑256d, header assembly, a real pool session), but it has **not been tested
+> on real hardware yet**. Feedback and bug reports are welcome.
+
 ## Supported boards
 
 | PlatformIO environment | Boards | Display |
@@ -65,12 +69,17 @@ Boards without a display report everything on the serial monitor and the
      (others: `solo.ckpool.org` / `3333`, or your own pool);
    * **BTC address**: your payout address, optionally followed by `.workerName`;
    * **Pool password**: usually `x`;
-   * **Suggested difficulty**: share difficulty suggested to the pool;
+   * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
+     (the pool may enforce a higher minimum);
    * **Timezone**: POSIX TZ string, defaults to Paris time
      `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…);
-   * **Price currency**: currency for the BTC price (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`).
+   * **Price currency**: currency for the BTC price, `USD` by default
+     (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`).
 3. The board restarts and begins mining automatically. Stats can be viewed on
    https://web.public-pool.io by searching for your address.
+
+If nothing is saved within **3 minutes**, the portal closes and the board restarts
+(it reopens the portal on the next boot as long as Wi‑Fi is not configured).
 
 To reopen the portal: **hold button A during boot** (2 s).
 To erase everything (Wi‑Fi + settings): **hold A for 5 s** while running.
@@ -134,6 +143,32 @@ boards without a display:
 curl http://nerdminer-xxxx.local/api/stats
 ```
 
+Example response (hashrates in H/s, fees in sat/vB, `retarget.change` and
+`retarget.progress` in percent, `market.updated_s` = seconds since the last
+mempool.space refresh, `-1` if none yet):
+
+```json
+{
+  "board": "M5StickC-Plus2", "firmware": "3.1.0", "uptime_s": 3600,
+  "hashrate": 48120, "total_hashes": 173232000, "engines": ["sw", "sw"],
+  "shares": { "accepted": 0, "rejected": 0 },
+  "best": { "session": 0.0213, "ever": 0.0213 },
+  "blocks": 0, "over32bits": 0,
+  "pool": { "host": "public-pool.io", "port": 21496, "connected": true,
+            "status": "Mining", "difficulty": 1 },
+  "network": { "height": 972641, "difficulty": 1.27e14 },
+  "address": "bc1q...", "heap": 142000, "temp_c": 48,
+  "ip": "192.168.1.20", "rssi": -61,
+  "market": { "updated_s": 42, "currency": "EUR", "price": 72543,
+              "fees": [3, 2, 1], "hashrate": 1.04e21, "mempool_tx": 23000,
+              "retarget": { "change": 3.5, "progress": 47.1, "blocks": 1067 } }
+}
+```
+
+> **Security:** the dashboard and the API have no authentication. Anyone on your local
+> network can read them, including your BTC address (which is public on the pool anyway).
+> They are read-only: settings can only be changed through the setup portal.
+
 ## Serial monitor (115200 baud)
 
 ```
@@ -144,6 +179,19 @@ curl http://nerdminer-xxxx.local/api/stats
 [market] 5/5 ok | 1 BTC = 72543 EUR | fees 3/2/1 | net 1.04e+21 H/s | retarget +3.50% in 1067
 [stats] 48.12 kH/s | shares 0 ok / 0 rejected | best 0.0213 (ever 0.0213) | blocks 0 | Mining
 ```
+
+## Troubleshooting
+
+| Symptom | What to check |
+|---|---|
+| Can't find the `NerdMinerV3-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
+| Portal saved but the board never mines | Read the serial monitor: Wi‑Fi password, pool host / port, and the `[pool]` lines. |
+| Status `Auth failed: check address` | The BTC address is invalid for this pool. Reopen the portal and fix it. |
+| Status `Pool unreachable` / `Pool silent, reconnecting` | Wrong host or port, or the pool is down. Try `solo.ckpool.org` / `3333`. |
+| No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
+| `nerdminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
+| Clock / Global screens stay empty | The board needs Internet access to `mempool.space` (HTTPS) and `pool.ntp.org`. The `[market]` serial line shows how many requests succeeded (`5/5 ok`). |
+| `hardware SHA: self-test FAILED, disabled` on an S2/S3/C3 | The board fell back to software mining; it still works, just slower. Please report it with your board model. |
 
 ## Good to know
 
@@ -181,3 +229,19 @@ PC tests (check SHA‑256d against the genesis block, header assembly and the pr
 ./test/host/run.sh                       # offline unit tests
 ./test/host/run.sh pool public-pool.io 21496 <address> 900   # real pool, stops at the 1st share
 ```
+
+## Credits
+
+* The screen design (full-screen bitmap backgrounds with values painted on top) is
+  inspired by [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).
+* Libraries: [M5Unified / M5GFX](https://github.com/m5stack/M5Unified) (LovyanGFX),
+  [WiFiManager](https://github.com/tzapu/WiFiManager),
+  [ArduinoJson](https://arduinojson.org/).
+* Market data: [mempool.space](https://mempool.space) public API.
+
+## License
+
+NerdMinerV3 is free software, released under the
+[GNU General Public License v3.0](LICENSE): you may use, modify and redistribute it,
+provided that modified versions you distribute are also released under the GPL‑3.0
+with their source code.
