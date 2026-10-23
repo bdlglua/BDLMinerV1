@@ -32,7 +32,9 @@ Hashing engines:
 
 * **Software** on each core, optimized SHA‑256d (midstate, first 3 rounds and
   `W[16..17]` precomputed per job, early rejection at round 61).
-* **Hardware** on one core, software on the other:
+* **Hardware** on one core, software on the other. On dual-core chips the hardware miner
+  owns core 1 at high priority, and everything else (software miner, WiFi, pool, screen,
+  web server, Arduino loop) runs on core 0, as in NerdMiner Modded:
   * ESP32‑S2/S3/C3: SHA accelerator with state resume (two blocks per nonce);
   * original ESP32 revision 3 and later (M5StickC Plus2, most current ESP32 boards): the
     accelerator cannot resume, so a nonce costs three blocks, but a cycle-counted assembly
@@ -45,7 +47,8 @@ Hashing engines:
     takes over. During the mempool.space HTTPS requests (a few seconds every 5 minutes)
     the hardware loop pauses and that core mines in software: on the original ESP32 the
     loop saturates the bus the RSA accelerator also uses, and a TLS handshake would
-    otherwise trip the task watchdog.
+    otherwise trip the task watchdog. Core 0's idle-task watchdog is also paused for each
+    request: the key exchange runs for seconds without yielding on a fully loaded core 0.
 
 ## Build and flash
 

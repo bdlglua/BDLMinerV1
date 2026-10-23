@@ -22,10 +22,19 @@ portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 // GET `path` and parse the JSON body through `filter` (keeps RAM low: large
 // arrays such as the mempool fee histogram are skipped while streaming).
 bool fetch(WiFiClientSecure &tls, const char *path, JsonDocument &doc, const JsonDocument &filter) {
-    // Keeps the hardware SHA loop out of the way of the TLS session.
+    // Keeps the hardware SHA loop out of the way of the TLS session. The
+    // handshake's key exchange runs for seconds without yielding, and with
+    // core 1 left to the hardware miner nothing else can feed core 0's idle
+    // task meanwhile: the idle task watchdog is off for the request.
     struct Hold {
-        Hold() { hwsha::hold(); }
-        ~Hold() { hwsha::release(); }
+        Hold() {
+            hwsha::hold();
+            disableCore0WDT();
+        }
+        ~Hold() {
+            enableCore0WDT();
+            hwsha::release();
+        }
     } hold;
     HTTPClient http;
     String url = String(kApi) + path;
@@ -52,6 +61,7 @@ bool refresh() {
         Serial.printf("[market] skipped, low memory (%u bytes free)\n", (unsigned)ESP.getFreeHeap());
         return false;
     }
+    uint32_t t0 = millis();
     WiFiClientSecure tls;
     tls.setInsecure();  // public read-only data, no secret is sent
     MarketData d = marketGet();
@@ -110,9 +120,9 @@ bool refresh() {
     portENTER_CRITICAL(&dataMux);
     data = d;
     portEXIT_CRITICAL(&dataMux);
-    Serial.printf("[market] %d/5 ok | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n", ok,
-                  d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour, d.networkHashrate,
-                  d.retargetChange, (unsigned)d.retargetBlocks);
+    Serial.printf("[market] %d/5 ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
+                  ok, (unsigned)(millis() - t0), d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour,
+                  d.networkHashrate, d.retargetChange, (unsigned)d.retargetBlocks);
     return ok == 5;
 }
 

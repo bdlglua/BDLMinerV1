@@ -10,11 +10,21 @@ MinerStats stats;
 
 namespace {
 
-// Hashes done between two looks at the job board. Sized for ~0.1 s of work
-// so new jobs are picked up quickly while the overhead stays tiny. Both
-// divide 2^32, so a work's nonce space always ends on a batch boundary.
+// Hashes done between two looks at the job board, so new jobs are picked up
+// quickly while the overhead (a 1 ms pause per batch) stays small: ~0.1 s of
+// software work, ~0.27 s of the original ESP32's hardware loop. All divide
+// 2^32, so a work's nonce space always ends on a batch boundary.
 constexpr uint32_t kBatchSw = 4096;
+#if CONFIG_IDF_TARGET_ESP32
+constexpr uint32_t kBatchHw = 262144;
+#else
 constexpr uint32_t kBatchHw = 65536;
+#endif
+
+// The hardware miner owns the last core of dual-core chips: above every task
+// that could share it (everything else, Arduino loop included, runs on core
+// 0). Stealing its CPU leaves the SHA engine idle.
+constexpr UBaseType_t kHwMinerPriority = 19;
 
 // Candidates under this top-32-bit value (diff >= ~1.5e-5) are fully
 // evaluated, which is what feeds the "best difficulty" statistic.
@@ -144,7 +154,7 @@ void minerTask(void *arg) {
         nonce += done;
         if (nonce == 0) haveWork = false;  // wrapped: 2^32 nonces exhausted
 
-        // Let the idle task run (task watchdog) and same-priority tasks share.
+        // Let the idle task and lower-priority tasks run.
         vTaskDelay(1);
     }
 }
@@ -193,7 +203,9 @@ void minerStart() {
         stats.engine[m.index] = m.hardware ? "hw" : "sw";
         char name[12];
         snprintf(name, sizeof(name), "miner%d", m.index);
-        xTaskCreatePinnedToCore(minerTask, name, 6144, &m, 1, nullptr, core);
+        // On a single core the network needs the CPU more than any miner.
+        UBaseType_t prio = m.hardware && cores > 1 ? kHwMinerPriority : 1;
+        xTaskCreatePinnedToCore(minerTask, name, 6144, &m, prio, nullptr, core);
         Serial.printf("[miner] %s engine=%s core=%d\n", name, stats.engine[m.index], core);
         stats.minerCount++;
     }
