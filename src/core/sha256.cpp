@@ -128,6 +128,20 @@ void prepare(MidState &ms, const uint8_t header[80]) {
     // After 3 rounds the register roles are rotated by 3.
     ms.pre[0] = f; ms.pre[1] = g; ms.pre[2] = h; ms.pre[3] = a;
     ms.pre[4] = b; ms.pre[5] = c; ms.pre[6] = d; ms.pre[7] = e;
+
+    // The same, laid out as nerd_sha256_bake() (NerdMiner) does for the
+    // assembly prefilter: w[0..2], w[16..17], the registers after round 2 in
+    // their rotated slots, and the parts of round 3 that do not need the nonce.
+    uint32_t *bake = ms.bake;
+    bake[0] = w[0]; bake[1] = w[1]; bake[2] = w[2];
+    bake[3] = w[16]; bake[4] = w[17];
+    uint32_t *r = bake + 5;
+    memcpy(r, ms.mid, 32);
+    ROUND(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], K[0], w[0]);
+    ROUND(r[7], r[0], r[1], r[2], r[3], r[4], r[5], r[6], K[1], w[1]);
+    ROUND(r[6], r[7], r[0], r[1], r[2], r[3], r[4], r[5], K[2], w[2]);
+    bake[13] = r[4] + S1(r[1]) + ch(r[1], r[2], r[3]) + K[3];
+    bake[14] = S0(r[5]) + maj(r[5], r[6], r[7]);
 }
 
 bool scan(const MidState &ms, uint32_t nonce, uint32_t limit, uint8_t out[32]) {

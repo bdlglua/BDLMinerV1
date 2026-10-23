@@ -20,29 +20,29 @@ constexpr uint32_t kMinHeapForTls = 70 * 1024;
 MarketData data;
 portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 
-// GET `path` and parse the JSON body through `filter` (keeps RAM low: large
-// arrays such as the mempool fee histogram are skipped while streaming).
-bool fetch(WiFiClientSecure &tls, const char *path, JsonDocument &doc, const JsonDocument &filter) {
-    // The TLS handshake is done here, HTTPClient then reuses the connection.
-    // It keeps the hardware SHA loop away (see hwsha::hold()), and its key
-    // exchange runs for seconds without yielding: with core 1 left to the
-    // hardware miner nothing else can feed core 0's idle task meanwhile, so
-    // the idle task watchdog is off for it. The rest of the request needs
-    // neither and the miner gets the engine back at once.
-    hwsha::hold();
-    disableCore0WDT();
-    bool connected = tls.connect(kHost, 443);
-    enableCore0WDT();
-    hwsha::release();
-    if (!connected) {
-        Serial.printf("[market] %s: cannot connect\n", path);
-        return false;
+// GET `path` on the TLS connection shared by one refresh and parse the JSON
+// body through `filter` (keeps RAM low: large arrays such as the mempool fee
+// histogram are skipped). The bodies are a few hundred bytes.
+bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocument &doc, const JsonDocument &filter) {
+    if (!tls.connected()) {
+        // The TLS handshake is done here, HTTPClient then reuses the
+        // connection (keep-alive), so a refresh needs one. It keeps the
+        // hardware SHA loop away (see hwsha::hold()), and its key exchange
+        // runs for seconds without yielding: with core 1 left to the hardware
+        // miner nothing else can feed core 0's idle task meanwhile, so the
+        // idle task watchdog is off for it.
+        hwsha::hold();
+        disableCore0WDT();
+        bool connected = tls.connect(kHost, 443);
+        enableCore0WDT();
+        hwsha::release();
+        if (!connected) {
+            Serial.printf("[market] %s: cannot connect\n", path);
+            return false;
+        }
     }
 
-    HTTPClient http;
     String url = String(kApi) + path;
-    http.useHTTP10(true);  // no chunked encoding: the body can be parsed as a stream
-    http.setTimeout(10000);
     if (!http.begin(tls, url)) {
         tls.stop();
         return false;
@@ -50,14 +50,14 @@ bool fetch(WiFiClientSecure &tls, const char *path, JsonDocument &doc, const Jso
     int code = http.GET();
     bool ok = false;
     if (code == HTTP_CODE_OK) {
-        DeserializationError err =
-            deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+        String body = http.getString();  // also undoes chunked encoding
+        DeserializationError err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
         ok = !err;
         if (err) Serial.printf("[market] %s: %s\n", path, err.c_str());
     } else {
         Serial.printf("[market] %s: HTTP %d\n", path, code);
     }
-    http.end();
+    http.end();  // keeps the connection open when the server allows it
     return ok;
 }
 
@@ -70,13 +70,16 @@ bool refresh() {
     uint32_t t0 = millis();
     WiFiClientSecure tls;
     tls.setInsecure();  // public read-only data, no secret is sent
+    HTTPClient http;    // one for the refresh: destroying it closes the connection
+    http.setReuse(true);
+    http.setTimeout(10000);
     MarketData d = marketGet();
     int ok = 0;
 
     {
         JsonDocument filter, doc;
         filter[settings.currency.c_str()] = true;
-        if (fetch(tls, "/v1/prices", doc, filter)) {
+        if (fetch(tls, http, "/v1/prices", doc, filter)) {
             d.price = doc[settings.currency.c_str()] | 0.0;
             ok++;
         }
@@ -86,7 +89,7 @@ bool refresh() {
         filter["fastestFee"] = true;
         filter["halfHourFee"] = true;
         filter["hourFee"] = true;
-        if (fetch(tls, "/v1/fees/recommended", doc, filter)) {
+        if (fetch(tls, http, "/v1/fees/recommended", doc, filter)) {
             d.feeFast = doc["fastestFee"] | 0;
             d.feeHalfHour = doc["halfHourFee"] | 0;
             d.feeHour = doc["hourFee"] | 0;
@@ -96,7 +99,7 @@ bool refresh() {
     {
         JsonDocument filter, doc;
         filter["currentHashrate"] = true;
-        if (fetch(tls, "/v1/mining/hashrate/3d", doc, filter)) {
+        if (fetch(tls, http, "/v1/mining/hashrate/3d", doc, filter)) {
             d.networkHashrate = doc["currentHashrate"] | 0.0;
             ok++;
         }
@@ -106,7 +109,7 @@ bool refresh() {
         filter["progressPercent"] = true;
         filter["difficultyChange"] = true;
         filter["remainingBlocks"] = true;
-        if (fetch(tls, "/v1/difficulty-adjustment", doc, filter)) {
+        if (fetch(tls, http, "/v1/difficulty-adjustment", doc, filter)) {
             d.retargetProgress = doc["progressPercent"] | 0.0;
             d.retargetChange = doc["difficultyChange"] | 0.0;
             d.retargetBlocks = doc["remainingBlocks"] | 0;
@@ -116,7 +119,7 @@ bool refresh() {
     {
         JsonDocument filter, doc;
         filter["count"] = true;
-        if (fetch(tls, "/mempool", doc, filter)) {
+        if (fetch(tls, http, "/mempool", doc, filter)) {
             d.mempoolTx = doc["count"] | 0;
             ok++;
         }

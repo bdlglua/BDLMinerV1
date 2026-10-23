@@ -6,6 +6,14 @@
 
 #include "hw_sha.h"
 
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S3
+// Hand-scheduled assembly of sha::scan() up to its early exit, in IRAM
+// (sw_sha_prefilter.S): true exactly when the top 16 bits of the hash are
+// zero. ~5300 instructions against ~7250 for the compiled C kernel.
+extern "C" bool sw_sha256d_prefilter(const uint32_t *mid, const uint8_t *tail, const uint32_t *bake);
+#define HAVE_SW_PREFILTER 1
+#endif
+
 MinerStats stats;
 
 namespace {
@@ -63,6 +71,7 @@ struct Miner {
 };
 
 Miner miners[MAX_MINERS];
+bool useAsm = false;  // sw_sha256d_prefilter() passed its self-test
 
 void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
     const work::Work &w = ((Miner *)ctx)->work;
@@ -113,6 +122,65 @@ bool fetchWork(Miner &m, uint32_t &seq) {
     return ok;
 }
 
+// Software kernel over positions [first, first + count). A hardware miner
+// whose engine is busy (TLS) keeps to the engine's nonce order so that no
+// nonce is hashed twice.
+void softwareBatch(Miner &m, uint32_t first, uint32_t count, uint32_t limit) {
+    uint8_t hash[32];
+    const sha::MidState &mid = m.work.mid;
+#ifdef HAVE_SW_PREFILTER
+    if (useAsm) {
+        // The assembly only finds hashes with top-32 bits <= 0xFFFF, which
+        // `limit` (>= kBestDiffFilter) always covers; sha::scan() then makes
+        // the hash of that 1 nonce in 65536 and applies `limit`.
+        uint8_t tail[16];
+        memcpy(tail, m.work.header + 64, 16);
+        for (uint32_t p = first, end = first + count; p != end; p++) {
+            uint32_t n = m.hardware ? hwsha::nonceAt(p) : p;
+            memcpy(tail + 12, &n, 4);  // little-endian, as in the header
+            if (sw_sha256d_prefilter(mid.mid, tail, mid.bake) && sha::scan(mid, n, limit, hash))
+                onCandidate(n, hash, &m);
+        }
+        return;
+    }
+#endif
+    for (uint32_t p = first, end = first + count; p != end; p++) {
+        uint32_t n = m.hardware ? hwsha::nonceAt(p) : p;
+        if (sha::scan(mid, n, limit, hash)) onCandidate(n, hash, &m);
+    }
+}
+
+#ifdef HAVE_SW_PREFILTER
+// Compares the assembly with sha::scan() on 6 known candidates (the header and
+// nonces of hwsha's known-answer test) and the 512 nonces after each.
+bool prefilterSelfTest() {
+    static const uint32_t kCandidates[] = {0xa94c, 0xe496, 0x1f476, 0x302f0, 0x35af9, 0x3cf5c};
+    uint8_t header[80] = {0};
+    for (int i = 0; i < 19; i++) {
+        uint32_t w = 0x9E3779B9u * (i + 1);
+        header[4 * i] = w >> 24;
+        header[4 * i + 1] = w >> 16;
+        header[4 * i + 2] = w >> 8;
+        header[4 * i + 3] = w;
+    }
+    sha::MidState ms;
+    sha::prepare(ms, header);
+    uint8_t tail[16], hash[32];
+    memcpy(tail, header + 64, 16);
+    int hits = 0;
+    for (uint32_t c : kCandidates) {
+        uint32_t first = __builtin_bswap32(0x1000 + c);
+        for (uint32_t n = first; n != first + 513; n++) {
+            memcpy(tail + 12, &n, 4);
+            bool fast = sw_sha256d_prefilter(ms.mid, tail, ms.bake);
+            if (fast != sha::scan(ms, n, 0x0000FFFF, hash)) return false;
+            hits += fast;
+        }
+    }
+    return hits >= 6;
+}
+#endif
+
 void minerTask(void *arg) {
     Miner &m = *(Miner *)arg;
     uint32_t seq = 0;
@@ -140,14 +208,7 @@ void minerTask(void *arg) {
         uint32_t hwBatch = left && left < kBatchHw ? left : kBatchHw;
         uint32_t done = m.hardware ? hwsha::scan(m.hwJob, nonce, hwBatch, limit, onCandidate, &m) : 0;
         if (!done) {
-            // Software kernel. A hardware miner whose engine is busy (TLS)
-            // keeps to the engine's nonce order so no nonce is hashed twice.
-            uint8_t hash[32];
-            const sha::MidState &mid = m.work.mid;
-            for (uint32_t p = nonce, end = nonce + kBatchSw; p != end; p++) {
-                uint32_t n = m.hardware ? hwsha::nonceAt(p) : p;
-                if (sha::scan(mid, n, limit, hash)) onCandidate(n, hash, &m);
-            }
+            softwareBatch(m, nonce, kBatchSw, limit);
             done = kBatchSw;
         }
         stats.hashes[m.index] += done;
@@ -194,6 +255,10 @@ void minerStart() {
     bool hw = hwsha::selfTest();
     Serial.printf("[miner] hardware SHA: %s\n",
                   hwsha::available() ? (hw ? "self-test OK" : "self-test FAILED, disabled") : "not supported");
+#ifdef HAVE_SW_PREFILTER
+    useAsm = prefilterSelfTest();
+    Serial.printf("[miner] software SHA: %s\n", useAsm ? "assembly (self-test OK)" : "C (assembly self-test FAILED)");
+#endif
 
     // One miner per core. With a hardware engine it gets its own core (the
     // last one, away from WiFi on dual-core chips) and software runs on the rest.

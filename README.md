@@ -31,7 +31,12 @@ is paid to **your** address.
 Hashing engines:
 
 * **Software** on each core, optimized SHA‑256d (midstate, first 3 rounds and
-  `W[16..17]` precomputed per job, early rejection at round 61).
+  `W[16..17]` precomputed per job, early rejection at round 61). On the original ESP32
+  and the S3, a hand-scheduled assembly version up to that rejection runs from IRAM
+  (~5300 instructions per nonce against ~7250 for the compiled C, from
+  [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded)); it is checked
+  against the C kernel at boot, and the C kernel makes the hash of the 1 nonce in 65536
+  that passes it.
 * **Hardware** on one core, software on the other. On dual-core chips the hardware miner
   owns core 1 at high priority, and everything else (software miner, WiFi, pool, screen,
   web server, Arduino loop) runs on core 0, as in NerdMiner Modded:
@@ -44,11 +49,12 @@ Hashing engines:
     slower loop with more timing margin takes over, then software alone. Older revisions
     mine in software only (a silicon bug makes the fast loop unsafe there);
   * the engine is checked against known answers at boot; if the check fails, software
-    takes over. During the TLS handshakes of the mempool.space requests (5 every 5 minutes)
-    the hardware loop pauses and that core mines in software: on the original ESP32 the
-    loop saturates the bus the RSA accelerator also uses, and a handshake would otherwise
-    trip the task watchdog. Core 0's idle-task watchdog is also paused for each handshake:
-    the key exchange runs for seconds without yielding on a fully loaded core 0.
+    takes over. During the TLS handshake of the mempool.space refresh (one every
+    5 minutes, the 5 requests share the connection) the hardware loop pauses and that
+    core mines in software: on the original ESP32 the loop saturates the bus the RSA
+    accelerator also uses, and a handshake would otherwise trip the task watchdog.
+    Core 0's idle-task watchdog is also paused for each handshake: the key exchange
+    runs for seconds without yielding on a fully loaded core 0.
 
 ## Build and flash
 
@@ -265,6 +271,7 @@ src/
     address.*      payout address check (Base58Check, Bech32, Bech32m)
   hw_sha.*         hardware engine (S2/S3/C3, original ESP32) + self-test
   hw_sha_classic.S cycle-counted SHA256d loop for the original ESP32 (MIT, NerdMiner Modded)
+  sw_sha_prefilter.S hand-scheduled software SHA256d up to the early exit (MIT, NerdMiner Modded)
   miner.*          FreeRTOS mining tasks, share queue, statistics, hashrate history
   net.*            network task: pool connection, reconnection, backup pool, share submission
   market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment)
@@ -290,7 +297,8 @@ and address validation):
 
 * The screen design (full-screen bitmap backgrounds with values painted on top) is
   inspired by [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).
-* The original-ESP32 hardware SHA loop (`src/hw_sha_classic.S`) comes from
+* The original-ESP32 hardware SHA loop (`src/hw_sha_classic.S`) and the assembly
+  software kernel (`src/sw_sha_prefilter.S`) come from
   [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded) by HenrysCat,
   MIT License, Copyright (c) 2023 Bitmaker, (c) 2026 HenrysCat.
 * Libraries: [M5Unified / M5GFX](https://github.com/m5stack/M5Unified) (LovyanGFX),
