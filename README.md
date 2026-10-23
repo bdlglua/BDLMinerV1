@@ -1,127 +1,127 @@
 # NerdMiner V3
 
-Mineur Bitcoin « loterie » (solo) pour **M5StickC Plus2** et les cartes ESP32 compatibles.
-Il se connecte à un pool Stratum V1 (par défaut `public-pool.io:21496`), calcule des
-SHA‑256d et, avec énormément de chance, peut trouver un bloc entier dont la récompense
-est versée à **votre** adresse.
+Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
+It connects to a Stratum V1 pool (`public-pool.io:21496` by default), computes
+SHA‑256d hashes and, with an enormous amount of luck, may find a full block whose reward
+is paid to **your** address.
 
-> Ordre de grandeur : un ESP32 fait ~50 à 300 kH/s, le réseau Bitcoin ~10^21 H/s.
-> C'est un ticket de loterie et un objet pédagogique, pas une source de revenu.
+> For scale: an ESP32 does ~50 to 300 kH/s, the Bitcoin network ~10^21 H/s.
+> This is a lottery ticket and an educational gadget, not a source of income.
 
-## Cartes supportées
+## Supported boards
 
-| Environnement PlatformIO | Cartes | Écran |
+| PlatformIO environment | Boards | Display |
 |---|---|---|
-| `m5stickc-plus2` (défaut) | M5StickC Plus2 | ST7789V2 135×240 |
-| `m5stack-esp32` | StickC / StickC Plus, Core Basic/Gray/Fire, Core2, Tough, Atom Lite/Matrix, Stamp Pico… (détection automatique) | selon le modèle |
-| `m5stack-s3` | AtomS3 / S3R / S3 Lite, CoreS3 / SE, Cardputer / ADV, StampS3, Dial, DinMeter, StickS3… | selon le modèle |
+| `m5stickc-plus2` (default) | M5StickC Plus2 | ST7789V2 135×240 |
+| `m5stack-esp32` | StickC / StickC Plus, Core Basic/Gray/Fire, Core2, Tough, Atom Lite/Matrix, Stamp Pico… (auto-detected) | depends on model |
+| `m5stack-s3` | AtomS3 / S3R / S3 Lite, CoreS3 / SE, Cardputer / ADV, StampS3, Dial, DinMeter, StickS3… | depends on model |
 | `lilygo-t-display` | LilyGO TTGO T‑Display (ESP32) | ST7789 135×240 |
-| `lilygo-t-display-s3` | LilyGO T‑Display‑S3 | ST7789 170×320 (parallèle) |
-| `esp32-2432s028r` | ESP32‑2432S028R « Cheap Yellow Display » | ILI9341 320×240 |
-| `esp32-headless` | toute carte ESP32 (LED GPIO2) | — (série) |
-| `esp32s3-headless` | toute carte ESP32‑S3 | — |
-| `esp32s2-headless` | toute carte ESP32‑S2 | — |
-| `esp32c3-headless` | toute carte ESP32‑C3 | — |
+| `lilygo-t-display-s3` | LilyGO T‑Display‑S3 | ST7789 170×320 (parallel) |
+| `esp32-2432s028r` | ESP32‑2432S028R "Cheap Yellow Display" | ILI9341 320×240 |
+| `esp32-headless` | any ESP32 board (LED on GPIO2) | — (serial) |
+| `esp32s3-headless` | any ESP32‑S3 board | — |
+| `esp32s2-headless` | any ESP32‑S2 board | — |
+| `esp32c3-headless` | any ESP32‑C3 board | — |
 
-Moteurs de hachage :
+Hashing engines:
 
-* **Logiciel** sur chaque cœur, SHA‑256d optimisé (midstate, 3 premiers tours et
-  `W[16..17]` précalculés par job, rejet anticipé au tour 61).
-* **Matériel** sur ESP32‑S2/S3/C3 (accélérateur SHA avec reprise d'état). Il est
-  vérifié au démarrage sur le bloc genesis ; en cas d'échec le logiciel prend le relais.
-  L'ESP32 d'origine (dont le M5StickC Plus2) ne permet pas la reprise d'état : il mine
-  en logiciel sur ses deux cœurs.
+* **Software** on each core, optimized SHA‑256d (midstate, first 3 rounds and
+  `W[16..17]` precomputed per job, early rejection at round 61).
+* **Hardware** on ESP32‑S2/S3/C3 (SHA accelerator with state resume). It is
+  verified at boot against the genesis block; if the check fails, software takes over.
+  The original ESP32 (including the M5StickC Plus2) does not support state resume, so it
+  mines in software on both cores.
 
-## Compiler et flasher
+## Build and flash
 
-Prérequis : [PlatformIO](https://platformio.org/) (`pip install platformio`).
+Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio`).
 
 ```sh
 pio run -e m5stickc-plus2 -t upload -t monitor   # M5StickC Plus2
-pio run -e esp32-headless -t upload -t monitor   # n'importe quel ESP32
-pio run                                          # compile toutes les cartes
+pio run -e esp32-headless -t upload -t monitor   # any ESP32
+pio run                                          # build all boards
 ```
 
-Carte headless : ajoutez `-DLED_PIN=<gpio>` dans `build_flags` si votre LED n'est pas sur GPIO2.
+Headless board: add `-DLED_PIN=<gpio>` to `build_flags` if your LED is not on GPIO2.
 
-## Première configuration
+## First-time setup
 
-1. Au premier démarrage la carte ouvre un point d'accès Wi‑Fi
-   **`NerdMinerV3-XXXX`**, mot de passe **`MineYourCoins`** (sur écran : QR code à scanner).
-2. Ouvrez **http://192.168.4.1**, choisissez votre Wi‑Fi et renseignez :
-   * **Pool host / port** : `public-pool.io` / `21496` par défaut
-     (autres : `solo.ckpool.org` / `3333`, ou votre propre pool) ;
-   * **BTC address** : votre adresse de réception, éventuellement suivie de `.nomDuWorker` ;
-   * **Pool password** : `x` en général ;
-   * **Suggested difficulty** : difficulté de share suggérée au pool ;
-   * **Timezone** : fuseau horaire au format POSIX TZ, par défaut l'heure de Paris
-     `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…) ;
-   * **Price currency** : devise du cours BTC (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`).
-3. La carte redémarre le minage automatiquement. Les stats sont visibles sur
-   https://web.public-pool.io en cherchant votre adresse.
+1. On first boot the board opens a Wi‑Fi access point
+   **`NerdMinerV3-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
+2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
+   * **Pool host / port**: `public-pool.io` / `21496` by default
+     (others: `solo.ckpool.org` / `3333`, or your own pool);
+   * **BTC address**: your payout address, optionally followed by `.workerName`;
+   * **Pool password**: usually `x`;
+   * **Suggested difficulty**: share difficulty suggested to the pool;
+   * **Timezone**: POSIX TZ string, defaults to Paris time
+     `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…);
+   * **Price currency**: currency for the BTC price (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`).
+3. The board restarts and begins mining automatically. Stats can be viewed on
+   https://web.public-pool.io by searching for your address.
 
-Pour rouvrir le portail : **maintenir le bouton A pendant le démarrage** (2 s).
-Pour tout effacer (Wi‑Fi + réglages) : **maintenir A 5 s** pendant le fonctionnement.
+To reopen the portal: **hold button A during boot** (2 s).
+To erase everything (Wi‑Fi + settings): **hold A for 5 s** while running.
 
-## Boutons
+## Buttons
 
 | | M5StickC Plus2 | T‑Display / T‑Display‑S3 | CYD / headless |
 |---|---|---|---|
-| Écran suivant | A (façade) | bouton droit (GPIO35 / GPIO14) | BOOT |
-| Luminosité 100→60→30→10→éteint | B (côté) ou Power | bouton BOOT | — |
-| Réinitialisation (5 s) | A | bouton droit | BOOT |
+| Next screen | A (front) | right button (GPIO35 / GPIO14) | BOOT |
+| Brightness 100→60→30→10→off | B (side) or Power | BOOT button | — |
+| Reset (5 s) | A | right button | BOOT |
 
-Écrans, dans l'ordre :
+Screens, in order:
 
-1. **Mining** : hashrate, shares, meilleure difficulté, difficulté pool, blocs, 32‑bit, température ;
-2. **Clock** : heure (NTP), date, cours du BTC, hashrate, hauteur de bloc, frais rapides, shares ;
-3. **Global** : cours du BTC et sats par unité de devise, hashrate du réseau, transactions en
-   attente, frais (rapide / 30 min / 1 h), prochain ajustement de difficulté, et le temps moyen
-   qu'il faudrait à *votre* mineur pour trouver un bloc seul ;
-4. **Network** : hauteur de bloc, prochain halving, difficulté réseau, total de hashs, pool, IP/RSSI ;
-5. **Info** : carte, firmware, moteurs, RAM libre, adresse.
+1. **Mining**: hashrate, shares, best difficulty, pool difficulty, blocks, 32‑bit, temperature;
+2. **Clock**: time (NTP), date, BTC price, hashrate, block height, fast fees, shares;
+3. **Global**: BTC price and sats per currency unit, network hashrate, pending
+   transactions, fees (fast / 30 min / 1 h), next difficulty adjustment, and the average time
+   it would take *your* miner to find a block on its own;
+4. **Network**: block height, next halving, network difficulty, total hashes, pool, IP/RSSI;
+5. **Info**: board, firmware, engines, free RAM, address.
 
-Les données Clock / Global viennent de l'API publique [mempool.space](https://mempool.space)
-(rafraîchies toutes les 5 minutes, en HTTPS) et l'heure de `pool.ntp.org`.
+Clock / Global data comes from the public [mempool.space](https://mempool.space) API
+(refreshed every 5 minutes over HTTPS) and the time from `pool.ntp.org`.
 
-### Fonds d'écran (style NerdMinerV2)
+### Backgrounds (NerdMinerV2 style)
 
-Comme sur NerdMinerV2, chaque écran est une image plein écran où les panneaux et les
-étiquettes sont déjà dessinés ; le firmware ne peint que les valeurs, champ par champ
-(petit sprite par champ : pas de scintillement, pas de tampon plein écran en RAM).
+As on NerdMinerV2, each screen is a full-screen image with the panels and
+labels already drawn; the firmware only paints the values, field by field
+(a small sprite per field: no flicker, no full-screen buffer in RAM).
 
-| Résolution | Cartes |
+| Resolution | Boards |
 |---|---|
 | 240×135 | M5StickC Plus2 / Plus, Cardputer, T‑Display |
 | 320×170 | T‑Display‑S3 |
 | 320×240 | M5Stack Core / Core2 / Tough / CoreS3, CYD |
 
-Les autres tailles d'écran (AtomS3, StickC d'origine, orientation portrait…) gardent
-l'interface dessinée par le code. Aperçus : `tools/preview/*.png`.
+Other screen sizes (AtomS3, original StickC, portrait orientation…) keep the
+code-drawn interface. Previews: `tools/preview/*.png`.
 
-Pour modifier le design, éditez `tools/make_backgrounds.py` (couleurs, panneaux, positions
-des champs) puis régénérez — la mise en page des champs est produite en même temps que
-les images, ils restent donc synchronisés :
+To change the design, edit `tools/make_backgrounds.py` (colors, panels, field
+positions) and regenerate — the field layout is produced together with the
+images, so they always stay in sync:
 
 ```sh
 pip install pillow numpy
 python3 tools/make_backgrounds.py
 ```
 
-## Tableau de bord web
+## Web dashboard
 
-Une fois connectée, la carte sert une page de suivi en lecture seule, utile surtout pour les
-cartes sans écran :
+Once connected, the board serves a read-only status page, mostly useful for
+boards without a display:
 
-* **http://<IP de la carte>/** ou **http://nerdminer-xxxx.local/** (mDNS ; `xxxx` = fin de
-  l'adresse MAC, affichée dans le moniteur série) ;
-* **/api/stats** : les mêmes données en JSON, pour Home Assistant, un script, etc.
+* **http://<board IP>/** or **http://nerdminer-xxxx.local/** (mDNS; `xxxx` = last digits of
+  the MAC address, shown in the serial monitor);
+* **/api/stats**: the same data as JSON, for Home Assistant, a script, etc.
 
 ```sh
 curl http://nerdminer-xxxx.local/api/stats
 ```
 
-## Moniteur série (115200 bauds)
+## Serial monitor (115200 baud)
 
 ```
 [miner] hardware SHA: not supported
@@ -132,39 +132,39 @@ curl http://nerdminer-xxxx.local/api/stats
 [stats] 48.12 kH/s | shares 0 ok / 0 rejected | best 0.0213 (ever 0.0213) | blocks 0 | Mining
 ```
 
-## À savoir
+## Good to know
 
-* `public-pool.io` impose aujourd'hui une difficulté de share minimale de **1**
-  (≈ 4,3 milliards de hashs) : avec un ESP32, comptez plusieurs heures entre deux shares
-  acceptés. La « meilleure difficulté » affichée progresse, elle, en continu.
-* La meilleure difficulté de tous les temps est sauvegardée en flash (au plus une fois par minute).
-* ESP32‑C6/H2 : non supportés par la plateforme `espressif32@6.9.0` (Arduino 2.x) utilisée ici.
+* `public-pool.io` currently enforces a minimum share difficulty of **1**
+  (≈ 4.3 billion hashes): with an ESP32, expect several hours between two
+  accepted shares. The displayed "best difficulty", however, keeps improving continuously.
+* The all-time best difficulty is saved to flash (at most once per minute).
+* ESP32‑C6/H2: not supported by the `espressif32@6.9.0` platform (Arduino 2.x) used here.
 
 ## Architecture
 
 ```
 src/
-  core/            code portable (testé sur PC)
-    sha256.*       SHA-256, midstate, noyau de minage optimisé
-    work.*         job Stratum -> en-tête 80 octets, coinbase, merkle, difficultés
-    stratum.*      machine à états Stratum V1 (subscribe/authorize/notify/submit)
-  hw_sha.*         moteur matériel ESP32-S2/S3/C3 + auto-test
-  miner.*          tâches de minage FreeRTOS, file de shares, statistiques
-  net.*            tâche réseau : connexion pool, reconnexion, envoi des shares
-  market.*         heure NTP + données mempool.space (cours, frais, hashrate, ajustement)
-  web.*            tableau de bord HTTP + /api/stats, mDNS
-  settings.*       NVS + portail WiFiManager
-  board.*          écran / boutons / LED / batterie par carte
-  ui.*             écrans (fonds bitmap + champs, ou rendu procédural)
-  bg/              fonds d'écran RGB565 générés + layout des champs
+  core/            portable code (tested on PC)
+    sha256.*       SHA-256, midstate, optimized mining kernel
+    work.*         Stratum job -> 80-byte header, coinbase, merkle, difficulties
+    stratum.*      Stratum V1 state machine (subscribe/authorize/notify/submit)
+  hw_sha.*         ESP32-S2/S3/C3 hardware engine + self-test
+  miner.*          FreeRTOS mining tasks, share queue, statistics
+  net.*            network task: pool connection, reconnection, share submission
+  market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment)
+  web.*            HTTP dashboard + /api/stats, mDNS
+  settings.*       NVS + WiFiManager portal
+  board.*          per-board display / buttons / LED / battery
+  ui.*             screens (bitmap backgrounds + fields, or procedural rendering)
+  bg/              generated RGB565 backgrounds + field layout
 tools/
-  make_backgrounds.py   générateur des fonds (Pillow)
-test/host/         tests PC : ./test/host/run.sh  et  ./test/host/run.sh pool
+  make_backgrounds.py   background generator (Pillow)
+test/host/         PC tests: ./test/host/run.sh  and  ./test/host/run.sh pool
 ```
 
-Tests sur PC (vérifie SHA‑256d sur le bloc genesis, l'assemblage d'en‑tête et le protocole) :
+PC tests (check SHA‑256d against the genesis block, header assembly and the protocol):
 
 ```sh
-./test/host/run.sh                       # tests unitaires hors-ligne
-./test/host/run.sh pool public-pool.io 21496 <adresse> 900   # vrai pool, s'arrête au 1er share
+./test/host/run.sh                       # offline unit tests
+./test/host/run.sh pool public-pool.io 21496 <address> 900   # real pool, stops at the 1st share
 ```
