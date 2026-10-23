@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
+#include "hw_sha.h"
 #include "settings.h"
 
 namespace {
@@ -46,6 +47,11 @@ bool refresh() {
         Serial.printf("[market] skipped, low memory (%u bytes free)\n", (unsigned)ESP.getFreeHeap());
         return false;
     }
+    // Keeps the hardware SHA loop off the DPORT bus for the handshakes.
+    struct Hold {
+        Hold() { hwsha::hold(); }
+        ~Hold() { hwsha::release(); }
+    } hold;
     WiFiClientSecure tls;
     tls.setInsecure();  // public read-only data, no secret is sent
     MarketData d = marketGet();

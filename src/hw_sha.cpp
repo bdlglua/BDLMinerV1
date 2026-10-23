@@ -17,6 +17,8 @@ namespace hwsha {
 bool available() { return true; }
 
 uint32_t nonceAt(uint32_t position) { return position; }
+void hold() {}
+void release() {}
 
 static inline void waitIdle() {
     while (sha_ll_busy()) {
@@ -199,6 +201,11 @@ bool available() { return true; }
 
 uint32_t nonceAt(uint32_t position) { return __builtin_bswap32(position); }
 
+// mbedtls only ever try-locks the engine and falls back to software SHA, so
+// holding it here never blocks a TLS session.
+void hold() { esp_sha_lock_engine(SHA2_256); }
+void release() { esp_sha_unlock_engine(SHA2_256); }
+
 void prepare(Job &job, const uint8_t header[80]) {
     for (int i = 0; i < 20; i++)
         job.words[i] = (uint32_t)header[4 * i] << 24 | (uint32_t)header[4 * i + 1] << 16 |
@@ -246,6 +253,8 @@ namespace hwsha {
 
 bool available() { return false; }
 uint32_t nonceAt(uint32_t position) { return position; }
+void hold() {}
+void release() {}
 void prepare(Job &, const uint8_t *) {}
 uint32_t scan(Job &, uint32_t, uint32_t, uint32_t, void (*)(uint32_t, const uint8_t *, void *), void *) {
     return 0;

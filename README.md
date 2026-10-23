@@ -42,7 +42,10 @@ Hashing engines:
     slower loop with more timing margin takes over, then software alone. Older revisions
     mine in software only (a silicon bug makes the fast loop unsafe there);
   * the engine is checked against known answers at boot; if the check fails, software
-    takes over. While an HTTPS request holds the engine, that core mines in software.
+    takes over. During the mempool.space HTTPS requests (a few seconds every 5 minutes)
+    the hardware loop pauses and that core mines in software: on the original ESP32 the
+    loop saturates the bus the RSA accelerator also uses, and a TLS handshake would
+    otherwise trip the task watchdog.
 
 ## Build and flash
 
