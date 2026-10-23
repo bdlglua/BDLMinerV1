@@ -6,6 +6,7 @@
 
 #include <chrono>
 
+#include "core/address.h"
 #include "core/sha256.h"
 #include "core/stratum.h"
 #include "core/work.h"
@@ -157,9 +158,47 @@ static void testStratumJob() {
     CHECK(p.lastError() == "Low difficulty share");
 }
 
+// Known-good addresses (genesis coinbase, BIP13, BIP173 and BIP350 vectors)
+// and the typos the check must catch.
+static void testAddress() {
+    using address::Network;
+    using address::Type;
+    struct Case {
+        const char *user;
+        Type type;
+        Network net;
+    } cases[] = {
+        {"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", Type::P2PKH, Network::Main},
+        {"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.rig1", Type::P2PKH, Network::Main},
+        {"3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", Type::P2SH, Network::Main},
+        {"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", Type::P2WPKH, Network::Main},
+        {"BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4", Type::P2WPKH, Network::Main},
+        {"bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", Type::P2WSH, Network::Main},
+        {"bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", Type::P2TR, Network::Main},
+        {"tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", Type::P2WPKH, Network::Test},
+        // Invalid: one character changed, mixed case, Bech32 checksum on a
+        // v1 address, wrong prefix, account name instead of an address.
+        {"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNb", Type::Invalid, Network::Unknown},
+        {"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", Type::Invalid, Network::Unknown},
+        {"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kV8F3T4", Type::Invalid, Network::Unknown},
+        {"bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqh2y7hd", Type::Invalid, Network::Unknown},
+        {"ltc1qw508d6qejxtdg4y5r3zarvary0c5xw7kgmn4n9", Type::Invalid, Network::Unknown},
+        {"myaccount.worker1", Type::Invalid, Network::Unknown},
+        {"", Type::Invalid, Network::Unknown},
+    };
+    for (const Case &c : cases) {
+        address::Info info = address::parse(c.user);
+        if (info.type != c.type || info.network != c.net) {
+            printf("FAIL address %s -> %s\n", c.user, address::typeName(info.type));
+            failures++;
+        }
+    }
+}
+
 int main() {
     testSha();
     testStratumJob();
+    testAddress();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);
     return failures ? 1 : 0;
 }

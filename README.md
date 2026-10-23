@@ -1,4 +1,4 @@
-# NerdMiner V3
+# BDLMiner V1
 
 Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
 It connects to a Stratum V1 pool (`public-pool.io:21496` by default), computes
@@ -63,11 +63,16 @@ Boards without a display report everything on the serial monitor and the
 ## First-time setup
 
 1. On first boot the board opens a Wi‑Fi access point
-   **`NerdMinerV3-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
+   **`BDLMinerV1-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
    * **Pool host / port**: `public-pool.io` / `21496` by default
      (others: `solo.ckpool.org` / `3333`, or your own pool);
-   * **BTC address**: your payout address, optionally followed by `.workerName`;
+   * **Backup pool host / port** (optional): used when the main pool fails, see
+     [Backup pool](#backup-pool);
+   * **BTC address**: your payout address, optionally followed by `.workerName`.
+     It is checked at boot (Base58Check and Bech32/Bech32m checksums): if it looks
+     mistyped, the screen shows *Invalid BTC address?* for 5 s and the serial monitor
+     a warning. Mining still starts, since some pools use account names instead;
    * **Pool password**: usually `x`;
    * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
      (the pool may enforce a higher minimum);
@@ -83,6 +88,15 @@ If nothing is saved within **3 minutes**, the portal closes and the board restar
 
 To reopen the portal: **hold button A during boot** (2 s).
 To erase everything (Wi‑Fi + settings): **hold A for 5 s** while running.
+
+### Backup pool
+
+When a backup pool is set and the main pool fails **3 times in a row** (unreachable,
+or the connection drops before authorization), the miner switches to the backup with
+the same address and password. After **30 minutes** on the backup it tries the main
+pool again. While on the backup, the Network screen highlights it (orange pool name,
+or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard shows
+*Pool (backup)*.
 
 ## Buttons
 
@@ -135,29 +149,39 @@ python3 tools/make_backgrounds.py
 Once connected, the board serves a read-only status page, mostly useful for
 boards without a display:
 
-* **http://<board IP>/** or **http://nerdminer-xxxx.local/** (mDNS; `xxxx` = last digits of
+* **http://<board IP>/** or **http://bdlminer-xxxx.local/** (mDNS; `xxxx` = last digits of
   the MAC address, shown in the serial monitor);
-* **/api/stats**: the same data as JSON, for Home Assistant, a script, etc.
+* **/api/stats**: the same data as JSON, for Home Assistant, a script, etc.;
+* **/metrics**: the main counters in Prometheus text format, for Prometheus / Grafana.
+
+The page also shows lifetime totals and a 24‑hour hashrate chart (5‑minute averages,
+kept in RAM, so it restarts empty after a reboot).
 
 ```sh
-curl http://nerdminer-xxxx.local/api/stats
+curl http://bdlminer-xxxx.local/api/stats
+curl http://bdlminer-xxxx.local/metrics
 ```
 
 Example response (hashrates in H/s, fees in sat/vB, `retarget.change` and
 `retarget.progress` in percent, `market.updated_s` = seconds since the last
-mempool.space refresh, `-1` if none yet):
+mempool.space refresh, `-1` if none yet; `history.hashrate` holds up to 288 values,
+oldest first; `address_type` is `P2PKH`, `P2SH`, `P2WPKH`, `P2WSH`, `P2TR`,
+`SegWit` or `invalid`):
 
 ```json
 {
-  "board": "M5StickC-Plus2", "firmware": "3.1.0", "uptime_s": 3600,
+  "board": "M5StickC-Plus2", "firmware": "1.0.0", "uptime_s": 3600,
   "hashrate": 48120, "total_hashes": 173232000, "engines": ["sw", "sw"],
   "shares": { "accepted": 0, "rejected": 0 },
   "best": { "session": 0.0213, "ever": 0.0213 },
   "blocks": 0, "over32bits": 0,
-  "pool": { "host": "public-pool.io", "port": 21496, "connected": true,
-            "status": "Mining", "difficulty": 1 },
+  "pool": { "host": "public-pool.io", "port": 21496, "backup": false,
+            "connected": true, "status": "Mining", "difficulty": 1 },
   "network": { "height": 972641, "difficulty": 1.27e14 },
-  "address": "bc1q...", "heap": 142000, "temp_c": 48,
+  "address": "bc1q...", "address_type": "P2WPKH",
+  "lifetime": { "hashes": 81000000000, "shares": 14, "blocks": 0 },
+  "history": { "interval_s": 300, "hashrate": [47210, 48302, 48120] },
+  "heap": 142000, "temp_c": 48,
   "ip": "192.168.1.20", "rssi": -61,
   "market": { "updated_s": 42, "currency": "EUR", "price": 72543,
               "fees": [3, 2, 1], "hashrate": 1.04e21, "mempool_tx": 23000,
@@ -172,10 +196,11 @@ mempool.space refresh, `-1` if none yet):
 ## Serial monitor (115200 baud)
 
 ```
+[cfg] address type P2WPKH
 [miner] hardware SHA: not supported
 [miner] miner0 engine=sw core=1
 [pool] job 265612f height=972641 clean=1 diff=1
-[web] dashboard: http://192.168.1.20/ or http://nerdminer-a1b2.local/
+[web] dashboard: http://192.168.1.20/ or http://bdlminer-a1b2.local/
 [market] 5/5 ok | 1 BTC = 72543 EUR | fees 3/2/1 | net 1.04e+21 H/s | retarget +3.50% in 1067
 [stats] 48.12 kH/s | shares 0 ok / 0 rejected | best 0.0213 (ever 0.0213) | blocks 0 | Mining
 ```
@@ -184,12 +209,13 @@ mempool.space refresh, `-1` if none yet):
 
 | Symptom | What to check |
 |---|---|
-| Can't find the `NerdMinerV3-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
+| Can't find the `BDLMinerV1-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
 | Portal saved but the board never mines | Read the serial monitor: Wi‑Fi password, pool host / port, and the `[pool]` lines. |
-| Status `Auth failed: check address` | The BTC address is invalid for this pool. Reopen the portal and fix it. |
+| *Invalid BTC address?* at boot | The address checksum is wrong (typo, missing character, mixed upper/lower case) or it is not a Bitcoin address. Reopen the portal and fix it; ignore the warning only if your pool uses account names. |
+| Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
 | Status `Pool unreachable` / `Pool silent, reconnecting` | Wrong host or port, or the pool is down. Try `solo.ckpool.org` / `3333`. |
 | No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
-| `nerdminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
+| `bdlminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
 | Clock / Global screens stay empty | The board needs Internet access to `mempool.space` (HTTPS) and `pool.ntp.org`. The `[market]` serial line shows how many requests succeeded (`5/5 ok`). |
 | `hardware SHA: self-test FAILED, disabled` on an S2/S3/C3 | The board fell back to software mining; it still works, just slower. Please report it with your board model. |
 
@@ -198,7 +224,9 @@ mempool.space refresh, `-1` if none yet):
 * `public-pool.io` currently enforces a minimum share difficulty of **1**
   (≈ 4.3 billion hashes): with an ESP32, expect several hours between two
   accepted shares. The displayed "best difficulty", however, keeps improving continuously.
-* The all-time best difficulty is saved to flash (at most once per minute).
+* The all-time best difficulty is saved to flash (at most once per minute), the lifetime
+  totals (hashes, accepted shares, blocks) every 10 minutes, and a found block at once.
+  A factory reset keeps them.
 * ESP32‑C6/H2: not supported by the `espressif32@6.9.0` platform (Arduino 2.x) used here.
 
 ## Architecture
@@ -209,11 +237,12 @@ src/
     sha256.*       SHA-256, midstate, optimized mining kernel
     work.*         Stratum job -> 80-byte header, coinbase, merkle, difficulties
     stratum.*      Stratum V1 state machine (subscribe/authorize/notify/submit)
+    address.*      payout address check (Base58Check, Bech32, Bech32m)
   hw_sha.*         ESP32-S2/S3/C3 hardware engine + self-test
-  miner.*          FreeRTOS mining tasks, share queue, statistics
-  net.*            network task: pool connection, reconnection, share submission
+  miner.*          FreeRTOS mining tasks, share queue, statistics, hashrate history
+  net.*            network task: pool connection, reconnection, backup pool, share submission
   market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment)
-  web.*            HTTP dashboard + /api/stats, mDNS
+  web.*            HTTP dashboard + /api/stats + /metrics, mDNS
   settings.*       NVS + WiFiManager portal
   board.*          per-board display / buttons / LED / battery
   ui.*             screens (bitmap backgrounds + fields, or procedural rendering)
@@ -223,7 +252,8 @@ tools/
 test/host/         PC tests: ./test/host/run.sh  and  ./test/host/run.sh pool
 ```
 
-PC tests (check SHA‑256d against the genesis block, header assembly and the protocol):
+PC tests (check SHA‑256d against the genesis block, header assembly, the protocol
+and address validation):
 
 ```sh
 ./test/host/run.sh                       # offline unit tests
@@ -241,7 +271,7 @@ PC tests (check SHA‑256d against the genesis block, header assembly and the pr
 
 ## License
 
-NerdMinerV3 is free software, released under the
+BDLMinerV1 is free software, released under the
 [GNU General Public License v3.0](LICENSE): you may use, modify and redistribute it,
 provided that modified versions you distribute are also released under the GPL‑3.0
 with their source code.

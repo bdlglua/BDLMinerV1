@@ -34,6 +34,17 @@ uint64_t totalHashes = 0;
 double hashrate = 0;
 uint32_t lastTickMs = 0;
 
+// Lifetime totals as loaded at boot; this session is added on top.
+uint64_t baseHashes = 0;
+uint32_t baseShares = 0, baseBlocks = 0;
+uint32_t savedBlocks = 0;
+
+// Ring buffer of HISTORY_INTERVAL_S averages.
+float history[HISTORY_LEN];
+int historyLen = 0, historyHead = 0;
+uint64_t historyHashes = 0;
+uint32_t historyMs = 0;
+
 struct Miner {
     uint8_t index;
     bool hardware;
@@ -197,25 +208,57 @@ void minerTick() {
     }
     lastTickMs = now;
 
-    // Persist a new best difficulty at most once a minute (flash wear).
+    stats.lifetimeHashes = baseHashes + totalHashes;
+    stats.lifetimeShares = baseShares + stats.accepted;
+    stats.lifetimeBlocks = baseBlocks + stats.blocksFound;
+
+    if (!historyMs) {
+        historyMs = now;
+        historyHashes = totalHashes;
+    } else if (now - historyMs >= HISTORY_INTERVAL_S * 1000UL) {
+        history[historyHead] = (totalHashes - historyHashes) * 1000.0 / (now - historyMs);
+        historyHead = (historyHead + 1) % HISTORY_LEN;
+        if (historyLen < HISTORY_LEN) historyLen++;
+        historyMs = now;
+        historyHashes = totalHashes;
+    }
+
+    // Flash wear: a found block is saved at once, a new best difficulty at
+    // most once a minute, the lifetime totals every 10 minutes.
     static uint32_t lastSave = 0;
-    if (bestDirty && now - lastSave > 60000) {
+    if (stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000) {
         lastSave = now;
-        minerSaveBest();
+        minerSaveStats();
     }
 }
 
-void minerLoadBest() {
+int minerHistory(float *out, int capacity) {
+    int n = min(historyLen, capacity);
+    for (int i = 0; i < n; i++) out[i] = history[(historyHead - n + i + HISTORY_LEN) % HISTORY_LEN];
+    return n;
+}
+
+void minerLoadStats() {
     Preferences p;
     p.begin("stats", true);
     stats.bestDiff = p.getDouble("best", 0);
+    baseHashes = p.getULong64("hashes", 0);
+    baseShares = p.getULong("shares", 0);
+    baseBlocks = p.getULong("blocks", 0);
     p.end();
+    stats.lifetimeHashes = baseHashes;
+    stats.lifetimeShares = baseShares;
+    stats.lifetimeBlocks = baseBlocks;
 }
 
-void minerSaveBest() {
+void minerSaveStats() {
     bestDirty = false;
+    savedBlocks = stats.blocksFound;
     Preferences p;
     p.begin("stats", false);
     p.putDouble("best", stats.bestDiff);
+    p.putULong64("hashes", stats.lifetimeHashes);
+    p.putULong("shares", stats.lifetimeShares);
+    p.putULong("blocks", stats.lifetimeBlocks);
     p.end();
 }

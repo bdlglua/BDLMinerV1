@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 
     stratum::Protocol proto;
     proto.setCredentials(std::string(addr) + ".hosttest", "x");
-    sendLine(fd, proto.subscribe("NerdMinerV3/hosttest"));
+    sendLine(fd, proto.subscribe("BDLMinerV1/hosttest"));
 
     // Hashing threads, each on its own extranonce2 like the firmware miners.
     std::mutex mu;  // guards proto (job + submit) and the socket writes

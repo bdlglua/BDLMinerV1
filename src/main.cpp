@@ -1,10 +1,11 @@
-// NerdMiner V3 - solo/lottery Bitcoin miner for the M5StickC Plus2 and other
+// BDLMiner V1 - solo/lottery Bitcoin miner for the M5StickC Plus2 and other
 // ESP32 boards. Connects to a Stratum V1 pool (public-pool.io by default).
 
 #include <Arduino.h>
 #include <WiFi.h>
 
 #include "board.h"
+#include "core/address.h"
 #include "market.h"
 #include "miner.h"
 #include "net.h"
@@ -28,7 +29,7 @@ static void logStats() {
 void setup() {
     Serial.begin(115200);
     delay(200);
-    Serial.printf("\nNerdMiner V3 %s on %s\n", FW_VERSION, BOARD_NAME);
+    Serial.printf("\nBDLMiner V1 %s on %s\n", FW_VERSION, BOARD_NAME);
 
     board::begin();
     settingsLoad();
@@ -47,8 +48,22 @@ void setup() {
     Serial.printf("[wifi] connected, IP %s\n", WiFi.localIP().toString().c_str());
     Serial.printf("[cfg] pool %s:%u user %s\n", settings.poolHost.c_str(), settings.poolPort,
                   settings.btcAddress.c_str());
+    if (!settings.backupHost.isEmpty())
+        Serial.printf("[cfg] backup pool %s:%u\n", settings.backupHost.c_str(), settings.backupPort);
 
-    minerLoadBest();
+    // Some pools use account names, so a bad address is only a warning.
+    address::Info addr = address::parse(settings.btcAddress.c_str());
+    if (addr.valid()) {
+        Serial.printf("[cfg] address type %s%s\n", address::typeName(addr.type),
+                      addr.network == address::Network::Main ? "" : " (testnet)");
+    } else {
+        Serial.println("[cfg] WARNING: not a valid Bitcoin address, rewards may be lost. "
+                       "Hold the main button at boot to fix it.");
+        ui::showMessage("Warning", "Invalid BTC address?", "Hold A at boot to fix");
+        delay(5000);
+    }
+
+    minerLoadStats();
     minerStart();
     netStart();
     marketStart();

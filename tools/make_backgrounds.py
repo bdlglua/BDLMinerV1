@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the NerdMiner V3 screen backgrounds.
+"""Generates the BDLMiner V1 screen backgrounds.
 
 Like NerdMinerV2, every screen is a full-screen bitmap with the labels and
 panels already drawn; the firmware only paints the live values into the field
@@ -205,9 +205,9 @@ class Canvas:
         self.vgradient((0, 0, self.w * SS, self.Y(h)), (34, 28, 22), (16, 14, 14))
         self.d.rectangle((0, self.Y(h), self.w * SS, self.Y(h) + max(SS, self.S(1.2))), fill=ORANGE)
         self.logo(11, h / 2, 7)
-        self.text((22, h / 2 + 0.5), "NerdMiner", 11.5, WHITE, "black", "lm")
-        tw = self.d.textlength("NerdMiner", font=font("black", self.S(11.5))) / self.sx / SS
-        self.text((22 + tw + 2.5, h / 2 + 0.5), "V3", 11.5, ORANGE, "black", "lm")
+        self.text((22, h / 2 + 0.5), "BDLMiner", 11.5, WHITE, "black", "lm")
+        tw = self.d.textlength("BDLMiner", font=font("black", self.S(11.5))) / self.sx / SS
+        self.text((22 + tw + 2.5, h / 2 + 0.5), "V1", 11.5, ORANGE, "black", "lm")
         # Page indicator.
         for i in range(PAGES):
             cx, cy, r = 110 + i * 5, h / 2, 1.6
@@ -244,9 +244,9 @@ class Canvas:
 def draw_splash(c):
     c.background()
     c.logo(120, 46, 25)
-    c.text((120, 84), "NerdMiner", 21, WHITE, "black", "mm")
-    tw = c.d.textlength("NerdMiner", font=font("black", c.S(21))) / c.sx / SS
-    c.text((120 + tw / 2 + 3, 84), "V3", 21, ORANGE, "black", "lm")
+    c.text((120, 84), "BDLMiner", 21, WHITE, "black", "mm")
+    tw = c.d.textlength("BDLMiner", font=font("black", c.S(21))) / c.sx / SS
+    c.text((120 + tw / 2 + 3, 84), "V1", 21, ORANGE, "black", "lm")
     c.text((120, 102), "BITCOIN  LOTTERY  MINER", 7.5, LABEL, "bold", "mm")
     c.field("SPLASH_INFO", 4, 117, 232, 14)
 

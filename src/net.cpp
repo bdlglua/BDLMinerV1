@@ -16,8 +16,14 @@ namespace {
 
 constexpr uint32_t kPoolSilenceTimeoutMs = 5 * 60 * 1000;  // no message -> reconnect
 constexpr size_t kMaxLine = 16 * 1024;
+// Failover: after this many sessions in a row without a successful
+// authorization the backup pool is used, and the main pool is retried
+// once the backup has been mined on for kBackupSessionMs.
+constexpr int kFailoverAfter = 3;
+constexpr uint32_t kBackupSessionMs = 30 * 60 * 1000;
 
 char status[48] = "Starting";
+volatile bool onBackup = false;
 
 void setStatus(const char *s) {
     strlcpy(status, s, sizeof(status));
@@ -28,13 +34,15 @@ bool sendLine(WiFiClient &client, const std::string &line) {
     return client.write((const uint8_t *)line.data(), line.size()) == line.size();
 }
 
-// Runs one pool session until the connection drops.
-void session(WiFiClient &client, stratum::Protocol &proto) {
+// Runs one pool session until the connection drops, or until `maxMs` has
+// elapsed when it is not 0.
+void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
     std::string buf;
     uint8_t chunk[512];
-    uint32_t lastRx = millis();
+    uint32_t start = millis();
+    uint32_t lastRx = start;
 
-    if (!sendLine(client, proto.subscribe("NerdMinerV3/" FW_VERSION))) return;
+    if (!sendLine(client, proto.subscribe("BDLMinerV1/" FW_VERSION))) return;
 
     while (client.connected() && WiFi.isConnected()) {
         int n;
@@ -58,7 +66,7 @@ void session(WiFiClient &client, stratum::Protocol &proto) {
                         break;
                     case stratum::Event::Authorized:
                         stats.poolConnected = true;
-                        setStatus("Mining");
+                        setStatus(onBackup ? "Mining (backup pool)" : "Mining");
                         break;
                     case stratum::Event::AuthFailed:
                         setStatus("Auth failed: check address");
@@ -92,6 +100,10 @@ void session(WiFiClient &client, stratum::Protocol &proto) {
             setStatus("Pool silent, reconnecting");
             return;
         }
+        if (maxMs && millis() - start > maxMs) {
+            setStatus("Retrying main pool");
+            return;
+        }
         // Waiting for a share also paces the socket polling.
         stratum::Share share;
         if (minerNextShare(share, 20)) {
@@ -106,6 +118,7 @@ void netTask(void *) {
     WiFiClient client;
     stratum::Protocol proto;
     uint32_t backoffMs = 2000;
+    int failures = 0;
 
     for (;;) {
         if (!WiFi.isConnected()) {
@@ -117,16 +130,18 @@ void netTask(void *) {
         }
 
         char msg[48];
-        snprintf(msg, sizeof(msg), "Connecting %s", settings.poolHost.c_str());
+        snprintf(msg, sizeof(msg), "Connecting %s", netPoolHost().c_str());
         setStatus(msg);
-        if (client.connect(settings.poolHost.c_str(), settings.poolPort, 10000)) {
+        bool authorized = false;
+        if (client.connect(netPoolHost().c_str(), netPoolPort(), 10000)) {
             client.setNoDelay(true);
             proto.reset();
             proto.setCredentials(settings.btcAddress.c_str(), settings.poolPassword.c_str());
             setStatus("Subscribing");
             uint32_t t0 = millis();
-            session(client, proto);
+            session(client, proto, onBackup ? kBackupSessionMs : 0);
             client.stop();
+            authorized = proto.authorized();
             if (millis() - t0 > 60000) backoffMs = 2000;  // session was healthy
         } else {
             setStatus("Pool unreachable");
@@ -134,7 +149,19 @@ void netTask(void *) {
 
         stats.poolConnected = false;
         minerInvalidate();
-        if (strcmp(status, "Mining") == 0) setStatus("Disconnected");
+        if (strncmp(status, "Mining", 6) == 0) setStatus("Disconnected");
+
+        failures = authorized ? 0 : failures + 1;
+        if (onBackup) {
+            onBackup = false;  // back to the main pool, whatever happened
+            failures = 0;
+        } else if (failures >= kFailoverAfter && !settings.backupHost.isEmpty()) {
+            onBackup = true;
+            failures = 0;
+            backoffMs = 2000;
+            Serial.printf("[pool] main pool failed %d times, switching to backup %s:%u\n", kFailoverAfter,
+                          settings.backupHost.c_str(), settings.backupPort);
+        }
         vTaskDelay(pdMS_TO_TICKS(backoffMs));
         backoffMs = min<uint32_t>(backoffMs * 2, 60000);
     }
@@ -145,3 +172,9 @@ void netTask(void *) {
 void netStart() { xTaskCreatePinnedToCore(netTask, "stratum", 12288, nullptr, 3, nullptr, 0); }
 
 const char *netStatus() { return status; }
+
+const String &netPoolHost() { return onBackup ? settings.backupHost : settings.poolHost; }
+
+uint16_t netPoolPort() { return onBackup ? settings.backupPort : settings.poolPort; }
+
+bool netOnBackup() { return onBackup; }

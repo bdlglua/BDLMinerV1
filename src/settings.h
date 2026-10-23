@@ -6,6 +6,7 @@
 #define DEFAULT_POOL_HOST "public-pool.io"
 #define DEFAULT_POOL_PORT 21496
 #define DEFAULT_POOL_PASSWORD "x"
+#define DEFAULT_BACKUP_PORT 3333
 #define DEFAULT_DIFFICULTY 0.0002
 #define PORTAL_AP_PASSWORD "MineYourCoins"
 #define PORTAL_TIMEOUT_S 180
@@ -16,6 +17,8 @@
 struct Settings {
     String poolHost = DEFAULT_POOL_HOST;
     uint16_t poolPort = DEFAULT_POOL_PORT;
+    String backupHost;  // used when the main pool keeps failing, empty = none
+    uint16_t backupPort = DEFAULT_BACKUP_PORT;
     String btcAddress;  // payout address (worker name may be appended: addr.worker)
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;

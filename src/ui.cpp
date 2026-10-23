@@ -352,7 +352,7 @@ void renderBitmap() {
             drawField(bg::NET_HALVING, h ? "halving in " + String(halving - h) + " blocks" : String());
             drawField(bg::NET_DIFF, diffText(stats.networkDiff));
             drawField(bg::NET_HASHES, work::formatSI((double)minerTotalHashes(), 2).c_str());
-            drawField(bg::NET_POOL, settings.poolHost + ":" + settings.poolPort);
+            drawField(bg::NET_POOL, netPoolHost() + ":" + netPoolPort(), netOnBackup() ? kOrange : bg::kColor[bg::NET_POOL]);
             drawField(bg::NET_BESTEVER, diffText(stats.bestDiff));
             drawField(bg::NET_IP, "IP " + WiFi.localIP().toString());
             drawField(bg::NET_RSSI, String(WiFi.RSSI()) + " dBm");
@@ -382,7 +382,7 @@ void renderBitmap() {
 
 void drawMining() {
     auto &d = g();
-    header("NerdMiner V3");
+    header("BDLMiner V1");
 
     const char *unit;
     String num = hashrateText(&unit);
@@ -445,7 +445,7 @@ void drawNetwork() {
     header("Network");
     row(6, 22, "Block", stats.blockHeight ? String(stats.blockHeight) : String("-"), kOrange);
     row(6, 40, "Net diff", diffText(stats.networkDiff));
-    row(6, 58, "Pool", settings.poolHost + ":" + settings.poolPort);
+    row(6, 58, netOnBackup() ? "Backup" : "Pool", netPoolHost() + ":" + netPoolPort());
     row(6, 76, "IP", WiFi.localIP().toString() + "  " + String(WiFi.RSSI()) + "dBm");
     row(6, 94, "Hashes", work::formatSI((double)minerTotalHashes(), 2).c_str());
     row(124, 94, "Best", diffText(stats.bestDiff));
@@ -518,7 +518,7 @@ void showSplash() {
     d.setTextSize(scale());
     d.setTextDatum(middle_center);
     d.setTextColor(kOrange, kBg);
-    d.drawString("NerdMiner V3", d.width() / 2, d.height() / 2 - px(12));
+    d.drawString("BDLMiner V1", d.width() / 2, d.height() / 2 - px(12));
     d.setFont(&fonts::Font2);
     d.setTextColor(kGrey, kBg);
     d.drawString(String(board::modelName()) + "  v" FW_VERSION, d.width() / 2, d.height() / 2 + px(14));

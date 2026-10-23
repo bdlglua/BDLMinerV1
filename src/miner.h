@@ -8,6 +8,9 @@
 #include "core/work.h"
 
 #define MAX_MINERS 3
+// Hash rate history: one average every 5 minutes, last 24 hours.
+#define HISTORY_INTERVAL_S 300
+#define HISTORY_LEN 288
 
 struct MinerStats {
     volatile uint32_t hashes[MAX_MINERS];   // per-miner counters (wrap around)
@@ -21,6 +24,11 @@ struct MinerStats {
     volatile uint32_t over32bits;    // hashes with >= 32 leading zero bits (diff >= 1)
     double bestDiff;                 // best share difficulty ever (persisted)
     double sessionBestDiff;
+
+    // Totals since the first boot (persisted), this session included.
+    uint64_t lifetimeHashes;
+    uint32_t lifetimeShares;
+    uint32_t lifetimeBlocks;
 
     // Job info for the UI.
     volatile uint32_t blockHeight;
@@ -49,6 +57,9 @@ uint64_t minerTotalHashes();
 double minerHashrate();
 void minerTick();
 
-// Persist best difficulty across reboots.
-void minerLoadBest();
-void minerSaveBest();
+// Copies the hash rate history (H/s, oldest first) and returns its length.
+int minerHistory(float *out, int capacity);
+
+// Persist best difficulty and lifetime totals across reboots.
+void minerLoadStats();
+void minerSaveStats();

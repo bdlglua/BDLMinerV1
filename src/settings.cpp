@@ -6,13 +6,15 @@
 
 Settings settings;
 
-static const char *kNamespace = "nerdminer";
+static const char *kNamespace = "bdlminer";
 
 void settingsLoad() {
     Preferences p;
     p.begin(kNamespace, true);
     settings.poolHost = p.getString("pool", DEFAULT_POOL_HOST);
     settings.poolPort = p.getUShort("port", DEFAULT_POOL_PORT);
+    settings.backupHost = p.getString("pool2", "");
+    settings.backupPort = p.getUShort("port2", DEFAULT_BACKUP_PORT);
     settings.btcAddress = p.getString("addr", "");
     settings.poolPassword = p.getString("pass", DEFAULT_POOL_PASSWORD);
     settings.suggestedDifficulty = p.getDouble("diff", DEFAULT_DIFFICULTY);
@@ -28,6 +30,8 @@ void settingsSave() {
     p.begin(kNamespace, false);
     p.putString("pool", settings.poolHost);
     p.putUShort("port", settings.poolPort);
+    p.putString("pool2", settings.backupHost);
+    p.putUShort("port2", settings.backupPort);
     p.putString("addr", settings.btcAddress);
     p.putString("pass", settings.poolPassword);
     p.putDouble("diff", settings.suggestedDifficulty);
@@ -41,7 +45,7 @@ void settingsSave() {
 String portalApName() {
     uint64_t mac = ESP.getEfuseMac();
     char buf[24];
-    snprintf(buf, sizeof(buf), "NerdMinerV3-%04X", (unsigned)((mac >> 32) & 0xFFFF));
+    snprintf(buf, sizeof(buf), "BDLMinerV1-%04X", (unsigned)((mac >> 32) & 0xFFFF));
     return buf;
 }
 
@@ -64,7 +68,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
 
     WiFiManager wm;
     wm.setDebugOutput(false);
-    wm.setTitle("NerdMiner V3");
+    wm.setTitle("BDLMiner V1");
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
     wm.setConnectTimeout(20);
     wm.setSaveConfigCallback([]() { shouldSave = true; });
@@ -72,12 +76,16 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         if (onPortal) onPortal();
     });
 
-    char port[8], diff[16];
+    char port[8], port2[8], diff[16];
     snprintf(port, sizeof(port), "%u", settings.poolPort);
+    snprintf(port2, sizeof(port2), "%u", settings.backupPort);
     snprintf(diff, sizeof(diff), "%g", settings.suggestedDifficulty);
 
     WiFiManagerParameter pHost("pool", "Pool host", settings.poolHost.c_str(), 80);
     WiFiManagerParameter pPort("port", "Pool port", port, 6, "type='number' min='1' max='65535'");
+    WiFiManagerParameter pHost2("pool2", "Backup pool host (optional, e.g. solo.ckpool.org)",
+                                settings.backupHost.c_str(), 80);
+    WiFiManagerParameter pPort2("port2", "Backup pool port", port2, 6, "type='number' min='1' max='65535'");
     WiFiManagerParameter pAddr("addr", "Your BTC address (optionally address.worker)",
                                settings.btcAddress.c_str(), 100);
     WiFiManagerParameter pPass("pass", "Pool password", settings.poolPassword.c_str(), 40);
@@ -88,6 +96,8 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                                settings.currency.c_str(), 4);
     wm.addParameter(&pHost);
     wm.addParameter(&pPort);
+    wm.addParameter(&pHost2);
+    wm.addParameter(&pPort2);
     wm.addParameter(&pAddr);
     wm.addParameter(&pPass);
     wm.addParameter(&pDiff);
@@ -110,6 +120,10 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.poolHost.trim();
         int p = atoi(pPort.getValue());
         if (p > 0 && p < 65536) settings.poolPort = p;
+        settings.backupHost = pHost2.getValue();
+        settings.backupHost.trim();
+        p = atoi(pPort2.getValue());
+        if (p > 0 && p < 65536) settings.backupPort = p;
         settings.btcAddress = pAddr.getValue();
         settings.btcAddress.trim();
         settings.poolPassword = pPass.getValue();
