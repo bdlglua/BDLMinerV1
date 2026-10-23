@@ -7,6 +7,10 @@
 
 namespace sha {
 
+// Round constants and initial state.
+extern const uint32_t K[64];
+extern const uint32_t IV[8];
+
 // Plain SHA-256 / double SHA-256 (used for coinbase and merkle tree).
 void sha256(const uint8_t *data, size_t len, uint8_t out[32]);
 void sha256d(const uint8_t *data, size_t len, uint8_t out[32]);

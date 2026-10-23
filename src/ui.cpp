@@ -363,9 +363,14 @@ void renderBitmap() {
             showBackground(bg::INFO);
             drawHeaderFields();
             int hw = 0, sw = 0;
-            for (int i = 0; i < stats.minerCount; i++) (strcmp(stats.engine[i], "hw") ? sw : hw)++;
+            bool fill = false;
+            for (int i = 0; i < stats.minerCount; i++) {
+                if (!strcmp(stats.engine[i], "hw")) hw++;
+                else if (!strcmp(stats.engine[i], "sw")) sw++;
+                else fill = true;  // "fill": software in the hardware loop's idle cycles
+            }
             String engines;
-            if (hw) engines = String(hw) + "x hardware";
+            if (hw) engines = String(hw) + "x hardware" + (fill ? "+" : "");
             if (sw) engines += String(hw ? " + " : "") + sw + "x software";
             drawField(bg::INFO_BOARD, board::modelName());
             drawField(bg::INFO_FIRMWARE, "v" FW_VERSION);

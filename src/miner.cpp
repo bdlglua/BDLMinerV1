@@ -68,13 +68,20 @@ struct Miner {
     bool ownsCore;  // alone on its core at kHwMinerPriority
     work::Work work;
     hwsha::Job hwJob;
+    // Hardware miner on the original ESP32: a second work hashed in software
+    // in the idle cycles of the hardware loop (hwsha::Fill).
+    bool useFill;
+    work::Work work2;
+    hwsha::Fill fill;
 };
 
 Miner miners[MAX_MINERS];
+int fillIndex = -1;  // stats.hashes slot of the idle-cycle hashing
 bool useAsm = false;  // sw_sha256d_prefilter() passed its self-test
 
+// `ctx` is the work::Work the nonce belongs to.
 void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
-    const work::Work &w = ((Miner *)ctx)->work;
+    const work::Work &w = *(const work::Work *)ctx;
     double d = work::hashDifficulty(hash);
 
     portENTER_CRITICAL(&statsMux);
@@ -116,9 +123,14 @@ bool fetchWork(Miner &m, uint32_t &seq) {
     if (ok) {
         seq = boardSeq;
         work::build(board, extranonce2Counter++, m.work);
+        if (m.useFill) work::build(board, extranonce2Counter++, m.work2);
     }
     xSemaphoreGive(jobMutex);
     if (ok && m.hardware) hwsha::prepare(m.hwJob, m.work.header);
+    if (ok && m.useFill) {
+        hwsha::prepareFill(m.fill, m.work2.header);
+        m.fill.ctx = &m.work2;
+    }
     return ok;
 }
 
@@ -139,14 +151,14 @@ void softwareBatch(Miner &m, uint32_t first, uint32_t count, uint32_t limit) {
             uint32_t n = m.hardware ? hwsha::nonceAt(p) : p;
             memcpy(tail + 12, &n, 4);  // little-endian, as in the header
             if (sw_sha256d_prefilter(mid.mid, tail, mid.bake) && sha::scan(mid, n, limit, hash))
-                onCandidate(n, hash, &m);
+                onCandidate(n, hash, &m.work);
         }
         return;
     }
 #endif
     for (uint32_t p = first, end = first + count; p != end; p++) {
         uint32_t n = m.hardware ? hwsha::nonceAt(p) : p;
-        if (sha::scan(mid, n, limit, hash)) onCandidate(n, hash, &m);
+        if (sha::scan(mid, n, limit, hash)) onCandidate(n, hash, &m.work);
     }
 }
 
@@ -206,7 +218,13 @@ void minerTask(void *arg) {
         // `nonce` is only a multiple of kBatchSw).
         uint32_t left = 0u - nonce;
         uint32_t hwBatch = left && left < kBatchHw ? left : kBatchHw;
-        uint32_t done = m.hardware ? hwsha::scan(m.hwJob, nonce, hwBatch, limit, onCandidate, &m) : 0;
+        uint32_t done = m.hardware ? hwsha::scan(m.hwJob, nonce, hwBatch, limit, onCandidate, &m.work,
+                                                 m.useFill ? &m.fill : nullptr)
+                                   : 0;
+        if (m.useFill && m.fill.hashes) {
+            stats.hashes[fillIndex] += m.fill.hashes;
+            m.fill.hashes = 0;
+        }
         if (!done) {
             softwareBatch(m, nonce, kBatchSw, limit);
             done = kBatchSw;
@@ -263,11 +281,14 @@ void minerStart() {
     // One miner per core. With a hardware engine it gets its own core (the
     // last one, away from WiFi on dual-core chips) and software runs on the rest.
     int cores = portNUM_PROCESSORS;
+    int tasks = min(cores, MAX_MINERS);
+    if (hw && hwsha::fillAvailable() && tasks < MAX_MINERS) fillIndex = tasks;
     stats.minerCount = 0;
-    for (int core = cores - 1; core >= 0 && stats.minerCount < MAX_MINERS; core--) {
+    for (int core = cores - 1; core >= 0 && stats.minerCount < tasks; core--) {
         Miner &m = miners[stats.minerCount];
         m.index = stats.minerCount;
         m.hardware = hw && core == cores - 1;
+        m.useFill = m.hardware && fillIndex >= 0;
         stats.engine[m.index] = m.hardware ? "hw" : "sw";
         char name[12];
         snprintf(name, sizeof(name), "miner%d", m.index);
@@ -276,6 +297,11 @@ void minerStart() {
         xTaskCreatePinnedToCore(minerTask, name, 6144, &m, m.ownsCore ? kHwMinerPriority : 1, nullptr, core);
         Serial.printf("[miner] %s engine=%s core=%d\n", name, stats.engine[m.index], core);
         stats.minerCount++;
+    }
+    if (fillIndex >= 0) {
+        stats.engine[fillIndex] = "fill";
+        stats.minerCount++;
+        Serial.printf("[miner] engine=fill: a second work in the idle cycles of miner0\n");
     }
 }
 

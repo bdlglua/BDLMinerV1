@@ -6,8 +6,14 @@
 
 #include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "core/address.h"
+#include "core/fill.h"
 #include "core/sha256.h"
 #include "core/stratum.h"
 #include "core/work.h"
@@ -134,6 +140,206 @@ static void testHashDifficulty() {
     CHECK(std::isinf(work::hashDifficulty(zero)));
 }
 
+// ---------------------------------------------------------------------------
+// The software SHA-256d of src/hw_sha_fill.S: its instructions (the lines
+// tagged "// F<body><n>") are run here on the buffers of fill::prepare(), and
+// the candidates it reports are compared with sha::scan().
+// ---------------------------------------------------------------------------
+
+namespace hwfill {
+
+// Ctx offsets, as in src/hw_sha.cpp and tools/hw_fill/gen_hw_fill.py.
+enum { FILLP = 100, Q = 104, HITQ = 108, HITF = 112, END1 = 116, END2 = 120, B1 = 124, B2 = 128, B1_61 = 132,
+       IV7 = 136, C18 = 140, MID = 144, CTX_BYTES = 176 };
+const uint32_t kCtx = 0x10000, kB1 = 0x20000, kB2 = 0x30000;
+
+struct Ins {
+    std::string op;
+    std::vector<std::string> args;
+};
+
+std::map<char, std::vector<Ins>> load(const char *path) {
+    std::map<char, std::vector<std::pair<int, Ins>>> tagged;
+    std::ifstream in(path);
+    std::string line;
+    while (std::getline(in, line)) {
+        size_t t = line.find("// F");
+        if (t == std::string::npos || t + 8 > line.size()) continue;
+        char body = line[t + 4];
+        int n = atoi(line.c_str() + t + 5);
+        std::string code = line.substr(0, t);
+        std::istringstream ss(code);
+        Ins ins;
+        ss >> ins.op;
+        std::string rest;
+        std::getline(ss, rest);
+        std::string arg;
+        for (char c : rest + ",") {
+            if (c == ',') {
+                if (!arg.empty()) ins.args.push_back(arg);
+                arg.clear();
+            } else if (c != ' ' && c != '\t') {
+                arg += c;
+            }
+        }
+        tagged[body].push_back({n, ins});
+    }
+    std::map<char, std::vector<Ins>> out;
+    for (auto &b : tagged) {
+        std::sort(b.second.begin(), b.second.end(), [](auto &x, auto &y) { return x.first < y.first; });
+        for (auto &x : b.second) out[b.first].push_back(x.second);
+    }
+    return out;
+}
+
+struct Machine {
+    uint32_t a[16] = {0};
+    uint32_t sar = 0;
+    uint8_t ctx[CTX_BYTES] = {0};
+    fill::Buffers *buf;
+    bool fault = false;
+
+    uint32_t *word(uint32_t addr) {
+        if (addr % 4) fault = true;
+        else if (addr >= kCtx && addr < kCtx + CTX_BYTES) return (uint32_t *)(ctx + addr - kCtx);
+        else if (addr >= kB1 && addr < kB1 + sizeof(buf->b1)) return &buf->b1[(addr - kB1) / 4];
+        else if (addr >= kB2 && addr < kB2 + sizeof(buf->b2)) return &buf->b2[(addr - kB2) / 4];
+        fault = true;
+        static uint32_t junk;
+        return &junk;
+    }
+    uint32_t &ctxw(int off) { return *word(kCtx + off); }
+    uint32_t &r(const std::string &name) { return a[atoi(name.c_str() + 1)]; }
+    uint32_t imm(const std::string &s) { return (uint32_t)strtol(s.c_str(), nullptr, 0); }
+
+    // Runs a body until its end; returns the branch target taken (".LTA",
+    // ".LTB") or "" at the end.
+    std::string run(const std::vector<Ins> &body) {
+        for (size_t i = 0; i < body.size() && !fault; i++) {
+            const Ins &x = body[i];
+            const auto &g = x.args;
+            if (x.op.back() == ':') continue;
+            if (x.op == "l32i") r(g[0]) = *word(r(g[1]) + imm(g[2]));
+            else if (x.op == "s32i") *word(r(g[1]) + imm(g[2])) = r(g[0]);
+            else if (x.op == "add") r(g[0]) = r(g[1]) + r(g[2]);
+            else if (x.op == "sub") r(g[0]) = r(g[1]) - r(g[2]);
+            else if (x.op == "addi") r(g[0]) = r(g[1]) + imm(g[2]);
+            else if (x.op == "xor") r(g[0]) = r(g[1]) ^ r(g[2]);
+            else if (x.op == "and") r(g[0]) = r(g[1]) & r(g[2]);
+            else if (x.op == "or") r(g[0]) = r(g[1]) | r(g[2]);
+            else if (x.op == "mov") r(g[0]) = r(g[1]);
+            else if (x.op == "movi.n" || x.op == "movi") r(g[0]) = imm(g[1]);
+            else if (x.op == "ssai") sar = imm(g[0]);
+            else if (x.op == "src") r(g[0]) = (uint32_t)((((uint64_t)r(g[1])) << 32 | r(g[2])) >> sar);
+            else if (x.op == "srli") r(g[0]) = r(g[1]) >> imm(g[2]);
+            else if (x.op == "extui") r(g[0]) = (r(g[1]) >> imm(g[2])) & ((1u << imm(g[3])) - 1);
+            else if (x.op == "beqz" || x.op == "bnez") {
+                bool taken = (r(g[0]) == 0) == (x.op == "beqz");
+                if (!taken) continue;
+                if (g[1].rfind(".LT", 0) == 0) return g[1];
+                while (++i < body.size() && body[i].op != g[1] + ":") {
+                }
+            } else {
+                printf("hwfill: unknown instruction %s\n", x.op.c_str());
+                fault = true;
+            }
+        }
+        return "";
+    }
+};
+
+// Candidates (positions, i.e. byte-swapped nonces) the generated code reports
+// for `count` nonces from position q0.
+std::vector<uint32_t> run(std::map<char, std::vector<Ins>> &prog, const uint8_t header[80], uint32_t q0, int count,
+                          bool *fault) {
+    static fill::Buffers buf;
+    fill::prepare(buf, header);
+    Machine m;
+    m.buf = &buf;
+    m.a[3] = kCtx;
+    m.ctxw(END1) = kB1 + fill::kSteps * fill::kRecordBytes;
+    m.ctxw(END2) = kB2 + fill::kSteps * fill::kRecordBytes;
+    m.ctxw(B1) = kB1;
+    m.ctxw(B2) = kB2;
+    m.ctxw(B1_61) = kB1 + 61 * fill::kRecordBytes;
+    m.ctxw(IV7) = sha::IV[7];
+    m.ctxw(C18) = buf.c18;
+    for (int i = 0; i < 8; i++) m.ctxw(MID + 4 * i) = buf.mid[i];
+    m.ctxw(Q) = q0 - 1;
+    m.a[9] = m.ctxw(END2);  // as after a second hash: the first iteration starts nonce q0
+    std::vector<uint32_t> hits;
+    // A nonce's result is checked by the transition that starts the next one.
+    while (!m.fault && (int32_t)(m.ctxw(Q) - q0) < count) {
+        std::string to = m.run(prog['M']);
+        if (to == ".LTA") m.run(prog['A']);
+        if (to == ".LTB") m.run(prog['B']);
+        if (m.ctxw(HITF)) {
+            hits.push_back(m.ctxw(HITQ));
+            m.ctxw(HITF) = 0;
+        }
+    }
+    *fault = m.fault;
+    return hits;
+}
+
+}  // namespace hwfill
+
+static void testHwFill() {
+    auto prog = hwfill::load("src/hw_sha_fill.S");
+    CHECK(prog['M'].size() > 100 && prog['A'].size() > 20 && prog['B'].size() > 20);
+    if (prog['M'].empty()) return;
+
+    // Reference: positions in [q0, q0 + count) whose hash has 16 leading zero bits.
+    auto expected = [](const uint8_t header[80], uint32_t q0, int count) {
+        sha::MidState ms;
+        sha::prepare(ms, header);
+        std::vector<uint32_t> out;
+        uint8_t h[32];
+        for (int i = 0; i < count; i++)
+            if (sha::scan(ms, __builtin_bswap32(q0 + i), 0x0000FFFF, h)) out.push_back(q0 + i);
+        return out;
+    };
+
+    // The known-answer header of hw_sha.cpp, around its first candidate.
+    uint8_t kat[80] = {0};
+    for (int i = 0; i < 19; i++) {
+        uint32_t w = 0x9E3779B9u * (i + 1);
+        kat[4 * i] = w >> 24;
+        kat[4 * i + 1] = w >> 16;
+        kat[4 * i + 2] = w >> 8;
+        kat[4 * i + 3] = w;
+    }
+    bool fault = false;
+    uint32_t q0 = 0x1000 + 0xa94c - 3;
+    auto got = hwfill::run(prog, kat, q0, 8, &fault);
+    CHECK(!fault);
+    CHECK(got == expected(kat, q0, 8));
+    CHECK(got.size() == 1 && got[0] == 0x1000 + 0xa94c);
+
+    // Random headers: around a candidate found by brute force, plus a run of
+    // 200 nonces that must match nonce for nonce.
+    uint32_t seed = 777;
+    int candidates = 0;
+    for (int k = 0; k < 6; k++) {
+        uint8_t h[80];
+        for (auto &b : h) b = (seed = seed * 1103515245u + 12345u) >> 16;
+        sha::MidState ms;
+        sha::prepare(ms, h);
+        uint8_t out[32];
+        uint32_t q = seed;
+        while (!sha::scan(ms, __builtin_bswap32(q), 0x0000FFFF, out)) q++;
+        got = hwfill::run(prog, h, q - 2, 6, &fault);
+        CHECK(!fault);
+        CHECK(got == expected(h, q - 2, 6));
+        candidates += got.size();
+        got = hwfill::run(prog, h, q + 1, 200, &fault);
+        CHECK(!fault);
+        CHECK(got == expected(h, q + 1, 200));
+    }
+    CHECK(candidates >= 6);
+    printf("hw fill: software hash of hw_sha_fill.S matches sha::scan (%d candidates)\n", candidates);
+}
+
 // Malformed or early messages must not crash or start mining on nothing.
 static void testStratumRobustness() {
     stratum::Protocol p;
@@ -250,6 +456,7 @@ static void testAddress() {
 int main() {
     testSha();
     testHashDifficulty();
+    testHwFill();
     testSubscribeRefused();
     testStratumRobustness();
     testStratumJob();

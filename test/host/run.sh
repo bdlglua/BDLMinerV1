@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 JSON=.pio/libdeps/esp32-headless/ArduinoJson/src
 [ -d "$JSON" ] || pio pkg install -e esp32-headless >/dev/null
 mkdir -p .pio/host
-CORE="src/core/sha256.cpp src/core/work.cpp src/core/stratum.cpp src/core/address.cpp"
+CORE="src/core/sha256.cpp src/core/work.cpp src/core/stratum.cpp src/core/address.cpp src/core/fill.cpp"
 if [ "$1" = "pool" ]; then
     shift
     g++ -std=c++17 -O2 -Wall -pthread -Isrc -I"$JSON" test/host/pool_test.cpp $CORE -o .pio/host/pool_test

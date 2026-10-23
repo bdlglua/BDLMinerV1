@@ -19,6 +19,24 @@ struct Job {
     sha::MidState check;  // original ESP32: software midstate to confirm candidates
 };
 
+// Original ESP32: a software SHA-256d of a second work that the hardware loop
+// runs in the cycles it otherwise waits for the engine (hw_sha_fill.S), one
+// nonce per 64 hardware nonces, without slowing the hardware down. Nonces
+// come in the same order as the engine's (positions). Only one Fill can be
+// in use (its buffers are static).
+struct Fill {
+    sha::MidState check;  // to confirm its candidates
+    uint32_t p = 0, q = 0;  // state of the generated code between scans
+    uint32_t hashes = 0;    // nonces done; the caller adds them up and resets it
+    void *ctx = nullptr;    // passed to hit() for its candidates
+    bool ready = false;
+};
+
+// True when the self-test found the idle-cycle hashing correct and faster.
+bool fillAvailable();
+// Starts hashing `header` (nonce bytes ignored) from position 0.
+void prepareFill(Fill &fill, const uint8_t header[80]);
+
 bool available();
 
 void prepare(Job &job, const uint8_t header[80]);
@@ -32,8 +50,10 @@ uint32_t nonceAt(uint32_t position);
 // original ESP32 only hashes with top-32 bits <= 0xFFFF are seen, whatever
 // `limit` is. Returns the number of hashes done, 0 when the peripheral is in
 // use elsewhere (TLS) or has been disabled: the caller then hashes in software.
+// With `fill`, its work is hashed too when available; its candidates go to
+// hit() with fill->ctx.
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
-              void (*hit)(uint32_t nonce, const uint8_t hash[32], void *ctx), void *ctx);
+              void (*hit)(uint32_t nonce, const uint8_t hash[32], void *ctx), void *ctx, Fill *fill = nullptr);
 
 // Keeps the mining loop off the peripheral until release(), waiting for the
 // batch in progress to end; the miner hashes in software meanwhile. HTTPS

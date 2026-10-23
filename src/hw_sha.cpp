@@ -53,8 +53,11 @@ void prepare(Job &job, const uint8_t header[80]) {
     esp_sha_release_hardware();
 }
 
+bool fillAvailable() { return false; }
+void prepareFill(Fill &, const uint8_t *) {}
+
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
-              void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
+              void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *) {
     uint32_t second[16] = {0};
     second[8] = 0x00000080;   // padding byte 0x80
     second[15] = 0x00010000;  // 256 bits, big-endian length
@@ -93,6 +96,9 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
 #include <Arduino.h>
 #include <stddef.h>
 
+#include <xtensa/hal.h>
+
+#include "core/fill.h"
 #include "driver/periph_ctrl.h"
 #include "esp_chip_info.h"
 #include "sha/sha_parallel_engine.h"
@@ -104,7 +110,9 @@ namespace hwsha {
 
 namespace {
 
-// What the loops in hw_sha_classic.S work from (CTX_* offsets there).
+// What the loops in hw_sha_classic.S work from (CTX_* offsets there); the
+// fields from fillP on are only used by hw_sha_fill.S (CTX in
+// tools/hw_fill/gen_hw_fill.py). Addresses are 32-bit on the ESP32.
 struct Ctx {
     uint32_t hdr[20];       // header words as the engine takes them (big-endian)
     uint32_t nonce;         // in: first position; out: the next one
@@ -112,10 +120,22 @@ struct Ctx {
     volatile uint32_t run;  // read every nonce: clearing it stops the loop
     uint32_t pad;           // 0x80000000
     uint32_t chk;           // only used by the original's benchmark builds
+    uint32_t fillP;         // software hash: current record
+    uint32_t q;             // software hash: position of the nonce in progress
+    uint32_t hitQ, hitF;    // software candidate: position, and set when there is one
+    uint32_t end1, end2;    // last record of each hash
+    uint32_t b1, b2, b1_61; // first record of each hash, record 61 of the first
+    uint32_t iv7, c18;
+    uint32_t mid[8];
 };
 static_assert(offsetof(Ctx, nonce) == 80 && offsetof(Ctx, budget) == 84 && offsetof(Ctx, run) == 88 &&
                   offsetof(Ctx, pad) == 92 && offsetof(Ctx, chk) == 96,
               "layout known to hw_sha_classic.S");
+static_assert(offsetof(Ctx, fillP) == 100 && offsetof(Ctx, q) == 104 && offsetof(Ctx, hitQ) == 108 &&
+                  offsetof(Ctx, hitF) == 112 && offsetof(Ctx, end1) == 116 && offsetof(Ctx, b1) == 124 &&
+                  offsetof(Ctx, b1_61) == 132 && offsetof(Ctx, iv7) == 136 && offsetof(Ctx, c18) == 140 &&
+                  offsetof(Ctx, mid) == 144,
+              "layout known to hw_sha_fill.S");
 
 // Returns 1 on a candidate (low 16 bits of the last digest word zero, i.e. the
 // top 16 bits of the hash) at position ctx->nonce - 1, 0 when the budget is
@@ -125,6 +145,8 @@ typedef uint32_t (*Loop)(volatile uint32_t *text, Ctx *ctx);
 extern "C" uint32_t hwsha_classic_fast(volatile uint32_t *text, Ctx *ctx);
 extern "C" uint32_t hwsha_classic_margin(volatile uint32_t *text, Ctx *ctx);
 extern "C" uint32_t hwsha_classic_wide(volatile uint32_t *text, Ctx *ctx);
+// The fast loop with a software hash in its idle cycles (hw_sha_fill.S).
+extern "C" uint32_t hwsha_classic_fill(volatile uint32_t *text, Ctx *ctx);
 
 // Fastest first (247, 257 and 317 cycles per nonce); the slower ones only
 // add timing margin, for chips on which the measured schedule fails.
@@ -162,6 +184,126 @@ bool knownAnswer(Loop fn) {
     return found == n && c.budget == 0;
 }
 
+// ---------------------------------------------------------------------------
+// Idle-cycle software hashing (hw_sha_fill.S)
+// ---------------------------------------------------------------------------
+
+fill::Buffers fillBuf;
+volatile bool fillOk = false;
+
+uint32_t addr(const void *p) { return (uint32_t)(uintptr_t)p; }
+
+// Points the generated code at the buffers and resumes `fill`.
+void fillLoad(Ctx &c, const Fill &f) {
+    c.fillP = f.p;
+    c.q = f.q;
+    c.hitF = 0;
+    c.end1 = addr(&fillBuf.b1[fill::kSteps * fill::kRecordWords]);
+    c.end2 = addr(&fillBuf.b2[fill::kSteps * fill::kRecordWords]);
+    c.b1 = addr(fillBuf.b1);
+    c.b2 = addr(fillBuf.b2);
+    c.b1_61 = addr(&fillBuf.b1[61 * fill::kRecordWords]);
+    c.iv7 = sha::IV[7];
+    c.c18 = fillBuf.c18;
+    memcpy(c.mid, fillBuf.mid, sizeof(c.mid));
+}
+
+void fillStart(Fill &f, const uint8_t header[80], uint32_t first) {
+    fill::prepare(fillBuf, header);
+    sha::prepare(f.check, header);
+    // As after a second hash: the first iteration starts nonce `first`.
+    f.p = addr(&fillBuf.b2[fill::kSteps * fill::kRecordWords]);
+    f.q = first - 1;
+    f.ready = true;
+}
+
+void kat(uint32_t words[20], uint8_t header[80]) {
+    for (int i = 0; i < 20; i++) {
+        uint32_t w = i < 19 ? 0x9E3779B9u * (i + 1) : 0;
+        if (words) words[i] = w;
+        if (header) {
+            header[4 * i] = w >> 24;
+            header[4 * i + 1] = w >> 16;
+            header[4 * i + 2] = w >> 8;
+            header[4 * i + 3] = w;
+        }
+    }
+}
+
+// The hardware part of hw_sha_fill.S is the fast loop instruction for
+// instruction, so knownAnswer() must pass with the software hash running,
+// which must meanwhile find the one candidate of its range.
+bool fillSelfTest() {
+    static const uint32_t expected[] = {0xa94c, 0xe496, 0x1f476, 0x302f0, 0x35af9, 0x3cf5c};
+    uint8_t header[80];
+    Ctx c{};
+    kat(c.hdr, header);
+    Fill f;
+    fillStart(f, header, 0x1000 + 0xa94c - 3);
+    fillLoad(c, f);
+    c.nonce = 0x1000;
+    c.budget = 262144;
+    c.run = 1;
+    c.pad = 0x80000000u;
+    size_t found = 0;
+    int fillHits = 0;
+    bool ok = true;
+    while (c.budget > 0) {
+        bool hw = hwsha_classic_fill(text(), &c);
+        if (c.hitF) {
+            ok &= c.hitQ == 0x1000 + 0xa94c;
+            fillHits++;
+            c.hitF = 0;
+        }
+        if (!hw) break;
+        ok &= found < 6 && c.nonce - 1 - 0x1000 == expected[found];
+        found++;
+    }
+    return ok && found == 6 && c.budget == 0 && fillHits == 1;
+}
+
+// Cycles for `n` hardware nonces with `fn`, the best of two runs.
+uint32_t timeLoop(Loop fn, uint32_t n, uint32_t *fillNonces) {
+    uint32_t best = UINT32_MAX;
+    for (int run = 0; run < 2; run++) {
+        uint8_t header[80];
+        Ctx c{};
+        kat(c.hdr, header);
+        Fill f;
+        fillStart(f, header, 0x80000000u);
+        fillLoad(c, f);
+        c.nonce = 0x40000000u;  // a candidate only returns early: the loop goes on
+        c.budget = n;
+        c.run = 1;
+        c.pad = 0x80000000u;
+        uint32_t t0 = xthal_get_ccount();
+        while (c.budget > 0 && fn(text(), &c)) {
+        }
+        uint32_t t = xthal_get_ccount() - t0;
+        if (t < best) best = t;
+        if (fillNonces) *fillNonces = c.q - (0x80000000u - 1);
+    }
+    return best;
+}
+
+// Uses idle-cycle hashing only when it is correct and makes the total faster.
+void pickFill() {
+    if (!fillSelfTest() && !fillSelfTest()) {
+        Serial.println("[miner] idle-cycle software hashing failed its self-test, disabled");
+        return;
+    }
+    const uint32_t n = 131072;
+    uint32_t fillNonces = 0;
+    uint32_t plain = timeLoop(hwsha_classic_fast, n, nullptr);
+    uint32_t mixed = timeLoop(hwsha_classic_fill, n, &fillNonces);
+    double mhz = getCpuFrequencyMhz();
+    double hwPlain = n * mhz * 1e3 / plain, hwMixed = n * mhz * 1e3 / mixed;  // kH/s
+    double extra = fillNonces * mhz * 1e3 / mixed;
+    fillOk = hwMixed + extra > hwPlain * 1.002;
+    Serial.printf("[miner] idle-cycle software hashing: %s (hardware %.1f -> %.1f kH/s, +%.1f kH/s software)\n",
+                  fillOk ? "on" : "off, no gain", hwPlain, hwMixed, extra);
+}
+
 // Picks the fastest loop this chip runs correctly.
 bool pickLoop() {
     // Before revision 3, a raw DPORT read on one core (the loops read the
@@ -184,9 +326,10 @@ bool pickLoop() {
         Serial.printf("[miner] hardware SHA loop '%s' failed its self-test\n", kLoops[pick].name);
         pick++;
     }
-    esp_sha_unlock_engine(SHA2_256);
     current = pick;
     if (pick < kLoopCount) Serial.printf("[miner] hardware SHA loop: %s\n", kLoops[pick].name);
+    if (pick == 0) pickFill();  // built on the fast loop only
+    esp_sha_unlock_engine(SHA2_256);
     return pick < kLoopCount;
 }
 
@@ -229,6 +372,10 @@ void release() {
     held = false;
 }
 
+bool fillAvailable() { return fillOk; }
+
+void prepareFill(Fill &f, const uint8_t header[80]) { fillStart(f, header, 0); }
+
 void prepare(Job &job, const uint8_t header[80]) {
     for (int i = 0; i < 20; i++)
         job.words[i] = (uint32_t)header[4 * i] << 24 | (uint32_t)header[4 * i + 1] << 16 |
@@ -236,8 +383,23 @@ void prepare(Job &job, const uint8_t header[80]) {
     sha::prepare(job.check, header);
 }
 
+// Hands a software candidate of the idle-cycle hash over, once confirmed.
+void fillHit(Ctx &c, Fill &f, uint32_t limit, void (*hit)(uint32_t, const uint8_t *, void *)) {
+    if (!c.hitF) return;
+    c.hitF = 0;
+    uint32_t nonce = nonceAt(c.hitQ);
+    uint8_t hash[32];
+    if (!sha::scan(f.check, nonce, 0x0000FFFF, hash)) {
+        fillOk = false;
+        Serial.println("[miner] idle-cycle software hashing reported a wrong candidate, disabled");
+        return;
+    }
+    uint32_t top = (uint32_t)hash[28] | (uint32_t)hash[29] << 8 | (uint32_t)hash[30] << 16 | (uint32_t)hash[31] << 24;
+    if (top <= limit) hit(nonce, hash, f.ctx);
+}
+
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
-              void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
+              void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *fill) {
     int loop = current;
     if (loop >= kLoopCount || held) return 0;
     // An open TLS connection can hold the engine for seconds (mbedtls then
@@ -252,7 +414,15 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
     c.budget = count;
     c.run = 1;
     c.pad = 0x80000000u;
-    while (c.budget > 0 && kLoops[loop].fn(text(), &c)) {
+    bool useFill = fill && fill->ready && fillOk && loop == 0;
+    Loop fn = useFill ? hwsha_classic_fill : kLoops[loop].fn;
+    uint32_t q0 = 0;
+    if (useFill) {
+        fillLoad(c, *fill);
+        q0 = c.q;
+    }
+    while (c.budget > 0 && fn(text(), &c)) {
+        if (useFill) fillHit(c, *fill, limit, hit);
         // The loop only looked at 16 bits of the digest: recompute the hash.
         uint32_t nonce = nonceAt(c.nonce - 1);
         uint8_t hash[32];
@@ -263,6 +433,12 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
                            (uint32_t)hash[31] << 24;
             if (top <= limit) hit(nonce, hash, ctx);
         }
+    }
+    if (useFill) {
+        fillHit(c, *fill, limit, hit);
+        fill->p = c.fillP;
+        fill->q = c.q;
+        fill->hashes += c.q - q0;
     }
     esp_sha_unlock_engine(SHA2_256);
     return count - c.budget;
@@ -279,7 +455,9 @@ uint32_t nonceAt(uint32_t position) { return position; }
 void hold() {}
 void release() {}
 void prepare(Job &, const uint8_t *) {}
-uint32_t scan(Job &, uint32_t, uint32_t, uint32_t, void (*)(uint32_t, const uint8_t *, void *), void *) {
+bool fillAvailable() { return false; }
+void prepareFill(Fill &, const uint8_t *) {}
+uint32_t scan(Job &, uint32_t, uint32_t, uint32_t, void (*)(uint32_t, const uint8_t *, void *), void *, Fill *) {
     return 0;
 }
 
