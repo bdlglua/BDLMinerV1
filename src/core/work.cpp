@@ -110,9 +110,16 @@ void build(const Job &job, uint64_t extranonce2, Work &out) {
 }
 
 double hashDifficulty(const uint8_t hash[32]) {
-    double v = leToDouble(hash);
-    if (v <= 0) return INFINITY;
-    return kDiff1 / v;
+    // The 8 bytes from the most significant non-zero one carry more bits than
+    // a double holds: one conversion instead of 32 multiply-adds (doubles are
+    // emulated in software on the ESP32, and this runs for every candidate).
+    int top = 31;
+    while (top >= 0 && !hash[top]) top--;
+    if (top < 0) return INFINITY;
+    int low = top >= 7 ? top - 7 : 0;
+    uint64_t v = 0;
+    for (int i = top; i >= low; i--) v = v << 8 | hash[i];
+    return kDiff1 / ldexp((double)v, 8 * low);
 }
 
 uint32_t quickLimitFor(double difficulty) {

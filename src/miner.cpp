@@ -19,18 +19,18 @@ MinerStats stats;
 namespace {
 
 // Hashes done between two looks at the job board (and two updates of the
-// hash counter): ~0.1 s of software work, ~17 ms of the original ESP32's
-// hardware loop, whose per-call cost is a few microseconds. Both divide 2^32,
-// so a work's nonce space always ends on a batch boundary.
+// hash counter): ~0.1 s of software work, ~67 ms of the original ESP32's
+// hardware loop. Both divide 2^32, so a work's nonce space always ends on a
+// batch boundary.
 constexpr uint32_t kBatchSw = 4096;
-constexpr uint32_t kBatchHw = 16384;
+constexpr uint32_t kBatchHw = 65536;
 
 // The hardware miner owns the last core of dual-core chips: above every task
 // that could share it (everything else, Arduino loop included, runs on core
-// 0). Stealing its CPU leaves the SHA engine idle, so it only pauses once a
-// second, for the idle task; miners sharing a core pause after every batch.
+// 0). Stealing its CPU leaves the SHA engine idle, so it only pauses every
+// 10 s, for the idle task; miners sharing a core pause after every batch.
 constexpr UBaseType_t kHwMinerPriority = 19;
-constexpr uint32_t kOwnCorePauseMs = 1000;
+constexpr uint32_t kOwnCorePauseMs = 10000;
 
 // Candidates under this top-32-bit value (diff >= ~1.5e-5) are fully
 // evaluated, which is what feeds the "best difficulty" statistic.

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
 #include <chrono>
 
 #include "core/address.h"
@@ -111,6 +112,26 @@ static void testSubscribeRefused() {
     CHECK(p.handleLine(R"({"id":1,"result":null,"error":[20,"Other error",null]})") ==
           stratum::Event::SubscribeFailed);
     CHECK(p.lastError() == "Other error");
+}
+
+// hashDifficulty() against the exact 256-bit value, for hashes with 0 to 31
+// leading zero bytes.
+static void testHashDifficulty() {
+    const double kDiff1 = 26959535291011309493156476344723991336010898738574164086137773096960.0;
+    uint32_t seed = 12345;
+    double worst = 0;
+    for (int k = 0; k < 100000; k++) {
+        uint8_t h[32];
+        for (auto &b : h) b = (seed = seed * 1103515245u + 12345u) >> 16;
+        for (int z = 0, zeros = k % 32; z < zeros; z++) h[31 - z] = 0;
+        double v = 0;
+        for (int i = 31; i >= 0; i--) v = v * 256.0 + h[i];
+        double ref = kDiff1 / v, got = work::hashDifficulty(h);
+        worst = std::max(worst, fabs(got / ref - 1));
+    }
+    CHECK(worst < 1e-15);
+    uint8_t zero[32] = {0};
+    CHECK(std::isinf(work::hashDifficulty(zero)));
 }
 
 // Malformed or early messages must not crash or start mining on nothing.
@@ -228,6 +249,7 @@ static void testAddress() {
 
 int main() {
     testSha();
+    testHashDifficulty();
     testSubscribeRefused();
     testStratumRobustness();
     testStratumJob();
