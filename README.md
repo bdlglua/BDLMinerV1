@@ -62,6 +62,21 @@ Hashing engines:
     watchdog is paused for each handshake: the key exchange runs for a second or two
     without yielding on a fully loaded core 0.
 
+## Install a release (no build tools)
+
+Each release has two files per board (`<board>` = the environment name of the table
+above, e.g. `m5stickc-plus2`):
+
+* **`<board>-factory.bin`**: complete image for a first install, flashed at address
+  **0x0**. In Chrome or Edge: https://espressif.github.io/esptool-js/ → *Connect* →
+  address `0x0`, the file → *Program*. Or `esptool.py write_flash 0x0 <board>-factory.bin`.
+  It erases the settings, WiFi and statistics.
+* **`<board>-firmware.bin`**: update keeping settings and statistics: on the dashboard
+  (*Settings* → *Firmware update*), or `esptool.py write_flash 0x10000 <board>-firmware.bin`.
+
+`SHA256SUMS.txt` lists their checksums. To make a release: `python3 tools/make_release.py`
+(writes `release/<version>/`).
+
 ## Build and flash
 
 Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio`).
