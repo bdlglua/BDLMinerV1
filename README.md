@@ -76,6 +76,9 @@ Boards without a display report everything on the serial monitor and the
    * **Pool password**: usually `x`;
    * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
      (the pool may enforce a higher minimum);
+   * **User agent**: miner name sent to the pool, `BDLMinerV1/<version>` by default.
+     Some pools only accept known miners: `pool.nerdminers.org` requires `NerdMinerV2`
+     and otherwise refuses the connection (status *Subscribe refused*);
    * **Timezone**: POSIX TZ string, defaults to Paris time
      `CET-1CEST,M3.5.0,M10.5.0/3` (`UTC0`, `EST5EDT,M3.2.0,M11.1.0`, `JST-9`…);
    * **Price currency**: currency for the BTC price, `USD` by default

@@ -18,6 +18,7 @@ void settingsLoad() {
     settings.btcAddress = p.getString("addr", "");
     settings.poolPassword = p.getString("pass", DEFAULT_POOL_PASSWORD);
     settings.suggestedDifficulty = p.getDouble("diff", DEFAULT_DIFFICULTY);
+    settings.userAgent = p.getString("ua", DEFAULT_USER_AGENT);
     settings.brightness = p.getUChar("bright", 80);
     settings.rotation = p.getUChar("rot", 1);
     settings.timezone = p.getString("tz", DEFAULT_TIMEZONE);
@@ -35,6 +36,7 @@ void settingsSave() {
     p.putString("addr", settings.btcAddress);
     p.putString("pass", settings.poolPassword);
     p.putDouble("diff", settings.suggestedDifficulty);
+    p.putString("ua", settings.userAgent);
     p.putUChar("bright", settings.brightness);
     p.putUChar("rot", settings.rotation);
     p.putString("tz", settings.timezone);
@@ -90,6 +92,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                                settings.btcAddress.c_str(), 100);
     WiFiManagerParameter pPass("pass", "Pool password", settings.poolPassword.c_str(), 40);
     WiFiManagerParameter pDiff("diff", "Suggested share difficulty", diff, 15);
+    WiFiManagerParameter pUa("ua", "User agent (pool.nerdminers.org needs NerdMinerV2)", settings.userAgent.c_str(), 40);
     WiFiManagerParameter pTz("tz", "Timezone (POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0)",
                              settings.timezone.c_str(), 48);
     WiFiManagerParameter pFiat("fiat", "Price currency (USD, EUR, GBP, CAD, CHF, AUD, JPY)",
@@ -101,6 +104,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pAddr);
     wm.addParameter(&pPass);
     wm.addParameter(&pDiff);
+    wm.addParameter(&pUa);
     wm.addParameter(&pTz);
     wm.addParameter(&pFiat);
 
@@ -129,6 +133,9 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.poolPassword = pPass.getValue();
         double d = atof(pDiff.getValue());
         if (d > 0) settings.suggestedDifficulty = d;
+        settings.userAgent = pUa.getValue();
+        settings.userAgent.trim();
+        if (settings.userAgent.isEmpty()) settings.userAgent = DEFAULT_USER_AGENT;
         settings.timezone = pTz.getValue();
         settings.timezone.trim();
         if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;

@@ -8,10 +8,6 @@
 #include "miner.h"
 #include "settings.h"
 
-#ifndef FW_VERSION
-#define FW_VERSION "dev"
-#endif
-
 namespace {
 
 constexpr uint32_t kPoolSilenceTimeoutMs = 5 * 60 * 1000;  // no message -> reconnect
@@ -42,7 +38,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
     uint32_t start = millis();
     uint32_t lastRx = start;
 
-    if (!sendLine(client, proto.subscribe("BDLMinerV1/" FW_VERSION))) return;
+    if (!sendLine(client, proto.subscribe(settings.userAgent.c_str()))) return;
 
     while (client.connected() && WiFi.isConnected()) {
         int n;
@@ -64,6 +60,11 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                             sendLine(client, proto.suggestDifficulty(settings.suggestedDifficulty));
                         sendLine(client, proto.authorize());
                         break;
+                    case stratum::Event::SubscribeFailed:
+                        setStatus("Subscribe refused");
+                        Serial.printf("[pool] subscribe refused: %s (user agent \"%s\")\n",
+                                      proto.lastError().c_str(), settings.userAgent.c_str());
+                        return;
                     case stratum::Event::Authorized:
                         stats.poolConnected = true;
                         setStatus(onBackup ? "Mining (backup pool)" : "Mining");

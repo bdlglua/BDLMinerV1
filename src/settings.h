@@ -13,6 +13,12 @@
 // POSIX TZ string (Central European Time with daylight saving by default).
 #define DEFAULT_TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 #define DEFAULT_CURRENCY "USD"
+#ifndef FW_VERSION
+#define FW_VERSION "dev"
+#endif
+// Sent in mining.subscribe. Some pools only accept known miners (e.g.
+// pool.nerdminers.org requires "NerdMinerV2").
+#define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
 
 struct Settings {
     String poolHost = DEFAULT_POOL_HOST;
@@ -22,6 +28,7 @@ struct Settings {
     String btcAddress;  // payout address (worker name may be appended: addr.worker)
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
+    String userAgent = DEFAULT_USER_AGENT;
     uint8_t brightness = 80;  // percent
     uint8_t rotation = 1;     // 0..3, display orientation
     String timezone = DEFAULT_TIMEZONE;

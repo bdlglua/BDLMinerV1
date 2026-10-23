@@ -13,6 +13,7 @@ namespace stratum {
 enum class Event {
     None,
     Subscribed,      // send authorize() (and suggestDifficulty()) now
+    SubscribeFailed, // refused (e.g. user agent not allowed), see lastError()
     Authorized,
     AuthFailed,
     NewJob,          // job() changed; clean() tells if old work must be dropped

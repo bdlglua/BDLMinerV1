@@ -102,6 +102,17 @@ static void testSha() {
 
 // Real block 125552 (the one used in the Bitcoin wiki hashing example) built
 // from Stratum-style fields, to check header assembly + byte orders.
+// pool.nerdminers.org answers an unknown user agent this way.
+static void testSubscribeRefused() {
+    stratum::Protocol p;
+    CHECK(p.handleLine(R"({"result":"Only allowed user agents may subscribe","id":1,"error":null})") ==
+          stratum::Event::SubscribeFailed);
+    CHECK(p.lastError() == "Only allowed user agents may subscribe");
+    CHECK(p.handleLine(R"({"id":1,"result":null,"error":[20,"Other error",null]})") ==
+          stratum::Event::SubscribeFailed);
+    CHECK(p.lastError() == "Other error");
+}
+
 static void testStratumJob() {
     stratum::Protocol p;
     p.setCredentials("addr.worker", "x");
@@ -197,6 +208,7 @@ static void testAddress() {
 
 int main() {
     testSha();
+    testSubscribeRefused();
     testStratumJob();
     testAddress();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);

@@ -158,8 +158,13 @@ Event Protocol::handleLine(const char *line) {
     }
 
     if (id == kIdSubscribe) {
-        // [[subscriptions...], extranonce1, extranonce2_size]
-        if (!ok || !result.is<JsonArray>()) return Event::Error;
+        // [[subscriptions...], extranonce1, extranonce2_size]. Some pools put
+        // a refusal message in "result" instead, with a null error.
+        if (!ok || !result.is<JsonArray>()) {
+            if (result.is<const char *>()) lastError_ = result.as<const char *>();
+            else if (lastError_.empty()) lastError_ = "subscribe refused";
+            return Event::SubscribeFailed;
+        }
         if (!work::fromHex(result[1] | "", job_.extranonce1)) return Event::Error;
         job_.extranonce2Size = result[2] | 4;
         return Event::Subscribed;
