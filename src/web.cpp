@@ -106,8 +106,10 @@ tick();setInterval(tick,3000);
 </script>)HTML";
 
 const char kSettingsPage[] PROGMEM = R"HTML(<form id="f" class="box" onsubmit="return save()"></form>
-<div class="box"><button onclick="save()">Save and restart</button><button onclick="exp()">Export</button>
-<button onclick="document.getElementById('imp').click()">Import</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)">
+<div class="box"><button onclick="save()">Save and restart</button>
+<fieldset><legend>Backup</legend><p class="s">The backup file holds every setting (passwords included: keep it private) and the lifetime statistics: best difficulty, the 10 best shares, hashes, shares, blocks, running time. Restoring it on another miner also gives that one these statistics.</p>
+<button onclick="location.href='/api/backup'">Download a backup</button>
+<button onclick="document.getElementById('imp').click()">Restore a backup</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)"></fieldset>
 <fieldset><legend>Firmware update</legend><input type="file" id="fw" accept=".bin"><button onclick="upd()">Update</button><div id="up" class="s"></div></fieldset>
 <p class="s" id="msg"></p></div>
 <script>
@@ -120,8 +122,9 @@ async function load(){const r=await fetch('/api/settings');if(!r.ok){$('msg').te
 function values(){const v={};for(const[k,type]of S.schema){const i=$('k_'+k);v[k]=type=='bool'?i.checked:type=='number'||type=='decimal'?Number(i.value):i.value}return v}
 async function post(v){const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});$('msg').textContent=r.ok?'Saved, restarting… reload in 15 s':await r.text()}
 function save(){post(values());return false}
-function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(values(),null,1)],{type:'application/json'}));a.download='bdlminer-settings.json';a.click()}
-function imp(i){const r=new FileReader();r.onload=()=>{try{post(JSON.parse(r.result))}catch(e){$('msg').textContent='Not a settings file'}};r.readAsText(i.files[0])}
+function imp(i){const r=new FileReader();r.onload=async()=>{try{JSON.parse(r.result)}catch(e){$('msg').textContent='Not a backup file';return}
+ if(!confirm('Restore this backup? The miner restarts afterwards.'))return;
+ const x=await fetch('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:r.result});$('msg').textContent=await x.text()};r.readAsText(i.files[0])}
 function upd(){const f=$('fw').files[0];if(!f)return;const x=new XMLHttpRequest(),d=new FormData();d.append('firmware',f);
  x.upload.onprogress=e=>$('up').textContent=Math.round(e.loaded*100/e.total)+' %';x.onload=()=>$('up').textContent=x.responseText;x.onerror=()=>$('up').textContent='Upload failed';
  x.open('POST','/update');x.send(d)}
@@ -263,19 +266,10 @@ void handleStats() {
     server.send(200, "application/json", body);
 }
 
-void handleGetSettings() {
-    if (!authorized()) return;
-    static const char *kTypes[] = {"text", "secret", "number", "decimal", "bool"};
-    JsonDocument j;
-    JsonArray schema = j["schema"].to<JsonArray>();
-    JsonObject values = j["values"].to<JsonObject>();
+// Every setting's value, under its key.
+void settingValues(JsonObject values) {
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
-        JsonArray row = schema.add<JsonArray>();
-        row.add(s.key);
-        row.add(kTypes[(int)s.type]);
-        row.add(s.group);
-        row.add(s.label);
         switch (s.type) {
             case SettingType::Text:
             case SettingType::Secret: values[s.key] = *(String *)s.value; break;
@@ -286,25 +280,14 @@ void handleGetSettings() {
             case SettingType::Bool: values[s.key] = *(bool *)s.value; break;
         }
     }
-    String body;
-    serializeJson(j, body);
-    server.sendHeader("Cache-Control", "no-store");
-    server.send(200, "application/json", body);
 }
 
-// Saves the settings present in the JSON body (an export, or the page's form)
-// and restarts, which applies everything the same way as at boot.
-void handlePostSettings() {
-    if (!authorized()) return;
-    JsonDocument j;
-    if (deserializeJson(j, server.arg("plain")) || !j.is<JsonObject>()) {
-        server.send(400, "text/plain", "Not a settings object");
-        return;
-    }
+// Applies the known keys of `values` and saves them; returns how many there were.
+int applySettings(JsonObjectConst values) {
     int changed = 0;
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
-        JsonVariant v = j[s.key];
+        JsonVariantConst v = values[s.key];
         if (v.isNull()) continue;
         switch (s.type) {
             case SettingType::Text:
@@ -322,11 +305,117 @@ void handlePostSettings() {
         }
         changed++;
     }
-    settingsSanitize();
-    settingsSave();
+    if (changed) {
+        settingsSanitize();
+        settingsSave();
+    }
+    return changed;
+}
+
+void handleGetSettings() {
+    if (!authorized()) return;
+    static const char *kTypes[] = {"text", "secret", "number", "decimal", "bool"};
+    JsonDocument j;
+    JsonArray schema = j["schema"].to<JsonArray>();
+    for (size_t i = 0; i < kSettingCount; i++) {
+        const SettingInfo &s = kSettings[i];
+        JsonArray row = schema.add<JsonArray>();
+        row.add(s.key);
+        row.add(kTypes[(int)s.type]);
+        row.add(s.group);
+        row.add(s.label);
+    }
+    settingValues(j["values"].to<JsonObject>());
+    String body;
+    serializeJson(j, body);
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", body);
+}
+
+// Saves the settings present in the JSON body (the page's form) and restarts,
+// which applies everything the same way as at boot.
+void handlePostSettings() {
+    if (!authorized()) return;
+    JsonDocument j;
+    if (deserializeJson(j, server.arg("plain")) || !j.is<JsonObject>()) {
+        server.send(400, "text/plain", "Not a settings object");
+        return;
+    }
+    int changed = applySettings(j.as<JsonObjectConst>());
     logf("[web] %d settings saved, restarting\n", changed);
     server.send(200, "text/plain", "Saved, restarting");
     restartSoon("settings changed from the web page");
+}
+
+// GET /api/backup: settings (passwords included) and lifetime statistics.
+void handleGetBackup() {
+    if (!authorized()) return;
+    JsonDocument j;
+    j["bdlminer_backup"] = 1;
+    j["board"] = board::modelName();
+    j["firmware"] = FW_VERSION;
+    time_t now = time(nullptr);
+    j["date"] = now > 1700000000 ? (uint32_t)now : 0;
+    settingValues(j["settings"].to<JsonObject>());
+    StatsSnapshot s;
+    minerStatsSnapshot(s);
+    JsonObject st = j["stats"].to<JsonObject>();
+    st["best"] = s.bestDiff;
+    st["hashes"] = s.hashes;
+    st["shares"] = s.shares;
+    st["blocks"] = s.blocks;
+    st["seconds"] = s.seconds;
+    JsonArray top = st["top"].to<JsonArray>();
+    for (const BestShare &b : s.top) {
+        if (!(b.difficulty > 0)) break;
+        JsonObject o = top.add<JsonObject>();
+        o["d"] = b.difficulty;
+        o["t"] = b.time;
+    }
+    String body;
+    serializeJson(j, body);
+    char name[80];
+    snprintf(name, sizeof(name), "attachment; filename=\"%s-backup.json\"", hostName.c_str());
+    server.sendHeader("Content-Disposition", name);
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", body);
+}
+
+// POST /api/backup: a file from GET /api/backup (or a settings-only export
+// of an earlier version); restores what it holds, then restarts.
+void handlePostBackup() {
+    if (!authorized()) return;
+    JsonDocument j;
+    if (deserializeJson(j, server.arg("plain")) || !j.is<JsonObject>()) {
+        server.send(400, "text/plain", "Not a backup file");
+        return;
+    }
+    bool full = !j["bdlminer_backup"].isNull();
+    int settingsCount = applySettings(full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>());
+    JsonObjectConst st = j["stats"];
+    bool withStats = full && !st.isNull();
+    if (withStats) {
+        StatsSnapshot s{};
+        s.bestDiff = st["best"] | 0.0;
+        s.hashes = st["hashes"] | (uint64_t)0;
+        s.shares = st["shares"] | 0u;
+        s.blocks = st["blocks"] | 0u;
+        s.seconds = st["seconds"] | 0u;
+        int i = 0;
+        for (JsonObjectConst o : st["top"].as<JsonArrayConst>()) {
+            if (i == TOP_SHARES) break;
+            s.top[i++] = {o["d"] | 0.0, o["t"] | 0u};
+        }
+        minerStatsRestore(s);
+    }
+    if (!settingsCount && !withStats) {
+        server.send(400, "text/plain", "Nothing to restore in this file");
+        return;
+    }
+    logf("[web] backup restored: %d settings%s, restarting\n", settingsCount, withStats ? " and statistics" : "");
+    server.send(200, "text/plain", String("Restored ") + settingsCount + " settings" +
+                                       (withStats ? " and the statistics" : "") + ", restarting… reload in 15 s");
+    restartSoon("backup restored from the web page");
 }
 
 // POST /update (multipart): a firmware.bin built for this board.
@@ -428,6 +517,8 @@ void webStart() {
     });
     server.on("/api/settings", HTTP_GET, handleGetSettings);
     server.on("/api/settings", HTTP_POST, handlePostSettings);
+    server.on("/api/backup", HTTP_GET, handleGetBackup);
+    server.on("/api/backup", HTTP_POST, handlePostBackup);
     server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
     server.on("/metrics", HTTP_GET, handleMetrics);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
@@ -438,6 +529,7 @@ void webStart() {
 void webHandle() {
     server.handleClient();
     if (restartAt && (int32_t)(millis() - restartAt) >= 0) {
+        minerSaveStats();  // does nothing after a restored backup
         setRestartReason(restartWhy);
         ESP.restart();
     }

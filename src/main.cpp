@@ -110,6 +110,7 @@ void loop() {
         case board::Input::FactoryReset:
             ui::showMessage("Reset", "Erasing settings...", "Rebooting into setup");
             logf("[cfg] factory reset\n");
+            minerSaveStats();  // statistics survive a factory reset
             delay(1500);
             settingsFactoryReset();
             break;

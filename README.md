@@ -206,9 +206,12 @@ the serial monitor):
   battery state. With **Other miners** set, a *Miners* section shows each of them and the
   total hashrate (each miner's `/api/stats` allows other pages to read it).
 * **Settings** (needs the web password set in the portal; user `admin`): every setting,
-  grouped (pool, display, notifications, safety, network); *Save and restart*;
-  **Export** downloads them as a JSON file (passwords included: keep it private),
-  **Import** loads such a file, for example into a second miner. **Firmware update**
+  grouped (pool, display, notifications, safety, network); *Save and restart*.
+  **Backup**: *Download a backup* gives a JSON file with every setting (passwords
+  included: keep it private) and the lifetime statistics (best difficulty, the 10 best
+  shares, hashes, shares, blocks, running time); *Restore a backup* puts them back, on
+  this miner after a factory reset or on another one (settings-only files of earlier
+  versions are accepted too). Also at `/api/backup` (GET / POST). **Firmware update**
   takes the `firmware.bin` of this board (`.pio/build/<env>/firmware.bin`): no cable
   needed. Boards whose firmware does not fit twice in flash (M5Stack Core,
   ESP32-2432S028R CYD) can only be updated by USB.
@@ -259,6 +262,12 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 * **Watchdogs**: the board restarts after 30 minutes without a pool connection, and,
   if set, after N hours without an accepted share. The reason is shown after the
   restart (dashboard, log, notification).
+* **Statistics on flash**: lifetime totals, best difficulty and the 10 best shares are
+  saved every 10 minutes (at once for a block, within a minute for a new best) and just
+  before every restart the miner makes itself, as one record written in turn to two
+  slots, each with a sequence number and a CRC (the scheme of NerdMiner Modded): at boot
+  the newest valid one is used, so a power cut during a save only loses that save.
+  Statistics survive a factory reset.
 * **Fallback WiFi**: two more networks can be set in the web settings; they are tried
   when the portal's network cannot be joined, at boot and after a minute of lost WiFi.
 

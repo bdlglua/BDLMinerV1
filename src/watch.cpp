@@ -23,6 +23,7 @@ uint32_t wakeUntil = 0;  // night mode suspended until then (button press)
 
 void restart(const char *why) {
     logf("[watch] restarting: %s\n", why);
+    minerSaveStats();  // what was mined since the last periodic save
     setRestartReason(why);
     delay(500);
     ESP.restart();

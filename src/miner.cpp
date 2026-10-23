@@ -1,6 +1,8 @@
 #include "miner.h"
 
 #include <Preferences.h>
+#include <esp_rom_crc.h>
+#include <stddef.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 
@@ -402,36 +404,105 @@ int minerHistory(float *out, int capacity) {
     return n;
 }
 
+namespace {
+
+// One saved record, written in turn to the slots "statA" and "statB" (the
+// scheme of NerdMiner Modded): at boot the newest slot with a good CRC wins.
+constexpr uint32_t kStatsMagic = 0x314C4442;  // "BDL1"
+struct StatsRecord {
+    uint32_t magic;
+    uint32_t seq;
+    StatsSnapshot s;
+    uint32_t crc;  // over every byte before it
+};
+
+uint32_t statsSeq = 0;
+bool statsLoaded = false;  // never save before the saved stats were read back
+bool statsFrozen = false;  // a restored backup waits for the restart
+
+uint32_t recordCrc(const StatsRecord &r) {
+    return esp_rom_crc32_le(0, (const uint8_t *)&r, offsetof(StatsRecord, crc));
+}
+
+bool readSlot(Preferences &p, const char *key, StatsRecord &r) {
+    if (p.getBytesLength(key) != sizeof(r)) return false;
+    p.getBytes(key, &r, sizeof(r));
+    return r.magic == kStatsMagic && r.crc == recordCrc(r);
+}
+
+void writeRecord(const StatsSnapshot &s) {
+    StatsRecord r;
+    memset(&r, 0, sizeof(r));
+    r.magic = kStatsMagic;
+    r.seq = ++statsSeq;
+    r.s = s;
+    r.crc = recordCrc(r);
+    Preferences p;
+    p.begin("stats", false);
+    if (p.putBytes(r.seq & 1 ? "statB" : "statA", &r, sizeof(r)) != sizeof(r)) logf("[stats] save failed\n");
+    p.end();
+}
+
+}  // namespace
+
 void minerLoadStats() {
     Preferences p;
     p.begin("stats", true);
-    stats.bestDiff = p.getDouble("best", 0);
-    baseHashes = p.getULong64("hashes", 0);
-    baseShares = p.getULong("shares", 0);
-    baseBlocks = p.getULong("blocks", 0);
-    baseSeconds = p.getULong("seconds", 0);
-    p.getBytes("top", top, sizeof(top));
+    StatsRecord a, b;
+    bool okA = readSlot(p, "statA", a), okB = readSlot(p, "statB", b);
+    StatsSnapshot s{};
+    if (okA || okB) {
+        const StatsRecord &r = okA && (!okB || (int32_t)(a.seq - b.seq) > 0) ? a : b;
+        s = r.s;
+        statsSeq = r.seq;
+        logf("[stats] restored save #%u%s\n", (unsigned)r.seq, okA && okB ? "" : " (one slot only)");
+    } else if (p.isKey("hashes")) {
+        // The separate keys of earlier versions, read once.
+        s.bestDiff = p.getDouble("best", 0);
+        s.hashes = p.getULong64("hashes", 0);
+        s.shares = p.getULong("shares", 0);
+        s.blocks = p.getULong("blocks", 0);
+        s.seconds = p.getULong("seconds", 0);
+        p.getBytes("top", s.top, sizeof(s.top));
+        logf("[stats] restored from the previous format\n");
+    }
     p.end();
+
+    stats.bestDiff = s.bestDiff;
+    baseHashes = s.hashes;
+    baseShares = s.shares;
+    baseBlocks = s.blocks;
+    baseSeconds = s.seconds;
+    memcpy(top, s.top, sizeof(top));
     stats.lifetimeHashes = baseHashes;
     stats.lifetimeShares = baseShares;
     stats.lifetimeBlocks = baseBlocks;
     stats.lifetimeSeconds = baseSeconds;
+    statsLoaded = true;
+}
+
+void minerStatsSnapshot(StatsSnapshot &out) {
+    memset(&out, 0, sizeof(out));
+    out.bestDiff = stats.bestDiff;
+    out.hashes = stats.lifetimeHashes;
+    out.shares = stats.lifetimeShares;
+    out.blocks = stats.lifetimeBlocks;
+    out.seconds = stats.lifetimeSeconds;
+    portENTER_CRITICAL(&statsMux);
+    memcpy(out.top, top, sizeof(out.top));
+    portEXIT_CRITICAL(&statsMux);
 }
 
 void minerSaveStats() {
+    if (!statsLoaded || statsFrozen) return;
     bestDirty = false;
     savedBlocks = stats.blocksFound;
-    Preferences p;
-    p.begin("stats", false);
-    p.putDouble("best", stats.bestDiff);
-    p.putULong64("hashes", stats.lifetimeHashes);
-    p.putULong("shares", stats.lifetimeShares);
-    p.putULong("blocks", stats.lifetimeBlocks);
-    p.putULong("seconds", stats.lifetimeSeconds);
-    BestShare copy[TOP_SHARES];
-    portENTER_CRITICAL(&statsMux);
-    memcpy(copy, top, sizeof(copy));
-    portEXIT_CRITICAL(&statsMux);
-    p.putBytes("top", copy, sizeof(copy));
-    p.end();
+    StatsSnapshot s;
+    minerStatsSnapshot(s);
+    writeRecord(s);
+}
+
+void minerStatsRestore(const StatsSnapshot &s) {
+    writeRecord(s);
+    statsFrozen = true;
 }

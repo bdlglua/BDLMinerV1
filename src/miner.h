@@ -63,7 +63,10 @@ void minerTick();
 // Copies the hash rate history (H/s, oldest first) and returns its length.
 int minerHistory(float *out, int capacity);
 
-// Persist best difficulty, the best shares and lifetime totals across reboots.
+// Persist best difficulty, the best shares and lifetime totals across reboots
+// (two NVS slots written in turn, each with a sequence number and a CRC: a
+// power cut during a save loses at most the previous save). Saving does
+// nothing before minerLoadStats() has read the saved stats back.
 void minerLoadStats();
 void minerSaveStats();
 
@@ -75,6 +78,18 @@ struct BestShare {
 };
 #define TOP_SHARES 10
 int minerTopShares(BestShare *out, int capacity);
+
+// Lifetime statistics, for a backup.
+struct StatsSnapshot {
+    double bestDiff;
+    uint64_t hashes;
+    uint32_t shares, blocks, seconds;
+    BestShare top[TOP_SHARES];
+};
+void minerStatsSnapshot(StatsSnapshot &out);
+// Saves `s` as the lifetime statistics, used from the next start on: restart
+// after it (nothing is saved meanwhile, so it is not overwritten).
+void minerStatsRestore(const StatsSnapshot &s);
 
 // Slows the miners down: Full speed, Half (on battery) or Paused (too hot).
 enum class Throttle : uint8_t { Full, Half, Paused };
