@@ -24,13 +24,14 @@ namespace {
 
 constexpr uint32_t kFirstCheckMs = 2 * 60 * 1000;
 constexpr uint32_t kCheckMs = 12 * 3600 * 1000UL;
+constexpr uint32_t kRetryMs = 30 * 60 * 1000;
 constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
 
 GithubUpdate state;
 String firmwareUrl, signatureUrl;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
-TaskHandle_t task = nullptr;
 volatile bool installRequested = false;
+uint32_t nextCheck = kFirstCheckMs;  // millis()
 
 void setError(const char *fmt, const char *arg = "") {
     portENTER_CRITICAL(&stateMux);
@@ -96,13 +97,14 @@ bool httpsGet(String url, WiFiClientSecure &tls, HTTPClient &http, int *code) {
     return false;
 }
 
-void check() {
+// False when the release could not be read (retried sooner).
+bool check() {
     WiFiClientSecure tls;
     HTTPClient http;
     int code = 0;
     if (!httpsGet("https://api.github.com/repos/" GITHUB_REPO "/releases/latest", tls, http, &code)) {
         setError("cannot read the latest release (HTTP %s)", String(code).c_str());
-        return;
+        return false;
     }
     JsonDocument filter, doc;
     filter["tag_name"] = true;
@@ -115,13 +117,13 @@ void check() {
     http.end();
     if (err) {
         setError("release: %s", err.c_str());
-        return;
+        return false;
     }
     char version[24];
     if (!findVersion(doc["tag_name"] | "", version, sizeof(version)) &&
         !findVersion(doc["name"] | "", version, sizeof(version))) {
         setError("no version number in the release tag or name");
-        return;
+        return false;
     }
     String fw, sig;
     for (JsonObject a : doc["assets"].as<JsonArray>()) {
@@ -149,6 +151,7 @@ void check() {
         snprintf(msg, sizeof(msg), "Version %s is available (this miner runs %s).", version, FW_VERSION);
         notify("Firmware update", msg, 3, "arrow_up");
     }
+    return true;
 }
 
 // 0 when `sig` is a valid signature of `hash` (SHA-256) by the release key.
@@ -253,23 +256,14 @@ void install() {
     }
 }
 
-void updateTask(void *) {
-    vTaskDelay(pdMS_TO_TICKS(kFirstCheckMs));
-    for (;;) {
-        if (settings.githubUpdate && WiFi.isConnected() && ESP.getFreeHeap() > kMinHeap) {
-            if (!installRequested) check();
-            if ((installRequested || settings.githubUpdate == 2) && state.available) install();
-            installRequested = false;
-        }
-        // Until the next check, or an install asked for from the dashboard.
-        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(kCheckMs));
-    }
-}
-
 }  // namespace
 
-void ghUpdateStart() {
-    xTaskCreatePinnedToCore(updateTask, "ghupdate", 12288, nullptr, 1, &task, 0);
+void ghUpdatePoll() {
+    if (!settings.githubUpdate || !(installRequested || (int32_t)(millis() - nextCheck) >= 0)) return;
+    if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) return;
+    if (!installRequested) nextCheck = millis() + (check() ? kCheckMs : kRetryMs);
+    if ((installRequested || settings.githubUpdate == 2) && state.available) install();
+    installRequested = false;
 }
 
 GithubUpdate ghUpdateState() {
@@ -280,8 +274,7 @@ GithubUpdate ghUpdateState() {
 }
 
 bool ghUpdateInstall() {
-    if (!state.available || state.installing || !task) return false;
+    if (!state.available || state.installing) return false;
     installRequested = true;
-    xTaskNotifyGive(task);
     return true;
 }

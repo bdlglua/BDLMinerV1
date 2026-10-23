@@ -274,6 +274,7 @@ void handleStats() {
     JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
     for (int i = 0; i < n; i++) hr.add((long)hist[i]);
     j["heap"] = ESP.getFreeHeap();
+    j["heap_max_block"] = ESP.getMaxAllocHeap();
     float temp = board::temperature();
     if (isnan(temp)) j["temp_c"] = nullptr;
     else j["temp_c"] = (int)lroundf(temp);

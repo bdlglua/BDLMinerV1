@@ -1,5 +1,6 @@
 // Firmware updates from the GitHub releases of GITHUB_REPO. The latest
-// release is checked 2 minutes after boot and then every 12 hours; its
+// release is checked 2 minutes after boot and then every 12 hours (30
+// minutes after a failed check); its
 // <FW_ENV>-firmware.bin is installed (by itself with settings.githubUpdate
 // == 2, or from the dashboard) only when <FW_ENV>-firmware.bin.sig is a valid
 // signature of it by the release key (update_key.h).
@@ -16,8 +17,12 @@ struct GithubUpdate {
     char error[80] = "";     // last problem, "" when none
 };
 
-void ghUpdateStart();
+// Checks or installs when it is time. Called every few seconds by the market
+// task, which makes the other HTTPS requests (no task and stack of its own:
+// boards without PSRAM need that RAM for TLS).
+void ghUpdatePoll();
 GithubUpdate ghUpdateState();
 
-// Asks for the available update to be installed; false when there is none.
+// Asks for the available update to be installed (within seconds, by the
+// next ghUpdatePoll()); false when there is none.
 bool ghUpdateInstall();

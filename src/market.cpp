@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
+#include "ghupdate.h"
 #include "log.h"
 #include "miner.h"
 #include "net.h"
@@ -237,6 +238,7 @@ void marketTask(void *) {
             nextMarket = now + (refresh() ? kRefreshMs : kRetryMs);
         if (WiFi.isConnected() && stats.poolConnected && (int32_t)(now - nextPool) >= 0)
             nextPool = now + (refreshPoolStats() ? kPoolStatsMs : kPoolStatsRetryMs);
+        ghUpdatePoll();
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
@@ -245,7 +247,8 @@ void marketTask(void *) {
 
 void marketStart() {
     configTzTime(settings.timezone.c_str(), "pool.ntp.org", "time.cloudflare.com");
-    xTaskCreatePinnedToCore(marketTask, "market", 10240, nullptr, 2, nullptr, 0);
+    // 12 KB: the GitHub update check and install (ghUpdatePoll()) run here too.
+    xTaskCreatePinnedToCore(marketTask, "market", 12288, nullptr, 2, nullptr, 0);
 }
 
 PoolStats poolStatsGet() {

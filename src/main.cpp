@@ -6,7 +6,6 @@
 
 #include "board.h"
 #include "core/address.h"
-#include "ghupdate.h"
 #include "log.h"
 #include "market.h"
 #include "miner.h"
@@ -90,7 +89,6 @@ void setup() {
     marketStart();
     webStart();
     mqttStart();
-    ghUpdateStart();
     ui::render();
 }
 

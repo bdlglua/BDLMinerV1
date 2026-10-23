@@ -83,7 +83,8 @@ that updates from GitHub check.
 
 ### Updates from GitHub
 
-Two minutes after boot and then every 12 hours, the miner looks at the latest release of
+Two minutes after boot and then every 12 hours (30 minutes after a failed check), the
+miner looks at the latest release of
 this repository. When it is newer than its own firmware, the dashboard shows an
 *Update available* tile with an **Install** button (and a notification is sent); with the
 *Updates from GitHub* setting at `2` it installs it by itself, `0` turns the check off.

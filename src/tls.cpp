@@ -1,6 +1,8 @@
 #include "tls.h"
 
+#include <esp_heap_caps.h>
 #include <freertos/semphr.h>
+#include <mbedtls/platform.h>
 
 #include "hw_sha.h"
 #include "log.h"
@@ -18,9 +20,27 @@ static SemaphoreHandle_t lock = [] {
     return s;
 }();
 
+// mbedtls allocates in internal RAM only (CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC),
+// and a connection needs a 16.7 KB block for its receive buffer: with the
+// heap fragmented (79 KB free, 18 KB largest block), handshakes failed now and
+// then with "Memory allocation failed". With PSRAM, buffers of 4 KB and more
+// go there; small ones (bignum limbs, hot in the handshake) stay internal.
+void *tlsCalloc(size_t n, size_t size) {
+    if (n * size >= 4096) {
+        void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM);
+        if (p) return p;
+    }
+    return heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     tls.setInsecure();
     xSemaphoreTake(lock, portMAX_DELAY);
+    static bool allocSet = false;
+    if (!allocSet) {
+        allocSet = true;
+        if (heap_caps_get_free_size(MALLOC_CAP_SPIRAM)) mbedtls_platform_set_calloc_free(tlsCalloc, heap_caps_free);
+    }
     // hwsha::hold() pauses the hardware SHA loop on the chips that need it
     // (the original ESP32 keeps mining and leaves TLS the software SHA), and
     // the key exchange runs for a second or two without yielding: with core 1
@@ -35,7 +55,8 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
         why[0] = ' ';
         tls.lastError(why + 1, sizeof(why) - 1);
     }
-    logf("[tls] %s: handshake %s in %u ms%s\n", host, ok ? "done" : "failed", (unsigned)(millis() - t0), why);
+    logf("[tls] %s: handshake %s in %u ms%s (heap %u, largest block %u)\n", host, ok ? "done" : "failed",
+         (unsigned)(millis() - t0), why, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
     enableCore0WDT();
     hwsha::release();
     xSemaphoreGive(lock);
