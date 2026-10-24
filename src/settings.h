@@ -65,6 +65,7 @@ struct Settings {
     String peers;  // other miners for the dashboard: "192.168.1.41, miner2.local"
     String webPassword;  // empty = settings and firmware cannot be changed from the web
     uint8_t githubUpdate = 2;  // 0 off, 1 check and offer, 2 install by itself
+    bool usageCount = true;    // daily download of this version's ping-<board>.txt (ghupdate.h)
 };
 
 extern Settings settings;

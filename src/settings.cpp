@@ -52,6 +52,8 @@ const SettingInfo kSettings[] = {
     S("peers", Text, peers, "Network", "Other miners on the dashboard (comma separated IPs or names)"),
     S("webpass", Secret, webPassword, "Network", "Web password (settings and firmware update from the dashboard)"),
     N("update", githubUpdate, "Network", "Updates from GitHub: 0 off, 1 check and offer, 2 install automatically"),
+    S("count", Bool, usageCount, "Network",
+      "Anonymous usage count: once a day, download a 2-byte file of this version's release (nothing is sent)"),
 };
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 

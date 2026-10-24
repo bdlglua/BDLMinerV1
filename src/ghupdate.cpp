@@ -25,6 +25,8 @@ namespace {
 constexpr uint32_t kFirstCheckMs = 2 * 60 * 1000;
 constexpr uint32_t kCheckMs = 12 * 3600 * 1000UL;
 constexpr uint32_t kRetryMs = 30 * 60 * 1000;
+constexpr uint32_t kFirstPingMs = 5 * 60 * 1000;
+constexpr uint32_t kPingMs = 24 * 3600 * 1000UL;
 constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
 
 GithubUpdate state;
@@ -32,6 +34,7 @@ String firmwareUrl, signatureUrl;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
 volatile bool installRequested = false;
 uint32_t nextCheck = kFirstCheckMs;  // millis()
+uint32_t nextPing = kFirstPingMs;
 
 void setError(const char *fmt, const char *arg = "") {
     portENTER_CRITICAL(&stateMux);
@@ -262,9 +265,29 @@ void install() {
     }
 }
 
+// The anonymous usage count: GitHub counts the downloads of each release
+// file, so fetching ping-<board>.txt of this version once a day makes the
+// download counts read "miner-days" per version and board
+// (tools/miner_stats.py). Nothing about the miner is sent; firmware built
+// locally, whose version has no release, just gets a 404.
+void ping() {
+    WiFiClientSecure tls;
+    HTTPClient http;
+    int code = 0;
+    bool ok = httpsGet("https://github.com/" GITHUB_REPO "/releases/download/v" FW_VERSION "/ping-" FW_ENV ".txt",
+                       tls, http, &code);
+    http.end();
+    logf("[update] usage count: %s\n", ok ? "counted" : String("HTTP " + String(code)).c_str());
+}
+
 }  // namespace
 
 void ghUpdatePoll() {
+    if (settings.usageCount && (int32_t)(millis() - nextPing) >= 0 && WiFi.isConnected() &&
+        ESP.getFreeHeap() >= kMinHeap) {
+        nextPing = millis() + kPingMs;
+        ping();
+    }
     if (!settings.githubUpdate || !(installRequested || (int32_t)(millis() - nextCheck) >= 0)) return;
     if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) {
         static uint32_t lastLog = 0;

@@ -95,6 +95,15 @@ reason **Install** works without a web password too (with one set, it is asked).
 and statistics are kept. Like web updates, it needs a board with room for two firmwares
 (not M5Stack Core or CYD).
 
+### Anonymous usage count
+
+To know how many miners run each version, 5 minutes after boot and then once a day the
+miner downloads a 2-byte file of its own version's release, `ping-<board>.txt`. GitHub
+counts the downloads of each release file, and `python3 tools/miner_stats.py` turns these
+counts into active miners per version and board. Nothing about the miner is sent (no
+address, network or identifier: only GitHub sees the download, like any other). It is on
+by default; turn it off with the *Anonymous usage count* setting (`count`).
+
 ### Making a release
 
 Pushing a tag **`vX.Y.Z`** runs the *Release* workflow (`.github/workflows/release.yml`):

@@ -7,6 +7,8 @@
   <env>-firmware.bin.sig  its ECDSA P-256 signature, which updates from GitHub
                       require (key: keys/release-signing-key.pem, or the file
                       named by RELEASE_SIGNING_KEY_FILE; skipped without one)
+  ping-<env>.txt      2 bytes each miner downloads once a day: the download
+                      counts are the anonymous usage count (tools/miner_stats.py)
   SHA256SUMS.txt
   boards.json         the chip of each board, for tools/make_installer.py
 
@@ -117,6 +119,7 @@ def main():
         if key:
             sign(key, firmware)
         boards[env] = mcu
+        open(os.path.join(out, f"ping-{env}.txt"), "w").write("1\n")
         for path in (factory, firmware):
             sums.append(f"{hashlib.sha256(open(path, 'rb').read()).hexdigest()}  {os.path.basename(path)}")
         print(f"[{env}] {mcu}, {size} flash, {mode} {freq}: "
