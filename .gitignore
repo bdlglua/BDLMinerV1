@@ -5,3 +5,4 @@ compile_commands.json
 release/
 keys/
 __pycache__/
+test/web/node_modules/

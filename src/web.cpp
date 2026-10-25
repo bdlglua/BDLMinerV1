@@ -46,9 +46,11 @@ footer{max-width:960px;margin:16px auto 0;color:var(--label);font-size:12px}
 form,.box{max-width:960px;margin:0 auto}label{display:block;margin:8px 0 2px;color:var(--label);font-size:13px}
 input{width:100%;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--fg);font:inherit}
 input[type=checkbox]{width:auto}button{margin:12px 8px 0 0;padding:8px 14px;border:0;border-radius:6px;background:var(--accent);color:#000;font-weight:700;cursor:pointer}
-fieldset{border:1px solid var(--border);border-radius:8px;margin:12px 0;padding:4px 12px 12px}legend{color:var(--accent);font-weight:700}
+fieldset{min-inline-size:0;border:1px solid var(--border);border-radius:8px;margin:12px 0;padding:4px 12px 12px}legend{color:var(--accent);font-weight:700}
 pre{max-width:960px;margin:0 auto;white-space:pre-wrap;font-size:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px}
 @media(max-width:460px){.t.big{grid-column:span 1}}
+button:disabled{opacity:.5;cursor:wait}input:invalid{border-color:var(--bad)}
+#msg,#up,#log-status{overflow-wrap:anywhere}
 </style>)CSS";
 
 // Translations for the pages: t('English') gives the French text when the
@@ -90,6 +92,64 @@ peers:'Autres miners du tableau de bord (IP ou noms, séparés par des virgules)
 update:'Mises à jour depuis GitHub : 0 non, 1 vérifier et proposer, 2 installer automatiquement',
 count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fichier de 2 octets de la release de cette version (rien n\'est envoyé)'};
 function t(s){return LANG=='fr'&&FR[s]||s}
+
+Object.assign(FR,{
+ 'Connection failed. Please try again.':'Connexion impossible. Réessaie.',
+ 'Request timed out. Please try again.':'Le délai de réponse est dépassé. Réessaie.',
+ 'Invalid response from the miner.':'Réponse du miner invalide.',
+ 'Authentication required. Reload this page and sign in.':'Authentification requise. Recharge la page et reconnecte-toi.',
+ 'Loading settings…':'Chargement des réglages…','Retry':'Réessayer',
+ 'Enter a valid value.':'Saisis une valeur valide.',
+ 'The temperature must be 0 or at least 30 °C.':'La température doit être 0 ou au moins 30 °C.',
+ 'The hour must be 0–23 or 255 to disable night mode.':'L’heure doit être comprise entre 0 et 23, ou 255 pour désactiver le mode nuit.',
+ 'The difficulty must be greater than zero.':'La difficulté doit être supérieure à zéro.',
+ 'Backup restored. The miner is restarting…':'Sauvegarde restaurée. Le miner redémarre…',
+ 'Select a firmware file first.':'Sélectionne d’abord un fichier de firmware.',
+ 'Use a firmware .bin file, not a factory image.':'Utilise le fichier firmware .bin, pas l’image factory.',
+ 'Invalid firmware file.':'Fichier de firmware invalide.',
+ 'Upload complete. Validating firmware…':'Envoi terminé. Validation du firmware…',
+ 'Firmware updated. The miner is restarting…':'Firmware mis à jour. Le miner redémarre…',
+ 'Upload timed out. Please try again.':'Le délai d’envoi est dépassé. Réessaie.',
+ 'Upload cancelled.':'Envoi annulé.',
+ 'Installing…':'Installation…','Installation requested.':'Installation demandée.',
+ 'Could not refresh the log.':'Impossible d’actualiser le journal.'
+});
+Object.assign(FR,{
+ 'Unsupported backup version':'Version de sauvegarde non prise en charge',
+ 'Invalid backup settings':'Réglages de sauvegarde invalides',
+ 'Missing backup statistics':'Statistiques absentes de la sauvegarde',
+ 'Invalid or incomplete backup statistics':'Statistiques de sauvegarde invalides ou incomplètes',
+ 'Invalid text setting':'Valeur de texte invalide',
+ 'Setting outside its allowed range':'Valeur hors de la plage autorisée',
+ 'Temperature must be 0 or at least 30 C':'La température doit être 0 ou au moins 30 °C',
+ 'Night hours must be 0-23 or 255':'Les heures doivent être comprises entre 0 et 23, ou 255',
+ 'Difficulty must be a finite positive number':'La difficulté doit être un nombre positif valide',
+ 'Invalid checkbox setting':'Valeur de case à cocher invalide',
+ 'Pool host and payout address cannot be empty':'L’hôte de la pool et l’adresse de paiement sont obligatoires',
+ 'No settings to save':'Aucun réglage à enregistrer',
+ 'No firmware file uploaded':'Aucun fichier de firmware envoyé',
+ 'Only one firmware file is allowed':'Un seul fichier de firmware est autorisé',
+ 'Empty firmware file':'Le fichier de firmware est vide',
+ 'Firmware update or restart pending; try again afterwards':'Une mise à jour ou un redémarrage est en cours. Réessaie ensuite'
+});
+function errorText(e){return e&&e.message?e.message:t('Connection failed. Please try again.')}
+async function request(url,options={},format='json'){
+ const {timeout=8000,...init}=options,c=new AbortController();
+ const timer=setTimeout(()=>c.abort(),timeout);
+ try{
+  const r=await fetch(url,{cache:'no-store',...init,signal:c.signal});
+  const body=await r.text();
+  if(r.status===401)throw Error(t('Authentication required. Reload this page and sign in.'));
+  if(!r.ok)throw Error(t(body)||'HTTP '+r.status);
+  if(format==='text')return body;
+  try{return JSON.parse(body)}catch(e){throw Error(t('Invalid response from the miner.'))}
+ }catch(e){
+  if(e.name==='AbortError')throw Error(t('Request timed out. Please try again.'));
+  if(e instanceof TypeError)throw Error(t('Connection failed. Please try again.'));
+  throw e;
+ }finally{clearTimeout(timer)}
+}
+
 document.addEventListener('DOMContentLoaded',()=>{document.documentElement.lang=LANG;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t))});
 </script>)JS";
 
@@ -101,11 +161,11 @@ const char kDashboard[] PROGMEM = R"HTML(<main id="m"></main>
 <footer id="f"></footer>
 <script>
 const SI=['','k','M','G','T','P','E','Z','Y'];
-function si(v,u=''){if(!v)return'-';let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
+function si(v,u=''){if(v==null||!Number.isFinite(v))return'-';if(v===0)return'0'+(u?' '+u:'');let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
 function diff(d){return!d?'-':d<1?d.toFixed(5):si(d)}
-function dur(s){if(!isFinite(s))return'-';if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+(LANG=='fr'?'j ':'d '):'')+(d||h?h+'h ':'')+m+'m'}
+function dur(s){if(!Number.isFinite(s))return'-';s=Math.max(0,s);if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+(LANG=='fr'?'j ':'d '):'')+(d||h?h+'h ':'')+m+'m'}
 function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*4294967296));return(LANG=='fr'?'1 sur ':'1 in ')+si(1/p).replace(' ','')}
-function chart(h){const v=h.hashrate,t0=tile(t('Hashrate history'),undefined,v.length?t('5-min averages, last')+' '+dur(v.length*h.interval_s)+' · '+t('avg')+' '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · '+t('range')+' '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):t('first point after')+' '+h.interval_s/60+' '+t('min of mining'),true);
+function chart(h={}){const v=Array.isArray(h.hashrate)?h.hashrate.filter(Number.isFinite):[],t0=tile(t('Hashrate history'),undefined,v.length?t('5-min averages, last')+' '+dur(v.length*h.interval_s)+' · '+t('avg')+' '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · '+t('range')+' '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):t('first point after')+' '+h.interval_s/60+' '+t('min of mining'),true);
  if(v.length>1){const N='http://www.w3.org/2000/svg',W=300,H=60,lo=Math.min(...v),hi=Math.max(...v),k=(H-4)/((hi-lo)||hi||1),s=document.createElementNS(N,'svg'),p=document.createElementNS(N,'polyline');
   s.setAttribute('viewBox','0 0 '+W+' '+H);s.setAttribute('preserveAspectRatio','none');s.style.cssText='display:block;width:100%;height:60px;margin:6px 0';
   p.setAttribute('points',v.map((y,i)=>(i*W/(v.length-1)).toFixed(1)+','+(H-2-(y-lo)*k).toFixed(1)).join(' '));
@@ -113,12 +173,45 @@ function chart(h){const v=h.hashrate,t0=tile(t('Hashrate history'),undefined,v.l
   s.appendChild(p);t0.insertBefore(s,t0.lastChild)}return t0}
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
-function upd(u){if(!u||!u.available)return;const e=tile(t('Update available'),u.version,u.notes||'',true),b=document.createElement('button');b.textContent=t('Install');
- b.onclick=async()=>{b.disabled=true;const r=await fetch('/api/github-update',{method:'POST'});b.textContent=await r.text()};e.appendChild(b);return e}
-const peers={};
-async function peer(h){try{const c=new AbortController();setTimeout(()=>c.abort(),2500);const r=await fetch('http://'+h+'/api/stats',{signal:c.signal});peers[h]=await r.json()}catch(e){peers[h]=null}}
+
+let installPending=false,installError='';
+function upd(u){
+ if(!u||!u.available)return;
+ if(installPending&&!u.installing&&u.error)installPending=false;
+ const e=tile(t('Update available'),u.version,u.notes||installError||'',true),b=document.createElement('button');
+ b.type='button';b.disabled=installPending||u.installing;b.textContent=t(b.disabled?'Installing…':'Install');
+ b.onclick=async()=>{
+  if(installPending||u.installing)return;
+  installPending=true;installError='';b.disabled=true;b.textContent=t('Installing…');
+  try{await request('/api/github-update',{method:'POST'},'text');installError=t('Installation requested.')}
+  catch(err){installPending=false;installError=errorText(err);b.disabled=false;b.textContent=t('Install')}
+  e.querySelector('.s').textContent=installError;
+ };
+ e.appendChild(b);return e;
+}
+function peerHosts(list,ip){
+ const seen=new Set(),hosts=[];
+ if(!Array.isArray(list))return hosts;
+ for(const entry of list||[]){
+  try{
+   const u=new URL(entry.includes('://')?entry:'http://'+entry);
+   if(!['http:','https:'].includes(u.protocol)||u.username||u.password)continue;
+   if(u.origin===location.origin||(u.hostname===ip&&(u.port||'80')===(location.port||'80'))||seen.has(u.origin))continue;
+   seen.add(u.origin);hosts.push(u);
+  }catch(e){}
+ }
+ return hosts;
+}
+async function peer(u){
+ try{
+  const p=await request(u.origin+'/api/stats',{timeout:2500});
+  if(!p||!Number.isFinite(p.hashrate)||p.hashrate<0||!p.pool||typeof p.pool.connected!=='boolean'||!p.shares||!Number.isFinite(p.shares.accepted)||!p.best||!Number.isFinite(p.best.ever))throw Error('Invalid peer');
+  return p;
+ }catch(e){return null}
+}
 async function tick(){
- try{const r=await fetch('/api/stats');const j=await r.json();const m=j.market,pv=j.pool_view;
+ try{const j=await request('/api/stats');const m=j.market,pv=j.pool_view;
+  if(!m||!pv||!j.pool||!Array.isArray(j.engines))throw Error(t('Invalid response from the miner.'));
   document.documentElement.style.setProperty('--accent',j.accent);
   const st=document.getElementById('st');st.textContent=t(j.pool.connected?'ONLINE':'OFFLINE');st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';
   const state=j.throttle=='paused'?'⚠ '+t('mining paused'):j.throttle=='half'?t('battery saver: half speed'):j.throttle=='reduced'?t('power limited'):'';
@@ -131,13 +224,13 @@ async function tick(){
    tile(t('Total hashes'),si(j.total_hashes),t('uptime')+' '+dur(j.uptime_s)),
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds)),
-   chart(j.history)];
+   chart(j.history||{})];
   const u=upd(j.github_update);if(u)T.unshift(u);
   if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')));
   else if(!pv.supported)T.push(tile(t('Seen by the pool'),'-',t('no stats API known for this pool')));
   const now=Date.now()/1e3,B=j.blocks_recent||[];
   if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+': '+t('your best')+' '+diff(B[0].best):''),true));
-  if(j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
+  if(j.top&&j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
   if(m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString()+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString()+' '+t('sats')+' / '+m.currency:'',true),
    tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),
    tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' '+t('tx in mempool')),
@@ -148,45 +241,129 @@ async function tick(){
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
   document.getElementById('m').replaceChildren(...T);
   document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
-  if(j.peers.length){document.getElementById('ph').hidden=false;j.peers.forEach(peer);let total=j.hashrate;
-   const P=j.peers.map(h=>{const p=peers[h];if(!p)return tile(h,'-',t('no answer'));total+=p.hashrate;return tile(h,si(p.hashrate,'H/s'),(p.pool.connected?t('online'):t('OFFLINE'))+' · '+p.shares.accepted+' '+t('shares')+' · '+t('best')+' '+diff(p.best.ever))});
-   P.unshift(tile(t('All miners'),si(total,'H/s'),(j.peers.length+1)+' '+t('miners'),true));document.getElementById('p').replaceChildren(...P)}
- }catch(e){document.getElementById('st').textContent=t('NO CONNECTION');}
+
+  const hosts=peerHosts(j.peers,j.ip);
+  document.getElementById('ph').hidden=!hosts.length;
+  if(hosts.length){
+   const replies=await Promise.all(hosts.map(peer));let total=j.hashrate;
+   const P=hosts.map((u,i)=>{const p=replies[i];if(!p)return tile(u.host,'-',t('no answer'));total+=p.hashrate;return tile(u.host,si(p.hashrate,'H/s'),(p.pool.connected?t('online'):t('OFFLINE'))+' · '+p.shares.accepted+' '+t('shares')+' · '+t('best')+' '+diff(p.best.ever))});
+   P.unshift(tile(t('All miners'),si(total,'H/s'),(hosts.length+1)+' '+t('miners'),true));document.getElementById('p').replaceChildren(...P);
+  }else document.getElementById('p').replaceChildren();
+ }catch(e){const st=document.getElementById('st');st.textContent=t('NO CONNECTION');st.style.color='var(--bad)';document.getElementById('f').textContent=errorText(e)}
+ finally{setTimeout(tick,3000)}
 }
-tick();setInterval(tick,3000);
+tick();
+
 </script>)HTML";
 
-const char kSettingsPage[] PROGMEM = R"HTML(<form id="f" class="box" onsubmit="return save()"></form>
-<div class="box"><button onclick="save()" data-t="Save and restart">Save and restart</button>
+const char kSettingsPage[] PROGMEM = R"HTML(<form id="f" class="box" onsubmit="saveSettings(event);return false"></form>
+<div class="box"><button id="save" type="submit" form="f" disabled data-t="Save and restart">Save and restart</button>
+<button id="retry" type="button" onclick="load()" hidden data-t="Retry">Retry</button>
 <fieldset><legend data-t="Backup">Backup</legend><p class="s" id="bh">The backup file holds every setting (passwords included: keep it private) and the lifetime statistics: best difficulty, the 10 best shares, hashes, shares, blocks, running time. Restoring it on another miner also gives that one these statistics.</p>
-<button onclick="location.href='/api/backup'" data-t="Download a backup">Download a backup</button>
-<button onclick="document.getElementById('imp').click()" data-t="Restore a backup">Restore a backup</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)"></fieldset>
-<fieldset><legend data-t="Firmware update">Firmware update</legend><input type="file" id="fw" accept=".bin"><button onclick="upd()" data-t="Update">Update</button><div id="up" class="s"></div></fieldset>
-<p class="s" id="msg"></p></div>
+<button id="backup" type="button" onclick="location.href='/api/backup'" disabled data-t="Download a backup">Download a backup</button>
+<button id="restore" type="button" onclick="document.getElementById('imp').click()" disabled data-t="Restore a backup">Restore a backup</button><input type="file" id="imp" accept=".json" hidden onchange="imp(this)"></fieldset>
+<fieldset><legend data-t="Firmware update">Firmware update</legend><input type="file" id="fw" accept=".bin" onchange="sync()"><button id="upload" type="button" onclick="uploadFirmware()" disabled data-t="Update">Update</button><div id="up" class="s" role="status" aria-live="polite"></div></fieldset>
+<p class="s" id="msg" role="status" aria-live="polite"></p></div>
 <script>
-let S;const $=id=>document.getElementById(id);
+let S=null,busy=false,restarting=false;const $=id=>document.getElementById(id);
 if(LANG=='fr')$('bh').textContent=t('backup_help');
-async function load(){const r=await fetch('/api/settings');if(!r.ok){$('msg').textContent=await r.text();return}S=await r.json();const f=$('f');let g='',fs;
- for(const[k,type,group,label]of S.schema){if(group!=g){g=group;fs=document.createElement('fieldset');const lg=document.createElement('legend');lg.textContent=t(g);fs.appendChild(lg);f.appendChild(fs)}
-  const l=document.createElement('label'),i=document.createElement('input');l.textContent=LANG=='fr'&&FR_SET[k]||label;i.id='k_'+k;
-  if(type=='bool'){i.type='checkbox';i.checked=S.values[k]}else{i.type=type=='secret'?'password':type=='text'?'text':'number';if(type=='decimal')i.step='any';i.value=S.values[k]}
-  fs.append(l,i)}}
-function values(){const v={};for(const[k,type]of S.schema){const i=$('k_'+k);v[k]=type=='bool'?i.checked:type=='number'||type=='decimal'?Number(i.value):i.value}return v}
-async function post(v){const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});$('msg').textContent=r.ok?t('Saved, restarting… reload in 15 s'):await r.text()}
-function save(){post(values());return false}
-function imp(i){const r=new FileReader();r.onload=async()=>{try{JSON.parse(r.result)}catch(e){$('msg').textContent=t('Not a backup file');return}
- if(!confirm(t('Restore this backup? The miner restarts afterwards.')))return;
- const x=await fetch('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:r.result});$('msg').textContent=await x.text()};r.readAsText(i.files[0])}
-function upd(){const f=$('fw').files[0];if(!f)return;const x=new XMLHttpRequest(),d=new FormData();d.append('firmware',f);
- x.upload.onprogress=e=>$('up').textContent=Math.round(e.loaded*100/e.total)+' %';x.onload=()=>$('up').textContent=x.responseText;x.onerror=()=>$('up').textContent=t('Upload failed');
- x.open('POST','/update');x.send(d)}
+function sync(){
+ const off=busy||restarting||!S;
+ for(const id of ['save','backup','restore'])$(id).disabled=off;
+ $('upload').disabled=off||!$('fw').files.length;
+ $('retry').disabled=busy||restarting;
+ document.querySelectorAll('#f input,#fw,#imp').forEach(i=>i.disabled=busy||restarting);
+}
+async function load(){
+ if(busy||restarting)return;
+ busy=true;S=null;sync();$('msg').textContent=t('Loading settings…');$('retry').hidden=true;
+ try{
+  const data=await request('/api/settings');
+  if(!data||!Array.isArray(data.schema)||!data.values)throw Error(t('Invalid response from the miner.'));
+  const f=$('f');f.replaceChildren();let g='',fs;
+  for(const[k,type,group,label,limits]of data.schema){
+   if(group!=g){g=group;fs=document.createElement('fieldset');const lg=document.createElement('legend');lg.textContent=t(g);fs.appendChild(lg);f.appendChild(fs)}
+   const l=document.createElement('label'),i=document.createElement('input');l.textContent=LANG=='fr'&&FR_SET[k]||label;i.id='k_'+k;l.htmlFor=i.id;
+   if(type=='bool'){i.type='checkbox';i.checked=data.values[k]}
+   else{
+    i.type=type=='secret'?'password':type=='text'?'text':'number';i.value=data.values[k]??'';
+    if(type=='number'||type=='decimal'){
+     i.required=true;i.step=type=='decimal'?'any':'1';i.min=limits?.min??0;
+     if(limits?.max!=null)i.max=limits.max;
+    }
+    if(k==='pool'||k==='addr')i.required=true;
+   }
+   i.addEventListener('input',()=>i.setCustomValidity(''));fs.append(l,i);
+  }
+  S=data;$('msg').textContent='';
+ }catch(e){$('msg').textContent=errorText(e);$('retry').hidden=false}
+ finally{busy=false;sync()}
+}
+function values(){
+ const v={};
+ for(const[k,type]of S.schema){
+  const i=$('k_'+k);v[k]=type=='bool'?i.checked:type=='number'||type=='decimal'?Number(i.value):i.value;
+  if((k==='pool'||k==='addr')&&!v[k].trim())i.setCustomValidity(t('Enter a valid value.'));
+  if(type==='decimal'&&!(v[k]>0))i.setCustomValidity(t('The difficulty must be greater than zero.'));
+  if(k==='maxtemp'&&v[k]>0&&v[k]<30)i.setCustomValidity(t('The temperature must be 0 or at least 30 °C.'));
+  if((k==='nightfrom'||k==='nightto')&&v[k]>23&&v[k]!==255)i.setCustomValidity(t('The hour must be 0–23 or 255 to disable night mode.'));
+ }
+ return v;
+}
+async function saveSettings(event){
+ if(event)event.preventDefault();if(busy||restarting||!S)return;
+ const v=values();if(!$('f').reportValidity())return;
+ busy=true;sync();
+ try{await request('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},'text');restarting=true;$('msg').textContent=t('Saved, restarting… reload in 15 s')}
+ catch(e){$('msg').textContent=errorText(e)}finally{busy=false;sync()}
+}
+async function imp(input){
+ const file=input.files[0];if(!file||busy||restarting)return;
+ busy=true;sync();
+ try{
+  const raw=await file.text();let parsed;
+  try{parsed=JSON.parse(raw)}catch(e){throw Error(t('Not a backup file'))}
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error(t('Not a backup file'));
+  if(!confirm(t('Restore this backup? The miner restarts afterwards.')))return;
+  // Send original text: parsing/stringifying would round uint64 hash totals.
+  await request('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:raw},'text');
+  restarting=true;$('msg').textContent=t('Backup restored. The miner is restarting…');
+ }catch(e){$('msg').textContent=errorText(e)}finally{input.value='';busy=false;sync()}
+}
+async function uploadFirmware(){
+ if(busy||restarting||!S)return;
+ const file=$('fw').files[0];if(!file){$('up').textContent=t('Select a firmware file first.');return}
+ busy=true;sync();
+ try{
+  if(!/\.bin$/i.test(file.name)||/factory(?:\.bin)?$/i.test(file.name))throw Error(t('Use a firmware .bin file, not a factory image.'));
+  if(!file.size||new Uint8Array(await file.slice(0,1).arrayBuffer())[0]!==0xE9)throw Error(t('Invalid firmware file.'));
+  const x=new XMLHttpRequest(),data=new FormData();data.append('firmware',file);
+  x.upload.onprogress=e=>{if(e.lengthComputable)$('up').textContent=e.loaded===e.total?t('Upload complete. Validating firmware…'):Math.round(e.loaded*100/e.total)+' %'};
+  const finish=message=>{$('up').textContent=message;busy=false;sync()};
+  x.onload=()=>{
+   if(x.status>=200&&x.status<300){restarting=true;finish(t('Firmware updated. The miner is restarting…'))}
+   else finish(x.status===401?t('Authentication required. Reload this page and sign in.'):t(x.responseText)||t('Upload failed'));
+  };
+  x.onerror=()=>finish(t('Upload failed'));x.ontimeout=()=>finish(t('Upload timed out. Please try again.'));x.onabort=()=>finish(t('Upload cancelled.'));
+  x.open('POST','/update');x.timeout=120000;x.send(data);
+ }catch(e){$('up').textContent=errorText(e);busy=false;sync()}
+}
 load();
 </script>)HTML";
 
 const char kLogPage[] PROGMEM = R"HTML(<pre id="l">…</pre><footer data-t="Refreshes every 5 s. Times are since the last start.">Refreshes every 5 s. Times are since the last start.</footer>
-<script>async function r(){try{const x=await fetch('/api/log');document.getElementById('l').textContent=await x.text()}catch(e){}}r();setInterval(r,5000)</script>)HTML";
+<p id="log-status" class="box s" role="status" aria-live="polite"></p>
+<script>
+async function refreshLog(){
+ try{document.getElementById('l').textContent=await request('/api/log',{},'text');document.getElementById('log-status').textContent=''}
+ catch(e){document.getElementById('log-status').textContent=t('Could not refresh the log.')+' '+errorText(e)}
+ finally{setTimeout(refreshLog,5000)}
+}
+refreshLog();
+</script>)HTML";
 
 void sendPage(const char *title, const char *body) {
+    server.sendHeader("Cache-Control", "no-store");
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "text/html", "");
     server.sendContent(String("<!doctype html><html lang=\"en\"><head><title>") + title + "</title>");
@@ -377,7 +554,7 @@ void settingValues(JsonObject values) {
     }
 }
 
-// Applies the known keys of `values` and saves them; returns how many there were.
+// Stage, normalize and save known keys; -1 means a required field became empty.
 int applySettings(JsonObjectConst values) {
     // Network tasks keep using immutable live strings until the reboot.
     Settings pending = settings;
@@ -385,6 +562,7 @@ int applySettings(JsonObjectConst values) {
     int changed = settingsApply(pending, values);
     if (changed) {
         settingsSanitize(pending);
+        if (pending.poolHost.isEmpty() || pending.btcAddress.isEmpty()) return -1;
         settingsSave(pending, true);
     }
     return changed;
@@ -402,6 +580,12 @@ void handleGetSettings() {
         row.add(kTypes[(int)s.type]);
         row.add(s.group);
         row.add(s.label);
+        JsonObject limits = row.add<JsonObject>();
+        if (s.type == SettingType::Number) {
+            SettingLimits range = settingLimits(s);
+            limits["min"] = range.minimum;
+            limits["max"] = range.maximum;
+        } else if (s.type == SettingType::Decimal) limits["min"] = 0;
     }
     settingValues(j["values"].to<JsonObject>());
     String body;
@@ -414,8 +598,8 @@ void handleGetSettings() {
 // which applies everything the same way as at boot.
 void handlePostSettings() {
     if (!authorized()) return;
-    if (restartAt) {
-        server.send(409, "text/plain", "Restart pending; reload after the restart");
+    if (restartAt || ota::busy()) {
+        server.send(409, "text/plain", "Firmware update or restart pending; try again afterwards");
         return;
     }
     JsonDocument j;
@@ -423,7 +607,19 @@ void handlePostSettings() {
         server.send(400, "text/plain", "Not a settings object");
         return;
     }
+    if (const char *error = settingsError(j.as<JsonObjectConst>())) {
+        server.send(400, "text/plain", error);
+        return;
+    }
     int changed = applySettings(j.as<JsonObjectConst>());
+    if (changed < 0) {
+        server.send(400, "text/plain", "Pool host and payout address cannot be empty");
+        return;
+    }
+    if (!changed) {
+        server.send(400, "text/plain", "No settings to save");
+        return;
+    }
     logf("[web] %d settings saved, restarting\n", changed);
     server.send(200, "text/plain", "Saved, restarting");
     restartSoon("settings changed from the web page");
@@ -467,8 +663,8 @@ void handleGetBackup() {
 // of an earlier version); restores what it holds, then restarts.
 void handlePostBackup() {
     if (!authorized()) return;
-    if (restartAt) {
-        server.send(409, "text/plain", "Restart pending; reload after the restart");
+    if (restartAt || ota::busy()) {
+        server.send(409, "text/plain", "Firmware update or restart pending; try again afterwards");
         return;
     }
     JsonDocument j;
@@ -481,7 +677,16 @@ void handlePostBackup() {
         return;
     }
     bool full = j["bdlminer_backup"].is<unsigned>();
-    int settingsCount = applySettings(full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>());
+    JsonObjectConst values = full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>();
+    if (const char *error = settingsError(values)) {
+        server.send(400, "text/plain", error);
+        return;
+    }
+    int settingsCount = applySettings(values);
+    if (settingsCount < 0) {
+        server.send(400, "text/plain", "Pool host and payout address cannot be empty");
+        return;
+    }
     JsonObjectConst st = j["stats"];
     bool withStats = full && !st.isNull();
     if (withStats) {
@@ -508,81 +713,111 @@ void handlePostBackup() {
     restartSoon("backup restored from the web page");
 }
 
-// POST /update (multipart): a firmware.bin built for this board.
-bool updateAllowed = false;
-bool updateBusy = false, updateSuccess = false;
+// POST /update (multipart): one firmware.bin built for this board.
+bool uploadStarted = false, uploadComplete = false;
+bool updateAllowed = false, updateBusy = false, uploadRejected = false;
 String uploadError;
+
+void resetUpload() {
+    uploadStarted = uploadComplete = updateAllowed = updateBusy = uploadRejected = false;
+    uploadError = "";
+}
+
+void abortWebUpload() {
+    if (uploadStarted && updateAllowed && !restartAt && ota::owns(ota::Owner::Web)) {
+        if (Update.isRunning()) Update.abort();
+        ota::release(ota::Owner::Web);
+    }
+}
+
+void uploadFailure(int status, const String &message) {
+    abortWebUpload();
+    server.send(status, "text/plain", message);
+    resetUpload();
+}
 
 void handleUpload() {
     HTTPUpload &up = server.upload();
-    // Even a continuously supplied (or unauthorized) upload must leave CPU
-    // time for the idle task; accepted OTA already pauses the miners.
     if (up.status == UPLOAD_FILE_WRITE) vTaskDelay(1);
+    if (up.status == UPLOAD_FILE_ABORTED) {
+        abortWebUpload();
+        resetUpload();
+        return;
+    }
     if (up.status == UPLOAD_FILE_START) {
-        if (ota::owns(ota::Owner::Web) && !restartAt) {
-            // One file per request. Never attach another part to this session.
-            if (Update.isRunning()) Update.abort();
-            ota::release(ota::Owner::Web);
-            updateSuccess = false;
+        if (uploadStarted) {
+            uploadRejected = true;
+            uploadComplete = false;
             uploadError = "Only one firmware file is allowed";
+            abortWebUpload();
             return;
         }
-        updateBusy = updateSuccess = false;
-        uploadError = "";
+        resetUpload();
+        uploadStarted = true;
         updateAllowed = !settings.webPassword.isEmpty() && server.authenticate("admin", settings.webPassword.c_str());
         if (!updateAllowed) return;
-        if (restartAt || !ota::acquire(ota::Owner::Web)) {
-            updateBusy = true;
-            updateAllowed = false;
+        if (restartAt) { updateBusy = true; return; }
+        String name = up.filename;
+        name.toLowerCase();
+        if (!name.endsWith(".bin") || name.endsWith("factory.bin")) {
+            uploadRejected = true;
+            uploadError = "Use a firmware .bin file, not a factory image";
             return;
         }
+        if (!ota::acquire(ota::Owner::Web)) { updateBusy = true; return; }
         logf("[web] firmware update: %s\n", up.filename.c_str());
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             uploadError = Update.errorString();
             ota::release(ota::Owner::Web);
         }
-    } else if (!updateAllowed) {
         return;
-    } else if (!ota::owns(ota::Owner::Web)) {
-        return;
-    } else if (up.status == UPLOAD_FILE_WRITE) {
+    }
+    if (!updateAllowed || updateBusy || uploadRejected || !ota::owns(ota::Owner::Web)) return;
+    if (up.status == UPLOAD_FILE_WRITE) {
         if (Update.write(up.buf, up.currentSize) != up.currentSize) {
             uploadError = Update.errorString();
-            Update.abort();
-            ota::release(ota::Owner::Web);
+            abortWebUpload();
         }
     } else if (up.status == UPLOAD_FILE_END) {
-        updateSuccess = Update.end(true);
-        if (updateSuccess) logf("[web] update: %u bytes written\n", (unsigned)up.totalSize);
-        else {
-            uploadError = Update.errorString();
-            Update.abort();
-            ota::release(ota::Owner::Web);
+        if (!up.totalSize) {
+            uploadRejected = true;
+            uploadError = "Empty firmware file";
+            abortWebUpload();
+        } else {
+            // Activate the new image only after the entire multipart request
+            // is parsed and authenticated. A later part or abort can still fail.
+            uploadComplete = true;
         }
-    } else if (up.status == UPLOAD_FILE_ABORTED) {
-        Update.abort();
-        uploadError = "Upload aborted";
-        ota::release(ota::Owner::Web);
     }
 }
 
 void handleUpdateDone() {
-    if (updateBusy) {
-        server.send(409, "text/plain", "Another firmware update is already running");
+    // Authenticate this request even if it has no multipart callbacks. Never
+    // reuse authorization or success flags from an earlier upload.
+    if (!authorized()) { abortWebUpload(); resetUpload(); return; }
+    if (restartAt || updateBusy) {
+        uploadFailure(409, "Another firmware update or restart is already pending");
         return;
     }
-    if (!updateAllowed) {
-        authorized();  // sends the right refusal
+    if (!uploadStarted) { uploadFailure(400, "No firmware file uploaded"); return; }
+    if (uploadRejected) { uploadFailure(400, uploadError); return; }
+    if (!uploadComplete || !uploadError.isEmpty() || !ota::owns(ota::Owner::Web)) {
+        String why = uploadError.isEmpty() ? String("Incomplete firmware upload") : uploadError;
+        uploadFailure(500, String("Update failed: ") + why);
         return;
     }
-    if (!updateSuccess) {
-        server.send(500, "text/plain",
-                    String("Update failed: ") + uploadError +
-                        " (boards whose firmware does not fit twice in flash can only be updated by USB)");
+    if (!Update.end(true)) {
+        String why = Update.errorString();
+        uploadFailure(500, String("Update failed: ") + why +
+                          " (this board may require a USB update)");
         return;
     }
+    logf("[web] firmware validated, restarting\n");
+    resetUpload();
     server.send(200, "text/plain", "Firmware updated, restarting… reload in 20 s");
     restartSoon("firmware updated from the web page");
+    // Keep OTA ownership until restart so neither miners nor another updater
+    // can modify the newly selected image in the response/reboot interval.
 }
 
 // Prometheus text format, for Grafana / Home Assistant scrapers.

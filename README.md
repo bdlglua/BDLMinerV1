@@ -452,6 +452,20 @@ python3 -m unittest discover -s test/tools -v  # offline release/usage-report re
 ./test/host/run.sh pool public-pool.io 21496 <address> 900   # real pool, stops at the 1st share
 ```
 
+Browser regressions exercise the actual HTML and scripts embedded in `src/web.cpp`
+against simulated miner APIs, including slow responses, invalid settings, peers,
+backup precision, firmware uploads and mobile layout:
+
+```sh
+npm ci --prefix test/web
+test/web/node_modules/.bin/playwright install chromium
+npm test --prefix test/web
+```
+
+Use `BDL_CHROMIUM_PATH` to select an existing Chromium executable. These tests do
+not connect to a physical miner; the host tests also execute the production upload
+callbacks with simulated flash/HTTP interfaces.
+
 ## Credits
 
 * The screen design (full-screen bitmap backgrounds with values painted on top) is
