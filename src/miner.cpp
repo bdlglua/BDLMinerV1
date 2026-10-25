@@ -43,8 +43,13 @@ SemaphoreHandle_t jobMutex;
 work::Job board;
 volatile bool boardValid = false;
 volatile uint32_t boardSeq = 0;
+volatile uint32_t workGeneration = 0;  // changes only when earlier jobs become invalid
 uint64_t extranonce2Counter = 0;
 
+struct QueuedShare {
+    stratum::Share share;
+    uint32_t generation;
+};
 QueueHandle_t shareQueue;
 portMUX_TYPE statsMux = portMUX_INITIALIZER_UNLOCKED;
 bool bestDirty = false;
@@ -81,16 +86,20 @@ int historyLen = 0, historyHead = 0;
 uint64_t historyHashes = 0;
 uint32_t historyMs = 0;
 
+struct MiningWork : work::Work {
+    uint32_t generation;
+};
+
 struct Miner {
     uint8_t index;
     bool hardware;
     bool ownsCore;  // alone on its core at kHwMinerPriority
-    work::Work work;
+    MiningWork work;
     hwsha::Job hwJob;
     // Hardware miner on the original ESP32: a second work hashed in software
     // in the idle cycles of the hardware loop (hwsha::Fill).
     bool useFill;
-    work::Work work2;
+    MiningWork work2;
     hwsha::Fill fill;
 };
 
@@ -98,9 +107,9 @@ Miner miners[MAX_MINERS];
 int fillIndex = -1;  // stats.hashes slot of the idle-cycle hashing
 bool useAsm = false;  // sw_sha256d_prefilter() passed its self-test
 
-// `ctx` is the work::Work the nonce belongs to.
+// `ctx` is the MiningWork the nonce belongs to.
 void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
-    const work::Work &w = *(const work::Work *)ctx;
+    const MiningWork &w = *(const MiningWork *)ctx;
     double d = work::hashDifficulty(hash);
     uint32_t when = 0;
     if (d > top[TOP_SHARES - 1].difficulty) {  // a peek, checked again below
@@ -137,7 +146,8 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         s.ntime = w.ntime;
         s.nonce = nonce;
         s.difficulty = d;
-        if (xQueueSend(shareQueue, &s, 0) == pdTRUE) {
+        QueuedShare queued{s, w.generation};
+        if (xQueueSend(shareQueue, &queued, 0) == pdTRUE) {
             portENTER_CRITICAL(&statsMux);
             stats.sharesFound++;
             portEXIT_CRITICAL(&statsMux);
@@ -153,7 +163,11 @@ bool fetchWork(Miner &m, uint32_t &seq) {
     if (ok) {
         seq = boardSeq;
         work::build(board, extranonce2Counter++, m.work);
-        if (m.useFill) work::build(board, extranonce2Counter++, m.work2);
+        m.work.generation = workGeneration;
+        if (m.useFill) {
+            work::build(board, extranonce2Counter++, m.work2);
+            m.work2.generation = workGeneration;
+        }
     }
     xSemaphoreGive(jobMutex);
     if (ok && m.hardware) hwsha::prepare(m.hwJob, m.work.header);
@@ -291,6 +305,10 @@ void minerTask(void *arg) {
 
 void minerPublishJob(const work::Job &job, bool clean) {
     xSemaphoreTake(jobMutex, portMAX_DELAY);
+    if (clean) {
+        workGeneration++;
+        xQueueReset(shareQueue);
+    }
     board = job;
     boardValid = true;
     boardSeq++;
@@ -305,21 +323,34 @@ void minerPublishJob(const work::Job &job, bool clean) {
     }
     stats.networkDiff = work::difficultyFromBits(job.nbits);
     stats.poolDiff = job.difficulty;
-    if (clean) xQueueReset(shareQueue);  // shares for stale jobs would be rejected
 }
 
 void minerInvalidate() {
+    xSemaphoreTake(jobMutex, portMAX_DELAY);
     boardValid = false;
+    workGeneration++;
     xQueueReset(shareQueue);
+    xSemaphoreGive(jobMutex);
 }
 
 bool minerNextShare(stratum::Share &share, uint32_t waitMs) {
-    return xQueueReceive(shareQueue, &share, pdMS_TO_TICKS(waitMs)) == pdTRUE;
+    QueuedShare queued;
+    TickType_t wait = pdMS_TO_TICKS(waitMs);
+    while (xQueueReceive(shareQueue, &queued, wait) == pdTRUE) {
+        // A batch already running during a clean job or disconnect can enqueue
+        // its result after the queue reset. It must not reach the next session.
+        if (queued.generation == workGeneration && boardValid) {
+            share = queued.share;
+            return true;
+        }
+        wait = 0;
+    }
+    return false;
 }
 
 void minerStart() {
     jobMutex = xSemaphoreCreateMutex();
-    shareQueue = xQueueCreate(16, sizeof(stratum::Share));
+    shareQueue = xQueueCreate(16, sizeof(QueuedShare));
     stats.startMillis = millis();
 
     bool hw = hwsha::selfTest();
@@ -539,12 +570,12 @@ void minerLoadStats() {
 
 void minerStatsSnapshot(StatsSnapshot &out) {
     memset(&out, 0, sizeof(out));
-    out.bestDiff = stats.bestDiff;
     out.hashes = stats.lifetimeHashes;
     out.shares = stats.lifetimeShares;
     out.blocks = stats.lifetimeBlocks;
     out.seconds = stats.lifetimeSeconds;
     portENTER_CRITICAL(&statsMux);
+    out.bestDiff = stats.bestDiff;
     memcpy(out.top, top, sizeof(out.top));
     portEXIT_CRITICAL(&statsMux);
 }

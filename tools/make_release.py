@@ -91,6 +91,19 @@ def set_version(v):
     open(path, "w").write(new)
 
 
+def write_checksums(out):
+    """Include previous boards too when rebuilding only part of a release."""
+    sums = []
+    for name in sorted(os.listdir(out)):
+        if not name.endswith(("-factory.bin", "-firmware.bin")):
+            continue
+        with open(os.path.join(out, name), "rb") as image:
+            digest = hashlib.sha256(image.read()).hexdigest()
+        sums.append(f"{digest}  {name}")
+    with open(os.path.join(out, "SHA256SUMS.txt"), "w") as output:
+        output.write("\n".join(sums) + "\n")
+
+
 def main():
     args = sys.argv[1:]
     if args[:1] == ["--version"]:
@@ -99,7 +112,6 @@ def main():
     targets = args or envs()
     out = os.path.join(ROOT, "release", version())
     os.makedirs(out, exist_ok=True)
-    sums = []
     boards = {}
     key = signing_key()
     if not key:
@@ -115,19 +127,26 @@ def main():
             args += [offset, path]
         subprocess.run(args, check=True, capture_output=True)
         firmware = os.path.join(out, f"{env}-firmware.bin")
+        # A previous signed build may already exist in this release folder.
+        # Never leave its signature attached to the newly copied firmware.
+        if os.path.exists(firmware + ".sig"):
+            os.remove(firmware + ".sig")
         shutil.copyfile(images[-1][1], firmware)
         if key:
             sign(key, firmware)
         boards[env] = mcu
-        open(os.path.join(out, f"ping-{env}.txt"), "w").write("1\n")
-        for path in (factory, firmware):
-            sums.append(f"{hashlib.sha256(open(path, 'rb').read()).hexdigest()}  {os.path.basename(path)}")
+        with open(os.path.join(out, f"ping-{env}.txt"), "w") as ping:
+            ping.write("1\n")
         print(f"[{env}] {mcu}, {size} flash, {mode} {freq}: "
               f"{os.path.getsize(factory)} + {os.path.getsize(firmware)} bytes", flush=True)
-    open(os.path.join(out, "SHA256SUMS.txt"), "w").write("\n".join(sums) + "\n")
+    write_checksums(out)
     path = os.path.join(out, "boards.json")
-    old = json.load(open(path)) if os.path.exists(path) else {}
-    json.dump({**old, **boards}, open(path, "w"), indent=1)
+    old = {}
+    if os.path.exists(path):
+        with open(path) as previous:
+            old = json.load(previous)
+    with open(path, "w") as output:
+        json.dump({**old, **boards}, output, indent=1)
     print(f"written to {out}")
 
 

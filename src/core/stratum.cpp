@@ -1,6 +1,7 @@
 #include "stratum.h"
 
 #include <ArduinoJson.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +21,13 @@ std::string serialize(JsonDocument &doc) {
     return out;
 }
 
-uint32_t parseHex32(const char *s) { return s ? (uint32_t)strtoul(s, nullptr, 16) : 0; }
+bool parseHex32(JsonVariant value, uint32_t &out) {
+    const char *s = value.as<const char *>();
+    uint8_t bytes[4];
+    if (!s || !work::fromHex(s, bytes, sizeof(bytes))) return false;
+    out = (uint32_t)bytes[0] << 24 | (uint32_t)bytes[1] << 16 | (uint32_t)bytes[2] << 8 | bytes[3];
+    return true;
+}
 
 // extranonce2 sizes we can serialize (Share::extranonce2 holds 16 bytes).
 bool validExtranonce2Size(int n) { return n >= 1 && n <= 16; }
@@ -30,6 +37,9 @@ bool validExtranonce2Size(int n) { return n >= 1 && n <= 16; }
 // shares are never checked against a slightly-too-easy target.
 double readDifficulty(JsonVariant v) {
     double d = v | 0.0;
+    // Integer variants were never rounded to float; decimal rounding would
+    // corrupt exact values such as 16777216 into 16777220.
+    if (v.is<int64_t>() || v.is<uint64_t>()) return d;
     if ((double)(float)d == d) {
         char buf[24];
         snprintf(buf, sizeof(buf), "%.7g", d);
@@ -42,6 +52,9 @@ double readDifficulty(JsonVariant v) {
 
 void Protocol::reset() {
     job_ = work::Job();
+    extranonce1_.clear();
+    extranonce2Size_ = 4;
+    difficulty_ = 1.0;
     hasJob_ = false;
     authorized_ = false;
     nextId_ = 10;
@@ -96,6 +109,10 @@ std::string Protocol::submit(const Share &share) {
 }
 
 Event Protocol::handleLine(const char *line) {
+    auto invalid = [this](const char *message) {
+        lastError_ = message;
+        return Event::Error;
+    };
     JsonDocument doc;
     if (deserializeJson(doc, line)) {
         lastError_ = "bad json";
@@ -106,49 +123,61 @@ Event Protocol::handleLine(const char *line) {
     if (method) {
         JsonArray params = doc["params"];
         if (!strcmp(method, "mining.notify")) {
-            if (params.size() < 9) return Event::Error;
+            if (params.size() < 9 || !params[0].is<const char *>() ||
+                strlen(params[0].as<const char *>()) >= sizeof(Share::jobId) ||
+                !params[1].is<const char *>() || !params[2].is<const char *>() ||
+                !params[3].is<const char *>() || !params[4].is<JsonArray>() || !params[8].is<bool>())
+                return invalid("invalid job parameters");
             work::Job j;
-            j.id = params[0] | "";
+            j.id = params[0].as<const char *>();
 
             // prevhash: eight 32-bit words, each byte-swapped vs header order.
             uint8_t prev[32];
-            if (!work::fromHex(params[1] | "", prev, 32)) return Event::Error;
+            if (!work::fromHex(params[1], prev, 32)) return invalid("invalid previous block hash");
             for (int w = 0; w < 8; w++)
                 for (int b = 0; b < 4; b++) j.prevHash[4 * w + b] = prev[4 * w + 3 - b];
 
-            if (!work::fromHex(params[2] | "", j.coinb1)) return Event::Error;
-            if (!work::fromHex(params[3] | "", j.coinb2)) return Event::Error;
+            if (!work::fromHex(params[2], j.coinb1) || !work::fromHex(params[3], j.coinb2))
+                return invalid("invalid coinbase hex");
             for (JsonVariant br : params[4].as<JsonArray>()) {
                 std::vector<uint8_t> b;
-                if (!work::fromHex(br | "", b) || b.size() != 32) return Event::Error;
+                if (!br.is<const char *>() || !work::fromHex(br, b) || b.size() != 32)
+                    return invalid("invalid merkle branch");
                 j.branches.push_back(b);
             }
-            j.version = parseHex32(params[5]);
-            j.nbits = parseHex32(params[6]);
-            j.ntime = parseHex32(params[7]);
-            j.clean = params[8] | false;
+            if (!parseHex32(params[5], j.version) || !parseHex32(params[6], j.nbits) ||
+                !parseHex32(params[7], j.ntime))
+                return invalid("invalid block header hex");
+            j.clean = params[8].as<bool>();
 
-            j.extranonce1 = job_.extranonce1;
-            j.extranonce2Size = job_.extranonce2Size;
-            j.difficulty = job_.difficulty;
+            j.extranonce1 = extranonce1_;
+            j.extranonce2Size = extranonce2Size_;
+            j.difficulty = difficulty_;
             job_ = std::move(j);
             hasJob_ = true;
             return Event::NewJob;
         }
         if (!strcmp(method, "mining.set_difficulty")) {
+            if (!params[0].is<double>()) return invalid("invalid difficulty");
             double d = readDifficulty(params[0]);
-            if (d <= 0) return Event::None;
-            job_.difficulty = d;
+            if (!isfinite(d) || d <= 0) return invalid("invalid difficulty");
+            difficulty_ = d;
+            if (!hasJob_) job_.difficulty = d;
             return Event::Difficulty;
         }
         if (!strcmp(method, "mining.set_extranonce")) {
             std::vector<uint8_t> en1;
-            int size = params[1] | job_.extranonce2Size;
-            if (!validExtranonce2Size(size) || !work::fromHex(params[0] | "", en1)) return Event::Error;
-            job_.extranonce1 = en1;
-            job_.extranonce2Size = size;
-            // Before the first notify there is no job to restart yet.
-            return hasJob_ ? Event::NewJob : Event::None;
+            int size = params[1] | 0;
+            if (!params[0].is<const char *>() || !params[1].is<int>() || !validExtranonce2Size(size) ||
+                !work::fromHex(params[0], en1))
+                return invalid("invalid extranonce parameters");
+            extranonce1_ = std::move(en1);
+            extranonce2Size_ = size;
+            if (!hasJob_) {
+                job_.extranonce1 = extranonce1_;
+                job_.extranonce2Size = size;
+            }
+            return Event::None;
         }
         return Event::None;  // client.reconnect, client.show_message...
     }
@@ -172,11 +201,22 @@ Event Protocol::handleLine(const char *line) {
             else if (lastError_.empty()) lastError_ = "subscribe refused";
             return Event::SubscribeFailed;
         }
-        if (!work::fromHex(result[1] | "", job_.extranonce1)) return Event::Error;
-        job_.extranonce2Size = result[2] | 4;
-        if (!validExtranonce2Size(job_.extranonce2Size)) {
+        std::vector<uint8_t> en1;
+        if (!result[0].is<JsonArray>() || !result[1].is<const char *>() || !result[2].is<int>() ||
+            !work::fromHex(result[1], en1)) {
+            lastError_ = "invalid subscription parameters";
+            return Event::SubscribeFailed;
+        }
+        int size = result[2].as<int>();
+        if (!validExtranonce2Size(size)) {
             lastError_ = "unsupported extranonce2 size";
             return Event::SubscribeFailed;
+        }
+        extranonce1_ = std::move(en1);
+        extranonce2Size_ = size;
+        if (!hasJob_) {
+            job_.extranonce1 = extranonce1_;
+            job_.extranonce2Size = size;
         }
         return Event::Subscribed;
     }

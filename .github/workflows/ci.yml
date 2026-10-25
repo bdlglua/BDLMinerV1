@@ -23,6 +23,7 @@ jobs:
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-
       - run: pip install platformio
+      - run: python3 -m unittest discover -s test/tools -v
       - run: ./test/host/run.sh
 
   build:

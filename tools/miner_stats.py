@@ -16,11 +16,19 @@ The previous counts are kept in ~/.cache/bdlminer_stats.json.
 """
 import json
 import os
+import re
 import time
 import urllib.request
 
 REPO = "bdlglua/BDLMinerV1"
 STATE = os.path.expanduser("~/.cache/bdlminer_stats.json")
+
+
+def version_order(key):
+    """Keep version components separate from the textual tie-breaker."""
+    version = key.split()[0]
+    parts = tuple(int(x) for x in re.findall(r"\d+", version))
+    return parts, key
 
 
 def releases():
@@ -45,7 +53,8 @@ def main():
 
     previous = {}
     if os.path.exists(STATE):
-        previous = json.load(open(STATE))
+        with open(STATE) as saved:
+            previous = json.load(saved)
     now = time.time()
     days = (now - previous["time"]) / 86400 if previous else 0
 
@@ -54,7 +63,7 @@ def main():
     else:
         print(f"{'version':10} {'board':22} {'miner-days':>10} {'active':>8}")
         total_active = 0.0
-        for key in sorted(counts, key=lambda k: [int(x) for x in k.split()[0].split(".")] + [k], reverse=True):
+        for key in sorted(counts, key=version_order, reverse=True):
             version, board = key.split()
             active = ""
             if days > 0:
@@ -68,7 +77,8 @@ def main():
             print("\nrun again in a day or more to see how many miners are active")
 
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
-    json.dump({"time": now, "counts": counts}, open(STATE, "w"))
+    with open(STATE, "w") as saved:
+        json.dump({"time": now, "counts": counts}, saved)
 
 
 if __name__ == "__main__":

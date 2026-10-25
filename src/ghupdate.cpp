@@ -80,13 +80,16 @@ bool httpsGet(String url, WiFiClientSecure &tls, HTTPClient &http, int *code) {
         if (!url.startsWith("https://")) return false;
         int slash = url.indexOf('/', 8);
         String host = url.substring(8, slash < 0 ? url.length() : slash);
-        tls.stop();
-        if (!tlsConnect(tls, host.c_str())) return false;
         http.end();
+        tls.stop();
         http.setReuse(false);
         http.setTimeout(15000);
         http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         if (!http.begin(tls, url)) return false;
+        // begin() may close the client when its host changes, including on
+        // the first request. Connect afterwards so GET() reuses the guarded
+        // handshake instead of starting another one with the miner running.
+        if (!tlsConnect(tls, host.c_str())) return false;
         http.setUserAgent("BDLMinerV1/" FW_VERSION);
         http.addHeader("Accept", "application/vnd.github+json");
         http.collectHeaders(kHeaders, 1);

@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <ArduinoJson.h>
+
 #include <algorithm>
 #include <chrono>
 #include <fstream>
@@ -356,8 +358,104 @@ static void testStratumRobustness() {
     const char *notify =
         R"({"params":[12,"ab02cd818b9e567ee21793cddef299feb29ad444a41b85b8000008a300000000",)"
         R"("01000000","00000000",[],"00000001","1a44b9f2","4dd7f5c7",true],"id":null,"method":"mining.notify"})";
-    CHECK(p.handleLine(notify) == stratum::Event::NewJob);
-    CHECK(p.job().id.empty());
+    CHECK(p.handleLine(notify) == stratum::Event::Error);
+    CHECK(!p.hasJob());
+}
+
+static const char *kNotify =
+    R"({"method":"mining.notify","params":["job-a",)"
+    R"("ab02cd818b9e567ee21793cddef299feb29ad444a41b85b8000008a300000000",)"
+    R"("01000000","00000000",[],"00000001","1a44b9f2","4dd7f5c7",true]})";
+
+static void testStratumValidation() {
+    stratum::Protocol p;
+    CHECK(p.handleLine(R"({"id":1,"result":[[],"aabb",4],"error":null})") == stratum::Event::Subscribed);
+
+    // A broken subscribe response must not erase or partly change the session.
+    const char *badSubscriptions[] = {
+        R"({"id":1,"result":[],"error":null})",
+        R"({"id":1,"result":[[],null,4],"error":null})",
+        R"({"id":1,"result":[[],"ccdd"],"error":null})",
+        R"({"id":1,"result":[[],"ccdd",64],"error":null})",
+        R"({"id":1,"result":[[],"11zz",4],"error":null})",
+    };
+    for (const char *line : badSubscriptions) {
+        CHECK(p.handleLine(line) == stratum::Event::SubscribeFailed);
+        CHECK(work::toHex(p.job().extranonce1.data(), p.job().extranonce1.size()) == "aabb");
+        CHECK(p.job().extranonce2Size == 4);
+        CHECK(!p.lastError().empty());
+    }
+
+    CHECK(p.handleLine(kNotify) == stratum::Event::NewJob);
+    work::Work original;
+    work::build(p.job(), 7, original);
+    struct BadField { int index; const char *json; } badFields[] = {
+        {0, "12"}, {0, "null"},
+        {0, R"("0123456789012345678901234567890123456789012345678901234567890123456789")"},
+        {1, R"("00")"}, {2, "null"}, {3, "false"},
+        {4, "null"}, {4, "{}"}, {4, R"(["11"])"},
+        {5, R"("0000000z")"}, {5, R"("100000000")"}, {5, "1"},
+        {6, R"("1a44b9f2junk")"}, {6, "null"},
+        {7, R"("-0000001")"}, {7, R"("4dd7f5c")"}, {8, R"("false")"},
+    };
+    for (const auto &bad : badFields) {
+        JsonDocument notify, value;
+        CHECK(!deserializeJson(notify, kNotify));
+        CHECK(!deserializeJson(value, bad.json));
+        notify["params"][bad.index].set(value.as<JsonVariant>());
+        std::string line;
+        serializeJson(notify, line);
+        CHECK(p.handleLine(line.c_str()) == stratum::Event::Error);
+        CHECK(p.hasJob());
+        CHECK(p.job().id == "job-a");
+        CHECK(!p.lastError().empty());
+        work::Work current;
+        work::build(p.job(), 7, current);
+        CHECK(memcmp(original.header, current.header, sizeof(original.header)) == 0);
+    }
+}
+
+static void testStratumSessionUpdates() {
+    stratum::Protocol p;
+    CHECK(p.handleLine(R"({"id":1,"result":[[],"aabb",4],"error":null})") == stratum::Event::Subscribed);
+    CHECK(p.handleLine(kNotify) == stratum::Event::NewJob);
+    CHECK(p.job().difficulty == 1);
+    work::Work original;
+    work::build(p.job(), 7, original);
+
+    // Session updates take effect at the next notify, including when the
+    // current job is clean. They must not rebuild the old job with new data.
+    CHECK(p.handleLine(R"({"method":"mining.set_difficulty","params":[0.0005]})") == stratum::Event::Difficulty);
+    CHECK(p.difficulty() == 0.0005);
+    CHECK(p.job().difficulty == 1);
+    CHECK(p.handleLine(R"({"method":"mining.set_extranonce","params":["ccdd",8]})") == stratum::Event::None);
+    CHECK(p.job().extranonce2Size == 4);
+    work::Work current;
+    work::build(p.job(), 7, current);
+    CHECK(memcmp(original.header, current.header, sizeof(original.header)) == 0);
+
+    CHECK(p.handleLine(R"({"method":"mining.set_difficulty","params":[1e999]})") == stratum::Event::Error);
+    CHECK(p.handleLine(R"({"method":"mining.set_extranonce","params":[null,4]})") == stratum::Event::Error);
+    CHECK(p.handleLine(R"({"method":"mining.set_extranonce","params":["1122"]})") == stratum::Event::Error);
+    CHECK(p.handleLine(kNotify) == stratum::Event::NewJob);
+    CHECK(p.job().difficulty == 0.0005);
+    CHECK(p.job().extranonce2Size == 8);
+    CHECK(work::toHex(p.job().extranonce1.data(), p.job().extranonce1.size()) == "ccdd");
+
+    p.reset();
+    CHECK(!p.hasJob());
+    CHECK(p.handleLine(kNotify) == stratum::Event::NewJob);
+    CHECK(p.job().difficulty == 1);
+    CHECK(p.job().extranonce2Size == 4);
+    CHECK(p.job().extranonce1.empty());
+
+    // Exact integer difficulties must not be rounded to seven digits by
+    // the workaround for ArduinoJson's compact floating-point storage.
+    CHECK(p.handleLine(R"({"method":"mining.set_difficulty","params":[16777216]})") == stratum::Event::Difficulty);
+    CHECK(p.difficulty() == 16777216);
+    CHECK(p.job().difficulty == 1);
+    CHECK(p.handleLine(kNotify) == stratum::Event::NewJob);
+    CHECK(p.job().difficulty == 16777216);
 }
 
 static void testStratumJob() {
@@ -459,6 +557,8 @@ int main() {
     testHwFill();
     testSubscribeRefused();
     testStratumRobustness();
+    testStratumValidation();
+    testStratumSessionUpdates();
     testStratumJob();
     testAddress();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);

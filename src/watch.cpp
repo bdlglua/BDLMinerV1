@@ -19,7 +19,8 @@ constexpr uint32_t kBestNotifyMs = 10 * 60 * 1000;   // at most one record notif
 
 bool night = false;
 bool hot = false;
-uint32_t wakeUntil = 0;  // night mode suspended until then (button press)
+bool awake = false;
+uint32_t wakeStarted = 0;  // night mode suspended for 30 s after a button press
 
 void restart(const char *why) {
     logf("[watch] restarting: %s\n", why);
@@ -60,7 +61,8 @@ void throttle() {
     minerSetThrottle(hot ? Throttle::Paused : saver ? Throttle::Half : Throttle::Full);
 
     uint8_t b = settings.brightness;
-    if (night && (int32_t)(millis() - wakeUntil) >= 0) b = 0;
+    if (awake && millis() - wakeStarted >= 30000) awake = false;
+    if (night && !awake) b = 0;
     else if (saver && b > 20) b = 20;
     ui::setBacklight(b);
 }
@@ -169,4 +171,7 @@ void watchTick() {
 
 bool watchNight() { return night; }
 
-void watchWake() { wakeUntil = millis() + 30000; }
+void watchWake() {
+    wakeStarted = millis();
+    awake = true;
+}

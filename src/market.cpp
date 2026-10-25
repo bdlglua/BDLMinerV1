@@ -33,14 +33,16 @@ portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 // body through `filter` (keeps RAM low: large arrays such as the mempool fee
 // histogram are skipped). The bodies are a few hundred bytes.
 bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocument &doc, const JsonDocument &filter) {
-    if (!tls.connected() && !tlsConnect(tls, kHost)) {
-        logf("[market] %s: cannot connect\n", path);
-        return false;
-    }
-
     String url = String(kApi) + path;
     if (!http.begin(tls, url)) {
         tls.stop();
+        return false;
+    }
+    // begin() can close an existing socket when it initializes the host.
+    // Connect afterwards so every TLS handshake uses the miner-safe helper.
+    if (!tls.connected() && !tlsConnect(tls, kHost)) {
+        logf("[market] %s: cannot connect\n", path);
+        http.end();
         return false;
     }
     int code = http.GET();
@@ -49,7 +51,7 @@ bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocume
         // after the handshake, seen on mempool.space): one more go on a new one.
         http.end();
         tls.stop();
-        if (tlsConnect(tls, kHost) && http.begin(tls, url)) code = http.GET();
+        if (http.begin(tls, url) && tlsConnect(tls, kHost)) code = http.GET();
     }
     bool ok = false;
     if (code == HTTP_CODE_OK) {
@@ -174,10 +176,10 @@ double parseRate(const char *s) {
 // through `filter`. Returns the HTTP code (or a negative error).
 int fetchJson(const String &host, uint16_t port, const String &path, JsonDocument &doc, const JsonDocument &filter) {
     WiFiClientSecure tls;
-    if (!tlsConnect(tls, host.c_str(), port)) return -1;
     HTTPClient http;
     http.setTimeout(10000);
     if (!http.begin(tls, "https://" + host + ":" + port + path)) return -2;
+    if (!tlsConnect(tls, host.c_str(), port)) return -1;
     int code = http.GET();
     if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter)))
         code = -3;

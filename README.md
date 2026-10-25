@@ -134,7 +134,8 @@ Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio`).
 ```sh
 pio run -e m5stickc-plus2 -t upload -t monitor   # M5StickC Plus2
 pio run -e esp32-headless -t upload -t monitor   # any ESP32
-pio run                                          # build all boards
+pio run                                        # build the default M5StickC Plus2
+pio run -e esp32-headless                       # build another board without flashing
 ```
 
 ### Headless boards
@@ -282,7 +283,9 @@ the serial monitor):
   included: keep it private) and the lifetime statistics (best difficulty, the 10 best
   shares, hashes, shares, blocks, running time); *Restore a backup* puts them back, on
   this miner after a factory reset or on another one (settings-only files of earlier
-  versions are accepted too). Also at `/api/backup` (GET / POST). **Firmware update**
+  versions are accepted too). Unsupported backup versions and incomplete or invalid
+  statistics are rejected before anything is restored. Also at `/api/backup`
+  (GET / POST). **Firmware update**
   takes the `firmware.bin` of this board (`.pio/build/<env>/firmware.bin`): no cable
   needed. Boards whose firmware does not fit twice in flash (M5Stack Core,
   ESP32-2432S028R CYD) can only be updated by USB.
@@ -414,11 +417,13 @@ test/host/         PC tests: ./test/host/run.sh  and  ./test/host/run.sh pool
 ```
 
 PC tests (check SHA‑256d against the genesis block, header assembly, the protocol,
-address validation, and the software hash of `src/hw_sha_fill.S`, whose instructions
+address and backup validation, stale-share filtering after reconnects, and the
+software hash of `src/hw_sha_fill.S`, whose instructions
 are run by a small interpreter and compared with the reference kernel):
 
 ```sh
 ./test/host/run.sh                       # offline unit tests
+python3 -m unittest discover -s test/tools -v  # offline release/usage-report regressions
 ./test/host/run.sh pool public-pool.io 21496 <address> 900   # real pool, stops at the 1st share
 ```
 

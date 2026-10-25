@@ -15,6 +15,7 @@
 #include "net.h"
 #include "settings.h"
 #include "watch.h"
+#include "web_validation.h"
 
 namespace {
 
@@ -477,7 +478,11 @@ void handlePostBackup() {
         server.send(400, "text/plain", "Not a backup file");
         return;
     }
-    bool full = !j["bdlminer_backup"].isNull();
+    if (const char *error = webvalidation::backupError(j.as<JsonObjectConst>(), TOP_SHARES)) {
+        server.send(400, "text/plain", error);
+        return;
+    }
+    bool full = j["bdlminer_backup"].is<unsigned>();
     int settingsCount = applySettings(full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>());
     JsonObjectConst st = j["stats"];
     bool withStats = full && !st.isNull();
@@ -548,7 +553,11 @@ void handleMetrics() {
     out.reserve(1536);
     auto metric = [&out](const char *name, const char *type, double value, const char *labels = "") {
         char line[160];
-        snprintf(line, sizeof(line), "# TYPE %s %s\n%s%s %.17g\n", name, type, name, labels, value);
+        if (type) {
+            snprintf(line, sizeof(line), "# TYPE %s %s\n", name, type);
+            out += line;
+        }
+        snprintf(line, sizeof(line), "%s%s %.17g\n", name, labels, value);
         out += line;
     };
     metric("bdlminer_hashrate_hps", "gauge", minerHashrate());
@@ -574,8 +583,10 @@ void handleMetrics() {
     metric("bdlminer_free_heap_bytes", "gauge", ESP.getFreeHeap());
     for (int i = 0; i < stats.minerCount; i++) {
         char labels[40];
-        snprintf(labels, sizeof(labels), "{engine=\"%s\"}", stats.engine[i]);
-        metric("bdlminer_engine_hashrate_hps", "gauge", minerEngineRate(i), labels);
+        // Software fallback can run two engines with the same name.
+        snprintf(labels, sizeof(labels), "{engine=\"%s\",index=\"%d\"}", stats.engine[i], i);
+        // A metric family has one TYPE line, even with several engines.
+        metric("bdlminer_engine_hashrate_hps", i == 0 ? "gauge" : nullptr, minerEngineRate(i), labels);
     }
     char labels[96];
     snprintf(labels, sizeof(labels), "{board=\"%s\",firmware=\"%s\"}", board::modelName(), FW_VERSION);

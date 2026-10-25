@@ -67,9 +67,9 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                 buf.clear();
                 switch (ev) {
                     case stratum::Event::Subscribed:
-                        if (settings.suggestedDifficulty > 0)
-                            sendLine(client, proto.suggestDifficulty(settings.suggestedDifficulty));
-                        sendLine(client, proto.authorize());
+                        if (settings.suggestedDifficulty > 0 &&
+                            !sendLine(client, proto.suggestDifficulty(settings.suggestedDifficulty))) return;
+                        if (!sendLine(client, proto.authorize())) return;
                         break;
                     case stratum::Event::SubscribeFailed:
                         setStatus("Subscribe refused");
@@ -96,9 +96,8 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                              proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
                         break;
                     case stratum::Event::Difficulty:
-                        stats.poolDiff = proto.job().difficulty;
-                        if (proto.hasJob()) minerPublishJob(proto.job(), false);
-                        logf("[pool] difficulty %g\n", proto.job().difficulty);
+                        stats.poolDiff = proto.difficulty();
+                        logf("[pool] difficulty %g\n", proto.difficulty());
                         break;
                     case stratum::Event::ShareAccepted:
                         stats.accepted++;
@@ -170,13 +169,13 @@ void netTask(void *) {
         snprintf(msg, sizeof(msg), "Connecting %s", netPoolHost().c_str());
         setStatus(msg);
         bool authorized = false;
+        sessionTimedOut = false;
         if (client.connect(netPoolHost().c_str(), netPoolPort(), 10000)) {
             client.setNoDelay(true);
             proto.reset();
             proto.setCredentials(settings.btcAddress.c_str(), settings.poolPassword.c_str());
             setStatus("Subscribing");
             uint32_t t0 = millis();
-            sessionTimedOut = false;
             session(client, proto, maxMs);
             client.stop();
             authorized = proto.authorized();

@@ -30,10 +30,10 @@ bool send(const Message &m) {
         host.remove(colon);
     }
     WiFiClientSecure tls;
-    if (!tlsConnect(tls, host.c_str(), port)) return false;
     HTTPClient http;
     http.setTimeout(10000);
     if (!http.begin(tls, "https://" + settings.ntfyServer + "/" + settings.ntfyTopic)) return false;
+    if (!tlsConnect(tls, host.c_str(), port)) return false;
     http.addHeader("Title", m.title);
     http.addHeader("Priority", String(m.priority));
     if (m.tags[0]) http.addHeader("Tags", m.tags);

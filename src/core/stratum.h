@@ -17,7 +17,7 @@ enum class Event {
     Authorized,
     AuthFailed,
     NewJob,          // job() changed; clean() tells if old work must be dropped
-    Difficulty,      // job().difficulty changed
+    Difficulty,      // difficulty() changed; applies to the next NewJob
     ShareAccepted,
     ShareRejected,
     Error,
@@ -46,11 +46,16 @@ public:
     const work::Job &job() const { return job_; }
     bool hasJob() const { return hasJob_; }
     bool authorized() const { return authorized_; }
+    double difficulty() const { return difficulty_; }
     const std::string &lastError() const { return lastError_; }
 
 private:
     std::string user_, password_;
     work::Job job_;
+    // Session updates apply to the next notify, not to work already issued.
+    std::vector<uint8_t> extranonce1_;
+    int extranonce2Size_ = 4;
+    double difficulty_ = 1.0;
     bool hasJob_ = false;
     bool authorized_ = false;
     uint32_t nextId_ = 10;
