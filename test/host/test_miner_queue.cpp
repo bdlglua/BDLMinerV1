@@ -2,12 +2,20 @@
 // callbacks reproduce a batch finishing after a job change or disconnect.
 #include <cassert>
 
+#define CONFIG_IDF_TARGET_ESP32 1
 #include "../../src/miner.cpp"
+
+int prefilterCalls = 0;
+extern "C" bool sw_sha256d_prefilter(const uint32_t *, const uint8_t *, const uint32_t *) {
+    ++prefilterCalls;
+    return false;
+}
 
 void logf(const char *, ...) {}
 namespace hwsha {
 void prepare(Job &, const uint8_t *) {}
 void prepareFill(Fill &, const uint8_t *) {}
+uint32_t nonceAt(uint32_t position) { return __builtin_bswap32(position); }
 }  // namespace hwsha
 
 int main() {
@@ -58,5 +66,57 @@ int main() {
     assert(minerNextShare(result, 0) && result.nonce == 8);
 
     puts("Miner queue: 7 checks passed");
+
+    // A late result belongs to its work's height, even after a clean notify.
+    job.coinb1.resize(46, 0);
+    job.coinb1[42] = 3;
+    job.coinb1[43] = 100;
+    minerPublishJob(job, true);
+    assert(fetchWork(miner, seq));
+    original = miner.work;
+    job.coinb1[43] = 101;
+    minerPublishJob(job, true);
+    onCandidate(9, hash, &original);
+    BlockBest blocks[BLOCK_BESTS];
+    assert(minerBlockBests(blocks, BLOCK_BESTS) == 2);
+    assert(blocks[0].height == 101 && blocks[0].best == 0);
+    assert(blocks[1].height == 100 && blocks[1].best > 0);
+    assert(!minerNextShare(result, 0));
+
+    // A known easy share outside the fixed 16-bit prefilter must reach C.
+    assert(fetchWork(miner, seq));
+    memset(miner.work.header, 0, sizeof(miner.work.header));
+    memset(miner.work.networkTarget, 0, sizeof(miner.work.networkTarget));
+    miner.work.shareDifficulty = 0.000001;
+    sha::prepare(miner.work.mid, miner.work.header);
+    useAsm = true;
+    softwareBatch(miner, 18678, 1, work::quickLimitFor(0.000001));
+    assert(prefilterCalls == 0);
+    assert(minerNextShare(result, 0) && result.nonce == 18678);
+    softwareBatch(miner, 18678, 1, 0xFFFF);
+    assert(prefilterCalls == 1 && !minerNextShare(result, 0));
+
+    // Uptime accumulates ticks instead of losing 49.7 days on wraparound.
+    testMillis = stats.startMillis = lastTickMs = 1000;
+    sessionMs = 0;
+    baseSeconds = 1234;
+    uint64_t elapsed = 0;
+    for (int i = 0; i < 3; ++i) {
+        testMillis += 0x70000000u;
+        elapsed += 0x70000000u;
+        minerTick();
+        assert(minerUptimeSeconds() == elapsed / 1000);
+        assert(minerStats().lifetimeSeconds == baseSeconds + elapsed / 1000);
+    }
+
+    minerSetPower(75);
+    assert(minerPowerPercent() == 75);
+    assert(ota::acquire(ota::Owner::Web));
+    assert(minerPowerPercent() == 0);
+    ota::release(ota::Owner::Web);
+    assert(minerPowerPercent() == 75);
+    testMillis += mining::kSafetyTimeoutMs + 1;
+    assert(minerPowerPercent() == 0);
+    puts("Miner records, easy shares, uptime wrap and safety integration: passed");
     delete shareQueue;
 }

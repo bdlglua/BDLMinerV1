@@ -1,4 +1,6 @@
 #include "board.h"
+#include <atomic>
+#include "core/mining_safety.h"
 
 #define LONG_PRESS_MS 5000
 
@@ -399,24 +401,37 @@ void beep() {
 #endif
 }
 
-static volatile float lastTemperature = NAN;
+static std::atomic<float> lastTemperature{NAN};
+static mining::Thermometer thermometer;
+static std::atomic<mining::TemperatureSource> temperatureSensor{mining::TemperatureSource::Unknown};
 
 void sampleTemperature() {
-    float t = NAN;
+    float imu = NAN, chip = NAN;
 #ifdef DISPLAY_M5UNIFIED
-    if (!M5.Imu.isEnabled() || !M5.Imu.getTemp(&t)) t = NAN;
+    if (thermometer.source != mining::TemperatureSource::Chip && M5.Imu.isEnabled()) {
+        if (!M5.Imu.getTemp(&imu)) imu = NAN;
+    }
 #endif
-    if (isnan(t)) {
-        t = temperatureRead();
+    if (thermometer.source != mining::TemperatureSource::Imu && !isfinite(imu)) {
+        chip = temperatureRead();
 #if CONFIG_IDF_TARGET_ESP32
         // The original ESP32's sensor is undocumented and missing on most
         // chips, which then always read a raw 128, i.e. 53.3 C.
-        if (fabsf(t - (128 - 32) / 1.8f) < 0.01f) t = NAN;
+        if (fabsf(chip - (128 - 32) / 1.8f) < 0.01f) chip = NAN;
 #endif
     }
-    lastTemperature = t;
+    lastTemperature = thermometer.sample(imu, chip);
+    temperatureSensor = thermometer.source;
 }
 
 float temperature() { return lastTemperature; }
+
+const char *temperatureSource() {
+    switch (temperatureSensor.load()) {
+        case mining::TemperatureSource::Imu: return "imu";
+        case mining::TemperatureSource::Chip: return "chip";
+        default: return "unavailable";
+    }
+}
 
 }  // namespace board

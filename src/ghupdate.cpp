@@ -12,6 +12,7 @@
 #include "log.h"
 #include "miner.h"
 #include "notify.h"
+#include "ota.h"
 #include "settings.h"
 #include "tls.h"
 #include "update_key.h"
@@ -32,7 +33,7 @@ constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
 GithubUpdate state;
 String firmwareUrl, signatureUrl;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
-volatile bool installRequested = false;
+std::atomic<bool> installRequested{false};
 uint32_t nextCheck = kFirstCheckMs;  // millis()
 uint32_t nextPing = kFirstPingMs;
 
@@ -171,6 +172,11 @@ int verifySignature(const uint8_t hash[32], const uint8_t *sig, size_t sigLen) {
 }
 
 void install() {
+    ota::Guard update(ota::Owner::Github);
+    if (!update) {
+        setError("another firmware update is already running");
+        return;
+    }
     if (!esp_ota_get_next_update_partition(nullptr)) {
         setError("this board has no room for a second firmware: update by USB");
         return;
@@ -181,10 +187,8 @@ void install() {
     state.error[0] = 0;
     portEXIT_CRITICAL(&stateMux);
     logf("[update] installing %s\n", state.version);
-    hwsha::hold();  // S2/S3/C3: TLS would wait for every mining batch
-    // The download keeps core 0 busy along with the software miner: its idle
-    // task, starved, would trip the watchdog (it did, mid-download).
-    core0WdtPause();
+    // OTA ownership pauses miners. Only tlsConnect() takes the TLS/SHA
+    // handshake locks, always in the same order; no outer SHA reservation.
 
     WiFiClientSecure tls;
     HTTPClient http;
@@ -225,7 +229,9 @@ void install() {
             mbedtls_sha256_update_ret(&sha, buf, n);
             if (Update.write(buf, n) != (size_t)n) break;
             done += n;
+            portENTER_CRITICAL(&stateMux);
             state.progress = (uint64_t)done * 100 / size;
+            portEXIT_CRITICAL(&stateMux);
             vTaskDelay(1);  // the screen and web server keep running
         }
         http.end();
@@ -248,8 +254,6 @@ void install() {
         ok = true;
     } while (false);
     mbedtls_sha256_free(&sha);
-    core0WdtResume();
-    hwsha::release();
 
     // After a success `installing` stays set: the screen keeps showing the
     // update window until the restart.
@@ -286,6 +290,7 @@ void ping() {
 }  // namespace
 
 void ghUpdatePoll() {
+    if (ota::busy()) return;
     if (settings.usageCount && (int32_t)(millis() - nextPing) >= 0 && WiFi.isConnected() &&
         ESP.getFreeHeap() >= kMinHeap) {
         nextPing = millis() + kPingMs;
@@ -301,7 +306,7 @@ void ghUpdatePoll() {
         return;
     }
     if (!installRequested) nextCheck = millis() + (check() ? kCheckMs : kRetryMs);
-    if ((installRequested || settings.githubUpdate == 2) && state.available) install();
+    if ((installRequested || settings.githubUpdate == 2) && ghUpdateState().available) install();
     installRequested = false;
 }
 
@@ -313,7 +318,8 @@ GithubUpdate ghUpdateState() {
 }
 
 bool ghUpdateInstall() {
-    if (!state.available || state.installing) return false;
+    GithubUpdate current = ghUpdateState();
+    if (!current.available || current.installing || ota::busy()) return false;
     installRequested = true;
     return true;
 }

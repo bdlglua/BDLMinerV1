@@ -47,6 +47,7 @@ void core0WdtResume() {
 
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     tls.setInsecure();
+    tls.setHandshakeTimeout(12);
     xSemaphoreTake(lock, portMAX_DELAY);
     static bool allocSet = false;
     if (!allocSet) {

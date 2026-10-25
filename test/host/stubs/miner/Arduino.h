@@ -25,7 +25,8 @@ constexpr int pdTRUE = 1;
 #define portEXIT_CRITICAL(x) ((void)(x))
 #define pdMS_TO_TICKS(x) (x)
 
-inline uint32_t millis() { return 1000; }
+inline uint32_t testMillis = 1000;
+inline uint32_t millis() { return testMillis; }
 inline void vTaskDelay(uint32_t) {}
 inline void xTaskCreatePinnedToCore(void (*)(void *), const char *, int, void *, unsigned, void *, int) {}
 

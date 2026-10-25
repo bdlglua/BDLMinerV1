@@ -7,7 +7,8 @@
 #include <Arduino.h>
 
 void webStart();
-// Serves pending requests; call from loop().
+// Applies scheduled restarts; call from loop(). HTTP runs in its own task so
+// a slow upload cannot block sensor sampling, buttons or the display.
 void webHandle();
 // mDNS host name ("bdlminer-xxxx"), empty before webStart().
 const String &webHostName();

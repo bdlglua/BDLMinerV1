@@ -60,6 +60,7 @@ void notifyTask(void *) {
 }  // namespace
 
 void notifyStart() {
+    if (settings.ntfyTopic.isEmpty()) return;  // changes take effect after reboot
     queue = xQueueCreate(6, sizeof(Message));
     xTaskCreatePinnedToCore(notifyTask, "notify", 10240, nullptr, 1, nullptr, 0);
 }

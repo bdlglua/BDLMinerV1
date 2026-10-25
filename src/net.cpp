@@ -3,6 +3,7 @@
 #include <WiFi.h>
 
 #include <string>
+#include <atomic>
 
 #include "core/stratum.h"
 #include "log.h"
@@ -20,10 +21,13 @@ constexpr int kFailoverAfter = 3;
 constexpr uint32_t kBackupSessionMs = 30 * 60 * 1000;
 
 char status[48] = "Starting";
-volatile bool onBackup = false;
+portMUX_TYPE statusMux = portMUX_INITIALIZER_UNLOCKED;
+std::atomic<bool> onBackup{false};
 
 void setStatus(const char *s) {
+    portENTER_CRITICAL(&statusMux);
     strlcpy(status, s, sizeof(status));
+    portEXIT_CRITICAL(&statusMux);
     logf("[pool] %s\n", s);
 }
 
@@ -82,7 +86,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                         }
                         return;
                     case stratum::Event::Authorized:
-                        stats.poolConnected = true;
+                        minerPoolConnected(true);
                         setStatus(onBackup ? "Mining (backup pool)" : "Mining");
                         break;
                     case stratum::Event::AuthFailed:
@@ -96,15 +100,15 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                              proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
                         break;
                     case stratum::Event::Difficulty:
-                        stats.poolDiff = proto.difficulty();
+                        minerPoolDifficulty(proto.difficulty());
                         logf("[pool] difficulty %g\n", proto.difficulty());
                         break;
                     case stratum::Event::ShareAccepted:
-                        stats.accepted++;
+                        minerShareResult(true);
                         logf("[pool] share accepted\n");
                         break;
                     case stratum::Event::ShareRejected:
-                        stats.rejected++;
+                        minerShareResult(false);
                         logf("[pool] share rejected: %s\n", proto.lastError().c_str());
                         break;
                     default:
@@ -184,7 +188,7 @@ void netTask(void *) {
             setStatus("Pool unreachable");
         }
 
-        stats.poolConnected = false;
+        minerPoolConnected(false);
         minerInvalidate();
         if (strncmp(status, "Mining", 6) == 0) setStatus("Disconnected");
 
@@ -213,7 +217,13 @@ void netTask(void *) {
 
 void netStart() { xTaskCreatePinnedToCore(netTask, "stratum", 12288, nullptr, 3, nullptr, 0); }
 
-const char *netStatus() { return status; }
+String netStatus() {
+    char copy[sizeof(status)];
+    portENTER_CRITICAL(&statusMux);
+    memcpy(copy, status, sizeof(copy));
+    portEXIT_CRITICAL(&statusMux);
+    return String(copy);
+}
 
 const String &netPoolHost() { return onBackup ? settings.backupHost : settings.poolHost; }
 

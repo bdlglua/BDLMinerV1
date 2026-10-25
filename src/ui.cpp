@@ -82,7 +82,7 @@ void bodyFont(lgfx::LovyanGFX &d) {
 }
 
 String uptime() {
-    uint32_t s = (millis() - stats.startMillis) / 1000;
+    uint32_t s = minerUptimeSeconds();
     char buf[24];
     snprintf(buf, sizeof(buf), "%ud %02u:%02u:%02u", (unsigned)(s / 86400), (unsigned)(s / 3600 % 24),
              (unsigned)(s / 60 % 60), (unsigned)(s % 60));
@@ -100,6 +100,7 @@ String diffText(double d) {
 }
 
 void header(const char *title) {
+    const MinerStats stats = minerStats();
     auto &d = g();
     int h = px(18);
     d.fillRect(0, 0, d.width(), h, accent());
@@ -210,6 +211,7 @@ String retargetText(const MarketData &m) {
 // Expected time for this miner to find a block alone, at the current
 // network difficulty: difficulty * 2^32 hashes on average.
 String soloOddsText() {
+    const MinerStats stats = minerStats();
     double hr = minerHashrate();
     if (hr <= 0 || stats.networkDiff <= 0) return "";
     double years = stats.networkDiff * 4294967296.0 / hr / 31557600.0;
@@ -233,6 +235,7 @@ String trf(const char *en, unsigned v) {
 }
 
 String sharesText() {
+    const MinerStats stats = minerStats();
     if (!stats.rejected) return String(stats.accepted);
     return String(stats.accepted) + " / " + String(stats.rejected);
 }
@@ -296,8 +299,6 @@ void drawField(bg::Field f, const String &text, uint32_t color) {
     if (color == 0xFFFFFFFF) color = bg::kColor[f];
     if (color == kOrange) color = accent();
     if (fieldText[f] == text && fieldColor[f] == color) return;
-    fieldText[f] = text;
-    fieldColor[f] = color;
 
     const bg::Rect &r = bgSet->rects[f];
     LGFX_Sprite s(lcd);
@@ -324,9 +325,12 @@ void drawField(bg::Field f, const String &text, uint32_t color) {
         s.drawString(text, x, r.h / 2);
     }
     s.pushSprite(r.x, r.y);
+    fieldText[f] = text;
+    fieldColor[f] = color;
 }
 
 void drawHeaderFields() {
+    const MinerStats stats = minerStats();
     int bat = board::batteryLevel();
     drawField(bg::HDR_BATTERY, bat >= 0 ? String(bat) + "%" : String());
     if (millis() < flashUntil) drawField(bg::HDR_STATUS, tr("+1 SHARE"), 0xFFE14D);
@@ -334,6 +338,7 @@ void drawHeaderFields() {
 }
 
 void renderBitmap() {
+    const MinerStats stats = minerStats();
     switch (screen) {
         case 0: {
             showBackground(bg::MINING);
@@ -348,7 +353,7 @@ void renderBitmap() {
             drawField(bg::MINING_BITS32, String(stats.over32bits));
             float t = board::temperature();
             drawField(bg::MINING_TEMP, isnan(t) ? String("--") : String((int)lroundf(t)) + " C");
-            drawField(bg::MINING_STATE, trStatus(netStatus()));
+            drawField(bg::MINING_STATE, trStatus(netStatus().c_str()));
             drawField(bg::MINING_UPTIME, uptime());
             break;
         }
@@ -430,6 +435,7 @@ void renderBitmap() {
 // ---------------------------------------------------------------------------
 
 void drawMining() {
+    const MinerStats stats = minerStats();
     auto &d = g();
     header("BDLMiner V1");
 
@@ -454,11 +460,12 @@ void drawMining() {
     row(6, 92, "Diff", diffText(stats.poolDiff));
     row(124, 92, tr("Blocks"), String(stats.blocksFound), stats.blocksFound ? accent() : kFg);
 
-    String f = trStatus(netStatus()) + "  " + uptime();
+    String f = trStatus(netStatus().c_str()) + "  " + uptime();
     footer(f.c_str());
 }
 
 void drawClock() {
+    const MinerStats stats = minerStats();
     auto &d = g();
     header(tr("Clock"));
     d.setFont(&fonts::Font7);
@@ -491,6 +498,7 @@ void drawGlobal() {
 }
 
 void drawNetwork() {
+    const MinerStats stats = minerStats();
     header(tr("Network"));
     row(6, 22, tr("Block"), stats.blockHeight ? String(stats.blockHeight) : String("-"), accent());
     row(6, 40, tr("Net diff"), diffText(stats.networkDiff));
@@ -503,6 +511,7 @@ void drawNetwork() {
 }
 
 void drawInfo() {
+    const MinerStats stats = minerStats();
     auto &d = g();
     header("Info");
     row(6, 22, tr("Board"), board::modelName());
@@ -529,6 +538,7 @@ void drawInfo() {
 
 // "1 in 2.3M" chance of finding a block within `seconds` at the current rate.
 String blockOdds(double seconds) {
+    const MinerStats stats = minerStats();
     double hr = minerHashrate();
     if (hr <= 0 || stats.networkDiff <= 0) return "-";
     double p = -expm1(-hr * seconds / (stats.networkDiff * 4294967296.0));
@@ -583,6 +593,7 @@ void drawGraph() {
 // The block being mined, then the latest blocks found (mempool.space), each
 // with the best share you found while it was the one to find.
 void drawBlocks() {
+    const MinerStats stats = minerStats();
     header(tr("Blocks"));
     MarketData m = marketGet();
     BlockBest bb[BLOCK_BESTS];
@@ -605,6 +616,7 @@ void drawBlocks() {
 }
 
 void drawRecords() {
+    const MinerStats stats = minerStats();
     header("Records");
     double hr = minerHashrate();
     row(6, 22, tr("Best ever"), diffText(stats.bestDiff), accent());
@@ -662,8 +674,8 @@ void begin() {
     lcd = board::display();
     if (!lcd) return;
     lcd->setRotation(settings.rotation);
-    board::setBrightness(settings.brightness);
-    backlight = settings.brightness;
+    board::setBrightness(settingsBrightness());
+    backlight = settingsBrightness();
     screenSince = millis();
 
     int w = lcd->width(), h = lcd->height();
@@ -769,10 +781,9 @@ void nextScreen() {
 
 void cycleBrightness() {
     size_t i = 0;
-    while (i < sizeof(kBrightnessSteps) && kBrightnessSteps[i] != settings.brightness) i++;
-    settings.brightness = kBrightnessSteps[(i + 1) % sizeof(kBrightnessSteps)];
-    setBacklight(settings.brightness);
-    settingsSave();
+    while (i < sizeof(kBrightnessSteps) && kBrightnessSteps[i] != settingsBrightness()) i++;
+    settingsSetBrightness(kBrightnessSteps[(i + 1) % sizeof(kBrightnessSteps)]);
+    setBacklight(settingsBrightness());
 }
 
 void setBacklight(uint8_t percent) {
@@ -806,7 +817,7 @@ void render() {
         sampleHead = (sampleHead + 1) % (sizeof(samples) / sizeof(samples[0]));
         if (sampleCount < (int)(sizeof(samples) / sizeof(samples[0]))) sampleCount++;
     }
-    if (!lcd || settings.brightness == 0 || backlight == 0) return;
+    if (!lcd || settingsBrightness() == 0 || backlight == 0) return;
     static bool updateShown = false;
     GithubUpdate u = ghUpdateState();
     if (u.installing) {

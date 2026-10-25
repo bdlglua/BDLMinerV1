@@ -25,6 +25,7 @@ static void onPortalStarted() {
 }
 
 static void logStats() {
+    const MinerStats stats = minerStats();
     // Per-engine rates, the same 1-minute averages as the total ("hw 948.2 + sw 41.0").
     char engines[64] = "";
     size_t len = 0;
@@ -35,7 +36,7 @@ static void logStats() {
 
     logf("[stats] %.2f kH/s%s | shares %u ok / %u rejected | best %.6g (ever %.6g) | blocks %u | %s\n",
          minerHashrate() / 1000.0, engines, (unsigned)stats.accepted, (unsigned)stats.rejected,
-         stats.sessionBestDiff, stats.bestDiff, (unsigned)stats.blocksFound, netStatus());
+         stats.sessionBestDiff, stats.bestDiff, (unsigned)stats.blocksFound, netStatus().c_str());
 }
 
 void setup() {
@@ -93,6 +94,7 @@ void setup() {
 }
 
 void loop() {
+    const MinerStats stats = minerStats();
     static uint32_t lastTick = 0, lastLog = 0, lastPass = 0;
     uint32_t now = millis();
     // Screen and web server stand still while this does not run.

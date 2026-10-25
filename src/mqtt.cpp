@@ -61,8 +61,10 @@ void announce() {
 }
 
 void publishState() {
+    const MinerStats stats = minerStats();
     JsonDocument d;
     d["hashrate"] = round(minerHashrate() / 10.0) / 100.0;  // kH/s, 2 decimals
+    d["power_percent"] = minerPowerPercent();
     float t = board::temperature();
     if (!isnan(t)) d["temperature"] = round(t * 10) / 10.0;
     d["accepted"] = stats.accepted;
@@ -71,7 +73,7 @@ void publishState() {
     d["best_ever"] = stats.bestDiff;
     d["shares32"] = stats.over32bits;
     d["blocks"] = stats.blocksFound;
-    d["uptime"] = (millis() - stats.startMillis) / 1000;
+    d["uptime"] = minerUptimeSeconds();
     d["status"] = netStatus();
     String payload;
     serializeJson(d, payload);
@@ -118,4 +120,7 @@ void mqttTask(void *) {
 
 }  // namespace
 
-void mqttStart() { xTaskCreatePinnedToCore(mqttTask, "mqtt", 6144, nullptr, 1, nullptr, 0); }
+void mqttStart() {
+    if (!settings.mqttHost.isEmpty())
+        xTaskCreatePinnedToCore(mqttTask, "mqtt", 6144, nullptr, 1, nullptr, 0);
+}

@@ -7,7 +7,7 @@
 void netStart();
 
 // Short human readable state for the UI ("Mining", "Connecting"...).
-const char *netStatus();
+String netStatus();
 
 // Pool currently in use: the main one, or the backup after repeated failures.
 const String &netPoolHost();

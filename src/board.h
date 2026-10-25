@@ -51,6 +51,8 @@ void beep();
 // from the loop task only (the IMU is on an I2C bus other tasks must not use).
 float temperature();
 void sampleTemperature();
+// Stable physical sensor for this session: "imu", "chip" or "unavailable".
+const char *temperatureSource();
 
 // 1 = running on battery, 0 = on external power, -1 = unknown or no battery.
 // Boards without a power chip (StickC Plus2) are judged by the battery

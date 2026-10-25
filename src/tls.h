@@ -8,7 +8,6 @@
 // notifications sent). Then use it with HTTPClient, which reuses the connection.
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port = 443);
 
-// Turn core 0's idle-task watchdog off and back on; calls nest (an update
-// download around tlsConnect() keeps it off until its own resume).
+// Turn core 0's idle-task watchdog off and back on for a handshake.
 void core0WdtPause();
 void core0WdtResume();

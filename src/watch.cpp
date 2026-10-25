@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "board.h"
+#include "core/mining_safety.h"
 #include "log.h"
 #include "market.h"
 #include "miner.h"
@@ -17,8 +18,8 @@ constexpr uint32_t kNoPoolRestartMs = 30 * 60 * 1000;  // not connected that lon
 constexpr uint32_t kOfflineNotifyMs = 10 * 60 * 1000;
 constexpr uint32_t kBestNotifyMs = 10 * 60 * 1000;   // at most one record notification per 10 min
 
-bool night = false;
-bool hot = false;
+std::atomic<bool> night{false};
+mining::ThermalPolicy thermal;
 bool awake = false;
 uint32_t wakeStarted = 0;  // night mode suspended for 30 s after a button press
 
@@ -42,25 +43,27 @@ bool nightNow() {
 void throttle() {
     board::sampleTemperature();
     float t = board::temperature();
-    if (settings.maxTemp && !isnan(t)) {
-        if (!hot && t >= settings.maxTemp) {
-            hot = true;
+    bool wasHot = thermal.hot, wasFault = thermal.sensorFault;
+    bool saver = settings.batterySaver && board::onBattery() == 1;
+    uint8_t power = thermal.power(t, settings.maxTemp, settings.miningPower, saver);
+    if (thermal.hot != wasHot) {
+        if (thermal.hot) {
             char msg[64];
             snprintf(msg, sizeof(msg), "%.0f C, mining paused until %u C", t, settings.maxTemp - 5);
             logf("[watch] too hot: %s\n", msg);
             notify("Miner too hot", msg, 4, "thermometer");
-        } else if (hot && t <= settings.maxTemp - 5) {
-            hot = false;
+        } else {
             logf("[watch] cooled down to %.0f C, mining again\n", t);
             notify("Miner cooled down", "Mining again", 2, "thermometer");
         }
-    } else {
-        hot = false;
     }
-    bool saver = settings.batterySaver && board::onBattery() == 1;
-    minerSetThrottle(hot ? Throttle::Paused : saver ? Throttle::Half : Throttle::Full);
+    if (thermal.sensorFault && !wasFault) {
+        logf("[watch] temperature unavailable: mining %s\n", power ? "limited to 25%" : "paused");
+        notify("Temperature unavailable", power ? "No usable sensor: mining limited to 25%" : "Mining paused until a valid temperature returns", 4, "thermometer");
+    }
+    minerSetPower(power, saver);
 
-    uint8_t b = settings.brightness;
+    uint8_t b = settingsBrightness();
     if (awake && millis() - wakeStarted >= 30000) awake = false;
     if (night && !awake) b = 0;
     else if (saver && b > 20) b = 20;
@@ -68,6 +71,7 @@ void throttle() {
 }
 
 void events(uint32_t now) {
+    const MinerStats stats = minerStats();
     static bool first = true;
     static uint32_t lastBlocks, lastOver32, lastAccepted, acceptedAt, lastConnected;
     static double lastBest;
@@ -122,7 +126,7 @@ void events(uint32_t now) {
         lastConnected = now;
         if (offlineSent) {
             offlineSent = false;
-            notify("Miner back online", netStatus(), 2, "white_check_mark");
+            notify("Miner back online", netStatus().c_str(), 2, "white_check_mark");
         }
         if (!bootSent) {
             bootSent = true;
@@ -136,7 +140,7 @@ void events(uint32_t now) {
         }
     } else if (!offlineSent && now - lastConnected > kOfflineNotifyMs) {
         offlineSent = true;
-        snprintf(msg, sizeof(msg), "Not mining for 10 minutes: %s", netStatus());
+        snprintf(msg, sizeof(msg), "Not mining for 10 minutes: %s", netStatus().c_str());
         notify("Miner offline", msg, 4, "warning");
     }
 

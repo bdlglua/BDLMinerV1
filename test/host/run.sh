@@ -21,3 +21,8 @@ g++ -std=c++17 -O2 -Wall -Wno-unused-variable -ffunction-sections -fdata-section
     -Itest/host/stubs/miner -Isrc test/host/test_miner_queue.cpp \
     src/core/sha256.cpp src/core/work.cpp -Wl,--gc-sections -o .pio/host/test_miner_queue
 .pio/host/test_miner_queue
+g++ -std=c++17 -O2 -Wall -pthread -Isrc test/host/test_mining_safety.cpp -o .pio/host/test_mining_safety
+.pio/host/test_mining_safety
+g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" \
+    test/host/test_settings_apply.cpp -o .pio/host/test_settings_apply
+.pio/host/test_settings_apply

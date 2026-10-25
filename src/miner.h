@@ -39,7 +39,12 @@ struct MinerStats {
     uint32_t startMillis;
 };
 
-extern MinerStats stats;
+// Coherent copy for UI/network consumers; shared storage stays in miner.cpp.
+MinerStats minerStats();
+void minerPoolConnected(bool connected);
+void minerPoolDifficulty(double difficulty);
+void minerShareResult(bool accepted);
+uint32_t minerUptimeSeconds();
 
 // Publish a new job to the miners. `clean` makes them drop current work.
 void minerPublishJob(const work::Job &job, bool clean);
@@ -104,6 +109,8 @@ void minerStatsSnapshot(StatsSnapshot &out);
 void minerStatsRestore(const StatsSnapshot &s);
 
 // Slows the miners down: Full speed, Half (on battery) or Paused (too hot).
-enum class Throttle : uint8_t { Full, Half, Paused };
-void minerSetThrottle(Throttle t);
+enum class Throttle : uint8_t { Full, Half, Paused, Reduced };
+// Refresh the safety lease after sampling temperature, at least once a second.
+void minerSetPower(uint8_t percent, bool batterySaver = false);
+uint8_t minerPowerPercent();
 Throttle minerThrottle();

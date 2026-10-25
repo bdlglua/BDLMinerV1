@@ -4,10 +4,14 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <esp_wifi.h>
+#include <freertos/semphr.h>
+#include <atomic>
 
 #include "log.h"
 
 Settings settings;
+static std::atomic<uint8_t> liveBrightness{80};
+static SemaphoreHandle_t settingsSaveMutex = xSemaphoreCreateMutex();
 
 static const char *kNamespace = "bdlminer";
 
@@ -39,6 +43,7 @@ const SettingInfo kSettings[] = {
     S("ntfysrv", Text, ntfyServer, "Notifications", "ntfy server"),
     S("notify32", Bool, notify32, "Notifications", "Also notify every 32-bit share"),
     N("maxtemp", maxTemp, "Safety", "Pause mining above this temperature in C (0 = off)"),
+    N("power", miningPower, "Safety", "Mining power on USB and battery (0-100%, 0 = paused)"),
     N("rebooth", rebootHours, "Safety", "Restart after N hours without an accepted share (0 = off)"),
     S("saver", Bool, batterySaver, "Safety", "Battery saver: dim and mine at half speed on battery"),
     S("wifi2", Text, wifi2Ssid, "Network", "Fallback WiFi 1 name"),
@@ -88,9 +93,9 @@ static void cleanHost(String &host, uint16_t *port) {
     }
 }
 
-void settingsSanitize() {
+void settingsSanitize(Settings &settings) {
     for (size_t i = 0; i < kSettingCount; i++)
-        if (kSettings[i].type == SettingType::Text) ((String *)kSettings[i].value)->trim();
+        if (kSettings[i].type == SettingType::Text) ((String *)settingValue(kSettings[i], settings))->trim();
     cleanHost(settings.poolHost, &settings.poolPort);
     cleanHost(settings.backupHost, &settings.backupPort);
     cleanHost(settings.ntfyServer, nullptr);
@@ -110,6 +115,7 @@ void settingsSanitize() {
     if (settings.language > 1) settings.language = 0;
     if (settings.githubUpdate > 2) settings.githubUpdate = 2;
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
+    if (settings.miningPower > 100) settings.miningPower = 100;
     if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
 }
@@ -140,26 +146,47 @@ void settingsLoad() {
     if (!p.isKey("updv")) settings.githubUpdate = 2;
     p.end();
     settingsSanitize();
+    liveBrightness = settings.brightness;
 }
 
-void settingsSave() {
+uint8_t settingsBrightness() { return liveBrightness.load(); }
+
+void settingsSetBrightness(uint8_t percent) {
+    liveBrightness = percent > 100 ? 100 : percent;
+    Settings copy = settings;
+    copy.brightness = liveBrightness;
+    settingsSave(copy);
+}
+
+void settingsSave(const Settings &values, bool forRestart) {
+    xSemaphoreTake(settingsSaveMutex, portMAX_DELAY);
+    static bool stagedForRestart = false;
+    // A brightness button during the reboot delay must not overwrite a
+    // staged web/backup configuration with the old live settings.
+    if (stagedForRestart && !forRestart) {
+        xSemaphoreGive(settingsSaveMutex);
+        return;
+    }
     Preferences p;
     p.begin(kNamespace, false);
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
+        const void *value = settingValue(s, values);
         switch (s.type) {
             case SettingType::Text:
-            case SettingType::Secret: p.putString(s.key, *(String *)s.value); break;
+            case SettingType::Secret: p.putString(s.key, *(const String *)value); break;
             case SettingType::Number:
-                if (s.bits == 8) p.putUChar(s.key, *(uint8_t *)s.value);
-                else p.putUShort(s.key, *(uint16_t *)s.value);
+                if (s.bits == 8) p.putUChar(s.key, *(const uint8_t *)value);
+                else p.putUShort(s.key, *(const uint16_t *)value);
                 break;
-            case SettingType::Decimal: p.putDouble(s.key, *(double *)s.value); break;
-            case SettingType::Bool: p.putBool(s.key, *(bool *)s.value); break;
+            case SettingType::Decimal: p.putDouble(s.key, *(const double *)value); break;
+            case SettingType::Bool: p.putBool(s.key, *(const bool *)value); break;
         }
     }
     p.putUChar("updv", 1);  // see settingsLoad()
     p.end();
+    if (forRestart) stagedForRestart = true;
+    xSemaphoreGive(settingsSaveMutex);
 }
 
 String portalApName() {

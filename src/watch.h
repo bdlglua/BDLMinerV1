@@ -1,6 +1,7 @@
 // Once-a-second supervision from the main loop: heat and battery throttling,
 // night mode, notifications, restarts when stuck, share flashes, automatic
-// screen changes and rotation.
+// screen changes and rotation. Mining permission expires independently in
+// each worker if this loop cannot refresh it for three seconds.
 #pragma once
 
 void watchTick();

@@ -5,6 +5,7 @@
 #include <atomic>
 
 #include "core/sha256.h"
+#include "core/mining_safety.h"
 #include "core/work.h"
 #include "log.h"
 #include "sdkconfig.h"
@@ -23,7 +24,7 @@ uint32_t nonceAt(uint32_t position) { return position; }
 
 // The SHA/AES lock is recursive, so mbedtls can still take it from the task
 // that holds it here, while the miner sees `held` and hashes in software.
-static volatile bool held = false;
+static std::atomic<bool> held{false};
 static int holds = 0;  // hold() nests (an update download around tlsConnect())
 
 void hold() {
@@ -525,6 +526,10 @@ void fillHit(Ctx &c, Fill &f, uint32_t limit, void (*hit)(uint32_t, const uint8_
 
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *fill) {
+    if (!mining::fixedFilterSupports(limit)) {
+        idle();
+        return 0;
+    }
     int loop = current;
     if (loop >= kLoopCount) return 0;
     // An open TLS connection can hold the engine for seconds (mbedtls then

@@ -54,7 +54,8 @@ struct Settings {
     String ntfyServer = DEFAULT_NTFY_SERVER;
     bool notify32 = false;  // also every 32-bit share
     // Safety
-    uint8_t maxTemp = 0;     // > 0: pause mining above this temperature (C)
+    uint8_t maxTemp = 65;    // 0 disables thermal limiting; existing choices are kept
+    uint8_t miningPower = 75; // duty cycle on USB and battery, 0..100 percent
     uint8_t rebootHours = 0; // > 0: restart after N hours without an accepted share
     bool batterySaver = false;  // on battery: dim the screen, mine at half speed
     // Network
@@ -71,9 +72,11 @@ struct Settings {
 extern Settings settings;
 
 void settingsLoad();
-void settingsSave();
+void settingsSave(const Settings &values = settings, bool forRestart = false);
+uint8_t settingsBrightness();
+void settingsSetBrightness(uint8_t percent);
 // Trims texts and brings out-of-range values back to defaults.
-void settingsSanitize();
+void settingsSanitize(Settings &values = settings);
 
 // Every setting the web page can show and change (also the export format).
 enum class SettingType { Text, Secret, Number, Decimal, Bool };
@@ -87,6 +90,15 @@ struct SettingInfo {
 };
 extern const SettingInfo kSettings[];
 extern const size_t kSettingCount;
+// Locate a table entry in a staged copy instead of mutating live strings.
+inline void *settingValue(const SettingInfo &info, Settings &values) {
+    size_t offset = (uintptr_t)info.value - (uintptr_t)&settings;
+    return (char *)&values + offset;
+}
+inline const void *settingValue(const SettingInfo &info, const Settings &values) {
+    size_t offset = (uintptr_t)info.value - (uintptr_t)&settings;
+    return (const char *)&values + offset;
+}
 
 // Name of the access point opened by the configuration portal.
 String portalApName();

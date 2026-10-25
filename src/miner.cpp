@@ -5,9 +5,12 @@
 #include <stddef.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
+#include <atomic>
 
+#include "core/mining_safety.h"
 #include "hw_sha.h"
 #include "log.h"
+#include "ota.h"
 
 #if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S3
 // Hand-scheduled assembly of sha::scan() up to its early exit, in IRAM
@@ -41,9 +44,9 @@ constexpr uint32_t kBestDiffFilter = 0x0000FFFF;
 
 SemaphoreHandle_t jobMutex;
 work::Job board;
-volatile bool boardValid = false;
-volatile uint32_t boardSeq = 0;
-volatile uint32_t workGeneration = 0;  // changes only when earlier jobs become invalid
+std::atomic<bool> boardValid{false};
+std::atomic<uint32_t> boardSeq{0};
+std::atomic<uint32_t> workGeneration{0};  // only changes when earlier jobs become invalid
 uint64_t extranonce2Counter = 0;
 
 struct QueuedShare {
@@ -56,7 +59,8 @@ bool bestDirty = false;
 BestShare top[TOP_SHARES];  // best first, difficulty 0 = empty
 BlockBest blockBests[BLOCK_BESTS];  // ring, blockHead = the height mined now
 int blockHead = 0;
-volatile Throttle throttle = Throttle::Full;
+mining::SafetyLease safety;
+std::atomic<bool> batteryLimited{false};
 
 uint32_t lastHashes[MAX_MINERS];
 uint64_t totalHashes = 0;
@@ -74,6 +78,7 @@ double hashrate = 0, hashrateLive = 0;
 constexpr int kLiveWindow = 10;
 double engineRate[MAX_MINERS];
 uint32_t lastTickMs = 0;
+uint64_t sessionMs = 0;
 
 // Lifetime totals as loaded at boot; this session is added on top.
 uint64_t baseHashes = 0;
@@ -88,6 +93,7 @@ uint32_t historyMs = 0;
 
 struct MiningWork : work::Work {
     uint32_t generation;
+    uint32_t height;
 };
 
 struct Miner {
@@ -112,7 +118,10 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
     const MiningWork &w = *(const MiningWork *)ctx;
     double d = work::hashDifficulty(hash);
     uint32_t when = 0;
-    if (d > top[TOP_SHARES - 1].difficulty) {  // a peek, checked again below
+    portENTER_CRITICAL(&statsMux);
+    bool topCandidate = d > top[TOP_SHARES - 1].difficulty;
+    portEXIT_CRITICAL(&statsMux);
+    if (topCandidate) {
         time_t now = time(nullptr);
         if (now > 1700000000) when = (uint32_t)now;  // clock set by NTP
     }
@@ -124,7 +133,9 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         bestDirty = true;
     }
     if (d >= 1.0) stats.over32bits++;
-    if (d > blockBests[blockHead].best) blockBests[blockHead].best = d;
+    for (auto &b : blockBests) {
+        if (b.height == w.height && w.height && d > b.best) b.best = d;
+    }
     if (d > top[TOP_SHARES - 1].difficulty) {
         int i = TOP_SHARES - 1;
         for (; i > 0 && top[i - 1].difficulty < d; i--) top[i] = top[i - 1];
@@ -164,9 +175,11 @@ bool fetchWork(Miner &m, uint32_t &seq) {
         seq = boardSeq;
         work::build(board, extranonce2Counter++, m.work);
         m.work.generation = workGeneration;
+        m.work.height = board.blockHeight();
         if (m.useFill) {
             work::build(board, extranonce2Counter++, m.work2);
             m.work2.generation = workGeneration;
+            m.work2.height = m.work.height;
         }
     }
     xSemaphoreGive(jobMutex);
@@ -185,10 +198,9 @@ void softwareBatch(Miner &m, uint32_t first, uint32_t count, uint32_t limit) {
     uint8_t hash[32];
     const sha::MidState &mid = m.work.mid;
 #ifdef HAVE_SW_PREFILTER
-    if (useAsm) {
-        // The assembly only finds hashes with top-32 bits <= 0xFFFF, which
-        // `limit` (>= kBestDiffFilter) always covers; sha::scan() then makes
-        // the hash of that 1 nonce in 65536 and applies `limit`.
+    if (useAsm && mining::fixedFilterSupports(limit)) {
+        // For easier pool targets the fixed 16-bit filter would lose shares;
+        // use the general C kernel instead.
         uint8_t tail[16];
         memcpy(tail, m.work.header + 64, 16);
         for (uint32_t p = first, end = first + count; p != end; p++) {
@@ -251,8 +263,8 @@ void minerTask(void *arg) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
-        Throttle th = throttle;
-        if (th == Throttle::Paused) {
+        uint8_t power = minerPowerPercent();
+        if (!power) {
             if (m.hardware) hwsha::idle();
             vTaskDelay(pdMS_TO_TICKS(200));
             continue;
@@ -268,6 +280,7 @@ void minerTask(void *arg) {
             }
         }
 
+        if (!minerPowerPercent()) continue;
         uint32_t limit = max(m.work.quickLimit, kBestDiffFilter);
         // Never run past the end of the nonce space (after software batches
         // `nonce` is only a multiple of kBatchSw).
@@ -277,20 +290,31 @@ void minerTask(void *arg) {
                                                  m.useFill ? &m.fill : nullptr)
                                    : 0;
         if (m.useFill && m.fill.hashes) {
+            portENTER_CRITICAL(&statsMux);
             stats.hashes[fillIndex] += m.fill.hashes;
+            portEXIT_CRITICAL(&statsMux);
             m.fill.hashes = 0;
         }
         if (!done) {
             softwareBatch(m, nonce, kBatchSw, limit);
             done = kBatchSw;
         }
+        portENTER_CRITICAL(&statsMux);
         stats.hashes[m.index] += done;
+        portEXIT_CRITICAL(&statsMux);
         nonce += done;
         if (nonce == 0) haveWork = false;  // wrapped: 2^32 nonces exhausted
 
-        if (th == Throttle::Half) {
-            // As long idle as busy: about half the power.
-            vTaskDelay(pdMS_TO_TICKS(max<uint32_t>(1, millis() - batchStart)));
+        if (power < 100) {
+            if (m.hardware) hwsha::idle();
+            uint32_t rest = mining::restMs(millis() - batchStart, power);
+            // Release hardware before sleeping; revisit controls frequently.
+            while (rest) {
+                uint32_t part = min<uint32_t>(rest, 100);
+                vTaskDelay(max<TickType_t>(1, pdMS_TO_TICKS(part)));
+                rest -= part;
+                if (minerPowerPercent() != power || seq != boardSeq || !boardValid) break;
+            }
             lastPause = millis();
         }
         // Let the idle task and lower-priority tasks run.
@@ -310,19 +334,19 @@ void minerPublishJob(const work::Job &job, bool clean) {
         xQueueReset(shareQueue);
     }
     board = job;
+    double networkDiff = work::difficultyFromBits(job.nbits);
+    portENTER_CRITICAL(&statsMux);
+    stats.blockHeight = job.blockHeight();
+    if (stats.blockHeight && stats.blockHeight != blockBests[blockHead].height) {
+        blockHead = (blockHead + 1) % BLOCK_BESTS;
+        blockBests[blockHead] = {stats.blockHeight, 0};
+    }
+    stats.networkDiff = networkDiff;
+    stats.poolDiff = job.difficulty;
+    portEXIT_CRITICAL(&statsMux);
     boardValid = true;
     boardSeq++;
     xSemaphoreGive(jobMutex);
-
-    stats.blockHeight = job.blockHeight();
-    if (stats.blockHeight && stats.blockHeight != blockBests[blockHead].height) {
-        portENTER_CRITICAL(&statsMux);
-        blockHead = (blockHead + 1) % BLOCK_BESTS;
-        blockBests[blockHead] = {stats.blockHeight, 0};
-        portEXIT_CRITICAL(&statsMux);
-    }
-    stats.networkDiff = work::difficultyFromBits(job.nbits);
-    stats.poolDiff = job.difficulty;
 }
 
 void minerInvalidate() {
@@ -352,6 +376,7 @@ void minerStart() {
     jobMutex = xSemaphoreCreateMutex();
     shareQueue = xQueueCreate(16, sizeof(QueuedShare));
     stats.startMillis = millis();
+    lastTickMs = stats.startMillis;
 
     bool hw = hwsha::selfTest();
     logf("[miner] hardware SHA: %s\n",
@@ -388,16 +413,71 @@ void minerStart() {
     }
 }
 
-uint64_t minerTotalHashes() { return totalHashes; }
+MinerStats minerStats() {
+    portENTER_CRITICAL(&statsMux);
+    MinerStats copy = stats;
+    portEXIT_CRITICAL(&statsMux);
+    return copy;
+}
 
-double minerHashrate() { return hashrate; }
+void minerPoolConnected(bool connected) {
+    portENTER_CRITICAL(&statsMux);
+    stats.poolConnected = connected;
+    portEXIT_CRITICAL(&statsMux);
+}
 
-double minerHashrateLive() { return hashrateLive; }
+void minerPoolDifficulty(double difficulty) {
+    portENTER_CRITICAL(&statsMux);
+    stats.poolDiff = difficulty;
+    portEXIT_CRITICAL(&statsMux);
+}
 
-double minerEngineRate(int i) { return i >= 0 && i < stats.minerCount ? engineRate[i] : 0; }
+void minerShareResult(bool accepted) {
+    portENTER_CRITICAL(&statsMux);
+    if (accepted) stats.accepted++;
+    else stats.rejected++;
+    portEXIT_CRITICAL(&statsMux);
+}
+
+uint32_t minerUptimeSeconds() {
+    portENTER_CRITICAL(&statsMux);
+    uint32_t value = sessionMs / 1000;
+    portEXIT_CRITICAL(&statsMux);
+    return value;
+}
+
+uint64_t minerTotalHashes() {
+    portENTER_CRITICAL(&statsMux);
+    uint64_t value = totalHashes;
+    portEXIT_CRITICAL(&statsMux);
+    return value;
+}
+
+double minerHashrate() {
+    portENTER_CRITICAL(&statsMux);
+    double value = hashrate;
+    portEXIT_CRITICAL(&statsMux);
+    return value;
+}
+
+double minerHashrateLive() {
+    portENTER_CRITICAL(&statsMux);
+    double value = hashrateLive;
+    portEXIT_CRITICAL(&statsMux);
+    return value;
+}
+
+double minerEngineRate(int i) {
+    portENTER_CRITICAL(&statsMux);
+    double value = i >= 0 && i < stats.minerCount ? engineRate[i] : 0;
+    portEXIT_CRITICAL(&statsMux);
+    return value;
+}
 
 void minerTick() {
     uint32_t now = millis();
+    portENTER_CRITICAL(&statsMux);
+    sessionMs += uint32_t(now - lastTickMs);
     uint32_t delta = 0, engineDelta[MAX_MINERS];
     for (int i = 0; i < stats.minerCount; i++) {
         uint32_t h = stats.hashes[i];
@@ -440,7 +520,7 @@ void minerTick() {
     stats.lifetimeHashes = baseHashes + totalHashes;
     stats.lifetimeShares = baseShares + stats.accepted;
     stats.lifetimeBlocks = baseBlocks + stats.blocksFound;
-    stats.lifetimeSeconds = baseSeconds + (now - stats.startMillis) / 1000;
+    stats.lifetimeSeconds = baseSeconds + sessionMs / 1000;
 
     if (!historyMs) {
         historyMs = now;
@@ -456,7 +536,9 @@ void minerTick() {
     // Flash wear: a found block is saved at once, a new best difficulty at
     // most once a minute, the lifetime totals every 10 minutes.
     static uint32_t lastSave = 0;
-    if (stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000) {
+    bool save = stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000;
+    portEXIT_CRITICAL(&statsMux);
+    if (save) {
         lastSave = now;
         minerSaveStats();
     }
@@ -481,13 +563,24 @@ int minerTopShares(BestShare *out, int capacity) {
     return n;
 }
 
-void minerSetThrottle(Throttle t) { throttle = t; }
+void minerSetPower(uint8_t percent, bool batterySaver) {
+    batteryLimited = batterySaver;
+    safety.update(millis(), percent);
+}
 
-Throttle minerThrottle() { return throttle; }
+uint8_t minerPowerPercent() { return ota::busy() ? 0 : safety.power(millis()); }
+
+Throttle minerThrottle() {
+    uint8_t power = minerPowerPercent();
+    return !power ? Throttle::Paused : power == 100 ? Throttle::Full
+                               : batteryLimited ? Throttle::Half : Throttle::Reduced;
+}
 
 int minerHistory(float *out, int capacity) {
+    portENTER_CRITICAL(&statsMux);
     int n = min(historyLen, capacity);
     for (int i = 0; i < n; i++) out[i] = history[(historyHead - n + i + HISTORY_LEN) % HISTORY_LEN];
+    portEXIT_CRITICAL(&statsMux);
     return n;
 }
 
@@ -506,6 +599,7 @@ struct StatsRecord {
 uint32_t statsSeq = 0;
 bool statsLoaded = false;  // never save before the saved stats were read back
 bool statsFrozen = false;  // a restored backup waits for the restart
+SemaphoreHandle_t saveMutex = xSemaphoreCreateMutex();
 
 uint32_t recordCrc(const StatsRecord &r) {
     return esp_rom_crc32_le(0, (const uint8_t *)&r, offsetof(StatsRecord, crc));
@@ -570,26 +664,35 @@ void minerLoadStats() {
 
 void minerStatsSnapshot(StatsSnapshot &out) {
     memset(&out, 0, sizeof(out));
+    portENTER_CRITICAL(&statsMux);
     out.hashes = stats.lifetimeHashes;
     out.shares = stats.lifetimeShares;
     out.blocks = stats.lifetimeBlocks;
     out.seconds = stats.lifetimeSeconds;
-    portENTER_CRITICAL(&statsMux);
     out.bestDiff = stats.bestDiff;
     memcpy(out.top, top, sizeof(out.top));
     portEXIT_CRITICAL(&statsMux);
 }
 
 void minerSaveStats() {
-    if (!statsLoaded || statsFrozen) return;
+    xSemaphoreTake(saveMutex, portMAX_DELAY);
+    if (!statsLoaded || statsFrozen) {
+        xSemaphoreGive(saveMutex);
+        return;
+    }
+    portENTER_CRITICAL(&statsMux);
     bestDirty = false;
     savedBlocks = stats.blocksFound;
+    portEXIT_CRITICAL(&statsMux);
     StatsSnapshot s;
     minerStatsSnapshot(s);
     writeRecord(s);
+    xSemaphoreGive(saveMutex);
 }
 
 void minerStatsRestore(const StatsSnapshot &s) {
+    xSemaphoreTake(saveMutex, portMAX_DELAY);
     writeRecord(s);
     statsFrozen = true;
+    xSemaphoreGive(saveMutex);
 }

@@ -55,12 +55,13 @@ uint32_t nonceAt(uint32_t position);
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t nonce, const uint8_t hash[32], void *ctx), void *ctx, Fill *fill = nullptr);
 
-// TLS handshakes run inside hold()/release() (they nest). S2/S3/C3: keeps
+// TLS handshakes run inside hold()/release(). S2/S3/C3: keeps
 // the mining loop off the peripheral (waiting for the batch in progress; the
 // miner hashes in software meanwhile), as TLS would otherwise wait for a
 // whole batch at every SHA or AES operation. Original ESP32: the miner keeps
 // the SHA engines between batches, so TLS hashes in software and mining goes
-// on (see hw_sha.cpp). Called from one task at a time.
+// on (see hw_sha.cpp). Called from one task at a time, after taking the TLS
+// semaphore. Never reserve SHA around a call that then acquires TLS.
 void hold();
 void release();
 

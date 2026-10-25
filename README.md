@@ -301,8 +301,12 @@ curl http://bdlminer-xxxx.local/metrics
 idle-cycle software hash), fees in sat/vB, `market.updated_s` / `pool_view.updated_s` =
 seconds since the last refresh (`-1` if none yet), `history.hashrate` up to 288
 5‑minute averages, `top` = best shares (`d` difficulty, `t` Unix time or 0),
-`throttle` = `full`, `half` (battery saver) or `paused` (too hot), `temp_c` = `null`
-without a usable sensor.
+`throttle` = `full`, `half` (battery saver), `reduced` (power/thermal limit) or
+`paused` (heat, lost supervision, sensor failure, a zero power setting, or OTA).
+`power_percent` is the current mining duty cycle, `power_limit_percent` the configured
+limit. `temp_c` = `null` without a usable sensor; `temperature_source` identifies the
+session's sensor (`imu`, `chip`, or `unavailable`). The duty cycle is a limit on mining
+activity, not a measurement of electrical power.
 
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).
@@ -328,10 +332,31 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 
 ## Safety, power and networks
 
-* **Too hot**: above *Pause mining above this temperature* (web settings, 0 = off) the
-  miners pause until 5 °C below.
-* **Battery saver**: on battery the screen dims to 20 % and the miners work half of the
-  time. Boards without a power chip (StickC Plus2) are judged by the battery voltage
+* **Mining power on USB and battery**: the web setting *Mining power* limits the
+  mining duty cycle to 0–100 %, default **75 %**. At 100 % the miners run at full
+  speed; 0 pauses them. Lower settings trade hashrate for idle time without changing
+  the clock timing of the hardware SHA loops. The limit also applies on USB.
+* **Too hot**: *Pause mining above this temperature* defaults to **65 °C** for new
+  configurations (0 = off). Existing saved thresholds, including 0, are preserved;
+  check this setting after upgrading. Within 10 °C of the threshold, mining is
+  limited to 50 %; within 5 °C, to 25 %. At the threshold, miners pause until at
+  least 5 °C below. These limits never increase a lower user-selected duty cycle.
+  IMU and chip sensors measure different components: choose a threshold for the
+  particular board and sensor, and verify it on hardware.
+* **Unavailable temperature**: with thermal protection enabled, a board that has
+  never produced a usable temperature is limited to 25 %. Losing a previously
+  working sensor pauses mining; an unreadable sample cannot clear a heat pause.
+  Once selected, the physical sensor stays the same until reboot, so a failed hot
+  IMU cannot be replaced silently by a cooler chip reading.
+  HTTP runs in its own task so slow requests do not block the screen or sensor reads.
+  Each worker also stops at its next batch boundary if supervision has not refreshed
+  its permission for over 3 seconds, including during a slow HTTP request. It resumes
+  after fresh supervision allows it. This guard also applies when the thermal
+  threshold is disabled. Firmware updates pause all miners and only one web/GitHub
+  installation can own the flash writer at a time.
+* **Battery saver**: on battery the screen dims to 20 % and the miners work at most
+  half of the time, or less if the power/thermal limit requires it.
+  Boards without a power chip (StickC Plus2) are judged by the battery voltage
   (below ~4.05 V: on battery), so it can also kick in while a low battery charges.
 * **Watchdogs**: the board restarts after 30 minutes without a pool connection, and,
   if set, after N hours without an accepted share. The reason is shown after the
@@ -400,7 +425,7 @@ src/
   miner.*          FreeRTOS mining tasks, share queue, statistics, hashrate history
   net.*            network task: pool connection, reconnection, backup pool, share submission
   market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment) + pool stats
-  web.*            HTTP dashboard, settings page, firmware update, log, /api/stats, /metrics, mDNS
+  web.*            HTTP task: dashboard, settings, firmware update, log, /api/stats, /metrics, mDNS
   watch.*          once-a-second supervision: heat / battery, night mode, notifications, watchdogs
   notify.*         ntfy push notifications
   mqtt.*           Home Assistant (MQTT discovery)

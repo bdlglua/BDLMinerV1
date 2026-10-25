@@ -13,7 +13,9 @@
 #include "market.h"
 #include "miner.h"
 #include "net.h"
+#include "ota.h"
 #include "settings.h"
+#include "settings_apply.h"
 #include "watch.h"
 #include "web_validation.h"
 
@@ -21,8 +23,8 @@ namespace {
 
 WebServer server(80);
 String hostName;
-uint32_t restartAt = 0;  // a restart is due at this millis(), 0 = none
-const char *restartWhy = "";
+std::atomic<uint32_t> restartAt{0};  // restart due at this millis(), 0 = none
+std::atomic<const char *> restartWhy{""};
 
 // Shared by the pages.
 const char kStyle[] PROGMEM = R"CSS(<meta charset="utf-8">
@@ -64,7 +66,7 @@ const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','
 'Pool (backup)':'Pool (secours)','Pool':'Pool','Payout address':'Adresse de paiement','not a valid Bitcoin address':'adresse Bitcoin invalide',
 'Device':'Appareil','night mode':'mode nuit','last reset':'dernier redémarrage','WiFi':'WiFi','Miners':'Miners','All miners':'Tous les miners',
 'miners':'miners','no answer':'pas de réponse','online':'en ligne','ONLINE':'EN LIGNE','OFFLINE':'HORS LIGNE','NO CONNECTION':'PAS DE CONNEXION',
-'Updated':'Mis à jour','market data':'données marché','min old':'min','paused: too hot':'en pause : trop chaud','battery saver: half speed':'économie de batterie : mi-régime',
+'Updated':'Mis à jour','market data':'données marché','min old':'min','mining paused':'minage en pause','power limited':'puissance limitée','battery saver: half speed':'économie de batterie : mi-régime',
 'Recent blocks':'Derniers blocs','mining now':'en cours de minage','your best':'ta meilleure','ago':'il y a','Firmware update':'Mise à jour du firmware',
 'Update available':'Mise à jour disponible','Install':'Installer','up to date':'à jour',
 'Save and restart':'Enregistrer et redémarrer','Backup':'Sauvegarde','Download a backup':'Télécharger une sauvegarde','Restore a backup':'Restaurer une sauvegarde',
@@ -80,7 +82,7 @@ rotateh:'Alterner pool principale / secours toutes les N heures (0 = seulement e
 autorot:'Rotation avec l\'accéléromètre (appareils M5)',lang:'Langue : 0 anglais, 1 français',theme:'Thème (0 orange, 1 vert, 2 bleu, 3 violet, 4 rose)',
 cycle:'Écran suivant toutes les N secondes (0 = non)',nightfrom:'Mode nuit à partir de (heure 0-23, 255 = non)',nightto:'Mode nuit jusqu\'à (heure 0-23)',
 beep:'Bip à chaque share 32 bits',tz:'Fuseau horaire (POSIX TZ, ex. CET-1CEST,M3.5.0,M10.5.0/3 ou UTC0)',fiat:'Devise du prix (USD, EUR, GBP, CAD, CHF, AUD, JPY)',
-ntfy:'Sujet ntfy (vide = non)',ntfysrv:'Serveur ntfy',notify32:'Notifier aussi chaque share 32 bits',maxtemp:'Pause du minage au-dessus de cette température en °C (0 = non)',
+ntfy:'Sujet ntfy (vide = non)',ntfysrv:'Serveur ntfy',notify32:'Notifier aussi chaque share 32 bits',power:'Puissance de minage sur USB et batterie (0–100 %, 0 = pause)',maxtemp:'Pause du minage au-dessus de cette température en °C (0 = non)',
 rebooth:'Redémarrer après N heures sans share acceptée (0 = non)',saver:'Économie de batterie : écran faible et minage à mi-régime sur batterie',
 wifi2:'WiFi de secours 1 : nom',wpass2:'WiFi de secours 1 : mot de passe',wifi3:'WiFi de secours 2 : nom',wpass3:'WiFi de secours 2 : mot de passe',
 mqtt:'Serveur MQTT pour Home Assistant (vide = non)',mqttport:'Port MQTT',mqttuser:'Utilisateur MQTT',mqttpass:'Mot de passe MQTT',
@@ -119,8 +121,8 @@ async function tick(){
  try{const r=await fetch('/api/stats');const j=await r.json();const m=j.market,pv=j.pool_view;
   document.documentElement.style.setProperty('--accent',j.accent);
   const st=document.getElementById('st');st.textContent=t(j.pool.connected?'ONLINE':'OFFLINE');st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';
-  const state=j.throttle=='paused'?'⚠ '+t('paused: too hot'):j.throttle=='half'?t('battery saver: half speed'):'';
-  const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state:''),true),
+  const state=j.throttle=='paused'?'⚠ '+t('mining paused'):j.throttle=='half'?t('battery saver: half speed'):j.throttle=='reduced'?t('power limited'):'';
+  const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state+' · '+j.power_percent+' %':''),true),
    tile(t('Shares'),j.shares.accepted+(j.shares.rejected?' / '+j.shares.rejected+' '+t('rejected'):''),t('pool diff')+' '+diff(j.pool.difficulty)),
    tile(t('Best difficulty'),diff(j.best.session),t('best ever')+' '+diff(j.best.ever)),
    tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
@@ -223,10 +225,11 @@ const char *accentCss() {
 }
 
 void handleStats() {
+    const MinerStats stats = minerStats();
     JsonDocument j;
     j["board"] = board::modelName();
     j["firmware"] = FW_VERSION;
-    j["uptime_s"] = (millis() - stats.startMillis) / 1000;
+    j["uptime_s"] = minerUptimeSeconds();
     j["hashrate"] = minerHashrate();
     j["total_hashes"] = (double)minerTotalHashes();
     JsonArray engines = j["engines"].to<JsonArray>();
@@ -278,9 +281,13 @@ void handleStats() {
     j["heap"] = ESP.getFreeHeap();
     j["heap_max_block"] = ESP.getMaxAllocHeap();
     float temp = board::temperature();
+    j["temperature_source"] = board::temperatureSource();
     if (isnan(temp)) j["temp_c"] = nullptr;
     else j["temp_c"] = (int)lroundf(temp);
     j["throttle"] = minerThrottle() == Throttle::Paused ? "paused" : minerThrottle() == Throttle::Half ? "half" : "full";
+    j["power_percent"] = minerPowerPercent();
+    j["power_limit_percent"] = settings.miningPower;
+    if (minerThrottle() == Throttle::Reduced) j["throttle"] = "reduced";
     j["night"] = watchNight();
     j["boot_reason"] = bootReason();
     j["accent"] = accentCss();
@@ -353,49 +360,32 @@ void handleStats() {
 
 // Every setting's value, under its key.
 void settingValues(JsonObject values) {
+    Settings visible = settings;
+    visible.brightness = settingsBrightness();
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
+        const void *value = settingValue(s, visible);
         switch (s.type) {
             case SettingType::Text:
-            case SettingType::Secret: values[s.key] = *(String *)s.value; break;
+            case SettingType::Secret: values[s.key] = *(const String *)value; break;
             case SettingType::Number:
-                values[s.key] = s.bits == 8 ? *(uint8_t *)s.value : *(uint16_t *)s.value;
+                values[s.key] = s.bits == 8 ? *(const uint8_t *)value : *(const uint16_t *)value;
                 break;
-            case SettingType::Decimal: values[s.key] = *(double *)s.value; break;
-            case SettingType::Bool: values[s.key] = *(bool *)s.value; break;
+            case SettingType::Decimal: values[s.key] = *(const double *)value; break;
+            case SettingType::Bool: values[s.key] = *(const bool *)value; break;
         }
     }
 }
 
 // Applies the known keys of `values` and saves them; returns how many there were.
 int applySettings(JsonObjectConst values) {
-    int changed = 0;
-    for (size_t i = 0; i < kSettingCount; i++) {
-        const SettingInfo &s = kSettings[i];
-        JsonVariantConst v = values[s.key];
-        if (v.isNull()) continue;
-        // An empty web password from the web would lock the page out for good
-        // (it can still be cleared in the setup portal).
-        if (s.value == &settings.webPassword && v.as<String>().isEmpty()) continue;
-        switch (s.type) {
-            case SettingType::Text:
-            case SettingType::Secret: *(String *)s.value = v.as<String>(); break;
-            case SettingType::Number: {
-                long n = v.as<long>();
-                long max = s.bits == 8 ? 255 : 65535;
-                n = n < 0 ? 0 : n > max ? max : n;
-                if (s.bits == 8) *(uint8_t *)s.value = n;
-                else *(uint16_t *)s.value = n;
-                break;
-            }
-            case SettingType::Decimal: *(double *)s.value = v.as<double>(); break;
-            case SettingType::Bool: *(bool *)s.value = v.as<bool>(); break;
-        }
-        changed++;
-    }
+    // Network tasks keep using immutable live strings until the reboot.
+    Settings pending = settings;
+    pending.brightness = settingsBrightness();
+    int changed = settingsApply(pending, values);
     if (changed) {
-        settingsSanitize();
-        settingsSave();
+        settingsSanitize(pending);
+        settingsSave(pending, true);
     }
     return changed;
 }
@@ -424,6 +414,10 @@ void handleGetSettings() {
 // which applies everything the same way as at boot.
 void handlePostSettings() {
     if (!authorized()) return;
+    if (restartAt) {
+        server.send(409, "text/plain", "Restart pending; reload after the restart");
+        return;
+    }
     JsonDocument j;
     if (deserializeJson(j, server.arg("plain")) || !j.is<JsonObject>()) {
         server.send(400, "text/plain", "Not a settings object");
@@ -473,6 +467,10 @@ void handleGetBackup() {
 // of an earlier version); restores what it holds, then restarts.
 void handlePostBackup() {
     if (!authorized()) return;
+    if (restartAt) {
+        server.send(409, "text/plain", "Restart pending; reload after the restart");
+        return;
+    }
     JsonDocument j;
     if (deserializeJson(j, server.arg("plain")) || !j.is<JsonObject>()) {
         server.send(400, "text/plain", "Not a backup file");
@@ -512,34 +510,74 @@ void handlePostBackup() {
 
 // POST /update (multipart): a firmware.bin built for this board.
 bool updateAllowed = false;
+bool updateBusy = false, updateSuccess = false;
+String uploadError;
 
 void handleUpload() {
     HTTPUpload &up = server.upload();
+    // Even a continuously supplied (or unauthorized) upload must leave CPU
+    // time for the idle task; accepted OTA already pauses the miners.
+    if (up.status == UPLOAD_FILE_WRITE) vTaskDelay(1);
     if (up.status == UPLOAD_FILE_START) {
+        if (ota::owns(ota::Owner::Web) && !restartAt) {
+            // One file per request. Never attach another part to this session.
+            if (Update.isRunning()) Update.abort();
+            ota::release(ota::Owner::Web);
+            updateSuccess = false;
+            uploadError = "Only one firmware file is allowed";
+            return;
+        }
+        updateBusy = updateSuccess = false;
+        uploadError = "";
         updateAllowed = !settings.webPassword.isEmpty() && server.authenticate("admin", settings.webPassword.c_str());
         if (!updateAllowed) return;
+        if (restartAt || !ota::acquire(ota::Owner::Web)) {
+            updateBusy = true;
+            updateAllowed = false;
+            return;
+        }
         logf("[web] firmware update: %s\n", up.filename.c_str());
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) logf("[web] update: %s\n", Update.errorString());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            uploadError = Update.errorString();
+            ota::release(ota::Owner::Web);
+        }
     } else if (!updateAllowed) {
         return;
+    } else if (!ota::owns(ota::Owner::Web)) {
+        return;
     } else if (up.status == UPLOAD_FILE_WRITE) {
-        if (Update.isRunning() && Update.write(up.buf, up.currentSize) != up.currentSize)
-            logf("[web] update: %s\n", Update.errorString());
+        if (Update.write(up.buf, up.currentSize) != up.currentSize) {
+            uploadError = Update.errorString();
+            Update.abort();
+            ota::release(ota::Owner::Web);
+        }
     } else if (up.status == UPLOAD_FILE_END) {
-        if (Update.isRunning() && Update.end(true)) logf("[web] update: %u bytes written\n", (unsigned)up.totalSize);
+        updateSuccess = Update.end(true);
+        if (updateSuccess) logf("[web] update: %u bytes written\n", (unsigned)up.totalSize);
+        else {
+            uploadError = Update.errorString();
+            Update.abort();
+            ota::release(ota::Owner::Web);
+        }
     } else if (up.status == UPLOAD_FILE_ABORTED) {
         Update.abort();
+        uploadError = "Upload aborted";
+        ota::release(ota::Owner::Web);
     }
 }
 
 void handleUpdateDone() {
+    if (updateBusy) {
+        server.send(409, "text/plain", "Another firmware update is already running");
+        return;
+    }
     if (!updateAllowed) {
         authorized();  // sends the right refusal
         return;
     }
-    if (Update.hasError() || !Update.isFinished()) {
+    if (!updateSuccess) {
         server.send(500, "text/plain",
-                    String("Update failed: ") + Update.errorString() +
+                    String("Update failed: ") + uploadError +
                         " (boards whose firmware does not fit twice in flash can only be updated by USB)");
         return;
     }
@@ -549,6 +587,7 @@ void handleUpdateDone() {
 
 // Prometheus text format, for Grafana / Home Assistant scrapers.
 void handleMetrics() {
+    const MinerStats stats = minerStats();
     String out;
     out.reserve(1536);
     auto metric = [&out](const char *name, const char *type, double value, const char *labels = "") {
@@ -576,9 +615,10 @@ void handleMetrics() {
     metric("bdlminer_pool_difficulty", "gauge", stats.poolDiff);
     metric("bdlminer_block_height", "gauge", stats.blockHeight);
     metric("bdlminer_network_difficulty", "gauge", stats.networkDiff);
-    metric("bdlminer_uptime_seconds", "gauge", (millis() - stats.startMillis) / 1000);
+    metric("bdlminer_uptime_seconds", "gauge", minerUptimeSeconds());
     if (!isnan(board::temperature())) metric("bdlminer_temperature_celsius", "gauge", board::temperature());
     metric("bdlminer_throttle", "gauge", (int)minerThrottle());
+    metric("bdlminer_power_percent", "gauge", minerPowerPercent());
     metric("bdlminer_wifi_rssi_dbm", "gauge", WiFi.RSSI());
     metric("bdlminer_free_heap_bytes", "gauge", ESP.getFreeHeap());
     for (int i = 0; i < stats.minerCount; i++) {
@@ -593,6 +633,13 @@ void handleMetrics() {
     metric("bdlminer_info", "gauge", 1, labels);
     server.sendHeader("Cache-Control", "no-store");
     server.send(200, "text/plain; version=0.0.4", out);
+}
+
+void webTask(void *) {
+    for (;;) {
+        server.handleClient();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 }
 
 }  // namespace
@@ -629,14 +676,20 @@ void webStart() {
     server.on("/metrics", HTTP_GET, handleMetrics);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
     server.begin();
+    // Slow HTTP clients must never stop the loop that owns the I2C sensors,
+    // thermal control, buttons and screen. The worker uses cached snapshots.
+    if (xTaskCreatePinnedToCore(webTask, "web", 6144, nullptr, 2, nullptr, 0) != pdPASS) {
+        server.stop();
+        logf("[web] not enough memory to start the web task\n");
+        return;
+    }
     logf("[web] dashboard: http://%s/ or http://%s.local/\n", WiFi.localIP().toString().c_str(), name);
 }
 
 void webHandle() {
-    server.handleClient();
     if (restartAt && (int32_t)(millis() - restartAt) >= 0) {
         minerSaveStats();  // does nothing after a restored backup
-        setRestartReason(restartWhy);
+        setRestartReason(restartWhy.load());
         ESP.restart();
     }
 }

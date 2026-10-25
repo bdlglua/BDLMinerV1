@@ -25,6 +25,9 @@ constexpr uint32_t kMinHeapForTls = 70 * 1024;
 constexpr uint32_t kPoolStatsMs = 30 * 60 * 1000;
 constexpr uint32_t kPoolStatsRetryMs = 60 * 60 * 1000;  // unknown API: try again hourly
 
+uint32_t endpointAt[6] = {};
+bool endpointValid[6] = {};
+
 MarketData data;
 PoolStats pool;
 portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
@@ -32,7 +35,7 @@ portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 // GET `path` on the TLS connection shared by one refresh and parse the JSON
 // body through `filter` (keeps RAM low: large arrays such as the mempool fee
 // histogram are skipped). The bodies are a few hundred bytes.
-bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocument &doc, const JsonDocument &filter) {
+bool fetch(int endpoint, WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocument &doc, const JsonDocument &filter) {
     String url = String(kApi) + path;
     if (!http.begin(tls, url)) {
         tls.stop();
@@ -66,6 +69,7 @@ bool fetch(WiFiClientSecure &tls, HTTPClient &http, const char *path, JsonDocume
         logf("[market] %s: HTTP %d\n", path, code);
     }
     http.end();  // keeps the connection open when the server allows it
+    if (ok) { endpointAt[endpoint] = millis(); endpointValid[endpoint] = true; }
     return ok;
 }
 
@@ -81,64 +85,69 @@ bool refresh() {
     http.setReuse(true);
     http.setTimeout(10000);
     MarketData d = marketGet();
-    int ok = 0;
+    int ok = 0, attempted = 0;
+    auto needed = [&](int endpoint) {
+        bool due = !endpointValid[endpoint] || millis() - endpointAt[endpoint] >= kRefreshMs;
+        if (due) attempted++;
+        return due;
+    };
 
-    {
+    if (needed(0)) {
         JsonDocument filter, doc;
         filter[settings.currency.c_str()] = true;
-        if (fetch(tls, http, "/v1/prices", doc, filter)) {
+        if (fetch(0, tls, http, "/v1/prices", doc, filter)) {
             d.price = doc[settings.currency.c_str()] | 0.0;
             ok++;
         }
     }
-    {
+    if (needed(1)) {
         JsonDocument filter, doc;
         filter["fastestFee"] = true;
         filter["halfHourFee"] = true;
         filter["hourFee"] = true;
-        if (fetch(tls, http, "/v1/fees/recommended", doc, filter)) {
+        if (fetch(1, tls, http, "/v1/fees/recommended", doc, filter)) {
             d.feeFast = doc["fastestFee"] | 0;
             d.feeHalfHour = doc["halfHourFee"] | 0;
             d.feeHour = doc["hourFee"] | 0;
             ok++;
         }
     }
-    {
+    if (needed(2)) {
         JsonDocument filter, doc;
         filter["currentHashrate"] = true;
-        if (fetch(tls, http, "/v1/mining/hashrate/3d", doc, filter)) {
+        if (fetch(2, tls, http, "/v1/mining/hashrate/3d", doc, filter)) {
             d.networkHashrate = doc["currentHashrate"] | 0.0;
             ok++;
         }
     }
-    {
+    if (needed(3)) {
         JsonDocument filter, doc;
         filter["progressPercent"] = true;
         filter["difficultyChange"] = true;
         filter["remainingBlocks"] = true;
-        if (fetch(tls, http, "/v1/difficulty-adjustment", doc, filter)) {
+        if (fetch(3, tls, http, "/v1/difficulty-adjustment", doc, filter)) {
             d.retargetProgress = doc["progressPercent"] | 0.0;
             d.retargetChange = doc["difficultyChange"] | 0.0;
             d.retargetBlocks = doc["remainingBlocks"] | 0;
             ok++;
         }
     }
-    {
+    if (needed(4)) {
         JsonDocument filter, doc;
         filter["count"] = true;
-        if (fetch(tls, http, "/mempool", doc, filter)) {
+        if (fetch(4, tls, http, "/mempool", doc, filter)) {
             d.mempoolTx = doc["count"] | 0;
             ok++;
         }
     }
-    {
+    if (needed(5)) {
         JsonDocument filter, doc;
         JsonObject b = filter.add<JsonObject>();
         b["height"] = true;
         b["timestamp"] = true;
         b["tx_count"] = true;
         b["extras"]["pool"]["name"] = true;
-        if (fetch(tls, http, "/v1/blocks", doc, filter)) {
+        if (fetch(5, tls, http, "/v1/blocks", doc, filter)) {
             d.blockCount = 0;
             for (JsonObject o : doc.as<JsonArray>()) {
                 if (d.blockCount == sizeof(d.blocks) / sizeof(d.blocks[0])) break;
@@ -156,10 +165,10 @@ bool refresh() {
     portENTER_CRITICAL(&dataMux);
     data = d;
     portEXIT_CRITICAL(&dataMux);
-    logf("[market] %d/6 ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
-         ok, (unsigned)(millis() - t0), d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour,
+    logf("[market] %d/%d ok in %u ms | 1 BTC = %.0f %s | fees %u/%u/%u | net %.3g H/s | retarget %+.2f%% in %u\n",
+         ok, attempted, (unsigned)(millis() - t0), d.price, settings.currency.c_str(), d.feeFast, d.feeHalfHour, d.feeHour,
          d.networkHashrate, d.retargetChange, (unsigned)d.retargetBlocks);
-    return ok == 6;
+    return ok == attempted;
 }
 
 // "856K" (ckpool hash rates) -> 856000
@@ -234,12 +243,17 @@ bool refreshPoolStats() {
 
 void marketTask(void *) {
     uint32_t nextMarket = 0, nextPool = 60000;  // pool stats once mining for a minute
+    uint32_t retry = kRetryMs;
     for (;;) {
-        uint32_t now = millis();
-        if (WiFi.isConnected() && (int32_t)(now - nextMarket) >= 0)
-            nextMarket = now + (refresh() ? kRefreshMs : kRetryMs);
-        if (WiFi.isConnected() && stats.poolConnected && (int32_t)(now - nextPool) >= 0)
-            nextPool = now + (refreshPoolStats() ? kPoolStatsMs : kPoolStatsRetryMs);
+        if (WiFi.isConnected() && (int32_t)(millis() - nextMarket) >= 0) {
+            bool ok = refresh();
+            nextMarket = millis() + (ok ? kRefreshMs : retry);
+            retry = ok ? kRetryMs : min<uint32_t>(retry * 2, kRefreshMs);
+        }
+        if (WiFi.isConnected() && minerStats().poolConnected && (int32_t)(millis() - nextPool) >= 0) {
+            bool ok = refreshPoolStats();
+            nextPool = millis() + (ok ? kPoolStatsMs : kPoolStatsRetryMs);
+        }
         ghUpdatePoll();
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
