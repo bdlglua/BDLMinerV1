@@ -150,3 +150,16 @@ Object.assign(FR,{
  'Start measurement':'Démarrer la mesure','Finish now':'Terminer maintenant','Download report':'Télécharger le rapport','Preparing measurement…':'Préparation de la mesure…','Measurement running…':'Mesure en cours…','Measurement cancelled. Keep this tab visible.':'Mesure annulée. Garde cet onglet visible.',
  'Miner restarted. Start a new measurement.':'Le miner a redémarré. Lance une nouvelle mesure.','Waiting for a new sample.':'En attente d’un nouveau relevé.','Measured hashrate':'Hashrate mesuré','Temperature samples contain gaps.':'Les relevés de température comportent des interruptions.'
 });
+Object.assign(FR,{
+ 'PERFORMANCE HISTORY':'SUIVI DES PERFORMANCES','Every hash, in perspective.':'Le minage dans la durée.',
+ 'Average of displayed samples':'Moyenne des points affichés','Minimum':'Minimum','Maximum':'Maximum','Samples':'Points',
+ 'Latest point':'Dernier point','Displayed history':'Historique affiché','Sampling interval':'Pas des mesures','Observation coverage':'Couverture des mesures',
+ 'History period':'Période de l’historique','Device overview':'État de la carte',
+ 'Five-minute averages. Time is relative to the latest recorded point. Use arrow keys to inspect.':'Moyennes sur cinq minutes. Temps relatif au dernier point enregistré. Utilise les flèches du clavier pour consulter les valeurs.',
+ 'Gaps mean missing observations.':'Les coupures indiquent des mesures manquantes.',
+ 'A usable temperature sensor is required.':'Un capteur de température utilisable est nécessaire.',
+ 'The first history point appears after five minutes of mining.':'Le premier point apparaît après cinq minutes de minage.',
+ 'Mining records':'Records du minage','Shares, luck and lifetime totals':'Shares, probabilités et compteurs cumulés',
+ 'Diagnostics & measurements':'Diagnostics et mesures','TLS, mining workers and ten-minute report':'TLS, moteurs de minage et rapport sur dix minutes'
+});
+Object.assign(FR,{'Other miners refresh every 15 seconds.':'Les autres miners sont actualisés toutes les 15 secondes.','accepted':'acceptées','One recorded sample':'Un point enregistré'});

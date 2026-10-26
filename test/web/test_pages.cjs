@@ -145,17 +145,17 @@ check('a stalled response body is also covered by the timeout',()=>run({},async 
 
 check('64-bit share counter shows exact count, translated session scope and realistic interval',()=>run({language:'fr',stats:{hashrate:1000000,over64bits:7}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#m .t');
-  const card=f.page.locator('#m .t').filter({has:f.page.locator('.l').filter({hasText:/^Shares 64 bits$/})});
+  const card=f.page.locator('#records-grid .t').filter({has:f.page.locator('.l').filter({hasText:/^Shares 64 bits$/})});
   assert.equal(await card.locator('.v').textContent(),'7');
   assert.match(await card.locator('.s').textContent(),/Depuis le redémarrage.*585 k ans/);
   f.state.stats.hashrate=0;f.state.stats.over64bits=0;
-  await f.page.waitForFunction(()=>[...document.querySelectorAll('#m .t')].some(e=>e.querySelector('.l')?.textContent==='Shares 64 bits'&&e.querySelector('.v')?.textContent==='0'));
+  await f.page.waitForFunction(()=>[...document.querySelectorAll('#records-grid .t')].some(e=>e.querySelector('.l')?.textContent==='Shares 64 bits'&&e.querySelector('.v')?.textContent==='0'));
   assert.match(await card.locator('.s').textContent(),/1 toutes les - en moyenne/);
 }));
 
 check('64-bit share display supports older miners without the counter',()=>run({stats:{over64bits:undefined}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#m .t');
-  const card=f.page.locator('#m .t').filter({has:f.page.locator('.l').filter({hasText:/^64-bit shares$/})});
+  const card=f.page.locator('#records-grid .t').filter({has:f.page.locator('.l').filter({hasText:/^64-bit shares$/})});
   assert.equal(await card.locator('.v').textContent(),'0');
   assert.match(await card.locator('.s').textContent(),/Since restart/);
 }));
@@ -338,7 +338,7 @@ check('history CSV retains sensor gaps and power limits',()=>run({stats:{history
   assert.match(text,/5,1000000,,100,100/);assert.match(text,/0,500000,60,50,98/);
 }));
 check('diagnostics show worker wall times and TLS counts',()=>run({},async f=>{
-  await f.page.goto(f.url);await f.page.waitForSelector('#profile-grid .t');assert.match(await f.page.locator('#profile-grid').textContent(),/TLS handshakes/);
+  await f.page.goto(f.url);await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#profile-grid .t');assert.match(await f.page.locator('#profile-grid').textContent(),/TLS handshakes/);
   assert.match(await f.page.locator('#profile-grid').textContent(),/Mining worker 0/);
 }));
 check('failed flash saves stay translated and allow another attempt',()=>run({language:'fr',postStatus:500,postText:'Settings could not be saved. Previous configuration kept; try again.'},async f=>{
@@ -351,7 +351,7 @@ check('GitHub download retries are visible and can be requested immediately',()=
   assert.match(await f.page.locator('#updates').textContent(),/Prochaine tentative dans 5m/);
 }));
 check('measurement uses actual hash deltas and exports no settings secrets',()=>run({},async f=>{
-  await f.page.goto(f.url);await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');
+  await f.page.goto(f.url);await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');
   await f.page.waitForSelector('#stop-benchmark:enabled');f.state.stats.uptime_s=300;f.state.stats.total_hashes=300000000;f.state.stats.temp_c=60;f.state.stats.power_percent=50;
   await f.page.waitForFunction(()=>document.querySelector('#benchmark-status').textContent.includes('5m'));
   await f.page.click('#stop-benchmark');await f.page.waitForSelector('#download-benchmark:enabled');
@@ -363,7 +363,7 @@ check('measurement uses actual hash deltas and exports no settings secrets',()=>
 check('measurement is cancelled by a restart or a hidden tab',()=>run({},async f=>{
   f.state.stats.uptime_s=100;f.state.stats.total_hashes=100000000;
   await f.page.addInitScript(()=>{window.__hidden=false;Object.defineProperty(document,'hidden',{get:()=>window.__hidden})});
-  await f.page.goto(f.url);await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
+  await f.page.goto(f.url);await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
   f.state.stats.uptime_s=2;f.state.stats.total_hashes=1000;await f.page.waitForFunction(()=>document.querySelector('#benchmark-status').textContent.includes('restarted'));
   assert.equal(await f.page.locator('#download-benchmark').isDisabled(),true);
   await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
@@ -374,23 +374,71 @@ check('measurement is cancelled by a restart or a hidden tab',()=>run({},async f
 
 check('measurement automatically finishes after ten minutes of device uptime',()=>run({},async f=>{
   f.state.stats.uptime_s=100;f.state.stats.total_hashes=100000000;
-  await f.page.goto(f.url);await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
+  await f.page.goto(f.url);await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
   f.state.stats.uptime_s=700;f.state.stats.total_hashes=700000000;
   await f.page.waitForSelector('#download-benchmark:enabled');assert.match(await f.page.locator('#benchmark-status').textContent(),/1\.00 MH\/s/);
   assert.equal(await f.page.locator('#stop-benchmark').isDisabled(),true);
 }));
 check('boot identity invalidates history and measurements even with higher counters',()=>run({stats:{history:undefined,history_revision:1,boot_id:'old',uptime_s:100,total_hashes:100000000}},async f=>{
-  f.state.diagnostics.boot_id='old';await f.page.goto(f.url);await f.page.waitForSelector('#history-grid .t');
+  f.state.diagnostics.boot_id='old';await f.page.goto(f.url);await f.page.waitForSelector('#history-grid .t');await f.page.locator('#diagnostics>summary').click();
   await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
   f.state.stats.boot_id='new';f.state.stats.uptime_s=200;f.state.stats.total_hashes=200000000;
   await f.page.waitForFunction(()=>document.querySelector('#benchmark-status').textContent.includes('restarted'));
   assert.equal(await f.page.locator('#download-benchmark').isDisabled(),true);assert.equal(f.state.historyCalls,2);
 }));
 
+check('chart periods filter locally, retain focus and export only the visible samples',()=>run({stats:{history:undefined,history_revision:1},history:{hashrate:Array.from({length:288},(_,i)=>(i+1)*1000),temperature_c:Array(288).fill(50),power_percent:Array(288).fill(100),coverage_percent:Array(288).fill(100),interval_s:300,revision:1}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='73');
+ await f.page.click('[data-range="3600"]');assert.equal(await f.page.locator('#chart-count').textContent(),'13');assert.equal(await f.page.locator('#chart-average').textContent(),'282 kH/s');
+ await f.page.waitForTimeout(150);assert.equal(f.state.historyCalls,1);assert.equal(await f.page.locator('[data-range="3600"]').evaluate(e=>e===document.activeElement),true);
+ const waiting=f.page.waitForEvent('download');await f.page.click('#download-history');const file=await waiting,stream=await file.createReadStream();let csv='';for await(const chunk of stream)csv+=chunk.toString();assert.equal(csv.trim().split('\n').length,14);assert.match(csv,/60,276000,50,100,100/);
+ await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='13');assert.equal(await f.page.locator('[data-range="3600"]').getAttribute('aria-pressed'),'true');
+ await f.page.click('[data-range="86400"]');assert.equal(await f.page.locator('#chart-count').textContent(),'288');
+}));
+check('charts preserve zeroes and missing positions and synchronize keyboard inspection',()=>run({stats:{history:undefined,history_revision:1,max_temp_c:65},history:{hashrate:[1000000,null,0,500000],temperature_c:[40,null,45,50],power_percent:[100,null,0,50],coverage_percent:[100,0,100,98],interval_s:300,revision:1}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='3');
+ const path=await f.page.locator('[data-series="hashrate"]').getAttribute('d');assert.equal((path.match(/M/g)||[]).length,2);assert.equal(/NaN|Infinity/.test(path),false);
+ assert.equal(await f.page.locator('.plot-limit').count(),1);assert.match(await f.page.locator('#history-grid').textContent(),/Configured limit 65/);
+ await f.page.locator('#hashrate-history').focus();await f.page.keyboard.press('Home');assert.match(await f.page.locator('#chart-inspection').textContent(),/1\.00 MH\/s/);
+ await f.page.keyboard.press('ArrowRight');assert.equal(await f.page.locator('#chart-inspection strong').allTextContents().then(a=>a.join('')),'———');assert.equal(await f.page.locator('.plot-dot[visibility="visible"]').count(),0);
+ await f.page.keyboard.press('ArrowRight');assert.match(await f.page.locator('#chart-inspection').textContent(),/0 H\/s/);assert.equal(await f.page.locator('.plot-dot[visibility="visible"]').count(),3);
+ await f.page.keyboard.press('End');assert.match(await f.page.locator('#chart-inspection').textContent(),/Latest point.*500 kH\/s.*98 %/);
+}));
+check('live polls retain metric and chart nodes and a focused update button',()=>run({stats:{history:undefined,history_revision:1,github_update:{available:false,mode:1,checked:true}}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='2');await f.page.waitForTimeout(80);
+ await f.page.evaluate(()=>{window.__chart=document.querySelector('#hashrate-history svg');window.__rate=document.querySelector('#m .hero .v')});await f.page.locator('.gh-check').focus();
+ f.state.stats.hashrate=1234567;await f.page.waitForFunction(()=>document.querySelector('#m .hero .v').textContent==='1.23 MH/s');
+ assert.equal(await f.page.evaluate(()=>window.__chart===document.querySelector('#hashrate-history svg')&&window.__rate===document.querySelector('#m .hero .v')),true);assert.equal(await f.page.locator('.gh-check').evaluate(e=>e===document.activeElement),true);assert.equal(f.state.historyCalls,1);
+}));
+check('diagnostics load on demand and peer polling is paced independently',()=>run({stats:{peers:['peer.test'],hashrate:1000}},async f=>{
+ let calls=0;await f.page.route('http://peer.test/api/stats?history=0',route=>{calls++;return route.fulfill({json:{hashrate:2000,pool:{connected:true},shares:{accepted:3},best:{ever:1}}})});
+ await f.page.goto(f.url);await f.page.waitForSelector('#p .t');await f.page.waitForTimeout(180);assert.equal(calls,1);assert.equal(f.state.requests.some(r=>r==='GET /api/diagnostics'),false);
+ await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#profile-grid .t');assert.equal(f.state.requests.filter(r=>r==='GET /api/diagnostics').length,1);
+ await f.page.locator('#diagnostics>summary').click();assert.equal(await f.page.locator('#diagnostics').getAttribute('open'),null);
+}));
+check('charts remain readable and bounded after mobile and desktop resizing',()=>run({stats:{history:undefined,history_revision:1}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='2');
+ for(const width of [320,375,768,1440]){await f.page.setViewportSize({width,height:850});await f.page.waitForTimeout(80);assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);const view=await f.page.locator('#hashrate-history svg').getAttribute('viewBox');assert.ok(Number(view.split(' ')[2])>=240);assert.equal(await f.page.locator('path[data-series]').evaluateAll(nodes=>nodes.some(n=>/NaN|Infinity/.test(n.getAttribute('d')))),false)}
+ assert.equal(f.state.historyCalls,1);
+}));
+check('pointer and touch inspection select actual points without changing polling',()=>run({stats:{history:undefined,history_revision:1}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='2');
+ const box=await f.page.locator('#hashrate-history').boundingBox();await f.page.mouse.move(box.x+62,box.y+60);await f.page.waitForTimeout(30);assert.match(await f.page.locator('#chart-inspection').textContent(),/1\.00 MH\/s/);
+ await f.page.locator('#hashrate-history').dispatchEvent('pointerdown',{pointerType:'touch',clientX:box.x+box.width-20,clientY:box.y+60});await f.page.waitForTimeout(30);assert.match(await f.page.locator('#chart-inspection').textContent(),/900 kH\/s/);
+ assert.equal(f.state.historyCalls,1);
+}));
+check('empty and single-point histories show honest states without invented samples',()=>run({stats:{history:undefined,history_revision:1},history:{hashrate:[],temperature_c:[],power_percent:[],coverage_percent:[],interval_s:300,revision:1}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForSelector('#hashrate-history .plot-empty');assert.equal(await f.page.locator('#download-history').isDisabled(),true);assert.match(await f.page.locator('#hashrate-history').textContent(),/first history point appears after five minutes/);
+ f.state.history={hashrate:[0],temperature_c:[null],power_percent:[0],coverage_percent:[100],interval_s:300,revision:2};f.state.stats.history_revision=2;
+ await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='1');assert.equal(await f.page.locator('#chart-average').textContent(),'0 H/s');assert.equal(await f.page.locator('#download-history').isEnabled(),true);assert.match(await f.page.locator('#history-grid').textContent(),/usable temperature sensor/);
+}));
+
 if(process.env.BDL_SCREENSHOT_DIR){
+ const previewHistory={hashrate:[],temperature_c:[],power_percent:[],coverage_percent:[],interval_s:300,revision:1};
+ for(let i=0;i<288;i++){const limited=i>=244&&i<252,gap=i>=262&&i<265;previewHistory.hashrate.push(gap?null:Math.round((limited?510000:997000)+17000*Math.sin(i/9)+8000*Math.cos(i/3)));previewHistory.temperature_c.push(gap?null:Math.round((51+8*Math.sin(i/19)+(limited?3:0))*10)/10);previewHistory.power_percent.push(gap?null:limited?50:100);previewHistory.coverage_percent.push(gap?0:100)}
  fs.mkdirSync(process.env.BDL_SCREENSHOT_DIR,{recursive:true});
  for(const [name,options,route]of [['dashboard',{language:'fr'},'/'],['mobile',{mobile:true,language:'fr'},'/'],['settings',{language:'fr'},'/settings'],['log',{language:'fr'},'/log']]){
-  check('visual preview '+name,()=>run({...options,stats:{hashrate:1001240,hashrate_live:1004820,engines:[{name:'hw',rate:968500},{name:'sw',rate:27000},{name:'fill',rate:5740}],power_percent:100,power_limit_percent:100,throttle:'full',limitation_reason:'full',max_temp_c:65,uptime_s:18432,shares:{accepted:247,rejected:1},best:{session:0.0034,ever:1.28},history:undefined,history_revision:1,boot_id:'preview',github_update:{mode:2,checked:true,version:'1.1.0',available:false},board:'M5StickC Plus2'}},async f=>{
+  check('visual preview '+name,()=>run({...options,history:previewHistory,stats:{firmware:'1.3.0',hashrate:1001240,hashrate_live:1004820,engines:[{name:'hw',rate:968500},{name:'sw',rate:27000},{name:'fill',rate:5740}],power_percent:100,power_limit_percent:100,throttle:'full',limitation_reason:'full',max_temp_c:65,uptime_s:18432,shares:{accepted:247,rejected:1},best:{session:0.0034,ever:1.28},history:undefined,history_revision:1,boot_id:'preview',github_update:{mode:2,checked:true,version:'1.3.0',available:false},board:'M5StickC Plus2'}},async f=>{
    await f.page.goto(f.url+route);await f.page.waitForTimeout(200);
    await f.page.screenshot({path:path.join(process.env.BDL_SCREENSHOT_DIR,name+'.png'),fullPage:true});
   }));

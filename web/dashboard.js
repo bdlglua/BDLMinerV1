@@ -1,24 +1,38 @@
 let cachedHistory={hashrate:[],interval_s:300},historyRevision=null,historyRetryAt=0,lastUptime=-1,lastBootId=null,latestStats=null;
+let historyRange=21600,historySelected=null,plotViews=[],historyWidth=0,historySignature='',lastChartLimit=null;
+let historyPointerFrame=0,peerCacheKey='',peerCache=[],peerCacheAt=0;
+try{const saved=Number(localStorage.getItem('bdl-history-range'));if([3600,21600,86400].includes(saved))historyRange=saved}catch(e){}
 const SI=['','k','M','G','T','P','E','Z','Y'];
 function si(v,u=''){if(v==null||!Number.isFinite(v))return'-';if(v===0)return'0'+(u?' '+u:'');let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
 function diff(d){return!d?'-':d<1?d.toFixed(5):si(d)}
 function dur(s){if(!Number.isFinite(s))return'-';s=Math.max(0,s);if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+(LANG=='fr'?'j ':'d '):'')+(d||h?h+'h ':'')+m+'m'}
 function share64Wait(hr){if(!(hr>0))return'-';const s=18446744073709551616/hr;return s>=31557600?si(s/31557600)+' '+t('years'):dur(s)}
 function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*4294967296));return(LANG=='fr'?'1 sur ':'1 in ')+si(1/p).replace(' ','')}
-function chart(h={}){const v=Array.isArray(h.hashrate)?h.hashrate.filter(Number.isFinite):[],t0=tile(t('Hashrate history'),undefined,v.length?t('5-min averages, last')+' '+dur(v.length*h.interval_s)+' · '+t('avg')+' '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · '+t('range')+' '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):t('first point after')+' '+h.interval_s/60+' '+t('min of mining'),true);
- t0.id='hashrate-history';
- if(v.length>1){const N='http://www.w3.org/2000/svg',W=600,H=140,lo=Math.min(...v),hi=Math.max(...v),k=(H-4)/((hi-lo)||hi||1),s=document.createElementNS(N,'svg'),p=document.createElementNS(N,'polyline');
-  s.setAttribute('viewBox','0 0 '+W+' '+H);s.setAttribute('preserveAspectRatio','none');s.style.cssText='display:block;width:100%;height:140px;margin:6px 0';
-  p.setAttribute('points',v.map((y,i)=>(i*W/(v.length-1)).toFixed(1)+','+(H-2-(y-lo)*k).toFixed(1)).join(' '));
-  p.setAttribute('vector-effect','non-scaling-stroke');p.style.cssText='fill:none;stroke:var(--accent);stroke-width:2';
-  s.appendChild(p);t0.insertBefore(s,t0.lastChild)}return t0}
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  if(label===t('Hashrate'))e.classList.add('hero');
  if(label===t('Hashrate history'))e.classList.add('history');
- for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
+ for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power'],records:['32-bit shares','64-bit shares','Block chance','Blocks found','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
 
+function textAt(id,value){const node=document.getElementById(id);if(node.textContent!==String(value))node.textContent=value}
+function syncTiles(id,nodes){
+ const parent=document.getElementById(id),old=new Map([...parent.children].map(e=>[e.querySelector('.l')?.textContent,e]));
+ nodes.forEach((fresh,i)=>{
+  const key=fresh.querySelector('.l')?.textContent,node=old.get(key)||fresh;old.delete(key);
+  if(node!==fresh){node.className=fresh.className;if(node.children.length!==fresh.children.length)node.replaceChildren(...fresh.childNodes);else [...fresh.children].forEach((child,j)=>{if(node.children[j].textContent!==child.textContent)node.children[j].textContent=child.textContent})}
+  if(parent.children[i]!==node)parent.insertBefore(node,parent.children[i]||null);
+ });
+ old.forEach(node=>node.remove());
+}
+
 let installPending=false,installRequestId=0,installError='',checkPending=false;
+let updateSignature='';
+function renderUpdate(u){
+ const signature=JSON.stringify([u,installPending,installError,checkPending]);if(signature===updateSignature)return;
+ updateSignature=signature;const focused=document.activeElement?.classList.contains('gh-check')?'gh-check':document.activeElement?.classList.contains('gh-install')?'gh-install':null;
+ const card=upd(u);document.getElementById('updates').replaceChildren(...(card?[card]:[]));
+ if(focused)document.querySelector('#updates .'+focused+':enabled')?.focus({preventScroll:true});
+}
 function upd(u){
  if(!u)return;
  if(installPending&&(u.request_id||0)!==installRequestId)installPending=false;
@@ -73,16 +87,16 @@ async function peer(u){
 async function tick(){
  try{const j=await request('/api/stats?history=0');const m=j.market,pv=j.pool_view;
   if(!m||!pv||!j.pool||!Array.isArray(j.engines))throw Error(t('Invalid response from the miner.'));
-  if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0}
+  if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;renderHistory()}
   lastUptime=j.uptime_s;lastBootId=j.boot_id||null;latestStats=j;
-  if(j.history)cachedHistory=j.history;
+  if(j.history){const signature=JSON.stringify(j.history);if(signature!==historySignature){cachedHistory=normalizeHistory(j.history);historySignature=signature;renderHistory()}}
   sampleBenchmark(j);
   document.getElementById('start-benchmark').disabled=benchmarkBusy||!!benchmark;
   document.documentElement.style.setProperty('--accent',j.accent);
-  const st=document.getElementById('st');st.textContent=t(j.pool.connected?'ONLINE':'OFFLINE');st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';
+  const st=document.getElementById('st');textAt('st',t(j.pool.connected?'ONLINE':'OFFLINE'));st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';st.dataset.state=j.pool.connected?'online':'disconnected';
   const state=j.throttle=='paused'?'⚠ '+t('mining paused'):j.throttle=='half'?t('battery saver: half speed'):j.throttle=='reduced'?t('power limited'):'';
   const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),t('1-minute average')+(Number.isFinite(j.hashrate_live)?' · '+t('Live (10 s)')+': '+si(j.hashrate_live,'H/s'):'')+'\n'+j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state+' · '+j.power_percent+' %':''),true),
-   tile(t('Shares'),j.shares.accepted+(j.shares.rejected?' / '+j.shares.rejected+' '+t('rejected'):''),t('pool diff')+' '+diff(j.pool.difficulty)+(j.pool.pending_shares?' · '+j.pool.pending_shares+' '+t('awaiting response'):'')),
+   tile(t('Shares'),j.shares.accepted,t('accepted')+(j.shares.rejected?' · '+j.shares.rejected+' '+t('rejected'):'')+'\n'+t('pool diff')+' '+diff(j.pool.difficulty)+(j.pool.pending_shares?' · '+j.pool.pending_shares+' '+t('awaiting response'):'')),
    tile(t('Best difficulty'),diff(j.best.session),t('best ever')+' '+diff(j.best.ever)),
    tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
    tile(t('64-bit shares'),j.over64bits??0,t('Since restart')+' · '+t('1 every')+' '+share64Wait(j.hashrate)+' '+t('on average')),
@@ -90,9 +104,8 @@ async function tick(){
    tile(t('Blocks found'),j.blocks,t('lifetime')+' '+j.lifetime.blocks),
    tile(t('Total hashes'),si(j.total_hashes),t('uptime')+' '+dur(j.uptime_s)),
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
-   tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds)),
-   chart(cachedHistory)];
-  const u=upd(j.github_update);document.getElementById('updates').replaceChildren(...(u?[u]:[]));
+   tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];
+  renderUpdate(j.github_update);
   if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')));
   else if(!pv.supported)T.push(tile(t('Seen by the pool'),'-',t('no stats API known for this pool')));
   const now=Date.now()/1e3,B=j.blocks_recent||[];
@@ -109,20 +122,24 @@ async function tick(){
    tile(t('Memory'),si(j.heap,'B'),t('largest block')+': '+si(j.heap_max_block,'B')),
    tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB'+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason),
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
-  for(const [group,id]of Object.entries({pool:'pool-grid',market:'market-grid',device:'device-grid',main:'m'}))document.getElementById(id).replaceChildren(...T.filter(e=>(e.dataset.group||'main')===group));
+  for(const [group,id]of Object.entries({pool:'pool-grid',market:'market-grid',device:'device-grid',records:'records-grid',main:'m'}))syncTiles(id,T.filter(e=>(e.dataset.group||'main')===group));
+  renderOverview(j);
+  if(lastChartLimit!==j.max_temp_c){lastChartLimit=j.max_temp_c;renderHistory()}
   document.getElementById('market-note').textContent=m.updated_s>=0?'':t('Public market data is temporarily unavailable. Mining can continue.');
   renderHealth(j);
   document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
 
+  await refreshHistory(j);
   const hosts=peerHosts(j.peers,j.ip);
   document.getElementById('ph').hidden=!hosts.length;
+  document.getElementById('peers-section').hidden=!hosts.length;
   if(hosts.length){
-   const replies=await Promise.all(hosts.map(peer));let total=j.hashrate;
+   const key=hosts.map(u=>u.origin).join('|');if(key!==peerCacheKey||Date.now()-peerCacheAt>=15000){peerCache=await Promise.all(hosts.map(peer));peerCacheKey=key;peerCacheAt=Date.now()}
+   const replies=peerCache;let total=j.hashrate;
    const P=hosts.map((u,i)=>{const p=replies[i];if(!p)return tile(u.host,'-',t('no answer'));total+=p.hashrate;return tile(u.host,si(p.hashrate,'H/s'),(p.pool.connected?t('online'):t('OFFLINE'))+' · '+p.shares.accepted+' '+t('shares')+' · '+t('best')+' '+diff(p.best.ever))});
-   P.unshift(tile(t('All miners'),si(total,'H/s'),(hosts.length+1)+' '+t('miners'),true));document.getElementById('p').replaceChildren(...P);
-  }else document.getElementById('p').replaceChildren();
-  await refreshHistory(j);
- }catch(e){const st=document.getElementById('st');st.textContent=t('NO CONNECTION');st.style.color='var(--bad)';document.getElementById('f').textContent=errorText(e)}
+   P.unshift(tile(t('All miners'),si(total,'H/s'),(hosts.length+1)+' '+t('miners'),true));syncTiles('p',P);
+  }else{document.getElementById('p').replaceChildren();peerCacheKey='';peerCache=[]}
+ }catch(e){const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
 }
 startPolling(tick,3000);
 
@@ -132,46 +149,152 @@ function renderHealth(j){
  const box=document.getElementById('health');box.hidden=!reason;box.textContent=t(reason);box.dataset.level=['sensor','hot','supervision'].includes(j.limitation_reason)?'bad':'info';
 }
 
+function renderOverview(j){
+ const values=[[t('Temperature'),j.temp_c==null?'—':j.temp_c+' °C',j.max_temp_c&&j.temp_c>=j.max_temp_c-5],[t('Effective power'),(j.power_percent??'—')+' %',false],[t('uptime'),dur(j.uptime_s),false]];
+ const host=document.getElementById('overview-strip');
+ values.forEach(([label,value,warm],i)=>{let node=host.children[i];if(!node){node=document.createElement('div');node.append(document.createElement('span'),document.createElement('strong'));host.appendChild(node)}if(node.children[0].textContent!==label)node.children[0].textContent=label;if(node.children[1].textContent!==value)node.children[1].textContent=value;node.children[1].classList.toggle('warm',!!warm)});
+}
+
 async function refreshHistory(j){
  if(j.history||j.history_revision==null||historyRevision===j.history_revision||Date.now()<historyRetryAt)return;
  try{
   const h=await request('/api/history');
-  if(!h||!Array.isArray(h.hashrate)||!Array.isArray(h.temperature_c)||!Array.isArray(h.power_percent)||h.hashrate.length!==h.temperature_c.length||h.hashrate.length!==h.power_percent.length)throw Error(t('Invalid response from the miner.'));
-  cachedHistory=h;historyRevision=h.revision??j.history_revision;historyRetryAt=0;
-  document.getElementById('hashrate-history').replaceWith(chart(h));
-  document.getElementById('history-grid').replaceChildren(series(t('Temperature'),'temperature_c','°C','#4fa7ff'),series(t('Effective power'),'power_percent','%','var(--accent)'));
-  document.getElementById('download-history').disabled=!h.hashrate.length;
+  const normalized=normalizeHistory(h);
+  if(h.boot_id&&j.boot_id&&h.boot_id!==j.boot_id)return;
+  cachedHistory=normalized;historyRevision=h.revision??j.history_revision;historyRetryAt=0;historySelected=null;
+  renderHistory();
   document.getElementById('history-status').textContent='';
  }catch(e){historyRetryAt=Date.now()+60000;document.getElementById('history-status').textContent=errorText(e)}
 }
-function series(label,key,unit,color){
- const values=cachedHistory[key]||[],valid=values.filter(Number.isFinite),last=values[values.length-1];
- const card=tile(label,Number.isFinite(last)?last.toFixed(1)+' '+unit:'-',valid.length?t('range')+' '+Math.min(...valid).toFixed(1)+'–'+Math.max(...valid).toFixed(1)+' '+unit:t('No observations yet.'),true);
- if(valid.length>1){
-  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path'),lo=key==='power_percent'?0:Math.min(...valid)-1,hi=key==='power_percent'?100:Math.max(...valid)+1,scale=96/(hi-lo||1);let drawing=false,d='';
-  values.forEach((v,i)=>{if(!Number.isFinite(v)){drawing=false;return}d+=(drawing?'L':'M')+(i*600/Math.max(1,values.length-1)).toFixed(1)+','+(98-(v-lo)*scale).toFixed(1)+' ';drawing=true});
-  svg.setAttribute('viewBox','0 0 600 100');svg.setAttribute('preserveAspectRatio','none');svg.style.cssText='width:100%;height:100px;display:block';path.setAttribute('d',d);path.setAttribute('fill','none');path.setAttribute('stroke',color);path.setAttribute('stroke-width','2');path.setAttribute('vector-effect','non-scaling-stroke');svg.appendChild(path);card.appendChild(svg);
+function normalizeHistory(h){
+ if(!h||!Array.isArray(h.hashrate)||h.hashrate.length>288||!Number.isFinite(h.interval_s)||h.interval_s<1||h.interval_s>86400)throw Error(t('Invalid response from the miner.'));
+ const copy={...h};
+ for(const key of ['hashrate','temperature_c','power_percent','coverage_percent']){
+  const values=h[key]??Array(h.hashrate.length).fill(null);
+  if(!Array.isArray(values)||values.length!==h.hashrate.length||values.some(v=>v!==null&&(!Number.isFinite(v)||(key==='hashrate'&&v<0)||(['power_percent','coverage_percent'].includes(key)&&(v<0||v>100)))))throw Error(t('Invalid response from the miner.'));
+  copy[key]=values.slice();
  }
- return card;
+ return copy;
+}
+function visibleHistory(){
+ const h=cachedHistory,n=Math.floor(historyRange/(h.interval_s||300))+1,result={interval_s:h.interval_s||300};
+ for(const key of ['hashrate','temperature_c','power_percent','coverage_percent'])result[key]=(h[key]||Array(h.hashrate.length).fill(null)).slice(-n);
+ return result;
+}
+function svgNode(name,attributes={},text){
+ const node=document.createElementNS('http://www.w3.org/2000/svg',name);
+ for(const [key,value]of Object.entries(attributes))node.setAttribute(key,value);
+ if(text!==undefined)node.textContent=text;
+ return node;
+}
+function historyDuration(seconds){const minutes=Math.round(seconds/60);return minutes<60?minutes+' min':Math.floor(minutes/60)+'h'+(minutes%60?String(minutes%60).padStart(2,'0'):'')}
+function sampleAge(index,count,interval){return index===count-1?t('Latest point'):'−'+historyDuration((count-1-index)*interval)}
+function niceStep(value){
+ if(!(value>0))return 1;
+ const base=10**Math.floor(Math.log10(value)),part=value/base;
+ return (part<=1?1:part<=2?2:part<=2.5?2.5:part<=5?5:10)*base;
+}
+function drawPlot(host,key,values,color,small=false){
+ const width=Math.max(240,Math.round(host.getBoundingClientRect().width)),height=small?165:host.clientHeight||275;
+ const left=small?45:61,right=width-16,top=18,bottom=height-31,valid=values.filter(Number.isFinite);
+ let low=0,high=100,step=25,limit=Number(latestStats?.max_temp_c)||0;
+ if(key==='hashrate'){const peak=Math.max(0,...valid)*1.06;step=niceStep(peak/3);high=Math.max(step,Math.ceil(peak/step)*step)}
+ if(key==='temperature_c'){const refs=limit>0?[...valid,limit]:valid;const min=refs.length?Math.min(...refs):0,max=refs.length?Math.max(...refs):80;step=niceStep((max-min+4)/4);low=Math.floor((min-2)/step)*step;high=Math.ceil((max+2)/step)*step}
+ const unit=key==='hashrate'?'H/s':key==='temperature_c'?'°C':'%',divisor=key==='hashrate'?(high>=1e9?1e9:high>=1e6?1e6:high>=1e3?1e3:1):1;
+ const axisUnit=key==='hashrate'?(divisor===1e9?'GH/s':divisor===1e6?'MH/s':divisor===1e3?'kH/s':'H/s'):unit;
+ const x=i=>values.length===1?right:left+i*(right-left)/Math.max(1,values.length-1),y=v=>bottom-(v-low)*(bottom-top)/(high-low||1);
+ const svg=svgNode('svg',{viewBox:`0 0 ${width} ${height}`,preserveAspectRatio:'none','aria-hidden':'true'});
+ svg.appendChild(svgNode('text',{x:small?10:12,y:11,class:'plot-axis'},axisUnit));
+ for(let i=0;i<=Math.round((high-low)/step);++i){const value=low+i*step,py=y(value);svg.append(svgNode('line',{x1:left,y1:py,x2:right,y2:py,class:'plot-grid'}),svgNode('text',{x:left-9,y:py+3,'text-anchor':'end',class:'plot-axis'},(value/divisor).toLocaleString(LANG,{maximumFractionDigits:divisor>1?2:1})))}
+ const ticks=width>550?5:3;
+ if(values.length){const used=new Set();for(let i=0;i<ticks;++i){const index=Math.round(i*(values.length-1)/(ticks-1));if(used.has(index))continue;used.add(index);svg.appendChild(svgNode('text',{x:x(index),y:height-8,'text-anchor':i===0&&values.length>1?'start':index===values.length-1?'end':'middle',class:'plot-axis'},sampleAge(index,values.length,cachedHistory.interval_s||300)))}}
+ const segments=[];let current=[];
+ values.forEach((value,index)=>{if(Number.isFinite(value))current.push([x(index),y(value)]);else if(current.length){segments.push(current);current=[]}});if(current.length)segments.push(current);
+ const path=segments.map(segment=>segment.map(([px,py],i)=>(i?'L':'M')+px.toFixed(1)+','+py.toFixed(1)).join(' ')).join(' ');
+ if(!small){const id='history-area-'+key,defs=svgNode('defs'),gradient=svgNode('linearGradient',{id,x1:'0',y1:'0',x2:'0',y2:'1'});gradient.append(svgNode('stop',{offset:'0%','stop-color':color,'stop-opacity':'.23'}),svgNode('stop',{offset:'100%','stop-color':color,'stop-opacity':'.01'}));defs.appendChild(gradient);svg.appendChild(defs);const area=segments.filter(s=>s.length>1).map(segment=>segment.map(([px,py],i)=>(i?'L':'M')+px.toFixed(1)+','+py.toFixed(1)).join(' ')+` L${segment[segment.length-1][0]},${bottom} L${segment[0][0]},${bottom} Z`).join(' ');svg.appendChild(svgNode('path',{d:area,fill:`url(#${id})`}))}
+ if(key==='temperature_c'&&limit>0&&valid.length)svg.appendChild(svgNode('line',{x1:left,y1:y(limit),x2:right,y2:y(limit),class:'plot-limit'}));
+ svg.appendChild(svgNode('path',{d:path,stroke:color,class:'plot-line','data-series':key}));
+ for(const segment of segments)if(segment.length===1)svg.appendChild(svgNode('circle',{cx:segment[0][0],cy:segment[0][1],r:3,fill:color}));
+ const cursor=svgNode('line',{x1:right,y1:top,x2:right,y2:bottom,class:'plot-cursor',visibility:'hidden'}),dot=svgNode('circle',{cx:right,cy:bottom,r:4,fill:color,class:'plot-dot',visibility:'hidden'});svg.append(cursor,dot);
+ host.replaceChildren(svg);
+ if(!valid.length){const empty=document.createElement('div');empty.className='plot-empty';const title=document.createElement('span');title.textContent=t('No observations yet.');const note=document.createElement('small');note.textContent=t(key==='temperature_c'?'A usable temperature sensor is required.':'The first history point appears after five minutes of mining.');empty.append(title,note);host.appendChild(empty)}
+ const view={host,values,x,y,left,right,width,cursor,dot};plotViews.push(view);
+ const point=event=>{if(!values.length)return;document.getElementById('chart-inspection').setAttribute('aria-live','off');const bounds=host.getBoundingClientRect(),px=(event.clientX-bounds.left)*width/bounds.width,index=Math.max(0,Math.min(values.length-1,Math.round((px-left)/(right-left)*Math.max(1,values.length-1))));if(historyPointerFrame)cancelAnimationFrame(historyPointerFrame);historyPointerFrame=requestAnimationFrame(()=>{historyPointerFrame=0;selectHistory(index)})};
+ host.onpointermove=point;host.onpointerdown=point;
+ host.onpointerleave=event=>{if(event.pointerType==='touch')return;if(historyPointerFrame)cancelAnimationFrame(historyPointerFrame);historyPointerFrame=0;selectHistory(null)};
+ return view;
+}
+function seriesCard(label,key,unit,color,history){
+ const values=history[key],valid=values.filter(Number.isFinite),last=values[values.length-1],card=document.createElement('div');card.className='t big chart-series';
+ const heading=document.createElement('div');heading.className='series-heading';
+ const title=document.createElement('span');title.className='l';const marker=document.createElement('i');marker.className='legend-dot';marker.style.color=color;const name=document.createElement('span');name.textContent=label;title.append(marker,name);
+ const value=document.createElement('span');value.className='v';value.style.color=color;value.textContent=Number.isFinite(last)?last.toFixed(1)+' '+unit:'—';heading.append(title,value);card.appendChild(heading);
+ const range=document.createElement('div');range.className='series-range';range.textContent=valid.length?t('range')+' '+Math.min(...valid).toFixed(1)+'–'+Math.max(...valid).toFixed(1)+' '+unit:t('No observations yet.');
+ if(key==='temperature_c'&&latestStats?.max_temp_c>0){const limit=document.createElement('span');limit.className='limit-key';limit.textContent=t('Configured limit')+' '+latestStats.max_temp_c+' °C';range.append(' · ',limit)}card.appendChild(range);
+ const host=document.createElement('div');host.className='plot-host small-plot';card.appendChild(host);card._plot={host,key,values,color};return card;
+}
+function renderHistory(){
+ const h=visibleHistory(),valid=h.hashrate.filter(Number.isFinite),mean=valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:null;
+ textAt('chart-average',mean===null?'—':si(mean,'H/s'));textAt('chart-min',valid.length?si(Math.min(...valid),'H/s'):'—');textAt('chart-max',valid.length?si(Math.max(...valid),'H/s'):'—');textAt('chart-count',valid.length);
+ document.querySelectorAll('[data-range]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.range)===historyRange)));
+ const cards=[seriesCard(t('Temperature'),'temperature_c','°C','#65b7ff',h),seriesCard(t('Effective power'),'power_percent','%','#50dba1',h)];document.getElementById('history-grid').replaceChildren(...cards);
+ plotViews=[];drawPlot(document.getElementById('hashrate-history'),'hashrate',h.hashrate,'var(--accent)');for(const card of cards){const p=card._plot;drawPlot(p.host,p.key,p.values,p.color,true)}
+ const duration=Math.max(0,h.hashrate.length-1)*h.interval_s;
+ const scope=h.hashrate.length>1?t('Displayed history')+': '+historyDuration(duration):t(h.hashrate.length?'One recorded sample':'No observations yet.');
+ textAt('history-caption',scope+' · '+t('Sampling interval')+': '+historyDuration(h.interval_s)+(h.hashrate.some(v=>v===null)||h.temperature_c.some(v=>v===null)?' · '+t('Gaps mean missing observations.') :''));
+ document.getElementById('download-history').disabled=!h.hashrate.length;
+ selectHistory(historySelected);
+}
+function selectHistory(index){
+ const h=visibleHistory(),count=h.hashrate.length,next=index===null?null:Math.max(0,Math.min(count-1,index));if(next===historySelected&&plotViews[0]?.selectionReady)return;historySelected=next;const selected=historySelected??count-1;if(plotViews[0])plotViews[0].selectionReady=true;
+ for(const view of plotViews){const value=view.values[selected],visible=historySelected!==null&&Number.isFinite(value);view.cursor.setAttribute('visibility',historySelected===null||!count?'hidden':'visible');view.dot.setAttribute('visibility',visible?'visible':'hidden');if(count){const px=view.x(selected);view.cursor.setAttribute('x1',px);view.cursor.setAttribute('x2',px);if(visible){view.dot.setAttribute('cx',px);view.dot.setAttribute('cy',view.y(value))}}}
+ const inspector=document.getElementById('chart-inspection');
+ if(!count){inspector.textContent=t('No observations yet.');return}
+ const age=document.createElement('span');age.className='sample-age';age.textContent=sampleAge(selected,count,h.interval_s);
+ const nodes=[age];for(const [key,color,unit,label]of [['hashrate','var(--accent)','H/s','Hashrate'],['temperature_c','#65b7ff','°C','Temperature'],['power_percent','#50dba1','%','Effective power']]){const value=h[key][selected],span=document.createElement('span');span.className='sample-value';const dot=document.createElement('i');dot.className='legend-dot';dot.style.color=color;dot.setAttribute('aria-hidden','true');const name=document.createElement('span');name.className='sr-only';name.textContent=t(label)+': ';const number=document.createElement('strong');number.style.color=color;number.textContent=!Number.isFinite(value)?'—':key==='hashrate'?si(value,unit):value.toFixed(1)+' '+unit;span.append(dot,name,number);nodes.push(span)}
+ if(Number.isFinite(h.coverage_percent[selected])&&h.coverage_percent[selected]<100){const coverage=document.createElement('span');coverage.className='sample-coverage';coverage.textContent=t('Observation coverage')+': '+h.coverage_percent[selected]+' %';nodes.push(coverage)}
+ inspector.replaceChildren(...nodes);
 }
 function downloadText(name,text,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 document.getElementById('download-history').onclick=()=>{
- const h=cachedHistory,rows=['minutes_before_latest,hashrate_hps,temperature_c,power_percent,coverage_percent'];
+ const h=visibleHistory(),rows=['minutes_before_latest,hashrate_hps,temperature_c,power_percent,coverage_percent'];
  h.hashrate.forEach((v,i)=>rows.push([(h.hashrate.length-1-i)*(h.interval_s||300)/60,v,h.temperature_c?.[i]??'',h.power_percent?.[i]??'',h.coverage_percent?.[i]??''].join(',')));
  downloadText('bdlminer-history.csv',rows.join('\n')+'\n','text/csv;charset=utf-8');
 };
 let latestDiagnostics=null;
 async function refreshDiagnostics(){
+ if(!document.getElementById('diagnostics').open)return;
  try{
   const d=await request('/api/diagnostics');
   if(!d?.tls||!Array.isArray(d.engines))throw Error(t('Invalid response from the miner.'));
   latestDiagnostics=d;
   const cards=[tile(t('TLS handshakes'),d.tls.handshakes,t('Elapsed time')+': '+dur(d.tls.total_ms/1000)+' · '+d.tls.failures+' '+t('failures'),true)];
   for(const e of d.engines)cards.push(tile(t('Mining worker')+' '+e.index+' · '+e.name,dur(e.hashing_ms/1000),t('Batch time')+'\n'+t('Rest')+': '+dur(e.rest_ms/1000)+' · '+t('Waiting for work')+': '+dur(e.waiting_ms/1000)+' · '+t('Paused')+': '+dur(e.paused_ms/1000),true));
-  document.getElementById('profile-grid').replaceChildren(...cards);document.getElementById('profile-status').textContent='';
+  syncTiles('profile-grid',cards);document.getElementById('profile-status').textContent='';
  }catch(e){document.getElementById('profile-status').textContent=errorText(e)}
 }
-startPolling(refreshDiagnostics,10000);
+const diagnosticsPoll=startPolling(refreshDiagnostics,10000);
+document.getElementById('diagnostics').addEventListener('toggle',()=>{if(document.getElementById('diagnostics').open)diagnosticsPoll.refresh()});
+
+document.querySelectorAll('[data-range]').forEach(button=>button.onclick=()=>{
+ historyRange=Number(button.dataset.range);historySelected=null;
+ try{localStorage.setItem('bdl-history-range',String(historyRange))}catch(e){}
+ renderHistory();
+});
+const historyHost=document.getElementById('hashrate-history');historyHost.setAttribute('aria-label',t('Hashrate history'));
+document.querySelector('.range-control').setAttribute('aria-label',t('History period'));
+document.getElementById('overview-strip').setAttribute('aria-label',t('Device overview'));
+historyHost.onkeydown=event=>{
+ const count=visibleHistory().hashrate.length;if(!count||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+ document.getElementById('chart-inspection').setAttribute('aria-live','polite');
+ event.preventDefault();const current=historySelected??count-1;
+ selectHistory(event.key==='Home'?0:event.key==='End'?count-1:current+(event.key==='ArrowLeft'?-1:1));
+};
+historyHost.onblur=()=>selectHistory(null);
+let historyResizeFrame=0;
+function resizeHistory(){const width=Math.round(document.getElementById('performance-panel').getBoundingClientRect().width);if(width===historyWidth)return;historyWidth=width;if(historyResizeFrame)cancelAnimationFrame(historyResizeFrame);historyResizeFrame=requestAnimationFrame(()=>{historyResizeFrame=0;renderHistory()})}
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(resizeHistory).observe(document.getElementById('performance-panel'));else window.addEventListener('resize',resizeHistory);
+renderHistory();
 
 let benchmark=null,benchmarkBusy=false,benchmarkReport=null,benchmarkCancelled=false,benchmarkFinishing=false;
 const benchmarkStatus=document.getElementById('benchmark-status');

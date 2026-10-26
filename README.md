@@ -332,8 +332,19 @@ The dashboard uses `/api/stats?history=0` for live values and requests
 out of every three-second refresh. History aligns hashrate with sampled temperature
 and effective power, includes observation coverage and can be downloaded as CSV.
 Temperature averages use valid sensor samples; missing readings stay empty.
+Use the 1 h, 6 h and 24 h controls to select a window locally; CSV exports that
+window. The browser remembers the selected window. Charts include axes, a zero
+baseline for hashrate, a configured-temperature-limit line and linked inspection
+with the pointer, touch or arrow/Home/End keys. Times are relative to the latest
+recorded point; the headline chart average uses the valid displayed samples.
+Missing points keep their positions and break the lines. Empty and single-point
+histories are shown without invented data.
 
-**Mining measurements** shows time spent in worker batches, deliberate rest,
+Live updates retain metric and graph elements instead of rebuilding the dashboard
+on every poll. Other miners refresh every 15 seconds; the local miner stays on its
+three-second polling interval. Diagnostics load when their section is opened.
+
+**Diagnostics & measurements**, below the main dashboard, shows time spent in worker batches, deliberate rest,
 waiting for jobs and safety/OTA pauses, plus TLS handshake counts and durations.
 These are elapsed times, not CPU-utilization measurements; the classic ESP32 can
 continue hardware hashing during TLS. Profiling runs between batches, never inside
