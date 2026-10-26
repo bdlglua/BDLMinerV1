@@ -1,17 +1,35 @@
 # BDLMiner V1
 
 Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
-It connects to a Stratum V1 pool (`public-pool.io:21496` by default), computes
-SHA‑256d hashes and, with an enormous amount of luck, may find a full block whose reward
-is paid to **your** address.
+It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or native
+Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
+whose reward is paid to **your** address.
+
+**Latest release: [v1.5.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.0)**
+· [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
+· [Release notes](docs/releases/v1.5.0.md)
+
+Version 1.5.0 adds encrypted V2 mining, independent main/backup protocol settings,
+an **Automatic / Manual** user-agent selector, and Public Pool solo presets.
+Stratum V1 remains the default for existing installations. The illustrated device
+screens, local dashboard, history charts, 32/64-bit records, thermal protection
+and optimized hashing engines are retained.
+
+[Install](#install-a-release-no-build-tools) · [First-time setup](#first-time-setup)
+· [Choose a pool](#pools-for-esp32) · [V1 / V2 setup](#stratum-v1-and-stratum-v2)
+· [User agent](#automatic-or-manual-user-agent) · [Shares explained](#pool-shares-and-local-records)
+· [Troubleshooting](#troubleshooting)
 
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
-> **Status:** the firmware builds for every board below and the portable core is tested
-> on PC (SHA‑256d, header assembly, a real pool session), but it has **not been tested
-> on real hardware yet**. Feedback and bug reports are welcome.
+> **Validation:** v1.5.0 builds and packages all ten board variants. Checks cover
+> SHA‑256d, V1/V2 protocol handling, an independent Noise responder, fragmented
+> socket sessions, settings persistence, physical-display rendering and 49 browser
+> regressions. The ten published firmware signatures, image checksums and update
+> manifest were verified. Live Public Pool V2 connectivity and physical-device V2
+> throughput still require hardware validation.
 
 ## Supported boards
 
@@ -171,8 +189,9 @@ Boards without a display report everything on the serial monitor and the
 1. On first boot the board opens a Wi‑Fi access point
    **`BDLMinerV1-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
-   * **Pool host / port**: `public-pool.io` / `21496` by default
-     (others: `solo.ckpool.org` / `3333`, or your own pool). A pasted
+   * **Pool host / port**: `public-pool.io` / `21496` is the compiled default.
+     For low-hashrate ESP32 feedback, see [Pools for ESP32](#pools-for-esp32),
+     or use your own pool. A pasted
      `stratum+tcp://host:port` is accepted: the prefix is dropped and the port taken;
    * **Backup pool host / port** (optional): used when the main pool fails, see
      [Backup pool](#backup-pool);
@@ -181,8 +200,9 @@ Boards without a display report everything on the serial monitor and the
      mistyped, the screen shows *Invalid BTC address?* for 5 s and the serial monitor
      a warning. Mining still starts, since some pools use account names instead;
    * **Pool password**: usually `x`;
-   * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
-     (the pool may enforce a higher minimum);
+   * **Suggested difficulty (V1)**: share difficulty requested from the pool,
+     `0.0002` by default; the pool may enforce a higher minimum. V2 uses the target
+     assigned to its mining channel;
    * **Main / backup protocol**: Stratum V1 by default, or Stratum V2 with Noise
      and a pool authority key. The dashboard includes a Public Pool V2 solo preset;
    * **User agent mode**: Automatic selects an identity for the pool; Manual sends
@@ -198,8 +218,9 @@ Boards without a display report everything on the serial monitor and the
    * **Language**: `0` English (default), `1` French, for the screen and the web dashboard;
    * **Web password**: lets the [web dashboard](#web-dashboard) change every setting and
      update the firmware (user `admin`). Empty = read-only dashboard.
-3. The board restarts and begins mining automatically. Stats can be viewed on
-   https://web.public-pool.io by searching for your address.
+3. The board restarts and connects automatically. Open its local dashboard using
+   the IP on the Network screen or serial monitor. If the chosen pool provides a
+   public dashboard, search there for your Bitcoin address or worker as well.
 
 If nothing is saved within **3 minutes**, the portal closes and the board restarts
 (it reopens the portal on the next boot as long as Wi‑Fi is not configured).
@@ -217,6 +238,97 @@ pools get N hours in turn instead. While on the backup, the Network screen highl
 or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard shows
 *Pool (backup)*.
 
+### Pools for ESP32
+
+For visible feedback at ESP32 hashrates, start with a pool that accepts low-difficulty
+shares. These are solo pools: accepted shares track your work; a payout requires
+finding a valid Bitcoin block.
+
+| Pool | Host | Port | Protocol / setup |
+|---|---|---|---|
+| [Nerdminers.org](https://pool.nerdminers.org/) | `pool.nerdminers.org` | `3333` | V1; designed for NerdMiner and similar ESP32 devices. Leave user agent on Automatic. |
+| [NerdMiner.io](https://nerdminer.io/) | `pool.nerdminer.io` | `3333` | V1; announces adaptive difficulty for small miners. Use your valid Bitcoin address as the worker. |
+| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `3333` | V1; use the dashboard's **Use Public Pool V1 (solo)** preset. |
+| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `23330` | V2; use **Use Public Pool V2 (solo)** to fill the protocol, port and authority key together. |
+
+For Nerdminers.org, use `YOUR_BTC_ADDRESS.worker1`; for NerdMiner.io, follow its
+published worker instructions and use your Bitcoin address. Password `x` is the
+usual V1 setting. Check the pool's linked setup page if its connection details
+change. The firmware's compiled default remains `public-pool.io:21496`; applying
+a preset changes the saved endpoint to the values shown above.
+
+A low suggested difficulty is a request, not a guarantee. The assigned pool
+or channel difficulty determines how often accepted shares can appear; see
+[Pool shares and local records](#pool-shares-and-local-records).
+
+<a id="automatic-pool-identity-and-stratum-versions"></a>
+
+### Automatic or manual user agent
+
+Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
+Automatic is the default; it requires no manual identity entry.
+Known ESP32 pool endpoints (`pool.nerdminers.org`, `pool.nerdminer.io`,
+`pool.bitronics.store`, `pool.bitronics.com` and `pool.solomining.de`) receive
+`NerdMinerV2` on the first subscription. Other pools receive `BDLMinerV1/<version>`.
+If an unknown pool explicitly refuses that user agent, the miner retries it once
+as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
+changing an endpoint resets its decision. Unrelated connection or authorization
+errors still follow the usual reconnect/failover policy. In Manual mode the exact
+configured identity is used, including on NerdMiner pools, without automatic
+replacement after a refusal. The manual value survives switching to Automatic.
+Older customized identities migrate to Manual; older default identities and
+records without an identity use Automatic. Existing protocol settings default to V1.
+
+### Stratum V1 and Stratum V2
+
+Select the protocol in **Settings → Pool → Main pool protocol** and, when used,
+**Backup pool protocol**. The dropdowns are independent. In the boot setup portal,
+`0` means V1 and `1` means V2. Save and restart to apply changes.
+
+| Setting | Stratum V1 | Stratum V2 |
+|---|---|---|
+| Connection | Stratum JSON over TCP | Binary mining messages over encrypted Noise |
+| Pool port | Use the pool's V1 port | Use the pool's V2 port |
+| Authority key | Not used | Required; Base58Check or 32-byte hexadecimal key |
+| Clock synchronization | Not required for a server certificate | Required to verify certificate validity |
+| Worker identity | Configured address/worker, with the V1 password | Configured address/worker; the V1 password is not sent |
+| Existing installations | Remain on V1 after updating | Explicitly select V2 or apply a V2 preset |
+
+Native **Stratum V2** uses a Noise_NX handshake (secp256k1 EllSwift, BIP340
+authority signature and ChaCha20-Poly1305), binary frames and an extended mining
+channel. Each pool has its own protocol, port and authority key. V2 requires a
+configured Base58Check authority key (or its 32-byte hexadecimal form) and a
+synchronized clock; invalid signatures, expired certificates and unauthenticated
+messages cause a reconnect. It never silently downgrades the selected endpoint
+to V1. A separately configured backup pool can explicitly use V1 or V2.
+
+For [Public Pool](https://web.public-pool.io/), click **Use Public Pool V2 (solo)**
+in settings: it fills `public-pool.io`, port `23330`, Stratum V2 and the published
+authority key `9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6`.
+Use your Bitcoin address (optionally `.worker`) as the worker identity and verify
+current connection details on the pool's site if its endpoint/key changes. This
+is a solo preset; it does not select Public Pool's separate PPLNS endpoint.
+**Use Public Pool V1 (solo)** selects port `3333` and V1, retaining the saved V2 key.
+The protocol and user agent do not override pool difficulty or increase the
+device's hashing power. V2 channel identity uses the configured address/worker;
+the V1 password setting is not sent as a V2 authentication field.
+
+V2 uses the existing SHA-256d kernels and a unique extranonce per work unit.
+Exact 256-bit share targets are retained rather than rounded to floating-point
+difficulty. New previous-block notifications invalidate old work; target changes
+are checked again before submission. Batched acknowledgments count only pending
+shares, and duplicate/unknown acknowledgments do not increment counters.
+Frames are limited to 16 KiB, with up to eight cached jobs and 32 KiB of cached
+coinbase data. Unsupported/oversized jobs reconnect with a diagnostic. The
+firmware does not implement Job Declaration, Template Distribution or a V2 pool
+server; see the [Stratum V2 specification](https://stratumprotocol.org/).
+
+Validation includes an independent Noise responder, official authority-key
+vectors, certificate/AEAD/replay failure cases, truncated-frame checks under
+sanitizers, independent coinbase/Merkle/header verification, and the production
+network session over fragmented local sockets. A live Public Pool connection
+and physical-device throughput still require hardware/network validation.
+
 ## Buttons
 
 | | M5StickC Plus2 | T‑Display / T‑Display‑S3 | CYD | headless |
@@ -228,19 +340,16 @@ or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard 
 
 Screens, in order:
 
-1. **Mining**: hashrate, shares, best difficulty, pool difficulty, blocks, 32‑bit, temperature
-   (IMU sensor on M5 devices, chip sensor on S2/S3/C3; `--` on an original ESP32 without
-   IMU, whose built-in sensor is missing on most chips and reads a constant 53 °C);
-2. **Clock**: time (NTP), date, BTC price, hashrate, block height, fast fees, shares;
-3. **Global**: BTC price and sats per currency unit, network hashrate, pending
-   transactions, fees (fast / 30 min / 1 h), next difficulty adjustment, and the average time
-   it would take *your* miner to find a block on its own;
+1. **Mining**: live hashrate, temperature, effective power, accepted/rejected shares,
+   best session difficulty and pool difficulty;
+2. **Clock**: local time/date (NTP), BTC price, block height, hashrate and accepted shares;
+3. **Bitcoin**: BTC price, next difficulty adjustment, pending transactions,
+   network hashrate and fees (fast / 30 min / 1 h);
 4. **Network**: block height, next halving, network difficulty, total hashes, pool, IP/RSSI;
-5. **Info**: board, firmware, engines, free RAM, address;
-6. **Graph**: hashrate over the last ~40 minutes (one point every 10 s), min / avg / max;
-7. **Records**: best difficulty ever and this session, 32‑bit shares and the average time
-   between two, the chance of finding a block within a day and a year at the current
-   hashrate, lifetime running time, blocks, hashes and the 3 best shares ever;
+5. **Device**: board, firmware, free RAM, payout address and active hashing engines;
+6. **Hashrate**: graph over the last ~40 minutes (one point every 10 s), min / avg / max;
+7. **Records**: best difficulty ever and this session, 32/64-bit counters,
+   lifetime hashes and running time, with block totals and annual block odds in the footer;
 8. **Blocks**: the block being mined, then the last 4 blocks found on the network, with
    their pool, age and your best share while each one was being mined.
 
@@ -431,57 +540,6 @@ IDs can affect accepted/rejected counters; duplicate and unknown replies are ign
 the configured mode, and `pool.protocol` reports `Stratum V1` or `Stratum V2 (Noise)`.
 These are also shown in the dashboard's Pool card.
 
-### Automatic pool identity and Stratum versions
-
-Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
-Automatic is the default; it requires no manual identity entry.
-Known ESP32 pool endpoints (`pool.nerdminers.org`, `pool.nerdminer.io`,
-`pool.bitronics.store`, `pool.bitronics.com` and `pool.solomining.de`) receive
-`NerdMinerV2` on the first subscription. Other pools receive `BDLMinerV1/<version>`.
-If an unknown pool explicitly refuses that user agent, the miner retries it once
-as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
-changing an endpoint resets its decision. Unrelated connection or authorization
-errors still follow the usual reconnect/failover policy. In Manual mode the exact
-configured identity is used, including on NerdMiner pools, without automatic
-replacement after a refusal. The manual value survives switching to Automatic.
-Older customized identities migrate to Manual; older default identities and
-records without an identity use Automatic. Existing protocol settings default to V1.
-
-Native **Stratum V2** uses a Noise_NX handshake (secp256k1 EllSwift, BIP340
-authority signature and ChaCha20-Poly1305), binary frames and an extended mining
-channel. Each pool has its own protocol, port and authority key. V2 requires a
-configured Base58Check authority key (or its 32-byte hexadecimal form) and a
-synchronized clock; invalid signatures, expired certificates and unauthenticated
-messages cause a reconnect. It never silently downgrades the selected endpoint
-to V1. A separately configured backup pool can explicitly use V1 or V2.
-
-For [Public Pool](https://web.public-pool.io/), click **Use Public Pool V2 (solo)**
-in settings: it fills `public-pool.io`, port `23330`, Stratum V2 and the published
-authority key `9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6`.
-Use your Bitcoin address (optionally `.worker`) as the worker identity and verify
-current connection details on the pool's site if its endpoint/key changes. This
-is a solo preset; it does not select Public Pool's separate PPLNS endpoint.
-**Use Public Pool V1 (solo)** selects port `3333` and V1, retaining the saved V2 key.
-The protocol and user agent do not override pool difficulty or increase the
-device's hashing power. V2 channel identity uses the configured address/worker;
-the V1 password setting is not sent as a V2 authentication field.
-
-V2 uses the existing SHA-256d kernels and a unique extranonce per work unit.
-Exact 256-bit share targets are retained rather than rounded to floating-point
-difficulty. New previous-block notifications invalidate old work; target changes
-are checked again before submission. Batched acknowledgments count only pending
-shares, and duplicate/unknown acknowledgments do not increment counters.
-Frames are limited to 16 KiB, with up to eight cached jobs and 32 KiB of cached
-coinbase data. Unsupported/oversized jobs reconnect with a diagnostic. The
-firmware does not implement Job Declaration, Template Distribution or a V2 pool
-server; see the [Stratum V2 specification](https://stratumprotocol.org/).
-
-Validation includes an independent Noise responder, official authority-key
-vectors, certificate/AEAD/replay failure cases, truncated-frame checks under
-sanitizers, independent coinbase/Merkle/header verification, and the production
-network session over fragmented local sockets. A live Public Pool connection
-and physical-device throughput still require hardware/network validation.
-
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).
 > Settings and firmware updates need the web password, sent with HTTP basic
@@ -570,17 +628,51 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 | Portal saved but the board never mines | Read the serial monitor: Wi‑Fi password, pool host / port, and the `[pool]` lines. |
 | *Invalid BTC address?* at boot | The address checksum is wrong (typo, missing character, mixed upper/lower case) or it is not a Bitcoin address. Reopen the portal and fix it; ignore the warning only if your pool uses account names. |
 | Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
-| Status `Pool unreachable` / `Pool silent, reconnecting` | Wrong host or port, or the pool is down. Try `solo.ckpool.org` / `3333`. |
+| Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
+| Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](#pool-shares-and-local-records). |
+| `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. The Public Pool V2 solo preset fills both; an altered or expired server certificate is refused. |
+| `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
+| A manually selected user agent is refused | Enter an identity accepted by that pool or select Automatic. Manual mode preserves your choice rather than replacing it after a refusal. |
 | No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
 | `bdlminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
 | Clock / Global screens stay empty | The board needs Internet access to `mempool.space` (HTTPS) and `pool.ntp.org`. The `[market]` serial line shows how many requests succeeded (`5/5 ok`). |
 | `hardware SHA: self-test FAILED, disabled` | The board fell back to software mining; it still works, just slower. Please report it with your board model and the `[miner]` lines. |
 
+## Pool shares and local records
+
+| Counter | What it measures |
+|---|---|
+| Accepted shares | Submitted proofs that the pool has acknowledged as accepted. |
+| Rejected shares | Submissions the pool has explicitly rejected. Check the log for its reason. |
+| Pending shares | Submissions still waiting for a pool response. |
+| 32-bit shares | Locally verified hashes at difficulty 1 or higher. |
+| 64-bit shares | Locally verified hashes with at least 64 leading zero bits. |
+| Best difficulty | The strongest locally verified hash in this session or across saved records. |
+
+An accepted-share counter at zero does not by itself mean hashing has stopped.
+Pool acceptance depends on the assigned difficulty, a valid connection and a
+reply. Local best-difficulty and 32/64-bit records are independent of that reply.
+The session counters restart at boot; the Lifetime card keeps saved accepted shares.
+
+The approximate average time to find a share is
+`difficulty × 2^32 / hashrate_in_H_per_second`. At **1 MH/s**, examples are:
+
+| Assigned difficulty | Average time per share |
+|---|---|
+| `0.001` | 4.3 seconds |
+| `1` | About 1 hour 12 minutes |
+| `65536` | About 8.9 years |
+
+These are averages, not deadlines or claims about a particular pool's current
+settings. Check **pool diff** in the dashboard. A pool intended for ASIC miners
+can assign a difficulty far beyond an ESP32's rate. Changing the user agent or
+switching from V1 to V2 does not make hashes stronger or force a lower share difficulty.
+
 ## Good to know
 
-* `public-pool.io` currently enforces a minimum share difficulty of **1**
-  (≈ 4.3 billion hashes): with an ESP32, expect several hours between two
-  accepted shares. The displayed "best difficulty", however, keeps improving continuously.
+* The pool controls the assigned share difficulty. A difficulty of **1** means
+  about 4.3 billion hashes per share on average. The locally computed best
+  difficulty can change before the pool accepts a share.
 * The all-time best difficulty is saved to flash (at most once per minute), the lifetime
   totals (hashes, accepted shares, blocks) every 10 minutes, and a found block at once.
   A factory reset keeps them.
@@ -594,6 +686,10 @@ src/
     sha256.*       SHA-256, midstate, optimized mining kernel
     work.*         Stratum job -> 80-byte header, coinbase, merkle, difficulties
     stratum.*      Stratum V1 state machine (subscribe/authorize/notify/submit)
+    sv2_protocol.* bounded Stratum V2 extended-channel state machine and share acknowledgments
+    sv2_noise.*    authenticated Noise_NX handshake and encrypted records
+    sv2_key.cpp    authority-key decoding and checksum verification
+    pool_agent.h   automatic identity selection and endpoint-specific retries
     address.*      payout address check (Base58Check, Bech32, Bech32m)
   hw_sha.*         hardware engine (S2/S3/C3, original ESP32) + self-test
   hw_sha_classic.S cycle-counted SHA256d loop for the original ESP32 (MIT, NerdMiner Modded)
@@ -602,6 +698,7 @@ src/
   core/fill.*      data for that software hash (portable, tested on a PC)
   miner.*          FreeRTOS mining tasks, share queue, statistics, hashrate history
   net.*            network task: pool connection, reconnection, backup pool, share submission
+  net_sv2.*        encrypted V2 session with incremental TCP framing
   market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment) + pool stats
   web.*            HTTP task: dashboard, settings, firmware update, log, /api/stats, /metrics, mDNS
   runtime.h        observable task/allocation startup failures
@@ -609,12 +706,19 @@ src/
   watch.*          once-a-second supervision: heat / battery, night mode, notifications, watchdogs
   notify.*         ntfy push notifications
   mqtt.*           Home Assistant (MQTT discovery)
-  tls.*            TLS connections that pause the hardware SHA loop for the handshake
+  tls.*            TLS/SHA coordination, handshake profiling and watchdog leases
   log.*            log ring buffer (web page) and reason of the last restart
   settings.*       NVS + WiFiManager portal
+  settings_store.h two-record settings persistence and legacy identity migration
+  settings_apply.h staged settings and backup validation
   board.*          per-board display / buttons / LED / battery
   ui.*             display data, buttons and history sampling
   ui_view.*        adaptive physical display renderer and change cache
+  ui_font.*        compressed native-size glyphs for the physical display
+  ui_art.*         display illustrations and native-size sprites
+lib/
+  secp256k1/       pinned Bitcoin Core EllSwift/BIP340 implementation (MIT)
+  monocypher/      pinned ChaCha20-Poly1305 implementation (BSD-2-Clause)
 tools/
   preview_display.py    native physical display tests and PNG previews
   hw_fill/gen_hw_fill.py  generates src/hw_sha_fill.S (python3 tools/hw_fill/gen_hw_fill.py src/hw_sha_fill.S)
@@ -629,8 +733,20 @@ are run by a small interpreter and compared with the reference kernel):
 ```sh
 ./test/host/run.sh                       # offline unit tests
 python3 -m unittest discover -s test/tools -v  # offline release/usage-report regressions
-./test/host/run.sh pool public-pool.io 21496 <address> 900   # real pool, stops at the 1st share
+./test/host/run.sh pool public-pool.io 3333 YOUR_BTC_ADDRESS 900  # optional live V1 test
 ```
+
+Native host checks require a C++ compiler, Python 3 and libsodium for the
+independent V2 test peer (`sudo apt-get install libsodium23` on Ubuntu/Debian).
+Install the ESP32 PlatformIO dependencies once with `pio pkg install -e esp32-headless`;
+the test runner installs them if needed. Firmware encryption uses the vendored
+Monocypher implementation; libsodium is a native test dependency.
+
+The default checks include V2 certificate, encrypted-record, replay and truncated-frame
+cases, independent proof reconstruction, fragmented production socket sessions,
+exact target boundaries and automatic/manual setting migration. They use a local
+test peer. The optional `pool` command connects to a real V1 pool and needs your
+address; its timeout may expire before a share is found at the assigned difficulty.
 
 Browser regressions exercise the actual HTML and scripts embedded in `src/web.cpp`
 against simulated miner APIs, including slow responses, invalid settings, peers,
@@ -657,6 +773,11 @@ callbacks with simulated flash/HTTP interfaces.
 * Libraries: [M5Unified / M5GFX](https://github.com/m5stack/M5Unified) (LovyanGFX),
   [WiFiManager](https://github.com/tzapu/WiFiManager),
   [ArduinoJson](https://arduinojson.org/).
+* V2 cryptography: [Bitcoin Core libsecp256k1](https://github.com/bitcoin-core/secp256k1)
+  (MIT, pinned source in `lib/secp256k1`) and
+  [Monocypher](https://github.com/LoupVaillant/Monocypher) (BSD-2-Clause, pinned source
+  in `lib/monocypher`). Their upstream notices and exact revisions are retained.
+* Stratum V2 protocol: [official specification](https://stratumprotocol.org/).
 * Market data: [mempool.space](https://mempool.space) public API.
 
 ## License
