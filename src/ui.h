@@ -18,7 +18,8 @@ void cycleBrightness();
 void setBacklight(uint8_t percent);
 // Turns the picture (the two landscape ways only), without saving it.
 void setRotation(uint8_t rotation);
-// Shows "+1 share" in the header for a moment.
+// Shows "+1 share" long enough to cover a one-second refresh, including
+// across millis() wraparound.
 void flashShare();
 // Milliseconds since the current screen was shown.
 uint32_t screenAge();

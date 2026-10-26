@@ -61,3 +61,6 @@ jobs:
       - run: pip install platformio==6.1.19
       - name: Build and package USB images from a clean checkout
         run: python3 tools/make_release.py "${{ matrix.env }}"
+      - name: Physical display rendering regressions
+        if: matrix.env == 'm5stickc-plus2'
+        run: python3 tools/preview_display.py --check

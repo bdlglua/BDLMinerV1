@@ -252,11 +252,25 @@ mode (screen off, no beep, from one hour to another; a button press lights it fo
 Clock / Global data comes from the public [mempool.space](https://mempool.space) API
 (refreshed every 10 minutes over HTTPS) and the time from `pool.ntp.org`.
 
-### Backgrounds (NerdMinerV2 style)
+### Physical display
 
-As on NerdMinerV2, each screen is a full-screen image with the panels and
-labels already drawn; the firmware only paints the values, field by field
-(a small sprite per field: no flicker, no full-screen buffer in RAM).
+The eight physical screens share a dark, high-contrast layout: mining, clock,
+Bitcoin market, network, device information, hashrate history, records and blocks.
+Mining puts the live hashrate first, alongside temperature, effective power,
+accepted shares and best difficulty. Records include both 32-bit and 64-bit shares.
+The footer identifies the current mining limit and the eight dots identify the page.
+
+The layout adapts to the panel dimensions, including square and small M5 screens.
+Short panels prioritize hashrate, temperature and power on the mining page.
+French and English, the five accent themes, buttons, rotation, night mode and
+brightness settings are retained. Missing temperatures display `--`, and pauses
+and thermal limits remain visible.
+
+Only changed cards and status fields are redrawn. The renderer reuses one 8 KiB
+strip buffer instead of allocating sprites for every field or a full-screen
+framebuffer. If this allocation fails, clipped direct drawing is used. The graph
+redraws when a new sample arrives, preserves elapsed time and gaps, and uses a zero
+baseline. No background bitmaps, external fonts or animation loops are needed.
 
 | Resolution | Boards |
 |---|---|
@@ -264,17 +278,21 @@ labels already drawn; the firmware only paints the values, field by field
 | 320×170 | T‑Display‑S3 |
 | 320×240 | M5Stack Core / Core2 / Tough / CoreS3, CYD |
 
-Other screen sizes (AtomS3, original StickC, portrait orientation…) keep the
-code-drawn interface. Previews: `tools/preview/*.png`.
-
-To change the design, edit `tools/make_backgrounds.py` (colors, panels, field
-positions) and regenerate — the field layout is produced together with the
-images, so they always stay in sync:
+All sizes use the same renderer in `src/ui_view.cpp`; `src/ui.cpp` supplies actual
+device readings. To test and generate previews using that renderer and its real
+LovyanGFX fonts:
 
 ```sh
-pip install pillow numpy
-python3 tools/make_backgrounds.py
+pio pkg install -e m5stickc-plus2
+python3 tools/preview_display.py --check
+pip install pillow
+python3 tools/preview_display.py
 ```
+
+The PNGs in `tools/preview/` use fictional demonstration readings; they are not
+photographs or measured performance results. Native checks cover eight pages,
+seven panel shapes, both languages, identical strip/direct output, unchanged-frame
+caching, long text, missing samples, timer wrap and restoration after an update.
 
 ## Web dashboard
 
@@ -516,10 +534,10 @@ src/
   log.*            log ring buffer (web page) and reason of the last restart
   settings.*       NVS + WiFiManager portal
   board.*          per-board display / buttons / LED / battery
-  ui.*             screens (bitmap backgrounds + fields, or procedural rendering)
-  bg/              generated RGB565 backgrounds + field layout
+  ui.*             display data, buttons and history sampling
+  ui_view.*        adaptive physical display renderer and change cache
 tools/
-  make_backgrounds.py   background generator (Pillow)
+  preview_display.py    native physical display tests and PNG previews
   hw_fill/gen_hw_fill.py  generates src/hw_sha_fill.S (python3 tools/hw_fill/gen_hw_fill.py src/hw_sha_fill.S)
 test/host/         PC tests: ./test/host/run.sh  and  ./test/host/run.sh pool
 ```
@@ -551,8 +569,8 @@ callbacks with simulated flash/HTTP interfaces.
 
 ## Credits
 
-* The screen design (full-screen bitmap backgrounds with values painted on top) is
-  inspired by [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).
+* The earlier bitmap screen design was inspired by
+  [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).
 * The original-ESP32 hardware SHA loop (`src/hw_sha_classic.S`) and the assembly
   software kernel (`src/sw_sha_prefilter.S`) come from
   [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded) by HenrysCat,
