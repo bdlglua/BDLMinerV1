@@ -30,13 +30,16 @@ uint16_t filtered(const uint16_t *pixels, int col, int row, int w, int h) {
 }
 void draw(lgfx::LovyanGFX &d, Icon icon, int x, int y, int w, int h) {
     if (w <= 0 || h <= 0) return;
-    const uint16_t *pixels = kArtwork[static_cast<unsigned>(icon) % 4];
+    unsigned id = static_cast<unsigned>(icon) % 4;
+    const uint16_t *pixels = kArtwork[id], *native = nullptr;
+    if (w == h) for (const auto &image : kNativeImages)
+        if (image.icon == id && image.size == w) { native = image.pixels; break; }
     d.startWrite();
     for (int row = 0; row < h; ++row) {
         int start = 0;
-        uint16_t color = filtered(pixels, 0, row, w, h);
+        uint16_t color = native ? native[row * w] : filtered(pixels, 0, row, w, h);
         for (int col = 1; col <= w; ++col) {
-            uint16_t next = col < w ? filtered(pixels, col, row, w, h) : 0;
+            uint16_t next = col < w ? (native ? native[row * w + col] : filtered(pixels, col, row, w, h)) : 0;
             if (col == w || next != color) {
                 if (color) d.drawFastHLine(x + start, y + row, col - start, color);
                 start = col;

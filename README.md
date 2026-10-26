@@ -277,8 +277,12 @@ strip buffer instead of allocating sprites for every field or a full-screen
 framebuffer. If this allocation fails, clipped direct drawing is used. The graph
 redraws when a new sample arrives, preserves elapsed time and gaps, and uses a zero
 baseline. Four 128x128 RGB565 illustrations use 128 KiB of flash in total. Area
-filtering smooths images at their actual display size. Text uses native-size,
-antialiased DejaVu Sans glyphs compressed in flash, instead of scaled pixel fonts.
+filtering remains available for other sizes; small commonly used illustrations
+also have native-size sprites prepared directly from the source PNG (about
+21 KiB extra), avoiding a second resize. Small labels use stronger hinted glyphs
+and numerical readouts use a dedicated cap-height family, so they fill the field
+without space reserved for unused descenders. Text retains light antialiasing
+and is compressed in flash, instead of stretching pixel fonts.
 Panel corners, indicators and graph lines are antialiased too. There is no
 decoded image buffer, font-loading heap, filesystem or animation loop. Headless
 builds exclude the artwork. The default yellow primary plate and cyan secondary

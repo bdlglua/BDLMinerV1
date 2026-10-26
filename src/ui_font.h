@@ -3,5 +3,5 @@
 
 namespace ui_font {
 // Select a pre-rendered size, never enlarge a pixel font.
-const lgfx::IFont *atMost(int height);
+const lgfx::IFont *atMost(int height, bool numerals = false);
 }

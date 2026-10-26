@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <new>
 
 namespace ui_view {
@@ -85,13 +86,24 @@ void fitted(lgfx::LovyanGFX &d, const std::string &value, int x, int y, int w, i
             uint32_t color, bool right = false) {
     if (w <= 0 || h <= 0) return;
     d.setTextSize(1);
+    bool numerals = value.find_first_of("0123456789") != std::string::npos &&
+                    value.find_first_not_of("0123456789 .:-+%C") == std::string::npos;
     // Fit native antialiased glyphs instead of stretching a coarse bitmap.
     // Long strings fall back to the smallest face and a visible ellipsis.
     for (int size = std::max(8, std::min(40, h)); size >= 8; --size) {
-        d.setFont(ui_font::atMost(size));
+        d.setFont(ui_font::atMost(size, numerals));
         if (d.textWidth(value.c_str()) <= w) break;
     }
-    std::string shown = ellipsis(d, value, w);
+    std::string shown = value;
+    if (numerals && d.textWidth(shown.c_str()) > w && !shown.empty() && shown.back() == 'C') {
+        shown.erase(std::remove(shown.begin(), shown.end(), ' '), shown.end());
+        if (d.textWidth(shown.c_str()) > w) {
+            char compact[24];
+            std::snprintf(compact, sizeof(compact), "%.0fC", std::strtod(value.c_str(), nullptr));
+            shown = compact;
+        }
+    }
+    shown = ellipsis(d, shown, w);
     d.setTextColor(color);
     d.setTextDatum(right ? lgfx::middle_right : lgfx::middle_left);
     d.drawString(shown.c_str(), right ? x + w : x, y + h / 2);

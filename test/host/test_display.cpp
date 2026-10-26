@@ -106,6 +106,18 @@ int main(int argc, char **argv) {
             shades.insert(c);
         }
         assert(shades.size() >= 8); // actual fractional coverage, not a binary bitmap font
+        sample.fillScreen(uint32_t(0x000000));
+        sample.setBaseColor(0x000000);
+        sample.setFont(ui_font::atMost(18, true));
+        sample.setTextColor(uint32_t(0xFFFFFF));
+        sample.drawString("1.005", 1, 1);
+        unsigned inkRows = 0;
+        for (int y = 0; y < sample.height(); ++y) {
+            bool ink = false;
+            for (int x = 0; x < sample.width(); ++x) ink |= sample.readPixel(x, y) != 0;
+            if (ink) ++inkRows;
+        }
+        assert(inkRows >= 15); // numerals use the field's cap height, not unused descender space
     }
     std::string out = argc > 1 ? argv[1] : "";
     const int sizes[][2] = {{240,135}, {320,170}, {320,240}, {160,80}, {128,128}, {80,160}, {135,240}};

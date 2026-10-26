@@ -5,22 +5,33 @@
 #include "ui_font.h"
 #include "ui_font_data.h"
 #include <algorithm>
+#include <cstring>
 
 namespace ui_font {
 namespace {
 class SmoothFont : public lgfx::IFont {
     const Glyph *glyphs_;
     uint8_t height_, baseline_;
+    bool numerals_;
+    unsigned index(uint16_t code, bool &valid) const {
+        if (numerals_) {
+            const char *character = code < 128 ? std::strchr(kNumeralCharacters, char(code)) : nullptr;
+            valid = character && code >= 32;
+            return unsigned((valid ? character : std::strchr(kNumeralCharacters, '?')) - kNumeralCharacters);
+        }
+        valid = code >= 32 && code <= 126;
+        return (valid ? code : '?') - 32;
+    }
 public:
-    constexpr SmoothFont(unsigned first, uint8_t height, uint8_t baseline)
-        : glyphs_(kGlyphs + first), height_(height), baseline_(baseline) {}
+    constexpr SmoothFont(unsigned first, uint8_t height, uint8_t baseline, bool numerals)
+        : glyphs_(kGlyphs + first), height_(height), baseline_(baseline), numerals_(numerals) {}
     int height() const { return height_; }
     void getDefaultMetric(lgfx::FontMetrics *m) const override {
         *m = {glyphs_[0].advance, glyphs_[0].advance, 0, height_, height_, 0, baseline_};
     }
     bool updateFontMetric(lgfx::FontMetrics *m, uint16_t code) const override {
-        bool valid = code >= 32 && code <= 126;
-        const auto &g = glyphs_[(valid ? code : '?') - 32];
+        bool valid;
+        const auto &g = glyphs_[index(code, valid)];
         m->width = g.width;
         m->x_advance = g.advance;
         m->x_offset = g.left;
@@ -28,7 +39,8 @@ public:
     }
     size_t drawChar(lgfx::LGFXBase *d, int32_t x, int32_t y, uint16_t code,
                     const lgfx::TextStyle *style, lgfx::FontMetrics *, int32_t &) const override {
-        const auto &g = glyphs_[(code >= 32 && code <= 126 ? code : '?') - 32];
+        bool valid;
+        const auto &g = glyphs_[index(code, valid)];
         uint32_t background = style->fore_rgb888 == style->back_rgb888 ? d->getBaseColor() : style->back_rgb888;
         uint32_t shades[16];
         for (int a = 0; a < 16; ++a) {
@@ -66,10 +78,11 @@ const SmoothFont kFonts[] = {BDL_FONT_FACES};
 #undef BDL_FONT_FACES
 }
 
-const lgfx::IFont *atMost(int height) {
-    for (int i = int(sizeof(kFonts) / sizeof(kFonts[0])) - 1; i >= 0; --i)
-        if (kFonts[i].height() <= height) return &kFonts[i];
-    return &kFonts[0];
+const lgfx::IFont *atMost(int height, bool numerals) {
+    unsigned base = numerals ? kFacesPerFamily : 0;
+    for (int i = int(kFacesPerFamily) - 1; i >= 0; --i)
+        if (kFonts[base + i].height() <= height) return &kFonts[base + i];
+    return &kFonts[base];
 }
 }
 #endif
