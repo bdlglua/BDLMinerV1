@@ -6,6 +6,7 @@
 
 #include "ui_view.h"
 #include "ui_art.h"
+#include "ui_font.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -14,6 +15,38 @@
 namespace ui_view {
 namespace {
 constexpr size_t kScratchPixels = 4096;
+
+uint32_t blend(uint32_t foreground, uint32_t background, unsigned alpha) {
+    uint32_t result = 0;
+    for (int shift : {16, 8, 0})
+        result |= ((((foreground >> shift) & 255) * alpha + ((background >> shift) & 255) * (255 - alpha) + 127) / 255) << shift;
+    return result;
+}
+
+void smoothDot(lgfx::LovyanGFX &d, int x, int y, int radius, uint32_t color) {
+    for (int dy = -radius; dy <= radius; ++dy) for (int dx = -radius; dx <= radius; ++dx) {
+        float coverage = std::max(0.0f, std::min(1.0f, radius + 0.5f - std::sqrt(float(dx * dx + dy * dy))));
+        if (coverage > 0) d.drawPixel(x + dx, y + dy, blend(color, kBackground, unsigned(coverage * 255)));
+    }
+}
+
+void smoothLine(lgfx::LovyanGFX &d, int x0, int y0, int x1, int y1, uint32_t color) {
+    bool steep = std::abs(y1 - y0) > std::abs(x1 - x0);
+    if (steep) { std::swap(x0, y0); std::swap(x1, y1); }
+    if (x0 > x1) { std::swap(x0, x1); std::swap(y0, y1); }
+    int dx = x1 - x0;
+    int32_t position = y0 * 65536;
+    int32_t slope = dx ? (y1 - y0) * 65536 / dx : 0;
+    for (int x = x0; x <= x1; ++x, position += slope) {
+        int y = int(std::floor(position / 65536.0));
+        unsigned alpha = unsigned(position - y * 65536) >> 8;
+        auto plot = [&](int yy, unsigned a) {
+            if (a) d.drawPixel(steep ? yy : x, steep ? x : yy, blend(color, kBackground, a));
+        };
+        plot(y, 255 - alpha);
+        plot(y + 1, alpha);
+    }
+}
 
 // Use the actual panel fonts for fitting; long addresses and pool names
 // remain bounded even on the 80-pixel and square M5 panels.
@@ -43,29 +76,21 @@ std::string compactLabel(const std::string &label) {
 }
 
 void labelFont(lgfx::LovyanGFX &d, int size) {
-    d.setFont(&lgfx::fonts::Font0);
-    d.setTextSize(std::max(1.0f, size / 8.0f));
+    d.setFont(ui_font::atMost(size));
+    d.setTextSize(1);
     d.setTextPadding(0);
 }
 
 void fitted(lgfx::LovyanGFX &d, const std::string &value, int x, int y, int w, int h,
-            uint32_t color, bool large, bool right = false, bool digital = false) {
+            uint32_t color, bool right = false) {
     if (w <= 0 || h <= 0) return;
-    if (h < 14) d.setFont(&lgfx::fonts::Font0);
-    else if (digital && !value.empty() && value.find_first_not_of("0123456789.:-") == std::string::npos)
-        d.setFont(&lgfx::fonts::Font7);
-    else d.setFont(large ? &lgfx::fonts::Font4 : &lgfx::fonts::Font2);
     d.setTextSize(1);
-    float factor = std::min(float(h) / d.fontHeight(), float(w) / std::max(1, int(d.textWidth(value.c_str()))));
-    if (!large && factor < 0.7f) {
-        labelFont(d, 8);
-        factor = std::min(1.0f, float(h) / d.fontHeight());
+    // Fit native antialiased glyphs instead of stretching a coarse bitmap.
+    // Long strings fall back to the smallest face and a visible ellipsis.
+    for (int size = std::max(8, std::min(40, h)); size >= 8; --size) {
+        d.setFont(ui_font::atMost(size));
+        if (d.textWidth(value.c_str()) <= w) break;
     }
-    factor = std::max(factor, 8.0f / d.fontHeight());
-    // Keep at least eight pixels of height while allowing a narrow field
-    // to fit all digits (e.g. "52.1 C" on a square 128-pixel panel).
-    float horizontal = std::min(factor, float(w) / std::max(1, int(d.textWidth(value.c_str()))));
-    d.setTextSize(std::max(horizontal, factor * 0.65f), factor);
     std::string shown = ellipsis(d, value, w);
     d.setTextColor(color);
     d.setTextDatum(right ? lgfx::middle_right : lgfx::middle_left);
@@ -111,12 +136,14 @@ void View::paint(Rect r, uint32_t background, Paint draw) {
             int h = std::min(rows, r.h - y);
             strip_.setBuffer(pixels_.get(), r.w, h, 16);
             strip_.fillScreen(background);
+            strip_.setBaseColor(background);
             draw(strip_, 0, -y);
             strip_.pushSprite(display_, r.x, r.y + y);
         }
     } else {
         display_->setClipRect(r.x, r.y, r.w, r.h);
         display_->fillRect(r.x, r.y, r.w, r.h, background);
+        display_->setBaseColor(background);
         draw(*display_, r.x, r.y);
         display_->clearClipRect();
     }
@@ -143,12 +170,6 @@ void View::frame(int page, uint32_t accent, uint8_t language) {
     height_ = display_->height();
     display_->clearClipRect();
     display_->fillScreen(kBackground);
-    // Fixed star/circuit texture: drawn only when changing pages. Readouts
-    // have opaque local backgrounds, so texture never obscures live values.
-    for (int i = 0; i < width_ / 3; ++i) {
-        int x = (i * 73 + 19) % width_, y = (i * 47 + 7) % height_;
-        display_->drawPixel(x, y, uint32_t(i % 4 ? 0x101820 : 0x273039));
-    }
     int hh = headerHeight(), m = margin();
     ui_art::draw(*display_, ui_art::Mining, m, 1, hh - 2, hh - 2);
     display_->drawFastHLine(m, hh, width_ - 2 * m, kBorder);
@@ -156,7 +177,7 @@ void View::frame(int page, uint32_t accent, uint8_t language) {
         int fy = height_ - footerHeight() / 2, gap = width_ >= 200 ? 6 : 4;
         for (int i = 0; i < kPages; ++i) {
             int x = width_ - m - 2 - (kPages - 1 - i) * gap;
-            display_->fillCircle(x, fy, i == page ? 2 : 1, i == page ? accent_ : kBorder);
+            smoothDot(*display_, x, fy, i == page ? 2 : 1, i == page ? accent_ : kBorder);
         }
     }
 }
@@ -181,13 +202,17 @@ void View::card(int slot, Rect r, const Metric &metric, bool hero, bool wrap, in
         uint32_t ink = skin ? 0x081017 : metric.color;
         uint32_t labelColor = skin ? 0x263039 : kMuted;
         d.fillRect(x, y, r.w, r.h, face);
+        d.setBaseColor(face);
         d.drawRect(x, y, r.w, r.h, skin ? face : kBorder);
         // Chamfered instrument-panel edge, rather than web-style cards.
         int cut = std::min(7, r.h / 4);
-        d.fillTriangle(x + r.w - cut, y, x + r.w - 1, y, x + r.w - 1, y + cut, kBackground);
+        for (int u = 0; u < cut; ++u) for (int v = 0; v <= u + 1; ++v) {
+            uint32_t c = v < u ? kBackground : v == u ? blend(skin ? face : kBorder, kBackground, 128)
+                                                                             : skin ? face : blend(kBorder, face, 128);
+            d.drawPixel(x + r.w - cut + u, y + v, c);
+        }
         if (!skin) {
             d.drawFastHLine(x + 2, y, std::min(14, r.w - 4), hero ? accent_ : uint32_t(0x56616C));
-            d.drawLine(x + r.w - cut, y, x + r.w - 1, y + cut, kBorder);
         }
         if (r.h < 21 && !wrap) {
             int labelW = r.w * 45 / 100;
@@ -195,7 +220,7 @@ void View::card(int slot, Rect r, const Metric &metric, bool hero, bool wrap, in
             d.setTextDatum(lgfx::middle_left);
             d.setTextColor(labelColor);
             d.drawString(ellipsis(d, compactLabel(metric.label), labelW - p).c_str(), x + p, y + r.h / 2);
-            fitted(d, metric.value, x + labelW, y + 2, r.w - labelW - p, r.h - 4, ink, false, true);
+            fitted(d, metric.value, x + labelW, y + 2, r.w - labelW - p, r.h - 4, ink, true);
             return;
         }
         int labelH = height_ >= 200 ? 12 : 8;
@@ -213,15 +238,21 @@ void View::card(int slot, Rect r, const Metric &metric, bool hero, bool wrap, in
         if (wrap) {
             labelFont(d, labelH);
             d.setTextColor(ink);
-            int perLine = std::max(1, (r.w - 2 * p) / std::max(1, int(d.textWidth("W"))));
-            for (size_t i = 0, line = 0; i < metric.value.size() && int((line + 1) * labelH) <= vh; i += perLine, ++line)
-                d.drawString(metric.value.substr(i, perLine).c_str(), x + p, y + vy + line * labelH);
+            size_t start = 0;
+            for (int line = 0; start < metric.value.size() && (line + 1) * labelH <= vh; ++line) {
+                size_t end = start + 1;
+                while (end <= metric.value.size() && d.textWidth(metric.value.substr(start, end - start).c_str()) <= r.w - 2 * p) ++end;
+                end = std::max(start + 1, end - 1);
+                std::string shown = metric.value.substr(start, end - start);
+                if ((line + 2) * labelH > vh && end < metric.value.size()) shown = ellipsis(d, metric.value.substr(start), r.w - 2 * p);
+                d.drawString(shown.c_str(), x + p, y + vy + line * labelH);
+                start = end;
+            }
         } else {
             int unitW = inlineUnit ? int(metric.detail.size()) * 6 + 4 : 0;
             int iconW = hero && page_ == 4 && r.w >= 120 ? std::min(36, vh) : 0;
             if (iconW) ui_art::draw(d, ui_art::Device, x + r.w - p - iconW, y + vy, iconW, iconW);
-            fitted(d, metric.value, x + p, y + vy, r.w - 2 * p - unitW - (iconW ? iconW + 4 : 0), vh, ink,
-                   hero || vh >= 16, false, skin || page_ == 6);
+            fitted(d, metric.value, x + p, y + vy, r.w - 2 * p - unitW - (iconW ? iconW + 4 : 0), vh, ink);
             if (inlineUnit) {
                 labelFont(d, 8);
                 d.setTextDatum(lgfx::bottom_right);
@@ -260,7 +291,7 @@ void View::chrome(const Model &m) {
     else {
         Rect dot{width_ - pad - 6, hh / 2 - 3, 6, 6};
         if (changed(17, dot, status + std::to_string(m.statusColor))) paint(dot, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
-            if (!status.empty()) d.fillCircle(x + 3, y + 3, 2, m.statusColor);
+            if (!status.empty()) smoothDot(d, x + 3, y + 3, 2, m.statusColor);
         });
     }
     int dotsW = (width_ >= 200 ? 6 : 4) * kPages + 2;
@@ -307,11 +338,11 @@ void View::graph(const Model &m, Rect r) {
             if (!std::isfinite(p.rate) || p.rate < 0) { previous = false; continue; }
             int x = x0 + (span ? uint64_t(p.ms - m.points[0].ms) * (w - 1) / span : w - 1);
             int y = y0 + h - 1 - int(p.rate / ceiling * (h - 1));
-            if (previous && p.ms - previousMs <= 20000) d.drawLine(ox + px, oy + py, ox + x, oy + y, accent_);
-            else d.fillCircle(ox + x, oy + y, 1, accent_);
+            if (previous && p.ms - previousMs <= 20000) smoothLine(d, ox + px, oy + py, ox + x, oy + y, accent_);
+            else smoothDot(d, ox + x, oy + y, 1, accent_);
             px = x; py = y; previousMs = p.ms; previous = true;
         }
-        if (previous) d.fillCircle(ox + px, oy + py, 2, accent_);
+        if (previous) smoothDot(d, ox + px, oy + py, 2, accent_);
     });
 }
 

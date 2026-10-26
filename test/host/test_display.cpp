@@ -1,6 +1,7 @@
 // Runs the production renderer with the production LovyanGFX fonts.
 // Native sprites replace the physical LCD; no firmware or miner is simulated.
 #include "ui_view.h"
+#include "ui_font.h"
 #include "i18n.h"
 #include "settings.h"
 #include <cassert>
@@ -8,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <set>
 
 using namespace ui_view;
 Settings settings;
@@ -88,6 +90,23 @@ Model example(int page, bool french) {
 }
 
 int main(int argc, char **argv) {
+    {
+        lgfx::LGFX_Sprite sample;
+        sample.setColorDepth(16);
+        assert(sample.createSprite(100, 32));
+        sample.fillScreen(uint32_t(0xF6DB00));
+        sample.setBaseColor(0xF6DB00);
+        sample.setFont(ui_font::atMost(24));
+        sample.setTextSize(1);
+        sample.setTextColor(uint32_t(0x000000));
+        sample.drawString("Az 1.05", 1, 1);
+        std::set<uint32_t> shades;
+        for (auto c : image(sample)) {
+            assert((c & 31) == 0); // black on yellow must not acquire blue/black-background fringes
+            shades.insert(c);
+        }
+        assert(shades.size() >= 8); // actual fractional coverage, not a binary bitmap font
+    }
     std::string out = argc > 1 ? argv[1] : "";
     const int sizes[][2] = {{240,135}, {320,170}, {320,240}, {160,80}, {128,128}, {80,160}, {135,240}};
     for (const auto &size : sizes) {

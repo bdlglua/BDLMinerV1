@@ -255,7 +255,7 @@ Clock / Global data comes from the public [mempool.space](https://mempool.space)
 ### Physical display
 
 The eight physical screens use a NerdMinerV2-inspired illustrated instrument panel:
-black backgrounds, Bitcoin/mining artwork, chamfered panels, digital numerals and
+black backgrounds, Bitcoin/mining artwork, chamfered panels, smooth numerals and
 yellow/cyan readouts. The pages cover mining, clock,
 Bitcoin market, network, device information, hashrate history, records and blocks.
 Mining puts the live hashrate first, alongside temperature, effective power,
@@ -276,8 +276,11 @@ Only changed cards and status fields are redrawn. The renderer reuses one 8 KiB
 strip buffer instead of allocating sprites for every field or a full-screen
 framebuffer. If this allocation fails, clipped direct drawing is used. The graph
 redraws when a new sample arrives, preserves elapsed time and gaps, and uses a zero
-baseline. Four 64x64 RGB565 illustrations use 32 KiB of flash in total, with no
-decoded image buffer, filesystem, external fonts or animation loops. Headless
+baseline. Four 128x128 RGB565 illustrations use 128 KiB of flash in total. Area
+filtering smooths images at their actual display size. Text uses native-size,
+antialiased DejaVu Sans glyphs compressed in flash, instead of scaled pixel fonts.
+Panel corners, indicators and graph lines are antialiased too. There is no
+decoded image buffer, font-loading heap, filesystem or animation loop. Headless
 builds exclude the artwork. The default yellow primary plate and cyan secondary
 plate follow the NerdMiner visual reference; selected accent themes are retained.
 
@@ -300,7 +303,11 @@ python3 tools/preview_display.py
 
 Artwork sources are in `assets/display/`. After replacing the original 2x2 PNG
 atlas, encode its small firmware images with `python3 tools/pack_display_art.py`.
-This preparation step requires Pillow; ordinary firmware builds do not.
+Generate the embedded fonts with `python3 tools/pack_display_fonts.py`; their
+source font and license are also included in that directory. These preparation
+steps require Pillow; ordinary firmware builds do not. Overview sheets use a
+filtered enlargement for inspection; panel PNGs retain their native resolution.
+Smoothing cannot increase the number of physical pixels in the LCD.
 
 The PNGs in `tools/preview/` use fictional demonstration readings; they are not
 photographs or measured performance results. Native checks cover eight pages,

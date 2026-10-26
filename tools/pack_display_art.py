@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the original 2x2 illustration atlas into four 64x64 RGB565 images.
+"""Pack the original 2x2 illustration atlas into four 128x128 RGB565 images.
 This is asset encoding, with no image decoder required on the miner.
 Run manually after changing assets/display/illustrations.png. Pillow is only
 needed for this preparation step, not normal firmware builds or native tests.
@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SIZE = 64
+SIZE = 128
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
         text += "{\n" + "\n".join("    " + ",".join(f"0x{p:04x}" for p in pixels[i:i+16]) + "," for i in range(0, len(pixels), 16)) + "\n},\n"
     text += "};\n}  // namespace ui_art\n"
     (ROOT / "src/ui_art_data.h").write_text(text)
-    print("Packed four 64x64 illustrations: 32 KiB of flash, no decoder buffer")
+    print("Packed four 128x128 illustrations: 128 KiB of flash, no decoder buffer")
 
 
 if __name__ == "__main__":

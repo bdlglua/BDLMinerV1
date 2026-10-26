@@ -38,7 +38,7 @@ def main():
              "-Itest/host/stubs/miner", "-I" + str(library)]
     run(os.environ.get("CC", "gcc"), "-O1", "-ffunction-sections", "-fdata-sections", "-c",
         library / "lgfx/utility/lgfx_qrcode.c", "-o", build / "qrcode.o")
-    run(compiler, *flags, "test/host/test_display.cpp", "src/ui_view.cpp", "src/ui_art.cpp", "src/i18n.cpp",
+    run(compiler, *flags, "test/host/test_display.cpp", "src/ui_view.cpp", "src/ui_art.cpp", "src/ui_font.cpp", "src/i18n.cpp",
         library / "lgfx/v1/lgfx_v1.cpp", build / "qrcode.o", "-Wl,--gc-sections", "-pthread",
         "-o", build / "test_display")
     if args.check:
@@ -63,7 +63,7 @@ def main():
             label = "APERCU / DONNEES DE DEMO" if language else "PREVIEW / DEMO DATA"
             draw.text((x, y), f"{i + 1}/8 - {label}", fill="white")
             with Image.open(args.output / f"{name}_240x135{language}.png") as image:
-                sheet.paste(image.resize((720, 405), Image.Resampling.NEAREST), (x, y + 18))
+                sheet.paste(image.resize((720, 405), Image.Resampling.LANCZOS), (x, y + 18))
         sheet.save(args.output / f"overview_240x135{language}.png")
     print("Previews use DEMO readings, not measurements from a connected miner:", args.output)
 
