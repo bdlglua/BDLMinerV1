@@ -246,6 +246,20 @@ check('settings stay within a mobile viewport and labels focus their inputs',()=
   await f.page.locator('label[for="k_power"]').click();assert.equal(await f.page.evaluate(()=>document.activeElement.id),'k_power');
 }));
 
+check('automatic pool identity is explained and updates when switching to backup',()=>run({language:'fr'},async f=>{
+  await loaded(f);
+  assert.match(await f.page.locator('#group-pool').textContent(),/choisi automatiquement pour chaque pool/);
+  assert.equal(await f.page.locator('#k_ua').count(),0);
+  f.state.stats.pool.user_agent='NerdMinerV2';f.state.stats.pool.protocol='Stratum V1';
+  await f.page.goto(f.url);
+  await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('NerdMinerV2'));
+  assert.match(await f.page.locator('#pool-grid').textContent(),/Stratum V1 · NerdMinerV2 · automatique/);
+  Object.assign(f.state.stats.pool,{host:'backup.example',backup:true,user_agent:'BDLMinerV1/test'});
+  await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('BDLMinerV1/test'));
+  assert.match(await f.page.locator('#pool-grid').textContent(),/Pool \(secours\)/);
+  assert.doesNotMatch(await f.page.locator('#pool-grid').textContent(),/NerdMinerV2/);
+}));
+
 
 check('full performance is an explicit 100 percent choice and preserves thermal protection',()=>run({language:'fr'},async f=>{
   await loaded(f);await f.page.fill('#settings-search','puissance');

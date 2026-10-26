@@ -56,5 +56,11 @@ int main() {
     replacement.peers = std::string(9000, 'x'); // not in this descriptor fixture
     replacement.poolHost = std::string(9000, 'x');
     assert(!settingsstore::save(wrapped, replacement, sequence));
+    // The retired manual user agent in older records/backups cannot override
+    // automatic selection, and must not invalidate the rest of the settings.
+    const char *legacy = R"({"pool":"legacy.pool","power":75,"ua":"custom-old-agent"})";
+    Settings migrated;
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(legacy), strlen(legacy), migrated));
+    assert(migrated.poolHost == "legacy.pool" && migrated.miningPower == 75);
     puts("Settings records: failed/truncated/corrupt writes, rollback, passwords and generation wrap passed");
 }

@@ -27,7 +27,6 @@ const SettingInfo kSettings[] = {
     S("addr", Text, btcAddress, "Pool", "BTC address (optionally address.worker)"),
     S("pass", Text, poolPassword, "Pool", "Pool password"),
     S("diff", Decimal, suggestedDifficulty, "Pool", "Suggested share difficulty"),
-    S("ua", Text, userAgent, "Pool", "User agent (pool.nerdminers.org needs NerdMinerV2)"),
     S("pool2", Text, backupHost, "Pool", "Backup pool host (empty = none)"),
     N("port2", backupPort, "Pool", "Backup pool port"),
     N("rotateh", rotateHours, "Pool", "Alternate main / backup pool every N hours (0 = only on failure)"),
@@ -106,10 +105,6 @@ void settingsSanitize(Settings &settings) {
     if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
     if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
     if (!(settings.suggestedDifficulty > 0) || !std::isfinite(settings.suggestedDifficulty)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
-    // "BDLMinerV1/x.y.z" was the default before 1.0.4: saved settings still
-    // carry it, and pool.nerdminers.org refuses it.
-    if (settings.userAgent.isEmpty() || settings.userAgent.startsWith("BDLMinerV1/"))
-        settings.userAgent = DEFAULT_USER_AGENT;
     if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;
     if (settings.ntfyServer.isEmpty()) settings.ntfyServer = DEFAULT_NTFY_SERVER;
     settings.currency = normalizeCurrency(settings.currency);
@@ -277,7 +272,6 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     WiFiManagerParameter pDiff("diff", "Suggested share difficulty", diff, 15);
     WiFiManagerParameter pBeep("beep", "Beep on a 32-bit share (1 = on, 0 = off)", beep, 1,
                                "type='number' min='0' max='1'");
-    WiFiManagerParameter pUa("ua", "User agent (pool.nerdminers.org needs NerdMinerV2)", settings.userAgent.c_str(), 40);
     WiFiManagerParameter pTz("tz", "Timezone (POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0)",
                              settings.timezone.c_str(), 48);
     WiFiManagerParameter pFiat("fiat", "Price currency (USD, EUR, GBP, CAD, CHF, AUD, JPY)",
@@ -295,7 +289,6 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pAddr);
     wm.addParameter(&pPass);
     wm.addParameter(&pDiff);
-    wm.addParameter(&pUa);
     wm.addParameter(&pBeep);
     wm.addParameter(&pTz);
     wm.addParameter(&pFiat);
@@ -318,7 +311,6 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.btcAddress = pAddr.getValue();
         settings.poolPassword = pPass.getValue();
         settings.suggestedDifficulty = atof(pDiff.getValue());
-        settings.userAgent = pUa.getValue();
         settings.beep = atoi(pBeep.getValue()) != 0;
         settings.timezone = pTz.getValue();
         settings.currency = pFiat.getValue();

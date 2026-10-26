@@ -21,7 +21,7 @@ const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','
 'Display':'Affichage','Notifications':'Notifications','Safety':'Sécurité','Network':'Réseau'};
 // Settings labels by key.
 const FR_SET={pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
-diff:'Difficulté de share suggérée',ua:'User agent (pool.nerdminers.org demande NerdMinerV2)',pool2:'Pool de secours (vide = aucune)',port2:'Port de la pool de secours',
+diff:'Difficulté de share suggérée',pool2:'Pool de secours (vide = aucune)',port2:'Port de la pool de secours',
 rotateh:'Alterner pool principale / secours toutes les N heures (0 = seulement en cas de panne)',bright:'Luminosité (%)',rot:'Rotation (0-3)',
 autorot:'Rotation avec l\'accéléromètre (appareils M5)',lang:'Langue : 0 anglais, 1 français',theme:'Thème (0 orange, 1 vert, 2 bleu, 3 violet, 4 rose)',
 cycle:'Écran suivant toutes les N secondes (0 = non)',nightfrom:'Mode nuit à partir de (heure 0-23, 255 = non)',nightto:'Mode nuit jusqu\'à (heure 0-23)',
@@ -34,6 +34,11 @@ peers:'Autres miners du tableau de bord (IP ou noms, séparés par des virgules)
 update:'Mises à jour depuis GitHub : 0 non, 1 vérifier et proposer, 2 installer automatiquement',
 count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fichier de 2 octets de la release de cette version (rien n\'est envoyé)'};
 function t(s){return LANG=='fr'&&FR[s]||s}
+
+Object.assign(FR,{
+ 'automatic':'automatique',
+ 'The Stratum user agent is selected automatically for each pool.':'Le user agent Stratum est choisi automatiquement pour chaque pool.'
+});
 
 Object.assign(FR,{
  'Connection failed. Please try again.':'Connexion impossible. Réessaie.',

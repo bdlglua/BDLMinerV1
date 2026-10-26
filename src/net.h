@@ -14,3 +14,5 @@ const String &netPoolHost();
 uint16_t netPoolPort();
 bool netOnBackup();
 uint8_t netPendingShares();
+// Automatically selected identity for the current/latest connection attempt.
+const char *netUserAgent();

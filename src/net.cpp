@@ -7,6 +7,7 @@
 
 #include "core/stratum.h"
 #include "core/line_buffer.h"
+#include "core/pool_agent.h"
 #include "log.h"
 #include "miner.h"
 #include "settings.h"
@@ -41,25 +42,24 @@ bool sendLine(WiFiClient &client, const std::string &line) {
 }
 
 bool sessionTimedOut = false;  // the last session ended because of its `maxMs`
-
-// Some pools only let known miners subscribe (pool.nerdminers.org:
-// "Only allowed user agents may subscribe"). After such a refusal the
-// following sessions present themselves as NerdMinerV2, until a restart.
-constexpr const char *kFallbackAgent = "NerdMinerV2";
-bool useFallbackAgent = false;
-
-const char *userAgent() { return useFallbackAgent ? kFallbackAgent : settings.userAgent.c_str(); }
+bool retryAgent = false;
+constexpr const char kNativeAgent[] = "BDLMinerV1/" FW_VERSION;
+std::atomic<const char *> activeAgent{kNativeAgent};
 
 // Runs one pool session until the connection drops, or until `maxMs` has
 // elapsed when it is not 0.
-void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
+void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, stratum::PoolAgent &agent) {
     stratum::LineBuffer input(kMaxLine);
     uint8_t chunk[512];
     uint32_t start = millis();
     uint32_t lastRx = start;
     uint32_t lastShareReply = start;
 
-    if (!sendLine(client, proto.subscribe(userAgent()))) return;
+    agent.endpoint(netPoolHost().c_str(), netPoolPort());
+    const char *identity = agent.select(kNativeAgent);
+    activeAgent = identity;
+    logf("[pool] Stratum V1 user agent \"%s\" (automatic)\n", identity);
+    if (!sendLine(client, proto.subscribe(identity))) return;
 
     while (client.connected() && WiFi.isConnected()) {
         int n;
@@ -87,11 +87,10 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                     case stratum::Event::SubscribeFailed:
                         setStatus("Subscribe refused");
                         logf("[pool] subscribe refused: %s (user agent \"%s\")\n", proto.lastError().c_str(),
-                             userAgent());
-                        if (!useFallbackAgent && strcasestr(proto.lastError().c_str(), "agent") &&
-                            settings.userAgent != kFallbackAgent) {
-                            useFallbackAgent = true;
-                            logf("[pool] retrying with user agent \"%s\"\n", kFallbackAgent);
+                             identity);
+                        if (agent.refused(proto.lastError().c_str())) {
+                            retryAgent = true;
+                            logf("[pool] retrying this pool with user agent \"%s\"\n", agent.select(kNativeAgent));
                         }
                         return;
                     case stratum::Event::Authorized:
@@ -170,6 +169,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
 void netTask(void *) {
     WiFiClient client;
     stratum::Protocol proto;
+    stratum::PoolAgent agents[2];  // keep main/backup compatibility decisions separate
     uint32_t backoffMs = 2000;
     int failures = 0;
 
@@ -199,13 +199,14 @@ void netTask(void *) {
         setStatus(msg);
         bool authorized = false;
         sessionTimedOut = false;
+        retryAgent = false;
         if (client.connect(netPoolHost().c_str(), netPoolPort(), 10000)) {
             client.setNoDelay(true);
             proto.reset();
             proto.setCredentials(settings.btcAddress.c_str(), settings.poolPassword.c_str());
             setStatus("Subscribing");
             uint32_t t0 = millis();
-            session(client, proto, maxMs);
+            session(client, proto, maxMs, agents[onBackup ? 1 : 0]);
             client.stop();
             authorized = proto.authorized();
             if (millis() - t0 > 60000) backoffMs = 2000;  // session was healthy
@@ -218,6 +219,9 @@ void netTask(void *) {
         minerInvalidate();
         if (netStatus().startsWith("Mining")) setStatus("Disconnected");
 
+        // An explicit identity retry is part of the same connection attempt:
+        // do not count it towards failover or wait for exponential backoff.
+        if (retryAgent) { backoffMs = 2000; continue; }
         failures = authorized ? 0 : failures + 1;
         if (rotate && sessionTimedOut) {
             onBackup = !onBackup;
@@ -260,3 +264,4 @@ uint16_t netPoolPort() { return onBackup ? settings.backupPort : settings.poolPo
 
 bool netOnBackup() { return onBackup; }
 uint8_t netPendingShares() { return pendingShares.load(); }
+const char *netUserAgent() { return activeAgent.load(); }

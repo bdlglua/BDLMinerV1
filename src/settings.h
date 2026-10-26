@@ -17,9 +17,6 @@
 #ifndef FW_VERSION
 #define FW_VERSION "dev"
 #endif
-// Sent in mining.subscribe. Some pools only accept known miners
-// (pool.nerdminers.org requires "NerdMinerV2"), and the others take it too.
-#define DEFAULT_USER_AGENT "NerdMinerV2"
 #define DEFAULT_NTFY_SERVER "ntfy.sh"
 // Firmware updates come from the releases of this GitHub repository.
 #ifndef GITHUB_REPO
@@ -37,7 +34,6 @@ struct Settings {
     String btcAddress;  // payout address (worker name may be appended: addr.worker)
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
-    String userAgent = DEFAULT_USER_AGENT;
     // Display and sound
     uint8_t brightness = 80;  // percent
     uint8_t rotation = 1;     // 0..3, display orientation

@@ -183,9 +183,6 @@ Boards without a display report everything on the serial monitor and the
    * **Pool password**: usually `x`;
    * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
      (the pool may enforce a higher minimum);
-   * **User agent**: miner name sent to the pool, `NerdMinerV2` by default.
-     Some pools only accept known miners: `pool.nerdminers.org` requires `NerdMinerV2`
-     (with another name, after its refusal the miner reconnects as `NerdMinerV2`);
    * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
      bits (difficulty ≥ 1) is found, `0` stays silent. M5 devices use their buzzer or
      speaker (StickC Plus2: GPIO2); on other boards add `-DBUZZER_PIN=<gpio>` to
@@ -426,6 +423,27 @@ restarts. `history_revision` changes when a new history point is added;
 `github_update.retry_in_s` is the current installation retry countdown.
 `pool.pending_shares` counts submissions awaiting a reply. Only outstanding request
 IDs can affect accepted/rejected counters; duplicate and unknown replies are ignored.
+`pool.user_agent` reports the automatically selected identity and `pool.protocol`
+reports `Stratum V1`; both are also shown in the dashboard's Pool card.
+
+### Automatic pool identity and Stratum versions
+
+No manual user-agent setting is required in the setup portal or dashboard.
+Known ESP32 pool endpoints (`pool.nerdminers.org`, `pool.nerdminer.io`,
+`pool.bitronics.store`, `pool.bitronics.com` and `pool.solomining.de`) receive
+`NerdMinerV2` on the first subscription. Other pools receive `BDLMinerV1/<version>`.
+If an unknown pool explicitly refuses that user agent, the miner retries it once
+as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
+changing an endpoint resets its decision. Unrelated connection or authorization
+errors still follow the usual reconnect/failover policy. Old saved or backed-up
+`ua` fields are ignored without changing the other settings.
+
+This firmware implements **Stratum V1 over TCP**, not native Stratum V2.
+SV2 uses a different binary protocol and connection security; a user agent or
+port change cannot enable it. An external SV1-to-SV2 translator can provide an
+SV1 endpoint to the miner and connect upstream using SV2, subject to the pool's
+accepted difficulty and authentication requirements. See the
+[Stratum V2 documentation](https://stratumprotocol.org/).
 
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).
