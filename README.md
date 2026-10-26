@@ -125,7 +125,7 @@ host tests, firmware `X.Y.Z` for every board (the version comes from the tag), s
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.4.1 && git push origin v1.4.1
+git tag v1.5.0 && git push origin v1.5.0
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
