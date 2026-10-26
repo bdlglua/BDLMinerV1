@@ -144,8 +144,14 @@ def main():
         print("no signing key: the firmware is not signed, GitHub updates will refuse it")
     for env in targets:
         print(f"[{env}] building", flush=True)
-        run("pio", "run", "-e", env)
+        # Discover the layout (and run pre-build generators) before compiling.
+        # A fresh envdump must never invalidate/remove images after the build
+        # that the merge command is about to consume.
         mcu, mode, freq, size, images = flash_layout(env)
+        run("pio", "run", "-e", env)
+        missing = [path for _, path in images if not os.path.isfile(path)]
+        if missing:
+            sys.exit("Build did not produce required flash images: " + ", ".join(missing))
         factory = os.path.join(out, f"{env}-factory.bin")
         args = [PYTHON, ESPTOOL, "--chip", mcu, "merge_bin", "-o", factory,
                 "--flash_mode", mode, "--flash_freq", freq, "--flash_size", size]

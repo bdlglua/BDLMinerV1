@@ -59,6 +59,5 @@ jobs:
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
       - run: pip install platformio==6.1.19
-      - run: pio run -e ${{ matrix.env }}
-      - name: Check USB factory image packaging
+      - name: Build and package USB images from a clean checkout
         run: python3 tools/make_release.py "${{ matrix.env }}"

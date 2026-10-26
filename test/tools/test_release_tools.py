@@ -25,6 +25,34 @@ class ReleaseToolsTests(unittest.TestCase):
                 make_release.checked(["esptool"])
         self.assertIn("missing input image", output.getvalue())
 
+    def test_layout_generation_precedes_build_from_a_clean_checkout(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            firmware = root / "firmware.bin"
+            bootloader = root / "bootloader.bin"
+            layout = ("esp32", "dio", "40m", "4MB", [("0x1000", str(bootloader)), ("0x10000", str(firmware))])
+            def discover(env):
+                # Reproduce a first envdump invalidating generated build files.
+                firmware.unlink(missing_ok=True)
+                bootloader.unlink(missing_ok=True)
+                return layout
+            def compile_(*args):
+                firmware.write_bytes(b"firmware")
+                bootloader.write_bytes(b"bootloader")
+            def merge(command, **kwargs):
+                self.assertTrue(firmware.is_file() and bootloader.is_file())
+                Path(command[command.index("-o") + 1]).write_bytes(b"factory")
+            with (patch.object(make_release, "ROOT", str(root)),
+                  patch.object(make_release, "version", return_value="1.1.2"),
+                  patch.object(make_release, "signing_key", return_value=None),
+                  patch.object(make_release, "run", side_effect=compile_),
+                  patch.object(make_release, "flash_layout", side_effect=discover),
+                  patch.object(make_release.subprocess, "run", side_effect=merge),
+                  patch.object(sys, "argv", ["make_release.py", "alpha"]),
+                  contextlib.redirect_stdout(io.StringIO())):
+                make_release.main()
+            self.assertTrue((root / "release/1.1.2/alpha-factory.bin").is_file())
+
     def test_partial_unsigned_rebuild_removes_stale_signature_and_keeps_checksums(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
