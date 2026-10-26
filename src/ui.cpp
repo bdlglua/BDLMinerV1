@@ -136,7 +136,7 @@ void buildModel(const MinerStats &stats, uint32_t now) {
             metric(2, "BLOCK", stats.blockHeight ? String(stats.blockHeight) : String("-"));
             metric(3, "HASHRATE", fullRate(minerHashrateLive()));
             metric(4, "SHARES", String(stats.accepted), String(), kGreen);
-            model.footer = marketAge(m).c_str();
+            model.footer = date.c_str();
             break;
         }
         case 2: {
@@ -162,6 +162,8 @@ void buildModel(const MinerStats &stats, uint32_t now) {
             metric(2, "TOTAL HASHES", work::formatSI(double(minerTotalHashes()), 1).c_str());
             metric(3, netOnBackup() ? "BACKUP POOL" : "POOL", netPoolHost(), String(netPoolPort()), netOnBackup() ? kAmber : kText);
             metric(4, "LOCAL IP", WiFi.localIP().toString(), String(WiFi.RSSI()) + " dBm");
+            model.footer = (lcd->width() >= 200 ? WiFi.localIP().toString() + " / " + String(WiFi.RSSI()) + " dBm"
+                                                : WiFi.localIP().toString()).c_str();
             break;
         }
         case 4: {

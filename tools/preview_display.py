@@ -38,7 +38,7 @@ def main():
              "-Itest/host/stubs/miner", "-I" + str(library)]
     run(os.environ.get("CC", "gcc"), "-O1", "-ffunction-sections", "-fdata-sections", "-c",
         library / "lgfx/utility/lgfx_qrcode.c", "-o", build / "qrcode.o")
-    run(compiler, *flags, "test/host/test_display.cpp", "src/ui_view.cpp", "src/i18n.cpp",
+    run(compiler, *flags, "test/host/test_display.cpp", "src/ui_view.cpp", "src/ui_art.cpp", "src/i18n.cpp",
         library / "lgfx/v1/lgfx_v1.cpp", build / "qrcode.o", "-Wl,--gc-sections", "-pthread",
         "-o", build / "test_display")
     if args.check:

@@ -254,12 +254,18 @@ Clock / Global data comes from the public [mempool.space](https://mempool.space)
 
 ### Physical display
 
-The eight physical screens share a dark, high-contrast layout: mining, clock,
+The eight physical screens use a NerdMinerV2-inspired illustrated instrument panel:
+black backgrounds, Bitcoin/mining artwork, chamfered panels, digital numerals and
+yellow/cyan readouts. The pages cover mining, clock,
 Bitcoin market, network, device information, hashrate history, records and blocks.
 Mining puts the live hashrate first, alongside temperature, effective power,
 accepted shares and best difficulty. Records include both 32-bit and 64-bit shares.
 The footer identifies the current mining limit and the eight dots identify the page.
 
+The mining, clock, Bitcoin and network pages place a dedicated illustration above
+the colored readouts. Startup has a Bitcoin-and-pickaxes splash, and the device
+page includes a decorative ASIC picture. These are original BDLMiner illustrations,
+not photographs of the connected board or copied NerdMiner logos.
 The layout adapts to the panel dimensions, including square and small M5 screens.
 Short panels prioritize hashrate, temperature and power on the mining page.
 French and English, the five accent themes, buttons, rotation, night mode and
@@ -270,7 +276,10 @@ Only changed cards and status fields are redrawn. The renderer reuses one 8 KiB
 strip buffer instead of allocating sprites for every field or a full-screen
 framebuffer. If this allocation fails, clipped direct drawing is used. The graph
 redraws when a new sample arrives, preserves elapsed time and gaps, and uses a zero
-baseline. No background bitmaps, external fonts or animation loops are needed.
+baseline. Four 64x64 RGB565 illustrations use 32 KiB of flash in total, with no
+decoded image buffer, filesystem, external fonts or animation loops. Headless
+builds exclude the artwork. The default yellow primary plate and cyan secondary
+plate follow the NerdMiner visual reference; selected accent themes are retained.
 
 | Resolution | Boards |
 |---|---|
@@ -288,6 +297,10 @@ python3 tools/preview_display.py --check
 pip install pillow
 python3 tools/preview_display.py
 ```
+
+Artwork sources are in `assets/display/`. After replacing the original 2x2 PNG
+atlas, encode its small firmware images with `python3 tools/pack_display_art.py`.
+This preparation step requires Pillow; ordinary firmware builds do not.
 
 The PNGs in `tools/preview/` use fictional demonstration readings; they are not
 photographs or measured performance results. Native checks cover eight pages,

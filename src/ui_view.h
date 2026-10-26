@@ -11,7 +11,7 @@
 namespace ui_view {
 
 constexpr int kPages = 8;
-constexpr uint32_t kBackground = 0x0B1017, kPanel = 0x151D28;
+constexpr uint32_t kBackground = 0x020406, kPanel = 0x0C1119;
 constexpr uint32_t kBorder = 0x2A3646, kText = 0xF1F5FA, kMuted = 0x94A3B8;
 constexpr uint32_t kGreen = 0x42D99B, kRed = 0xFF6577, kAmber = 0xFFBC55;
 
@@ -63,7 +63,8 @@ private:
     bool changed(int slot, Rect rect, const std::string &key);
     void frame(int page, uint32_t accent, uint8_t language);
     void text(int slot, Rect rect, const std::string &value, uint32_t color, int size, bool right = false);
-    void card(int slot, Rect rect, const Metric &metric, bool hero = false, bool wrap = false);
+    void card(int slot, Rect rect, const Metric &metric, bool hero = false, bool wrap = false, int skin = 0);
+    void illustration(int slot, Rect rect, int icon);
     void chrome(const Model &model);
     void graph(const Model &model, Rect rect);
     template <typename Paint> void paint(Rect rect, uint32_t background, Paint draw);

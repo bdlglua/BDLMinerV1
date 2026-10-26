@@ -46,6 +46,7 @@ Model example(int page, bool french) {
             m.title = french ? "HORLOGE" : "CLOCK";
             metric(0, "LOCAL TIME", "21:14", "Mon 26 Oct 2026"); metric(1, "BTC PRICE", "104250", "USD", m.accent);
             metric(2, "BLOCK", "950128"); metric(3, "HASHRATE", "1.005 MH/s"); metric(4, "SHARES", "10827");
+            m.footer = french ? "lun 26 oct 2026" : "Mon 26 Oct 2026";
             break;
         case 2:
             m.title = "BITCOIN";
@@ -57,6 +58,7 @@ Model example(int page, bool french) {
             metric(0, "BLOCK HEIGHT", "950128", "halving in 99872 blocks", m.accent);
             metric(1, "NETWORK DIFF", "152.4T"); metric(2, "TOTAL HASHES", "94.6G");
             metric(3, "POOL", "public-pool.io", "21496"); metric(4, "LOCAL IP", "192.168.1.42", "-47 dBm");
+            m.footer = "192.168.1.42";
             break;
         case 4:
             m.title = french ? "APPAREIL" : "DEVICE";
@@ -125,6 +127,8 @@ int main(int argc, char **argv) {
         if (!out.empty()) ppm(lcd, out + "/update_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.update("Automatic update", "1.3.1 -> next", 100, "Restarting...");
         view.render(example(0, false)); // failed update restores the mining frame
+        view.message("BDLMiner V1", "M5StickC Plus2", "v1.3.1 / hold A: setup");
+        if (!out.empty()) ppm(lcd, out + "/splash_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.message("WiFi", "Connecting...", "Hold A at boot: setup");
         if (!out.empty()) ppm(lcd, out + "/startup_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.portal("WiFi setup", "BDLMinerV1-XXXX", "MineYourCoins", "WIFI:T:WPA;S:BDLMinerV1-XXXX;P:MineYourCoins;;");

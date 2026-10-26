@@ -5,6 +5,7 @@
 #if defined(HAS_DISPLAY) || defined(BDLMINER_DISPLAY_PREVIEW)
 
 #include "ui_view.h"
+#include "ui_art.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -48,9 +49,11 @@ void labelFont(lgfx::LovyanGFX &d, int size) {
 }
 
 void fitted(lgfx::LovyanGFX &d, const std::string &value, int x, int y, int w, int h,
-            uint32_t color, bool large, bool right = false) {
+            uint32_t color, bool large, bool right = false, bool digital = false) {
     if (w <= 0 || h <= 0) return;
     if (h < 14) d.setFont(&lgfx::fonts::Font0);
+    else if (digital && !value.empty() && value.find_first_not_of("0123456789.:-") == std::string::npos)
+        d.setFont(&lgfx::fonts::Font7);
     else d.setFont(large ? &lgfx::fonts::Font4 : &lgfx::fonts::Font2);
     d.setTextSize(1);
     float factor = std::min(float(h) / d.fontHeight(), float(w) / std::max(1, int(d.textWidth(value.c_str()))));
@@ -59,7 +62,10 @@ void fitted(lgfx::LovyanGFX &d, const std::string &value, int x, int y, int w, i
         factor = std::min(1.0f, float(h) / d.fontHeight());
     }
     factor = std::max(factor, 8.0f / d.fontHeight());
-    d.setTextSize(factor);
+    // Keep at least eight pixels of height while allowing a narrow field
+    // to fit all digits (e.g. "52.1 C" on a square 128-pixel panel).
+    float horizontal = std::min(factor, float(w) / std::max(1, int(d.textWidth(value.c_str()))));
+    d.setTextSize(std::max(horizontal, factor * 0.65f), factor);
     std::string shown = ellipsis(d, value, w);
     d.setTextColor(color);
     d.setTextDatum(right ? lgfx::middle_right : lgfx::middle_left);
@@ -137,12 +143,14 @@ void View::frame(int page, uint32_t accent, uint8_t language) {
     height_ = display_->height();
     display_->clearClipRect();
     display_->fillScreen(kBackground);
+    // Fixed star/circuit texture: drawn only when changing pages. Readouts
+    // have opaque local backgrounds, so texture never obscures live values.
+    for (int i = 0; i < width_ / 3; ++i) {
+        int x = (i * 73 + 19) % width_, y = (i * 47 + 7) % height_;
+        display_->drawPixel(x, y, uint32_t(i % 4 ? 0x101820 : 0x273039));
+    }
     int hh = headerHeight(), m = margin();
-    display_->fillRoundRect(m, 3, hh - 5, hh - 5, 3, accent_);
-    labelFont(*display_, std::max(8, hh - 12));
-    display_->setTextDatum(lgfx::middle_center);
-    display_->setTextColor(kBackground);
-    display_->drawString("B", m + (hh - 5) / 2, 3 + (hh - 5) / 2);
+    ui_art::draw(*display_, ui_art::Mining, m, 1, hh - 2, hh - 2);
     display_->drawFastHLine(m, hh, width_ - 2 * m, kBorder);
     if (page >= 0) {
         int fy = height_ - footerHeight() / 2, gap = width_ >= 200 ? 6 : 4;
@@ -164,57 +172,81 @@ void View::text(int slot, Rect r, const std::string &value, uint32_t color, int 
     });
 }
 
-void View::card(int slot, Rect r, const Metric &metric, bool hero, bool wrap) {
-    std::string key = metric.label + '\n' + metric.value + '\n' + metric.detail + '\n' + std::to_string(metric.color);
+void View::card(int slot, Rect r, const Metric &metric, bool hero, bool wrap, int skin) {
+    std::string key = metric.label + '\n' + metric.value + '\n' + metric.detail + '\n' + std::to_string(metric.color) + ":" + std::to_string(skin);
     if (!changed(slot, r, key)) return;
     paint(r, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
         int p = wrap && r.h < 40 ? 1 : r.h < 36 ? 3 : std::min(6, std::max(3, r.w / 28));
-        int radius = r.h >= 30 ? 5 : 3;
-        d.fillRoundRect(x, y, r.w, r.h, radius, kPanel);
-        d.drawRoundRect(x, y, r.w, r.h, radius, hero ? accent_ : kBorder);
+        uint32_t face = skin == 1 ? (accent_ == 0xF7931A ? 0xF6DB00 : accent_) : skin == 2 ? 0x06DCEB : kPanel;
+        uint32_t ink = skin ? 0x081017 : metric.color;
+        uint32_t labelColor = skin ? 0x263039 : kMuted;
+        d.fillRect(x, y, r.w, r.h, face);
+        d.drawRect(x, y, r.w, r.h, skin ? face : kBorder);
+        // Chamfered instrument-panel edge, rather than web-style cards.
+        int cut = std::min(7, r.h / 4);
+        d.fillTriangle(x + r.w - cut, y, x + r.w - 1, y, x + r.w - 1, y + cut, kBackground);
+        if (!skin) {
+            d.drawFastHLine(x + 2, y, std::min(14, r.w - 4), hero ? accent_ : uint32_t(0x56616C));
+            d.drawLine(x + r.w - cut, y, x + r.w - 1, y + cut, kBorder);
+        }
         if (r.h < 21 && !wrap) {
             int labelW = r.w * 45 / 100;
             labelFont(d, 8);
             d.setTextDatum(lgfx::middle_left);
-            d.setTextColor(kMuted);
+            d.setTextColor(labelColor);
             d.drawString(ellipsis(d, compactLabel(metric.label), labelW - p).c_str(), x + p, y + r.h / 2);
-            fitted(d, metric.value, x + labelW, y + 2, r.w - labelW - p, r.h - 4, metric.color, false, true);
+            fitted(d, metric.value, x + labelW, y + 2, r.w - labelW - p, r.h - 4, ink, false, true);
             return;
         }
         int labelH = height_ >= 200 ? 12 : 8;
         labelFont(d, labelH);
-        d.setTextColor(kMuted);
+        d.setTextColor(labelColor);
         d.setTextDatum(lgfx::top_left);
         std::string label = metric.label;
         if (d.textWidth(label.c_str()) > r.w - 2 * p) label = compactLabel(label);
         bool hideLabel = wrap && r.h < 40;
         if (!hideLabel) d.drawString(ellipsis(d, label, r.w - 2 * p).c_str(), x + p, y + p);
         int vy = hideLabel ? p : p + labelH + 2, vh = r.h - vy - p;
-        bool inlineUnit = hero && r.w >= 120 && !metric.detail.empty() && metric.detail.size() <= 5;
+        bool inlineUnit = hero && r.w >= (skin ? 68 : 120) && !metric.detail.empty() && metric.detail.size() <= 5;
         bool detail = !inlineUnit && !metric.detail.empty() && vh >= (hero ? 22 : 26);
         if (detail) vh -= labelH + 3;
         if (wrap) {
             labelFont(d, labelH);
-            d.setTextColor(metric.color);
+            d.setTextColor(ink);
             int perLine = std::max(1, (r.w - 2 * p) / std::max(1, int(d.textWidth("W"))));
             for (size_t i = 0, line = 0; i < metric.value.size() && int((line + 1) * labelH) <= vh; i += perLine, ++line)
                 d.drawString(metric.value.substr(i, perLine).c_str(), x + p, y + vy + line * labelH);
         } else {
             int unitW = inlineUnit ? int(metric.detail.size()) * 6 + 4 : 0;
-            fitted(d, metric.value, x + p, y + vy, r.w - 2 * p - unitW, vh, metric.color, hero || vh >= 16);
+            int iconW = hero && page_ == 4 && r.w >= 120 ? std::min(36, vh) : 0;
+            if (iconW) ui_art::draw(d, ui_art::Device, x + r.w - p - iconW, y + vy, iconW, iconW);
+            fitted(d, metric.value, x + p, y + vy, r.w - 2 * p - unitW - (iconW ? iconW + 4 : 0), vh, ink,
+                   hero || vh >= 16, false, skin || page_ == 6);
             if (inlineUnit) {
                 labelFont(d, 8);
                 d.setTextDatum(lgfx::bottom_right);
-                d.setTextColor(kMuted);
+                d.setTextColor(labelColor);
                 d.drawString(metric.detail.c_str(), x + r.w - p, y + r.h - p);
             }
         }
         if (detail) {
             labelFont(d, labelH);
             d.setTextDatum(lgfx::bottom_left);
-            d.setTextColor(kMuted);
+            d.setTextColor(labelColor);
             d.drawString(ellipsis(d, metric.detail, r.w - 2 * p).c_str(), x + p, y + r.h - p);
         }
+    });
+}
+
+void View::illustration(int slot, Rect r, int icon) {
+    if (!changed(slot, r, std::to_string(icon))) return;
+    paint(r, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
+        int size = std::min(r.w - 4, r.h - 12);
+        ui_art::draw(d, static_cast<ui_art::Icon>(icon), x + (r.w - size) / 2, y, size, size);
+        labelFont(d, 8);
+        d.setTextDatum(lgfx::bottom_center);
+        d.setTextColor(accent_ == 0xF7931A ? 0xF6DB00 : accent_);
+        d.drawString(r.w >= 54 ? "BDL MINER" : "BDL", x + r.w / 2, y + r.h);
     });
 }
 
@@ -288,7 +320,25 @@ void View::render(const Model &m) {
     chrome(m);
     Rect b = body();
     int gap = margin() >= 6 ? 5 : 3;
-    if (m.page == 5) {
+    if (m.page <= 3 && width_ >= 120 && width_ >= height_ && height_ >= 120) {
+        // Classic NerdMiner-style composition: illustrated brand at the
+        // upper left, live instruments above yellow/cyan LCD readouts.
+        int bottom = height_ >= 200 ? 56 : 34;
+        int top = b.h - bottom - gap;
+        int artW = b.w * 29 / 100;
+        int sideX = b.x + artW + gap, sideW = b.w - artW - gap;
+        int midW = (sideW - gap) / 2, rowH = (top - gap) / 2;
+        int art = m.page == 0 ? ui_art::Mining : m.page == 1 ? ui_art::Clock : ui_art::Network;
+        illustration(6, {b.x, b.y, artW, top}, art);
+        card(1, {sideX, b.y, midW, rowH}, m.metrics[1]);
+        card(2, {sideX, b.y + rowH + gap, midW, top - rowH - gap}, m.metrics[2]);
+        int upperMetric = m.page == 1 ? 4 : m.page == 2 ? 4 : 3;
+        card(upperMetric, {sideX + midW + gap, b.y, sideW - midW - gap, top}, m.metrics[upperMetric]);
+        int lowerRight = m.page == 1 ? 3 : m.page == 2 ? 3 : 4;
+        int primary = (b.w - gap) * 64 / 100;
+        card(0, {b.x, b.y + top + gap, primary, bottom}, m.metrics[0], true, false, 1);
+        card(lowerRight, {b.x + primary + gap, b.y + top + gap, b.w - primary - gap, bottom}, m.metrics[lowerRight], true, false, 2);
+    } else if (m.page == 5) {
         int summaryH = height_ >= 200 ? 40 : height_ >= 110 ? 24 : 17;
         if (width_ < 180 || height_ < 110) card(1, {b.x, b.y, b.w, summaryH}, m.metrics[1]);
         else {
@@ -319,12 +369,12 @@ void View::render(const Model &m) {
         card(3, {b.x, b.y + 2 * rh + gap, b.w, b.h - 2 * rh - gap}, m.metrics[3], false, true);
     } else if (width_ < 120) {
         int upper = (b.h - 2 * gap) / 2, side = (b.h - upper - 2 * gap) / 2;
-        card(0, {b.x, b.y, b.w, upper}, m.metrics[0], true);
+        card(0, {b.x, b.y, b.w, upper}, m.metrics[0], true, false, 1);
         card(1, {b.x, b.y + upper + gap, b.w, side}, m.metrics[1]);
         card(2, {b.x, b.y + upper + side + 2 * gap, b.w, b.h - upper - side - 2 * gap}, m.metrics[2]);
     } else if (height_ < 110) {
         int upper = b.h - 21 - gap;
-        card(0, {b.x, b.y, b.w, upper}, m.metrics[0], true);
+        card(0, {b.x, b.y, b.w, upper}, m.metrics[0], true, false, m.page <= 3 ? 1 : 0);
         int half = (b.w - gap) / 2;
         card(1, {b.x, b.y + upper + gap, half, 21}, m.metrics[1]);
         card(2, {b.x + half + gap, b.y + upper + gap, b.w - half - gap, 21}, m.metrics[2]);
@@ -333,7 +383,7 @@ void View::render(const Model &m) {
         int lower = b.h - upper - gap;
         int left = (b.w - gap) * 65 / 100, right = b.w - left - gap;
         int side = (upper - gap) / 2;
-        card(0, {b.x, b.y, left, upper}, m.metrics[0], true);
+        card(0, {b.x, b.y, left, upper}, m.metrics[0], true, false, m.page <= 3 ? 1 : 0);
         card(1, {b.x + left + gap, b.y, right, side}, m.metrics[1]);
         card(2, {b.x + left + gap, b.y + side + gap, right, upper - side - gap}, m.metrics[2]);
         if (m.page == 4) card(3, {b.x, b.y + upper + gap, b.w, lower}, m.metrics[3], false, true);
@@ -346,7 +396,8 @@ void View::render(const Model &m) {
 }
 
 void View::message(const char *title, const char *line1, const char *line2) {
-    frame(-1, accent_, language_);
+    bool splash = title && std::string(title) == "BDLMiner V1";
+    frame(splash ? -4 : -1, accent_, language_);
     Model m;
     m.title = title ? title : "";
     chrome(m);
@@ -355,7 +406,11 @@ void View::message(const char *title, const char *line1, const char *line2) {
     info.label = title ? title : "";
     info.value = line1 ? line1 : "";
     info.detail = line2 ? line2 : "";
-    card(0, b, info, true);
+    if (splash && width_ >= 120) {
+        int artW = std::min(b.h, b.w / 3);
+        illustration(6, {b.x, b.y, artW, b.h}, ui_art::Mining);
+        card(0, {b.x + artW + 5, b.y, b.w - artW - 5, b.h}, info, true);
+    } else card(0, b, info, true);
 }
 
 void View::portal(const char *title, const char *ssid, const char *password, const char *qr) {
