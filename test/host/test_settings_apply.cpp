@@ -12,6 +12,12 @@ const SettingInfo kSettings[] = {
     {"saver", SettingType::Bool, &settings.batterySaver, 0, "", ""},
     {"maxtemp", SettingType::Number, &settings.maxTemp, 8, "", ""},
     {"nightfrom", SettingType::Number, &settings.nightFrom, 8, "", ""},
+    {"uaauto", SettingType::Bool, &settings.userAgentAuto, 0, "", ""},
+    {"ua", SettingType::Text, &settings.userAgent, 0, "", ""},
+    {"proto", SettingType::Number, &settings.poolProtocol, 8, "", ""},
+    {"proto2", SettingType::Number, &settings.backupProtocol, 8, "", ""},
+    {"sv2key", SettingType::Text, &settings.poolAuthority, 0, "", ""},
+    {"sv2key2", SettingType::Text, &settings.backupAuthority, 0, "", ""},
 };
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
@@ -50,4 +56,14 @@ int main() {
     assert(!deserializeJson(changes, R"({"power":0,"port":65535,"diff":0.000001,"saver":false,"maxtemp":0,"nightfrom":255})"));
     assert(settingsError(changes.as<JsonObjectConst>()) == nullptr);
     puts("Staged settings preserve live network strings and clamp numeric fields: passed");
+    for(const char *raw:{R"({"proto":2})",R"({"proto":1})",R"({"proto2":1,"sv2key2":"bad"})",R"({"uaauto":false,"ua":"   "})",R"({"uaauto":"true"})",
+                        R"({"proto":1,"sv2key":"9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH7"})"}){
+        assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>())!=nullptr);
+    }
+    assert(!deserializeJson(changes,R"({"proto":1,"sv2key":"9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6","proto2":0,"uaauto":false,"ua":"CustomMiner"})"));
+    assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
+    assert(settingsApply(pending,changes.as<JsonObjectConst>())==5);
+    assert(pending.poolProtocol==1&&pending.backupProtocol==0&&!pending.userAgentAuto&&pending.userAgent=="CustomMiner");
+    assert(settings.poolProtocol==0&&settings.userAgentAuto);
+    puts("V1/V2 and automatic/manual settings: validation, staged isolation and preserved manual identity passed");
 }

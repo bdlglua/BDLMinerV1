@@ -183,6 +183,10 @@ Boards without a display report everything on the serial monitor and the
    * **Pool password**: usually `x`;
    * **Suggested difficulty**: share difficulty suggested to the pool, `0.0002` by default
      (the pool may enforce a higher minimum);
+   * **Main / backup protocol**: Stratum V1 by default, or Stratum V2 with Noise
+     and a pool authority key. The dashboard includes a Public Pool V2 solo preset;
+   * **User agent mode**: Automatic selects an identity for the pool; Manual sends
+     your custom identity. The stored manual value is kept when switching modes;
    * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
      bits (difficulty ≥ 1) is found, `0` stays silent. M5 devices use their buzzer or
      speaker (StickC Plus2: GPIO2); on other boards add `-DBUZZER_PIN=<gpio>` to
@@ -423,27 +427,60 @@ restarts. `history_revision` changes when a new history point is added;
 `github_update.retry_in_s` is the current installation retry countdown.
 `pool.pending_shares` counts submissions awaiting a reply. Only outstanding request
 IDs can affect accepted/rejected counters; duplicate and unknown replies are ignored.
-`pool.user_agent` reports the automatically selected identity and `pool.protocol`
-reports `Stratum V1`; both are also shown in the dashboard's Pool card.
+`pool.user_agent` reports the identity being sent, `pool.user_agent_auto` reports
+the configured mode, and `pool.protocol` reports `Stratum V1` or `Stratum V2 (Noise)`.
+These are also shown in the dashboard's Pool card.
 
 ### Automatic pool identity and Stratum versions
 
-No manual user-agent setting is required in the setup portal or dashboard.
+Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
+Automatic is the default; it requires no manual identity entry.
 Known ESP32 pool endpoints (`pool.nerdminers.org`, `pool.nerdminer.io`,
 `pool.bitronics.store`, `pool.bitronics.com` and `pool.solomining.de`) receive
 `NerdMinerV2` on the first subscription. Other pools receive `BDLMinerV1/<version>`.
 If an unknown pool explicitly refuses that user agent, the miner retries it once
 as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
 changing an endpoint resets its decision. Unrelated connection or authorization
-errors still follow the usual reconnect/failover policy. Old saved or backed-up
-`ua` fields are ignored without changing the other settings.
+errors still follow the usual reconnect/failover policy. In Manual mode the exact
+configured identity is used, including on NerdMiner pools, without automatic
+replacement after a refusal. The manual value survives switching to Automatic.
+Older customized identities migrate to Manual; older default identities and
+records without an identity use Automatic. Existing protocol settings default to V1.
 
-This firmware implements **Stratum V1 over TCP**, not native Stratum V2.
-SV2 uses a different binary protocol and connection security; a user agent or
-port change cannot enable it. An external SV1-to-SV2 translator can provide an
-SV1 endpoint to the miner and connect upstream using SV2, subject to the pool's
-accepted difficulty and authentication requirements. See the
-[Stratum V2 documentation](https://stratumprotocol.org/).
+Native **Stratum V2** uses a Noise_NX handshake (secp256k1 EllSwift, BIP340
+authority signature and ChaCha20-Poly1305), binary frames and an extended mining
+channel. Each pool has its own protocol, port and authority key. V2 requires a
+configured Base58Check authority key (or its 32-byte hexadecimal form) and a
+synchronized clock; invalid signatures, expired certificates and unauthenticated
+messages cause a reconnect. It never silently downgrades the selected endpoint
+to V1. A separately configured backup pool can explicitly use V1 or V2.
+
+For [Public Pool](https://web.public-pool.io/), click **Use Public Pool V2 (solo)**
+in settings: it fills `public-pool.io`, port `23330`, Stratum V2 and the published
+authority key `9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6`.
+Use your Bitcoin address (optionally `.worker`) as the worker identity and verify
+current connection details on the pool's site if its endpoint/key changes. This
+is a solo preset; it does not select Public Pool's separate PPLNS endpoint.
+**Use Public Pool V1 (solo)** selects port `3333` and V1, retaining the saved V2 key.
+The protocol and user agent do not override pool difficulty or increase the
+device's hashing power. V2 channel identity uses the configured address/worker;
+the V1 password setting is not sent as a V2 authentication field.
+
+V2 uses the existing SHA-256d kernels and a unique extranonce per work unit.
+Exact 256-bit share targets are retained rather than rounded to floating-point
+difficulty. New previous-block notifications invalidate old work; target changes
+are checked again before submission. Batched acknowledgments count only pending
+shares, and duplicate/unknown acknowledgments do not increment counters.
+Frames are limited to 16 KiB, with up to eight cached jobs and 32 KiB of cached
+coinbase data. Unsupported/oversized jobs reconnect with a diagnostic. The
+firmware does not implement Job Declaration, Template Distribution or a V2 pool
+server; see the [Stratum V2 specification](https://stratumprotocol.org/).
+
+Validation includes an independent Noise responder, official authority-key
+vectors, certificate/AEAD/replay failure cases, truncated-frame checks under
+sanitizers, independent coinbase/Merkle/header verification, and the production
+network session over fragmented local sockets. A live Public Pool connection
+and physical-device throughput still require hardware/network validation.
 
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).

@@ -27,8 +27,14 @@ const SettingInfo kSettings[] = {
     S("addr", Text, btcAddress, "Pool", "BTC address (optionally address.worker)"),
     S("pass", Text, poolPassword, "Pool", "Pool password"),
     S("diff", Decimal, suggestedDifficulty, "Pool", "Suggested share difficulty"),
+    N("proto", poolProtocol, "Pool", "Main pool protocol"),
+    S("sv2key", Text, poolAuthority, "Pool", "Main pool Stratum V2 authority key"),
+    S("uaauto", Bool, userAgentAuto, "Pool", "User agent mode"),
+    S("ua", Text, userAgent, "Pool", "Manual user agent"),
     S("pool2", Text, backupHost, "Pool", "Backup pool host (empty = none)"),
     N("port2", backupPort, "Pool", "Backup pool port"),
+    N("proto2", backupProtocol, "Pool", "Backup pool protocol"),
+    S("sv2key2", Text, backupAuthority, "Pool", "Backup pool Stratum V2 authority key"),
     N("rotateh", rotateHours, "Pool", "Alternate main / backup pool every N hours (0 = only on failure)"),
     N("bright", brightness, "Display", "Brightness (%)"),
     N("rot", rotation, "Display", "Rotation (0-3)"),
@@ -95,9 +101,19 @@ static void cleanHost(String &host, uint16_t *port) {
     }
 }
 
+static void poolURL(String &host, uint8_t &protocol, String &authority) {
+    host.trim();
+    if (!host.startsWith("stratum2+tcp://")) return;
+    protocol = 1;
+    int path = host.indexOf('/', 15);
+    if (path >= 0 && path + 1 < int(host.length())) authority = host.substring(path + 1);
+}
+
 void settingsSanitize(Settings &settings) {
     for (size_t i = 0; i < kSettingCount; i++)
         if (kSettings[i].type == SettingType::Text) ((String *)settingValue(kSettings[i], settings))->trim();
+    poolURL(settings.poolHost, settings.poolProtocol, settings.poolAuthority);
+    poolURL(settings.backupHost, settings.backupProtocol, settings.backupAuthority);
     cleanHost(settings.poolHost, &settings.poolPort);
     cleanHost(settings.backupHost, &settings.backupPort);
     cleanHost(settings.ntfyServer, nullptr);
@@ -105,6 +121,9 @@ void settingsSanitize(Settings &settings) {
     if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
     if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
     if (!(settings.suggestedDifficulty > 0) || !std::isfinite(settings.suggestedDifficulty)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
+    if (settings.userAgent.isEmpty() || settings.userAgent.length() > 64) settings.userAgent = "NerdMinerV2";
+    if (settings.poolProtocol > 1) settings.poolProtocol = 0;
+    if (settings.backupProtocol > 1) settings.backupProtocol = 0;
     if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;
     if (settings.ntfyServer.isEmpty()) settings.ntfyServer = DEFAULT_NTFY_SERVER;
     settings.currency = normalizeCurrency(settings.currency);
@@ -148,6 +167,7 @@ void settingsLoad() {
     // (every save stored the value) switch to 2; those saved since carry
     // "updv" and keep their choice.
     if (!p.isKey("updv")) settings.githubUpdate = 2;
+    if (!p.isKey("uaauto") && p.isKey("ua")) settings.userAgentAuto = !legacyManualAgent(settings.userAgent.c_str());
     p.end();
     settingsSanitize();
     liveBrightness = settings.brightness;
@@ -260,6 +280,8 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     snprintf(port, sizeof(port), "%u", settings.poolPort);
     snprintf(port2, sizeof(port2), "%u", settings.backupPort);
     snprintf(diff, sizeof(diff), "%g", settings.suggestedDifficulty);
+    char proto[2] = {char('0' + settings.poolProtocol), 0}, proto2[2] = {char('0' + settings.backupProtocol), 0};
+    char automatic[2] = {settings.userAgentAuto ? '1' : '0', 0};
 
     WiFiManagerParameter pHost("pool", "Pool host", settings.poolHost.c_str(), 80);
     WiFiManagerParameter pPort("port", "Pool port", port, 6, "type='number' min='1' max='65535'");
@@ -270,6 +292,12 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                                settings.btcAddress.c_str(), 100);
     WiFiManagerParameter pPass("pass", "Pool password", settings.poolPassword.c_str(), 40);
     WiFiManagerParameter pDiff("diff", "Suggested share difficulty", diff, 15);
+    WiFiManagerParameter pProto("proto", "Main protocol: 0 Stratum V1, 1 Stratum V2 (Noise)", proto, 1, "type='number' min='0' max='1'");
+    WiFiManagerParameter pKey("sv2key", "Main SV2 authority key (required for V2)", settings.poolAuthority.c_str(), 64);
+    WiFiManagerParameter pProto2("proto2", "Backup protocol: 0 Stratum V1, 1 Stratum V2 (Noise)", proto2, 1, "type='number' min='0' max='1'");
+    WiFiManagerParameter pKey2("sv2key2", "Backup SV2 authority key (required for V2)", settings.backupAuthority.c_str(), 64);
+    WiFiManagerParameter pAuto("uaauto", "User agent: 1 automatic, 0 manual", automatic, 1, "type='number' min='0' max='1'");
+    WiFiManagerParameter pUa("ua", "Manual user agent (used only in manual mode)", settings.userAgent.c_str(), 64);
     WiFiManagerParameter pBeep("beep", "Beep on a 32-bit share (1 = on, 0 = off)", beep, 1,
                                "type='number' min='0' max='1'");
     WiFiManagerParameter pTz("tz", "Timezone (POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0)",
@@ -284,11 +312,17 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                               settings.webPassword.c_str(), 40, "type='password'");
     wm.addParameter(&pHost);
     wm.addParameter(&pPort);
+    wm.addParameter(&pProto);
+    wm.addParameter(&pKey);
     wm.addParameter(&pHost2);
     wm.addParameter(&pPort2);
+    wm.addParameter(&pProto2);
+    wm.addParameter(&pKey2);
     wm.addParameter(&pAddr);
     wm.addParameter(&pPass);
     wm.addParameter(&pDiff);
+    wm.addParameter(&pAuto);
+    wm.addParameter(&pUa);
     wm.addParameter(&pBeep);
     wm.addParameter(&pTz);
     wm.addParameter(&pFiat);
@@ -311,6 +345,9 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.btcAddress = pAddr.getValue();
         settings.poolPassword = pPass.getValue();
         settings.suggestedDifficulty = atof(pDiff.getValue());
+        settings.poolProtocol = atoi(pProto.getValue()); settings.backupProtocol = atoi(pProto2.getValue());
+        settings.poolAuthority = pKey.getValue(); settings.backupAuthority = pKey2.getValue();
+        settings.userAgentAuto = atoi(pAuto.getValue()) != 0; settings.userAgent = pUa.getValue();
         settings.beep = atoi(pBeep.getValue()) != 0;
         settings.timezone = pTz.getValue();
         settings.currency = pFiat.getValue();

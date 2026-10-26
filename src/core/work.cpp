@@ -105,6 +105,10 @@ void build(const Job &job, uint64_t extranonce2, Work &out) {
     out.ntime = job.ntime;
     out.shareDifficulty = job.difficulty;
     out.quickLimit = quickLimitFor(job.difficulty);
+    out.exactShareTarget = job.exactShareTarget;
+    memcpy(out.shareTarget, job.shareTarget, 32);
+    if (job.exactShareTarget) out.quickLimit = uint32_t(job.shareTarget[28]) | uint32_t(job.shareTarget[29]) << 8 |
+        uint32_t(job.shareTarget[30]) << 16 | uint32_t(job.shareTarget[31]) << 24;
     targetFromBits(job.nbits, out.networkTarget);
     sha::prepare(out.mid, h);
 }

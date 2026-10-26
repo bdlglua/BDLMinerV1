@@ -12,6 +12,7 @@
 #include "miner.h"
 #include "settings.h"
 #include "runtime.h"
+#include "net_sv2.h"
 
 namespace {
 
@@ -56,7 +57,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
     uint32_t lastShareReply = start;
 
     agent.endpoint(netPoolHost().c_str(), netPoolPort());
-    const char *identity = agent.select(kNativeAgent);
+    const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
     activeAgent = identity;
     logf("[pool] Stratum V1 user agent \"%s\" (automatic)\n", identity);
     if (!sendLine(client, proto.subscribe(identity))) return;
@@ -88,7 +89,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         setStatus("Subscribe refused");
                         logf("[pool] subscribe refused: %s (user agent \"%s\")\n", proto.lastError().c_str(),
                              identity);
-                        if (agent.refused(proto.lastError().c_str())) {
+                        if (settings.userAgentAuto && agent.refused(proto.lastError().c_str())) {
                             retryAgent = true;
                             logf("[pool] retrying this pool with user agent \"%s\"\n", agent.select(kNativeAgent));
                         }
@@ -206,9 +207,22 @@ void netTask(void *) {
             proto.setCredentials(settings.btcAddress.c_str(), settings.poolPassword.c_str());
             setStatus("Subscribing");
             uint32_t t0 = millis();
-            session(client, proto, maxMs, agents[onBackup ? 1 : 0]);
+            if ((onBackup ? settings.backupProtocol : settings.poolProtocol) == 1) {
+                auto &agent = agents[onBackup ? 1 : 0];
+                agent.endpoint(netPoolHost().c_str(), netPoolPort());
+                const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
+                activeAgent = identity;
+                sv2::SessionResult result = sv2::session(client, maxMs, identity, setStatus, pendingShares);
+                authorized = result.authorized; sessionTimedOut = result.timedOut;
+                if (settings.userAgentAuto && !result.refusal.empty() && agent.refused(result.refusal.c_str())) {
+                    retryAgent = true;
+                    logf("[pool] retrying this V2 pool with identity \"%s\"\n", agent.select(kNativeAgent));
+                }
+            } else {
+                session(client, proto, maxMs, agents[onBackup ? 1 : 0]);
+                authorized = proto.authorized();
+            }
             client.stop();
-            authorized = proto.authorized();
             if (millis() - t0 > 60000) backoffMs = 2000;  // session was healthy
         } else {
             setStatus("Pool unreachable");
@@ -265,3 +279,4 @@ uint16_t netPoolPort() { return onBackup ? settings.backupPort : settings.poolPo
 bool netOnBackup() { return onBackup; }
 uint8_t netPendingShares() { return pendingShares.load(); }
 const char *netUserAgent() { return activeAgent.load(); }
+const char *netProtocol() { return (onBackup ? settings.backupProtocol : settings.poolProtocol) == 1 ? "Stratum V2 (Noise)" : "Stratum V1"; }

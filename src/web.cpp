@@ -126,7 +126,8 @@ void handleStats() {
     j["pool"]["difficulty"] = stats.poolDiff;
     j["pool"]["pending_shares"] = netPendingShares();
     j["pool"]["user_agent"] = netUserAgent();
-    j["pool"]["protocol"] = "Stratum V1";
+    j["pool"]["protocol"] = netProtocol();
+    j["pool"]["user_agent_auto"] = settings.userAgentAuto;
     PoolStats pv = poolStatsGet();
     j["pool_view"]["updated_s"] = pv.updatedMs ? (long)((millis() - pv.updatedMs) / 1000) : -1;
     j["pool_view"]["supported"] = pv.supported;

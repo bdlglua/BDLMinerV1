@@ -5,7 +5,9 @@
 #include <cmath>
 #include <cctype>
 #include <cstring>
+#include <utility>
 #include "settings.h"
+#include "core/sv2_noise.h"
 
 struct SettingLimits { long minimum, maximum; };
 inline SettingLimits settingLimits(const SettingInfo &s) {
@@ -15,6 +17,7 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "rot")) limits.maximum = 3;
     if (!strcmp(s.key, "lang")) limits.maximum = 1;
     if (!strcmp(s.key, "theme")) limits.maximum = 4;
+    if (!strcmp(s.key, "proto") || !strcmp(s.key, "proto2")) limits.maximum = 1;
     if (!strcmp(s.key, "update")) limits.maximum = 2;
     return limits;
 }
@@ -31,6 +34,7 @@ inline const char *settingsError(JsonObjectConst values) {
             case SettingType::Text:
             case SettingType::Secret:
                 if (!v.is<const char *>()) return "Invalid text setting";
+                if (!strcmp(s.key, "ua") && strlen(v.as<const char *>()) > 64) return "User agent must be at most 64 characters";
                 if (!strcmp(s.key, "pool") || !strcmp(s.key, "addr")) {
                     const char *text = v.as<const char *>();
                     while (*text && std::isspace((unsigned char)*text)) ++text;
@@ -55,6 +59,18 @@ inline const char *settingsError(JsonObjectConst values) {
                 if (!v.is<bool>()) return "Invalid checkbox setting";
                 break;
         }
+    }
+    bool automatic = values["uaauto"] | settings.userAgentAuto;
+    const char *agent = values["ua"] | settings.userAgent.c_str();
+    if (!automatic) {
+        while (*agent && std::isspace(static_cast<unsigned char>(*agent))) ++agent;
+        if (!*agent) return "A manual user agent is required";
+    }
+    for (const auto &fields : {std::pair<const char *, const char *>{"proto", "sv2key"}, {"proto2", "sv2key2"}}) {
+        unsigned protocol = values[fields.first] | unsigned(!strcmp(fields.first, "proto") ? settings.poolProtocol : settings.backupProtocol);
+        const char *key = values[fields.second] | (!strcmp(fields.first, "proto") ? settings.poolAuthority.c_str() : settings.backupAuthority.c_str());
+        uint8_t authority[32];
+        if (protocol == 1 && !sv2::authorityKey(key, authority)) return "A valid Stratum V2 authority key is required";
     }
     return nullptr;
 }
@@ -83,5 +99,7 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
         }
         changed++;
     }
+    if (values["uaauto"].isUnbound() && values["ua"].is<const char *>())
+        pending.userAgentAuto = !legacyManualAgent(values["ua"].as<const char *>());
     return changed;
 }

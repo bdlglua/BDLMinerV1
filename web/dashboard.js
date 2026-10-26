@@ -115,7 +115,7 @@ async function tick(){
    tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),
    tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' '+t('tx in mempool')),
    tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+m.retarget.progress.toFixed(0)+' % '+t('done')+')'))}
-  T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,j.pool.status+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t('automatic'):'')),
+  T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')),
    tile(t('Payout address'),j.address,j.address_type==='invalid'?'⚠ '+t('not a valid Bitcoin address'):j.address_type),
    tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+': '+j.max_temp_c+' °C':'')),
    tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+': '+(j.power_limit_percent??'-')+' %'),

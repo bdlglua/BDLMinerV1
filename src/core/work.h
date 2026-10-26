@@ -27,6 +27,8 @@ struct Job {
     std::vector<uint8_t> extranonce1;
     int extranonce2Size = 4;
     double difficulty = 1.0;
+    bool exactShareTarget = false; // SV2 supplies a full U256 target
+    uint8_t shareTarget[32] = {};
 
     uint32_t blockHeight() const;  // BIP34 height parsed from coinb1, 0 if unknown
 };
@@ -41,6 +43,8 @@ struct Work {
     double shareDifficulty = 1.0;
     uint32_t quickLimit = 0;  // top-32-bit filter passed to sha::scan
     uint8_t networkTarget[32];  // little-endian
+    bool exactShareTarget = false;
+    uint8_t shareTarget[32] = {};
 };
 
 void build(const Job &job, uint64_t extranonce2, Work &out);

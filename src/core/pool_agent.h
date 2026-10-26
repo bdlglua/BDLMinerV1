@@ -29,7 +29,9 @@ public:
         for (const char *pool : pools) if (host_ == pool) fallback_ = true;
     }
 
-    const char *select(const char *native) const { return fallback_ ? compatible() : native; }
+    const char *select(const char *native, bool automatic = true, const char *manual = "NerdMinerV2") const {
+        return automatic ? (fallback_ ? compatible() : native) : manual;
+    }
 
     bool refused(const char *error) {
         // Retry only an explicit agent refusal, once. Authentication errors,

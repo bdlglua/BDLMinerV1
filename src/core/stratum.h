@@ -25,10 +25,12 @@ enum class Event {
 
 struct Share {
     char jobId[64];
-    char extranonce2[40];  // up to 16 bytes, hex
+    char extranonce2[65];  // up to 32 bytes for SV2; V1 subscription still limited to 16
     uint32_t ntime;
     uint32_t nonce;
     double difficulty;
+    uint32_t version;
+    uint8_t hash[32]; // exact SV2 target recheck if the pool changes target before submission
 };
 
 class Protocol {

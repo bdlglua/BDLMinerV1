@@ -159,13 +159,15 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         portEXIT_CRITICAL(&statsMux);
         logf("!!!!! BLOCK FOUND !!!!! nonce=%08x job=%s\n", nonce, w.jobId.c_str());
     }
-    if (d >= w.shareDifficulty || block) {
+    if ((w.exactShareTarget ? work::meetsTarget(hash, w.shareTarget) : d >= w.shareDifficulty) || block) {
         stratum::Share s{};
         strlcpy(s.jobId, w.jobId.c_str(), sizeof(s.jobId));
         strlcpy(s.extranonce2, w.extranonce2Hex.c_str(), sizeof(s.extranonce2));
         s.ntime = w.ntime;
         s.nonce = nonce;
         s.difficulty = d;
+        s.version = uint32_t(w.header[0]) | uint32_t(w.header[1]) << 8 | uint32_t(w.header[2]) << 16 | uint32_t(w.header[3]) << 24;
+        memcpy(s.hash, hash, 32);
         QueuedShare queued{s, w.generation};
         if (xQueueSend(shareQueue, &queued, 0) == pdTRUE) {
             portENTER_CRITICAL(&statsMux);

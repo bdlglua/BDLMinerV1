@@ -87,5 +87,6 @@ with tempfile.TemporaryDirectory(prefix='bdl-settings-') as temp:
     exe = Path(temp) / 'test'
     cpp.write_text(prefix + save + apply + post + tests)
     subprocess.run(['g++', '-std=c++17', '-O2', '-Itest/host/stubs/miner', '-Isrc',
-                    '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp), '-o', str(exe)], cwd=root, check=True)
+                    '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp),
+                    'src/core/sv2_key.cpp', 'src/core/work.cpp', 'src/core/sha256.cpp', '-o', str(exe)], cwd=root, check=True)
     subprocess.run([str(exe)], check=True)

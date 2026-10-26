@@ -22,6 +22,7 @@ const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','
 // Settings labels by key.
 const FR_SET={pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
 diff:'Difficulté de share suggérée',pool2:'Pool de secours (vide = aucune)',port2:'Port de la pool de secours',
+proto:'Protocole du pool principal',proto2:'Protocole du pool de secours',sv2key:'Clé d’autorité V2 du pool principal',sv2key2:'Clé d’autorité V2 du pool de secours',uaauto:'Mode du user agent',ua:'User agent manuel',
 rotateh:'Alterner pool principale / secours toutes les N heures (0 = seulement en cas de panne)',bright:'Luminosité (%)',rot:'Rotation (0-3)',
 autorot:'Rotation avec l\'accéléromètre (appareils M5)',lang:'Langue : 0 anglais, 1 français',theme:'Thème (0 orange, 1 vert, 2 bleu, 3 violet, 4 rose)',
 cycle:'Écran suivant toutes les N secondes (0 = non)',nightfrom:'Mode nuit à partir de (heure 0-23, 255 = non)',nightto:'Mode nuit jusqu\'à (heure 0-23)',
@@ -37,6 +38,24 @@ function t(s){return LANG=='fr'&&FR[s]||s}
 
 Object.assign(FR,{
  'automatic':'automatique',
+ 'manual':'manuel','Automatic':'Automatique','Manual':'Manuel',
+ 'Choose automatic or manual user agent below. Each pool has its own protocol and authority key.':'Choisis le user agent automatique ou manuel ci-dessous. Chaque pool a son protocole et sa clé d’autorité.',
+ 'Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.':'Stratum V2 nécessite le port V2 et la clé d’autorité du pool. La difficulté des shares reste décidée par le pool.',
+ 'Use Public Pool V2 (solo)':'Utiliser Public Pool V2 (solo)',
+ 'Use Public Pool V1 (solo)':'Utiliser Public Pool V1 (solo)',
+ 'Pool connection details':'Paramètres de connexion du pool',
+ 'User agent must be at most 64 characters':'Le user agent ne doit pas dépasser 64 caractères',
+ 'A manual user agent is required':'Un user agent manuel est obligatoire',
+ 'A valid Stratum V2 authority key is required':'Une clé d’autorité Stratum V2 valide est obligatoire',
+ 'SV2 authority key missing/invalid':'Clé d’autorité V2 absente ou invalide',
+ 'SV2 waiting for synchronized time':'V2 attend la synchronisation de l’heure',
+ 'SV2 allocation failed':'Mémoire insuffisante pour V2',
+ 'SV2 encrypted handshake':'Établissement de la connexion V2 chiffrée',
+ 'SV2 Noise handshake failed':'Échec de la négociation V2 Noise',
+ 'SV2 server verification failed':'Échec de la vérification du serveur V2',
+ 'SV2 invalid or unauthenticated frame':'Message V2 invalide ou non authentifié',
+ 'SV2 protocol refused/invalid':'Protocole V2 refusé ou invalide',
+ 'SV2 setup/channel timed out':'Délai dépassé pour l’ouverture du canal V2',
  'The Stratum user agent is selected automatically for each pool.':'Le user agent Stratum est choisi automatiquement pour chaque pool.'
 });
 

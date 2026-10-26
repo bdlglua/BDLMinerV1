@@ -101,6 +101,21 @@ int main() {
     softwareBatch(miner, 18678, 1, 0xFFFF);
     assert(prefilterCalls == 1 && !minerNextShare(result, 0));
 
+    // SV2's exact U256 target must distinguish hashes whose floating-point
+    // difficulties are identical, and retain equality at the boundary.
+    miner.work.exactShareTarget = true;
+    memcpy(miner.work.shareTarget, hash, 32);
+    miner.work.shareDifficulty = work::hashDifficulty(hash);
+    uint8_t boundary[32]; memcpy(boundary, hash, 32); ++boundary[0];
+    assert(work::hashDifficulty(boundary) == miner.work.shareDifficulty);
+    onCandidate(41, boundary, &miner.work); assert(!minerNextShare(result, 0));
+    onCandidate(42, hash, &miner.work); assert(minerNextShare(result, 0) && result.nonce == 42);
+    assert(!memcmp(result.hash, hash, 32));
+    --boundary[0]; --boundary[0];
+    onCandidate(43, boundary, &miner.work); assert(minerNextShare(result, 0) && result.nonce == 43);
+    miner.work.exactShareTarget = false;
+    puts("SV2 miner targets: exact U256 boundary, rounded difficulty collision and full hash retained passed");
+
     // Uptime accumulates ticks instead of losing 49.7 days on wraparound.
     testMillis = stats.startMillis = lastTickMs = 1000;
     sessionMs = 0;

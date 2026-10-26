@@ -23,12 +23,16 @@ const settings = {
   schema:[
     ['pool','text','Pool','Pool host',{}], ['port','number','Pool','Pool port',{min:1,max:65535}],
     ['addr','text','Pool','BTC address',{}], ['diff','decimal','Pool','Suggested difficulty',{min:0}],
+    ['proto','number','Pool','Main pool protocol',{min:0,max:1}],['sv2key','text','Pool','Main SV2 authority key',{}],
+    ['uaauto','bool','Pool','User agent mode',{}],['ua','text','Pool','Manual user agent',{}],
+    ['pool2','text','Pool','Backup pool host',{}],['port2','number','Pool','Backup pool port',{min:1,max:65535}],
+    ['proto2','number','Pool','Backup pool protocol',{min:0,max:1}],['sv2key2','text','Pool','Backup SV2 authority key',{}],
     ['power','number','Safety','Mining power',{min:0,max:100}],
     ['maxtemp','number','Safety','Temperature limit',{min:0,max:255}],
     ['nightfrom','number','Display','Night hour',{min:0,max:255}],
     ['saver','bool','Safety','Battery saver',{}], ['webpass','secret','Network','Web password',{}]
   ],
-  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
+  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:true,ua:'NerdMinerV2',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
 };
 let browser;
 const cases=[];
@@ -248,8 +252,8 @@ check('settings stay within a mobile viewport and labels focus their inputs',()=
 
 check('automatic pool identity is explained and updates when switching to backup',()=>run({language:'fr'},async f=>{
   await loaded(f);
-  assert.match(await f.page.locator('#group-pool').textContent(),/choisi automatiquement pour chaque pool/);
-  assert.equal(await f.page.locator('#k_ua').count(),0);
+  assert.match(await f.page.locator('#group-pool').textContent(),/automatique ou manuel/);
+  assert.equal(await f.page.locator('#k_ua').isDisabled(),true);
   f.state.stats.pool.user_agent='NerdMinerV2';f.state.stats.pool.protocol='Stratum V1';
   await f.page.goto(f.url);
   await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('NerdMinerV2'));
@@ -258,6 +262,28 @@ check('automatic pool identity is explained and updates when switching to backup
   await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('BDLMinerV1/test'));
   assert.match(await f.page.locator('#pool-grid').textContent(),/Pool \(secours\)/);
   assert.doesNotMatch(await f.page.locator('#pool-grid').textContent(),/NerdMinerV2/);
+}));
+
+check('manual user agent and independent V1/V2 choices are saved with their actual types',()=>run({},async f=>{
+ await loaded(f);await f.page.selectOption('#k_uaauto','false');assert.equal(await f.page.locator('#k_ua').isEnabled(),true);
+ await f.page.fill('#k_ua','MyMiner/test');await f.page.selectOption('#k_proto','1');
+ assert.equal(await f.page.locator('#k_sv2key').isEnabled(),true);await f.page.click('#save');
+ assert.equal(f.state.posts.length,0); // no unauthenticated V2 setting can be submitted without a key
+ await f.page.click('#public-pool-proto');
+ assert.equal(await f.page.locator('#k_pool').inputValue(),'public-pool.io');assert.equal(await f.page.locator('#k_port').inputValue(),'23330');
+ assert.equal(await f.page.locator('#k_proto2').inputValue(),'0');assert.equal(await f.page.locator('#k_sv2key2').isDisabled(),true);
+ await f.page.click('#public-pool-v1-proto');assert.equal(await f.page.locator('#k_proto').inputValue(),'0');assert.equal(await f.page.locator('#k_port').inputValue(),'3333');assert.equal(await f.page.locator('#k_sv2key').isDisabled(),true);
+ await f.page.click('#public-pool-proto');
+ await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
+ const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,false);assert.equal(saved.ua,'MyMiner/test');assert.equal(saved.proto,1);assert.equal(saved.proto2,0);assert.equal(saved.sv2key,'9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');
+}));
+
+check('automatic mode preserves a manual value and V2 backup does not change the main endpoint',()=>run({},async f=>{
+ await loaded(f);await f.page.selectOption('#k_uaauto','false');await f.page.fill('#k_ua','SavedCustomMiner');
+ await f.page.selectOption('#k_uaauto','true');assert.equal(await f.page.locator('#k_ua').isDisabled(),true);
+ await f.page.click('#public-pool-proto2');assert.equal(await f.page.locator('#k_pool').inputValue(),'pool.example');assert.equal(await f.page.locator('#k_proto').inputValue(),'0');
+ await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
+ const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,true);assert.equal(saved.ua,'SavedCustomMiner');assert.equal(saved.proto2,1);assert.equal(saved.port2,23330);assert.equal(saved.pool2,'public-pool.io');
 }));
 
 

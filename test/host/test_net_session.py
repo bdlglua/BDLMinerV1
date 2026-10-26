@@ -22,7 +22,7 @@ prefix = r'''
 #define FW_VERSION "test"
 #define pdMS_TO_TICKS(x) (x)
 using String = std::string;
-struct { double suggestedDifficulty = 0.001; } settings;
+struct { double suggestedDifficulty = 0.001; bool userAgentAuto = true; String userAgent = "NerdMinerV2"; } settings;
 struct { bool isConnected() { return true; } } WiFi;
 struct WiFiClient {
     std::string input;
@@ -94,6 +94,11 @@ int main() {
                     "{\"id\":2,\"result\":false,\"error\":[24,\"Invalid worker\",null]}\n");
     session(auth, protocol, 0, backup);
     assert(!retryAgent && !poolConnected && status == "Auth failed: check address");
+    host = "pool.nerdminers.org"; settings.userAgentAuto = false; settings.userAgent = "MyManualMiner";
+    protocol.reset(); onBackup = false;
+    WiFiClient manual(refusal);
+    session(manual, protocol, 0, main);
+    assert(manual.sent[0].find("MyManualMiner") != std::string::npos && !retryAgent);
     puts("Production Stratum session: automatic subscribe, explicit refusal retry, authorization, retry bounds and backup isolation passed");
 }
 '''

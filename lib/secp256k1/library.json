@@ -1,0 +1,10 @@
+{
+  "name": "bdl-secp256k1",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "Bitcoin Core libsecp256k1, pinned to 0cdc758a56360bf58a851fe91085a327ec97685a for SV2 EllSwift/BIP340",
+  "build": {
+    "srcFilter": ["+<secp256k1.c>", "+<precomputed_ecmult.c>", "+<precomputed_ecmult_gen.c>"],
+    "flags": ["-DECMULT_WINDOW_SIZE=4", "-DCOMB_BLOCKS=2", "-DCOMB_TEETH=5", "-DENABLE_MODULE_ELLSWIFT=1", "-DENABLE_MODULE_SCHNORRSIG=1", "-DENABLE_MODULE_EXTRAKEYS=1", "-DUSE_FORCE_WIDEMUL_INT64=1"]
+  }
+}

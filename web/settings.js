@@ -1,4 +1,10 @@
 let S=null,busy=false,restarting=false;const $=id=>document.getElementById(id);
+function publicPoolPreset(protocolKey,version){
+ const backup=protocolKey==='proto2',fields=[[backup?'pool2':'pool','public-pool.io'],[backup?'port2':'port',version===1?23330:3333],[protocolKey,version]];
+ if(version===1)fields.push([backup?'sv2key2':'sv2key','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6']);
+ for(const[key,value]of fields){const input=$('k_'+key);if(input){input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}))}}
+ sync();
+}
 $('bh').textContent=LANG==='fr'?t('backup_help'):'The backup contains all settings, passwords and lifetime statistics. Keep it private.';
 function sync(){
  const off=busy||restarting||!S;
@@ -8,6 +14,8 @@ function sync(){
  if(usb)$('firmware-help').textContent=t('This board requires a USB firmware update.');
  $('retry').disabled=busy||restarting;
  document.querySelectorAll('#f input,#f select,#f button,#fw,#imp').forEach(i=>i.disabled=busy||restarting);
+ if($('k_ua')){$('k_ua').disabled=off||$('k_uaauto')?.value!=='false';$('k_ua').required=$('k_uaauto')?.value==='false';$('k_ua').maxLength=64}
+ for(const [protocol,key]of [['proto','sv2key'],['proto2','sv2key2']])if($('k_'+key)){$('k_'+key).disabled=off||$('k_'+protocol)?.value!=='1';$('k_'+key).required=$('k_'+protocol)?.value==='1';$('k_'+key).maxLength=64}
 }
 async function load(){
  if(busy||restarting)return;
@@ -18,8 +26,9 @@ async function load(){
   const f=$('f');f.replaceChildren();$('settings-nav').replaceChildren();const groups=new Map();
   for(const[k,type,group,label,limits]of data.schema){
    let fs=groups.get(group);if(!fs){groups.set(group,fs=document.createElement('fieldset'));const lg=document.createElement('legend');lg.textContent=t(group);fs.id=group==='Safety'?'performance':'group-'+group.toLowerCase();fs.appendChild(lg);f.appendChild(fs);const link=document.createElement('a');link.href='#'+fs.id;link.textContent=t(group);link.onclick=()=>{$('settings-search').value='';filterSettings()};$('settings-nav').appendChild(link)}
-   const l=document.createElement('label'),i=document.createElement('input');l.textContent=LANG=='fr'&&FR_SET[k]||label;i.id='k_'+k;l.htmlFor=i.id;
-   if(type=='bool'){i.type='checkbox';i.checked=data.values[k]}
+   const l=document.createElement('label'),choice=k==='proto'||k==='proto2'||k==='uaauto',i=document.createElement(choice?'select':'input');l.textContent=LANG=='fr'&&FR_SET[k]||label;i.id='k_'+k;l.htmlFor=i.id;
+   if(choice){for(const[value,name]of k==='uaauto'?[['true','Automatic'],['false','Manual']]:[['0','Stratum V1'],['1','Stratum V2 (Noise)']]){const option=document.createElement('option');option.value=value;option.textContent=t(name);i.appendChild(option)}i.value=String(data.values[k]??(k==='uaauto'?true:0))}
+   else if(type=='bool'){i.type='checkbox';i.checked=data.values[k]}
    else{
     i.type=type=='secret'?'password':type=='text'?'text':'number';i.value=data.values[k]??'';
     if(type=='number'||type=='decimal'){
@@ -28,11 +37,18 @@ async function load(){
     }
     if(k==='pool'||k==='addr')i.required=true;
    }
-   i.addEventListener('input',()=>{i.setCustomValidity('');dirtyState()});
+   i.addEventListener('input',()=>{i.setCustomValidity('');dirtyState();if(choice)sync()});
    const row=document.createElement('div');row.className='field'+(type==='bool'?' boolean':'');row.dataset.search=(l.textContent+' '+k).toLocaleLowerCase();row.appendChild(l);
    const control=document.createElement('div');control.className='field-control';control.appendChild(i);row.appendChild(control);
    if(type==='secret'){const show=document.createElement('button');show.type='button';show.className='secondary secret-toggle';show.textContent=t('Show');show.setAttribute('aria-label',t('Show')+' '+l.textContent);show.onclick=()=>{const visible=i.type==='password';i.type=visible?'text':'password';show.textContent=t(visible?'Hide':'Show');show.setAttribute('aria-label',t(visible?'Hide':'Show')+' '+l.textContent)};control.appendChild(show)}
-   if(k==='pool'){const help=document.createElement('p');help.className='field-help';help.textContent=t('The Stratum user agent is selected automatically for each pool.');row.appendChild(help)}
+   if(k==='pool'){const help=document.createElement('p');help.className='field-help';help.textContent=t('Choose automatic or manual user agent below. Each pool has its own protocol and authority key.');row.appendChild(help)}
+   if(k==='proto'||k==='proto2'){
+    const help=document.createElement('p');help.className='field-help';help.textContent=t('Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.');
+    const preset=document.createElement('button');preset.type='button';preset.className='secondary';preset.textContent=t('Use Public Pool V2 (solo)');preset.id='public-pool-'+k;
+    preset.onclick=()=>publicPoolPreset(k,1);
+    const v1=document.createElement('button');v1.type='button';v1.className='secondary';v1.textContent=t('Use Public Pool V1 (solo)');v1.id='public-pool-v1-'+k;v1.onclick=()=>publicPoolPreset(k,0);
+    help.appendChild(document.createElement('br'));help.append(v1,' ',preset);const source=document.createElement('a');source.href='https://web.public-pool.io/';source.target='_blank';source.rel='noopener noreferrer';source.textContent=t('Pool connection details');help.append(' · ',source);row.appendChild(help);
+   }
    if(k==='power'){const help=document.createElement('div');help.className='field-help';help.textContent=t('At 100%, mining runs at full available speed. Temperature protection can still reduce it.');const presets=document.createElement('div');presets.className='presets';for(const [name,value]of [['Full performance',100],['Balanced',75],['Quiet',50]]){const button=document.createElement('button');button.type='button';button.className='secondary';button.id='preset-'+value;button.textContent=t(name)+' · '+value+' %';button.onclick=()=>{i.value=value;i.dispatchEvent(new Event('input',{bubbles:true}))};presets.appendChild(button)}help.appendChild(presets);row.appendChild(help)}
    if(k==='maxtemp'){const help=document.createElement('p');help.className='field-help';const update=()=>{const limit=Number(i.value);help.textContent=limit>=30?t('Throttling starts at')+' '+(limit-10)+' °C. '+t('Mining pauses at')+' '+limit+' °C.':limit===0?t('Thermal protection is disabled.'):''};i.addEventListener('input',update);update();row.appendChild(help)}
    fs.appendChild(row);
@@ -44,7 +60,7 @@ async function load(){
 function values(){
  const v={};
  for(const[k,type]of S.schema){
-  const i=$('k_'+k);v[k]=type=='bool'?i.checked:type=='number'||type=='decimal'?Number(i.value):i.value;
+  const i=$('k_'+k);v[k]=type=='bool'?(i.tagName==='SELECT'?i.value==='true':i.checked):type=='number'||type=='decimal'?Number(i.value):i.value;
   if((k==='pool'||k==='addr')&&!v[k].trim())i.setCustomValidity(t('Enter a valid value.'));
   if(type==='decimal'&&!(v[k]>0))i.setCustomValidity(t('The difficulty must be greater than zero.'));
   if(k==='maxtemp'&&v[k]>0&&v[k]<30)i.setCustomValidity(t('The temperature must be 0 or at least 30 °C.'));
@@ -95,7 +111,7 @@ load();
 function dirtyState(){
  if(!S)return;
  let count=0;
- for(const[k,type]of S.schema){const input=$('k_'+k);const value=type==='bool'?input.checked:type==='number'||type==='decimal'?Number(input.value):input.value;if(value!==S.values[k])count++}
+ for(const[k,type]of S.schema){const input=$('k_'+k);const value=type==='bool'?(input.tagName==='SELECT'?input.value==='true':input.checked):type==='number'||type==='decimal'?Number(input.value):input.value;if(value!==S.values[k])count++}
  $('dirty').textContent=count?count+' '+t('unsaved changes'):t('Changes take effect after restart.');
 }
 function filterSettings(){

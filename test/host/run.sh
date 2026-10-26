@@ -18,6 +18,7 @@ g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_core.cpp $CORE -o .pio/h
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_pool_agent.cpp $CORE -o .pio/host/test_pool_agent
 .pio/host/test_pool_agent
 python3 test/host/test_net_session.py
+python3 test/host/test_sv2.py
 python3 test/host/test_hw_resume.py
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_line_buffer.cpp $CORE -o .pio/host/test_line_buffer
 .pio/host/test_line_buffer
@@ -30,7 +31,7 @@ g++ -std=c++17 -O2 -Wall -Wno-unused-variable -ffunction-sections -fdata-section
 g++ -std=c++17 -O2 -Wall -pthread -Isrc test/host/test_mining_safety.cpp -o .pio/host/test_mining_safety
 .pio/host/test_mining_safety
 g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" \
-    test/host/test_settings_apply.cpp -o .pio/host/test_settings_apply
+    test/host/test_settings_apply.cpp src/core/sv2_key.cpp src/core/work.cpp src/core/sha256.cpp -o .pio/host/test_settings_apply
 .pio/host/test_settings_apply
 g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_store.cpp -o .pio/host/test_settings_store
 .pio/host/test_settings_store

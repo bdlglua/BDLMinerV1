@@ -44,6 +44,12 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - run: python3 -m unittest discover -s test/tools -v
+      - name: Native SV2 crypto test dependency
+        run: |
+          if ! python3 -c 'import ctypes.util; assert ctypes.util.find_library("sodium")'; then
+            sudo apt-get update
+            sudo apt-get install -y libsodium23
+          fi
       - run: ./test/host/run.sh
 
       - name: Signing key

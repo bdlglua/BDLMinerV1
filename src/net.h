@@ -16,3 +16,4 @@ bool netOnBackup();
 uint8_t netPendingShares();
 // Automatically selected identity for the current/latest connection attempt.
 const char *netUserAgent();
+const char *netProtocol();

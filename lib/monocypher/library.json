@@ -1,0 +1,7 @@
+{
+  "name": "bdl-monocypher",
+  "version": "4.0.2",
+  "license": "BSD-2-Clause",
+  "description": "Monocypher 4.0.2, pinned to 0d85f98c9d9b0227e42cf795cb527dff372b40a4; IETF ChaCha20-Poly1305 for Stratum V2",
+  "build": {"includeDir": "src", "srcFilter": ["+<monocypher.c>"]}
+}

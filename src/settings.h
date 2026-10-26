@@ -3,6 +3,11 @@
 #pragma once
 
 #include <Arduino.h>
+#include <cstring>
+
+inline bool legacyManualAgent(const char *agent) {
+    return agent && *agent && strcmp(agent, "NerdMinerV2") && strncmp(agent, "BDLMinerV1/", 11);
+}
 
 #define DEFAULT_POOL_HOST "public-pool.io"
 #define DEFAULT_POOL_PORT 21496
@@ -34,6 +39,10 @@ struct Settings {
     String btcAddress;  // payout address (worker name may be appended: addr.worker)
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
+    bool userAgentAuto = true;
+    String userAgent = "NerdMinerV2";
+    uint8_t poolProtocol = 0, backupProtocol = 0; // 0 Stratum V1, 1 Stratum V2 + Noise
+    String poolAuthority, backupAuthority; // SV2 Base58Check authority keys, or 32-byte hex
     // Display and sound
     uint8_t brightness = 80;  // percent
     uint8_t rotation = 1;     // 0..3, display orientation
