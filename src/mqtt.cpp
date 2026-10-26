@@ -31,6 +31,7 @@ const Sensor kSensors[] = {
     {"best_session", "Best difficulty (session)", nullptr, nullptr, "measurement"},
     {"best_ever", "Best difficulty (ever)", nullptr, nullptr, "measurement"},
     {"shares32", "32-bit shares", nullptr, nullptr, "total_increasing"},
+    {"shares64", "64-bit shares", nullptr, nullptr, "total_increasing"},
     {"blocks", "Blocks found", nullptr, nullptr, "total_increasing"},
     {"uptime", "Uptime", "s", "duration", "measurement"},
     {"status", "Pool status", nullptr, nullptr, nullptr},
@@ -73,6 +74,7 @@ void publishState() {
     d["best_session"] = stats.sessionBestDiff;
     d["best_ever"] = stats.bestDiff;
     d["shares32"] = stats.over32bits;
+    d["shares64"] = stats.over64bits;
     d["blocks"] = stats.blocksFound;
     d["uptime"] = minerUptimeSeconds();
     d["status"] = netStatus();

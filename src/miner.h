@@ -22,6 +22,7 @@ struct MinerStats {
     volatile uint32_t rejected;
     volatile uint32_t blocksFound;
     volatile uint32_t over32bits;    // hashes with >= 32 leading zero bits (diff >= 1)
+    volatile uint32_t over64bits;    // hashes with >= 64 leading zero bits, this boot
     double bestDiff;                 // best share difficulty ever (persisted)
     double sessionBestDiff;
 

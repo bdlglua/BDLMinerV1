@@ -279,7 +279,7 @@ Once connected, the board serves a dashboard at **http://<board IP>/** or
 **http://bdlminer-xxxx.local/** (mDNS; `xxxx` = last digits of the MAC address, shown in
 the serial monitor):
 
-* **Dashboard**: hashrate per engine, shares, best difficulties, 32‑bit shares and their
+* **Dashboard**: hashrate per engine, shares, best difficulties, 32‑bit and 64‑bit shares and their
   average interval, block chance per day and per year, the 10 best shares ever with
   their date, what the pool sees (hashrate, best share, workers: public-pool.io and
   ckpool-style pools such as pool.nerdminers.org and solo.ckpool.org), market data,
@@ -291,6 +291,10 @@ the serial monitor):
   The responsive interface separates mining, pool, Bitcoin network, device health and
   GitHub updates. It shows both the 60-second average and the live 10-second hashrate,
   configured/effective duty cycle and the reason for a limit or pause.
+  The 64-bit share counter counts fully verified hashes with at least 64 leading
+  zero bits, since restart. At 1 MH/s their expected interval is about 585,000 years;
+  this is a statistical average. Also exposed as `/api/stats.over64bits`, the
+  `bdlminer_shares_64bit_total` Prometheus metric and MQTT/Home Assistant `shares64`.
 * **Settings** (needs the web password set in the portal; user `admin`): every setting,
   grouped (pool, display, notifications, safety, network); *Save and restart*.
   **Backup**: *Download a backup* gives a JSON file with every setting (passwords

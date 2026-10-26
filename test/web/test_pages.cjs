@@ -12,7 +12,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const baseStats = {
   board:'Test miner', firmware:'1.0.10', uptime_s:0, hashrate:0, total_hashes:0,
   engines:[{name:'hw',rate:0}], shares:{accepted:0,rejected:0}, best:{session:0,ever:0},
-  blocks:0, over32bits:0, top:[], pool:{host:'pool.example',port:3333,connected:true,status:'Mining',difficulty:1},
+  blocks:0, over32bits:0, over64bits:0, top:[], pool:{host:'pool.example',port:3333,connected:true,status:'Mining',difficulty:1},
   pool_view:{updated_s:-1,supported:true}, network:{height:1,difficulty:1e14},
   address:'address.worker', address_type:'P2WPKH', lifetime:{hashes:0,shares:0,blocks:0,seconds:0},
   history:{hashrate:[0,0],interval_s:300}, heap:100000, temp_c:45, throttle:'reduced',
@@ -141,6 +141,23 @@ check('a stalled response body is also covered by the timeout',()=>run({},async 
   await f.page.goto(f.url);const message=await f.page.evaluate(async()=>{
     try{await request('/slow-body',{timeout:60});return 'no timeout'}catch(e){return e.message}
   });assert.match(message,/timed out/i);
+}));
+
+check('64-bit share counter shows exact count, translated session scope and realistic interval',()=>run({language:'fr',stats:{hashrate:1000000,over64bits:7}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .t');
+  const card=f.page.locator('#m .t').filter({has:f.page.locator('.l').filter({hasText:/^Shares 64 bits$/})});
+  assert.equal(await card.locator('.v').textContent(),'7');
+  assert.match(await card.locator('.s').textContent(),/Depuis le redémarrage.*585 k ans/);
+  f.state.stats.hashrate=0;f.state.stats.over64bits=0;
+  await f.page.waitForFunction(()=>[...document.querySelectorAll('#m .t')].some(e=>e.querySelector('.l')?.textContent==='Shares 64 bits'&&e.querySelector('.v')?.textContent==='0'));
+  assert.match(await card.locator('.s').textContent(),/1 toutes les - en moyenne/);
+}));
+
+check('64-bit share display supports older miners without the counter',()=>run({stats:{over64bits:undefined}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .t');
+  const card=f.page.locator('#m .t').filter({has:f.page.locator('.l').filter({hasText:/^64-bit shares$/})});
+  assert.equal(await card.locator('.v').textContent(),'0');
+  assert.match(await card.locator('.s').textContent(),/Since restart/);
 }));
 
 check('peer URLs are normalized and fresh results appear on the first poll',()=>run({stats:{hashrate:1000,peers:['http://peer.test/','peer.test','bad.test']}},async f=>{

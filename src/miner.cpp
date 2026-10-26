@@ -138,6 +138,10 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         bestDirty = true;
     }
     if (d >= 1.0) stats.over32bits++;
+    // Bitcoin interprets the digest as little-endian. Inspect the exact bits
+    // of fully verified candidates, avoiding floating-point boundary rounding.
+    if (!(hash[24] | hash[25] | hash[26] | hash[27] | hash[28] | hash[29] | hash[30] | hash[31]))
+        ++stats.over64bits;
     for (auto &b : blockBests) {
         if (b.height == w.height && w.height && d > b.best) b.best = d;
     }

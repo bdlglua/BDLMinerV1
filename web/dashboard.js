@@ -3,6 +3,7 @@ const SI=['','k','M','G','T','P','E','Z','Y'];
 function si(v,u=''){if(v==null||!Number.isFinite(v))return'-';if(v===0)return'0'+(u?' '+u:'');let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
 function diff(d){return!d?'-':d<1?d.toFixed(5):si(d)}
 function dur(s){if(!Number.isFinite(s))return'-';s=Math.max(0,s);if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+(LANG=='fr'?'j ':'d '):'')+(d||h?h+'h ':'')+m+'m'}
+function share64Wait(hr){if(!(hr>0))return'-';const s=18446744073709551616/hr;return s>=31557600?si(s/31557600)+' '+t('years'):dur(s)}
 function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*4294967296));return(LANG=='fr'?'1 sur ':'1 in ')+si(1/p).replace(' ','')}
 function chart(h={}){const v=Array.isArray(h.hashrate)?h.hashrate.filter(Number.isFinite):[],t0=tile(t('Hashrate history'),undefined,v.length?t('5-min averages, last')+' '+dur(v.length*h.interval_s)+' · '+t('avg')+' '+si(v.reduce((a,b)=>a+b,0)/v.length,'H/s')+(v.length>1?' · '+t('range')+' '+si(Math.min(...v))+'–'+si(Math.max(...v),'H/s'):''):t('first point after')+' '+h.interval_s/60+' '+t('min of mining'),true);
  t0.id='hashrate-history';
@@ -84,6 +85,7 @@ async function tick(){
    tile(t('Shares'),j.shares.accepted+(j.shares.rejected?' / '+j.shares.rejected+' '+t('rejected'):''),t('pool diff')+' '+diff(j.pool.difficulty)+(j.pool.pending_shares?' · '+j.pool.pending_shares+' '+t('awaiting response'):'')),
    tile(t('Best difficulty'),diff(j.best.session),t('best ever')+' '+diff(j.best.ever)),
    tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
+   tile(t('64-bit shares'),j.over64bits??0,t('Since restart')+' · '+t('1 every')+' '+share64Wait(j.hashrate)+' '+t('on average')),
    tile(t('Block chance'),odds(j.hashrate,j.network.difficulty,86400)+' / '+t('day'),odds(j.hashrate,j.network.difficulty,31557600)+' / '+t('year')),
    tile(t('Blocks found'),j.blocks,t('lifetime')+' '+j.lifetime.blocks),
    tile(t('Total hashes'),si(j.total_hashes),t('uptime')+' '+dur(j.uptime_s)),

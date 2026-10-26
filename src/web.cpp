@@ -109,6 +109,7 @@ void handleStats() {
     j["best"]["ever"] = stats.bestDiff;
     j["blocks"] = stats.blocksFound;
     j["over32bits"] = stats.over32bits;
+    j["over64bits"] = stats.over64bits;
     BestShare top[TOP_SHARES];
     int nt = minerTopShares(top, TOP_SHARES);
     JsonArray ta = j["top"].to<JsonArray>();
@@ -610,6 +611,7 @@ void handleMetrics() {
     metric("bdlminer_best_difficulty", "gauge", stats.sessionBestDiff);
     metric("bdlminer_best_difficulty_ever", "gauge", stats.bestDiff);
     metric("bdlminer_shares_32bit_total", "counter", stats.over32bits);
+    metric("bdlminer_shares_64bit_total", "counter", stats.over64bits);
     metric("bdlminer_lifetime_hashes_total", "counter", (double)stats.lifetimeHashes);
     metric("bdlminer_lifetime_shares_total", "counter", stats.lifetimeShares);
     metric("bdlminer_lifetime_seconds_total", "counter", stats.lifetimeSeconds);

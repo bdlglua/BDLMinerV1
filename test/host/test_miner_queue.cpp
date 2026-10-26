@@ -146,6 +146,23 @@ int main() {
     minerInvalidate();
     assert(!minerNextShare(result, 0));
     puts("Miner startup failures: no phantom engines, contiguous fill and safe recovery passed");
+    // Exact 64-zero-bit boundary, including values indistinguishable as doubles.
+    MiningWork probe{}; probe.shareDifficulty = 1e100;
+    uint8_t rare[32] = {};
+    memset(rare, 0xff, 24);  // largest integer with 64 leading zero bits
+    stats.over64bits = 0;
+    onCandidate(0, rare, &probe);
+    assert(minerStats().over64bits == 1);
+    for (int i = 24; i < 32; ++i) {
+        rare[i] = 1;
+        onCandidate(0, rare, &probe);
+        assert(minerStats().over64bits == 1);
+        rare[i] = 0;
+    }
+    memset(rare, 0, sizeof(rare)); rare[0] = 1;
+    onCandidate(0, rare, &probe);
+    assert(minerStats().over64bits == 2);
+    puts("64-bit shares: exact threshold, byte order and rounded boundary passed");
     // Flash faults must not freeze a failed restore or discard dirty records.
     Preferences::data.clear(); statsLoaded = true; statsFrozen = false; statsSeq = 0;
     stats.lifetimeHashes = 123; stats.lifetimeBlocks = baseBlocks; stats.bestDiff = 2;
