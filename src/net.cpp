@@ -51,7 +51,7 @@ bool sendLine(WiFiClient &client, const std::string &line) {
 
 bool sessionTimedOut = false;  // the last session ended because of its `maxMs`
 bool retryAgent = false;
-constexpr const char kNativeAgent[] = "BDLMinerV1/" FW_VERSION;
+constexpr const char kNativeAgent[] = DEFAULT_USER_AGENT;
 std::atomic<const char *> activeAgent{kNativeAgent};
 
 // Runs one pool session until the connection drops, or until `maxMs` has

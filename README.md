@@ -266,19 +266,23 @@ or channel difficulty determines how often accepted shares can appear; see
 
 ### Automatic or manual user agent
 
+> The native-default behavior below applies to development builds on `main`
+> after v1.5.1; the published v1.5.1 firmware retains its previous defaults.
+
 Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
 Automatic is the default; it requires no manual identity entry.
-Known ESP32 pool endpoints (`pool.nerdminers.org`, `pool.nerdminer.io`,
-`pool.bitronics.store`, `pool.bitronics.com` and `pool.solomining.de`) receive
-`NerdMinerV2` on the first subscription. Other pools receive `BDLMinerV1/<version>`.
-If an unknown pool explicitly refuses that user agent, the miner retries it once
+Every pool receives `BDLMinerV1/<version>` on the first connection, including
+ESP32/NerdMiner pools. The manual field also defaults to this native identity.
+If a pool explicitly refuses that user agent, the miner retries it once
 as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
 changing an endpoint resets its decision. Unrelated connection or authorization
 errors still follow the usual reconnect/failover policy. In Manual mode the exact
 configured identity is used, including on NerdMiner pools, without automatic
-replacement after a refusal. The manual value survives switching to Automatic.
+replacement after a refusal. Saved custom identities survive switching to Automatic.
 Older customized identities migrate to Manual; older default identities and
-records without an identity use Automatic. Existing protocol settings default to V1.
+records without an identity use Automatic. A saved `NerdMinerV2` default in
+Automatic mode is replaced with the native identity; explicit Manual choices
+are preserved. Existing protocol settings default to V1.
 
 ### Stratum V1 and Stratum V2
 

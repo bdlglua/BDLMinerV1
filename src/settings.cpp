@@ -120,7 +120,7 @@ void settingsSanitize(Settings &settings) {
     if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
     if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
     if (!(settings.suggestedDifficulty > 0) || !std::isfinite(settings.suggestedDifficulty)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
-    if (settings.userAgent.isEmpty() || settings.userAgent.length() > 64) settings.userAgent = "NerdMinerV2";
+    settingsNormalizeAgent(settings);
     if (settings.poolProtocol > 1) settings.poolProtocol = 0;
     if (settings.backupProtocol > 1) settings.backupProtocol = 0;
     if (settings.timezone.isEmpty()) settings.timezone = DEFAULT_TIMEZONE;

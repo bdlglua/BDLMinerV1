@@ -23,6 +23,22 @@ const SettingInfo kSettings[] = {
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
 int main() {
+    assert(settings.userAgent == DEFAULT_USER_AGENT);
+    Settings identity;
+    identity.userAgent = "NerdMinerV2";
+    settingsNormalizeAgent(identity);
+    assert(identity.userAgent == DEFAULT_USER_AGENT && identity.userAgentAuto);
+    identity.userAgentAuto = false; identity.userAgent = "NerdMinerV2";
+    settingsNormalizeAgent(identity);
+    assert(identity.userAgent == "NerdMinerV2" && !identity.userAgentAuto);
+    identity.userAgentAuto = true; identity.userAgent = "MySavedIdentity";
+    settingsNormalizeAgent(identity);
+    assert(identity.userAgent == "MySavedIdentity");
+    for (const auto &agent : {std::string(), std::string(65, 'x')}) {
+        identity.userAgent = agent;
+        settingsNormalizeAgent(identity);
+        assert(identity.userAgent == DEFAULT_USER_AGENT);
+    }
     settings.poolHost = "original.pool";
     settings.webPassword = "original-password";
     Settings pending = settings;

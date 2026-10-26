@@ -11,8 +11,9 @@ int main() {
                              "pool.nerdminer.io", "pool.bitronics.store",
                              "pool.bitronics.com", "pool.solomining.de"}) {
         main.endpoint(host, 3333);
-        assert(!strcmp(main.select(native), "NerdMinerV2"));
-        assert(!main.refused("Only allowed user agents may subscribe"));
+        assert(!strcmp(main.select(native), native));
+        assert(!strcmp(main.select(native, false), native));
+        assert(!strcmp(main.select(native, false, "CustomMiner"), "CustomMiner"));
     }
     main.endpoint("pool.nerdminers.org.example", 3333);
     assert(!strcmp(main.select(native), native));  // exact hosts, not a substring
@@ -38,9 +39,14 @@ int main() {
     main.endpoint("pool.nerdminers.org.example", 3334); // a different service resets learning
     assert(!strcmp(main.select(native), native));
     main.endpoint("pool.nerdminers.org", 3333);
-    assert(!strcmp(main.select(native), "NerdMinerV2"));
+    assert(!strcmp(main.select(native), native));
+    assert(main.refused("Only allowed user agents may subscribe"));
+    main.endpoint("POOL.NERDMINERS.ORG.", 3333);
+    assert(!strcmp(main.select(native), "NerdMinerV2")); // learned fallback survives reconnect
+    assert(!strcmp(main.select(native, false, native), native)); // manual never uses learned fallback
+    assert(!strcmp(main.select(native, false, "NerdMinerV2"), "NerdMinerV2")); // explicit manual choice retained
     main.endpoint("other.example", 3333);
     assert(!strcmp(main.select(native), native));
     assert(!strcmp(backup.select(native), native));
-    puts("Automatic pool agent: known endpoints, real subscribe/refusal/retry, bounded retries, endpoint reset and backup isolation passed");
+    puts("Pool agent: native default on every endpoint, explicit-refusal fallback, manual identity, retry bounds and backup isolation passed");
 }

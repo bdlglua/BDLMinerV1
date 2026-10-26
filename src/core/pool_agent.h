@@ -1,4 +1,4 @@
-// Automatic Stratum V1 identity, learned separately for each pool endpoint.
+// Automatic Stratum identity, learned separately for each pool endpoint.
 #pragma once
 
 #include <cctype>
@@ -20,17 +20,12 @@ public:
         host_ = name;
         port_ = port;
         fallback_ = false;
-        // These endpoints serve ESP32/NerdMiner work. Use their compatible
-        // identity on the first attempt, without a failed subscription first.
-        static const char *const pools[] = {
-            "pool.nerdminers.org", "pool.nerdminer.io", "pool.bitronics.store",
-            "pool.bitronics.com", "pool.solomining.de"
-        };
-        for (const char *pool : pools) if (host_ == pool) fallback_ = true;
+        // Always start with the native identity, including ESP32 pools.
+        // Compatibility is learned only from an explicit agent refusal.
     }
 
-    const char *select(const char *native, bool automatic = true, const char *manual = "NerdMinerV2") const {
-        return automatic ? (fallback_ ? compatible() : native) : manual;
+    const char *select(const char *native, bool automatic = true, const char *manual = nullptr) const {
+        return automatic ? (fallback_ ? compatible() : native) : manual ? manual : native;
     }
 
     bool refused(const char *error) {

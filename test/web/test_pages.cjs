@@ -32,7 +32,7 @@ const settings = {
     ['nightfrom','number','Display','Night hour',{min:0,max:255}],
     ['saver','bool','Safety','Battery saver',{}], ['webpass','secret','Network','Web password',{}]
   ],
-  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:true,ua:'NerdMinerV2',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
+  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:true,ua:'BDLMinerV1/test',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
 };
 let browser;
 const cases=[];

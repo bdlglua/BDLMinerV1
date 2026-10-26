@@ -20,9 +20,10 @@ prefix = r'''
 #include "core/line_buffer.h"
 #include "core/pool_agent.h"
 #define FW_VERSION "test"
+#define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
 #define pdMS_TO_TICKS(x) (x)
 using String = std::string;
-struct { double suggestedDifficulty = 0.001; bool userAgentAuto = true; String userAgent = "NerdMinerV2"; } settings;
+struct { double suggestedDifficulty = 0.001; bool userAgentAuto = true; String userAgent = DEFAULT_USER_AGENT; } settings;
 struct { bool isConnected() { return true; } } WiFi;
 struct WiFiClient {
     std::string input;
@@ -80,7 +81,7 @@ int main() {
     host = "pool.nerdminers.org";
     WiFiClient known(ok);
     session(known, protocol, 0, main);
-    assert(known.sent.size() == 3 && known.sent[0].find("NerdMinerV2") != std::string::npos);
+    assert(known.sent.size() == 3 && known.sent[0].find(DEFAULT_USER_AGENT) != std::string::npos);
     assert(poolConnected && status == "Mining" && !retryAgent);
 
     host = "custom.example"; protocol.reset(); poolConnected = false;

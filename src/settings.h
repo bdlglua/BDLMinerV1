@@ -22,6 +22,7 @@ inline bool legacyManualAgent(const char *agent) {
 #ifndef FW_VERSION
 #define FW_VERSION "dev"
 #endif
+#define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
 #define DEFAULT_NTFY_SERVER "ntfy.sh"
 // Firmware updates come from the releases of this GitHub repository.
 #ifndef GITHUB_REPO
@@ -40,7 +41,7 @@ struct Settings {
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
     bool userAgentAuto = true;
-    String userAgent = "NerdMinerV2";
+    String userAgent = DEFAULT_USER_AGENT;
     uint8_t poolProtocol = 0, backupProtocol = 0; // 0 Stratum V1, 1 Stratum V2 + Noise
     String poolAuthority, backupAuthority; // SV2 Base58Check authority keys, or 32-byte hex
     // Display and sound
@@ -73,6 +74,12 @@ struct Settings {
     uint8_t githubUpdate = 2;  // 0 off, 1 check and offer, 2 install by itself
     bool usageCount = true;    // daily download of this version's ping-<board>.txt (ghupdate.h)
 };
+
+inline void settingsNormalizeAgent(Settings &values) {
+    const char *agent = values.userAgent.c_str();
+    if (!*agent || strlen(agent) > 64 || (values.userAgentAuto && !strcmp(agent, "NerdMinerV2")))
+        values.userAgent = DEFAULT_USER_AGENT;
+}
 
 extern Settings settings;
 
