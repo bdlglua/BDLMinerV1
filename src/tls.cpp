@@ -5,6 +5,7 @@
 #include <mbedtls/platform.h>
 
 #include <atomic>
+#include <cstdint>
 
 #include "hw_sha.h"
 #include "log.h"
@@ -18,7 +19,7 @@
 // before any task can race for it.
 static SemaphoreHandle_t lock = [] {
     SemaphoreHandle_t s = xSemaphoreCreateBinary();
-    xSemaphoreGive(s);
+    if (s) xSemaphoreGive(s);
     return s;
 }();
 
@@ -28,6 +29,7 @@ static SemaphoreHandle_t lock = [] {
 // then with "Memory allocation failed". With PSRAM, buffers of 4 KB and more
 // go there; small ones (bignum limbs, hot in the handshake) stay internal.
 void *tlsCalloc(size_t n, size_t size) {
+    if (size && n > SIZE_MAX / size) return nullptr;
     if (n * size >= 4096) {
         void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM);
         if (p) return p;
@@ -57,7 +59,10 @@ void core0WdtResume() {
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     tls.setInsecure();
     tls.setHandshakeTimeout(12);
-    xSemaphoreTake(lock, portMAX_DELAY);
+    if (!lock || xSemaphoreTake(lock, portMAX_DELAY) != pdTRUE) {
+        logf("[tls] handshake unavailable: TLS lock missing\n");
+        return false;
+    }
     static bool allocSet = false;
     if (!allocSet) {
         allocSet = true;

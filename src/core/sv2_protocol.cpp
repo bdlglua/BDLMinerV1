@@ -60,17 +60,17 @@ void Protocol::activate(Slot &slot, uint32_t time, bool clean) {
     current_.ntime = time; current_.nbits = nbits_; current_.clean = clean;
     memcpy(current_.prevHash, previous_, 32);
     current_.extranonce1 = prefix_; current_.extranonce2Size = extranonceSize_;
-    current_.exactShareTarget = true; memcpy(current_.shareTarget, target_, 32);
-    current_.difficulty = difficulty(); haveCurrent_ = true; slot.future = false;
+    haveCurrent_ = true; slot.future = false;
 }
 size_t Protocol::pendingIndex(uint32_t sequence) const {
     for (size_t i = 0; i < pendingCount_; ++i) if (pending_[i] == sequence) return i;
     return pendingCount_;
 }
 Frame Protocol::submit(const stratum::Share &s) {
-    if (!opened() || pendingCount_ >= 32 || !haveCurrent_ || !work::meetsTarget(s.hash, target_)) return {};
+    if (!opened() || pendingCount_ >= 32 || !haveCurrent_) return {};
     bool valid = false; uint32_t id = 0;
     for (const auto &slot : jobs_) if (slot.valid && !slot.future && slot.job.id == s.jobId && slot.job.version == s.version) {
+        if (!work::meetsTarget(s.hash, slot.job.shareTarget)) return {};
         valid = true; id = slot.id; break;
     }
     if (!valid) return {};
@@ -112,6 +112,9 @@ Event Protocol::handle(const Frame &f) {
     if (f.type == 0x1f) {
         uint32_t channel = r.number(4), id = r.number(4), option = r.number(1), time = option == 1 ? r.number(4) : 0;
         Slot slot; slot.valid = true; slot.id = id; slot.future = option == 0;
+        slot.dynamicTarget = slot.future;
+        slot.job.exactShareTarget = true; memcpy(slot.job.shareTarget, target_, 32);
+        slot.job.difficulty = difficulty();
         slot.job.id = std::to_string(id); slot.job.version = r.number(4);
         uint32_t rolling = r.number(1), branches = r.number(1);
         if (!r.ok || option > 1 || rolling > 1 || branches > 32) return fail("Invalid SV2 job fields");
@@ -146,7 +149,15 @@ Event Protocol::handle(const Frame &f) {
         uint32_t channel = r.number(4); uint8_t target[32]{}; r.bytes(target, 32);
         if (!r.end() || (channel != channel_ && channel != group_) || zero(target, 32)) return fail("Invalid SV2 target");
         memcpy(target_, target, 32);
-        if (haveCurrent_) { memcpy(current_.shareTarget, target, 32); current_.difficulty = difficulty(); current_.clean = false; }
+        // Explicit-ntime jobs retain the target assigned when received.
+        // Future jobs follow the channel target even after activation.
+        for (auto &slot : jobs_) if (slot.valid && slot.dynamicTarget) {
+            memcpy(slot.job.shareTarget, target, 32); slot.job.difficulty = difficulty();
+            if (haveCurrent_ && slot.job.id == current_.id) {
+                memcpy(current_.shareTarget, target, 32); current_.difficulty = difficulty();
+            }
+        }
+        if (haveCurrent_) current_.clean = false;
         return Event::Target;
     }
     if (f.type == 0x1c) {

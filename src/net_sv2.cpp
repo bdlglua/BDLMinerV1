@@ -126,11 +126,12 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
                 minerPoolDifficulty(protocol->difficulty());
             }
             if (event == Event::Job || (event == Event::Target && protocol->hasJob())) {
+                minerPoolDifficulty(protocol->job().difficulty);
                 minerPublishJob(protocol->job(), protocol->job().clean);
                 logf("[pool] SV2 job %s height=%u clean=%d diff=%g\n", protocol->job().id.c_str(),
-                     protocol->job().blockHeight(), protocol->job().clean, protocol->difficulty());
+                     protocol->job().blockHeight(), protocol->job().clean, protocol->job().difficulty);
             }
-            if (event == Event::Target) minerPoolDifficulty(protocol->difficulty());
+            if (event == Event::Target && !protocol->hasJob()) minerPoolDifficulty(protocol->difficulty());
             if (event == Event::Accepted || event == Event::Rejected) {
                 lastReply = millis();
                 for (uint32_t i = 0; i < protocol->acknowledged(); ++i) minerShareResult(event == Event::Accepted);

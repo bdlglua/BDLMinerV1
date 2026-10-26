@@ -8,6 +8,7 @@
 #include <utility>
 #include "settings.h"
 #include "core/sv2_noise.h"
+#include "core/pool_identity.h"
 
 struct SettingLimits { long minimum, maximum; };
 inline SettingLimits settingLimits(const SettingInfo &s) {
@@ -69,8 +70,11 @@ inline const char *settingsError(JsonObjectConst values) {
     for (const auto &fields : {std::pair<const char *, const char *>{"proto", "sv2key"}, {"proto2", "sv2key2"}}) {
         unsigned protocol = values[fields.first] | unsigned(!strcmp(fields.first, "proto") ? settings.poolProtocol : settings.backupProtocol);
         const char *key = values[fields.second] | (!strcmp(fields.first, "proto") ? settings.poolAuthority.c_str() : settings.backupAuthority.c_str());
+        const bool main = !strcmp(fields.first, "proto");
+        const char *host = values[main ? "pool" : "pool2"] | (main ? settings.poolHost.c_str() : settings.backupHost.c_str());
+        auto identity = stratum::poolIdentity(host, protocol, key);
         uint8_t authority[32];
-        if (protocol == 1 && !sv2::authorityKey(key, authority)) return "A valid Stratum V2 authority key is required";
+        if (identity.protocol == 1 && !sv2::authorityKey(identity.authority.c_str(), authority)) return "A valid Stratum V2 authority key is required";
     }
     return nullptr;
 }

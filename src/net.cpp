@@ -39,7 +39,14 @@ void setStatus(const char *s) {
 }
 
 bool sendLine(WiFiClient &client, const std::string &line) {
-    return client.write((const uint8_t *)line.data(), line.size()) == line.size();
+    size_t sent = 0;
+    uint32_t started = millis();
+    while (sent < line.size() && client.connected() && WiFi.isConnected() && millis() - started < 10000) {
+        size_t n = client.write((const uint8_t *)line.data() + sent, line.size() - sent);
+        if (!n) return false;
+        sent += n;
+    }
+    return sent == line.size();
 }
 
 bool sessionTimedOut = false;  // the last session ended because of its `maxMs`
@@ -59,7 +66,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
     agent.endpoint(netPoolHost().c_str(), netPoolPort());
     const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
     activeAgent = identity;
-    logf("[pool] Stratum V1 user agent \"%s\" (automatic)\n", identity);
+    logf("[pool] Stratum V1 user agent \"%s\" (%s)\n", identity, settings.userAgentAuto ? "automatic" : "manual");
     if (!sendLine(client, proto.subscribe(identity))) return;
 
     while (client.connected() && WiFi.isConnected()) {
@@ -97,13 +104,16 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                     case stratum::Event::Authorized:
                         minerPoolConnected(true);
                         setStatus(onBackup ? "Mining (backup pool)" : "Mining");
+                        // Pools can send the first notify before authorization.
+                        // Keep that work, but only start hashing once accepted.
+                        if (proto.hasJob()) minerPublishJob(proto.job(), proto.job().clean);
                         break;
                     case stratum::Event::AuthFailed:
                         setStatus("Auth failed: check address");
                         logf("[pool] error: %s\n", proto.lastError().c_str());
                         return;
                     case stratum::Event::NewJob:
-                        if (!proto.hasJob()) break;
+                        if (!proto.authorized() || !proto.hasJob()) break;
                         minerPublishJob(proto.job(), proto.job().clean);
                         logf("[pool] job %s height=%u clean=%d diff=%g\n", proto.job().id.c_str(),
                              proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
@@ -148,7 +158,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
         }
         // Waiting for a share also paces the socket polling.
         stratum::Share share;
-        if (!proto.canSubmit()) {
+        if (!proto.authorized() || !proto.hasJob() || !proto.canSubmit()) {
             vTaskDelay(pdMS_TO_TICKS(20));
         } else if (minerNextShare(share, 20)) {
             // A clean job voids every older one; shares found on those by a

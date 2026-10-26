@@ -26,7 +26,11 @@ public:
     double difficulty() const;
     const std::string &error() const { return error_; }
 private:
-    struct Slot { uint32_t id = 0; bool valid = false, future = true; work::Job job; };
+    struct Slot {
+        uint32_t id = 0;
+        bool valid = false, future = true, dynamicTarget = true;
+        work::Job job;
+    };
     std::array<Slot, 8> jobs_;
     size_t nextSlot_ = 0, pendingCount_ = 0;
     uint32_t pending_[32]{}, sequence_ = 0, channel_ = 0, group_ = 0, acknowledged_ = 0;

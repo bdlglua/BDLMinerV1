@@ -27,13 +27,22 @@ struct { bool isConnected() { return true; } } WiFi;
 struct WiFiClient {
     std::string input;
     std::vector<std::string> sent;
+    size_t maxWrite = SIZE_MAX, readFrames = SIZE_MAX;
+    bool failWrite = false;
+    bool closed = false, yieldRead = false;
     explicit WiFiClient(const char *frames) : input(frames) {}
-    bool connected() { return !input.empty(); }
+    bool connected() { return !closed; }
     int read(uint8_t *out, size_t size) {
+        if (yieldRead) { yieldRead = false; return 0; }
+        if (input.empty()) { closed = true; return 0; }
         size_t n = std::min(size, input.size());
+        if (readFrames == 1) { n = std::min(n, input.find('\n') + 1); yieldRead = true; }
         std::memcpy(out, input.data(), n); input.erase(0, n); return n;
     }
-    size_t write(const uint8_t *line, size_t size) { sent.emplace_back((const char *)line, size); return size; }
+    size_t write(const uint8_t *line, size_t size) {
+        if (failWrite) return 0;
+        size = std::min(size, maxWrite); sent.emplace_back((const char *)line, size); return size;
+    }
 };
 constexpr size_t kMaxLine = 16384;
 constexpr uint32_t kHandshakeTimeoutMs = 30000, kPoolSilenceTimeoutMs = 300000, kShareAckTimeoutMs = 60000;
@@ -48,14 +57,20 @@ String host;
 const String &netPoolHost() { return host; }
 uint16_t netPoolPort() { return 3333; }
 bool poolConnected = false;
+int published = 0, premature = 0, polled = 0;
 void minerPoolConnected(bool v) { poolConnected = v; }
-void minerPublishJob(const work::Job &, bool) {}
+void minerPublishJob(const work::Job &, bool) { ++published; if (!poolConnected) ++premature; }
 void minerPoolDifficulty(double) {}
 void minerShareResult(bool) {}
-bool minerNextShare(stratum::Share &, uint32_t) { return false; }
+bool minerNextShare(stratum::Share &, uint32_t) { ++polled; if (!poolConnected) ++premature; return false; }
 '''
 tests = r'''
 int main() {
+    WiFiClient shortWrite("alive"); shortWrite.maxWrite = 3;
+    assert(sendLine(shortWrite, "0123456789\n"));
+    std::string complete; for (const auto &part : shortWrite.sent) complete += part;
+    assert(complete == "0123456789\n");
+    shortWrite.failWrite = true; assert(!sendLine(shortWrite, "x"));
     const char *ok = "{\"id\":1,\"result\":[[],\"aabb\",4],\"error\":null}\n"
                      "{\"id\":2,\"result\":true,\"error\":null}\n";
     const char *refusal = "{\"id\":1,\"result\":null,\"error\":[20,\"Only allowed user agents may subscribe\",null]}\n";
@@ -99,7 +114,21 @@ int main() {
     WiFiClient manual(refusal);
     session(manual, protocol, 0, main);
     assert(manual.sent[0].find("MyManualMiner") != std::string::npos && !retryAgent);
-    puts("Production Stratum session: automatic subscribe, explicit refusal retry, authorization, retry bounds and backup isolation passed");
+
+    // A pool may notify between subscribe and authorize. Keep its job, but
+    // neither publish it nor poll shares until the worker is authorized.
+    protocol.reset(); poolConnected = false; published = premature = polled = 0;
+    WiFiClient early("{\"id\":1,\"result\":[[],\"aabb\",4],\"error\":null}\n"
+        "{\"method\":\"mining.notify\",\"params\":[\"early\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0102\",\"03\",[],\"20000000\",\"1d00ffff\",\"6b49d200\",true]}\n"
+        "{\"id\":2,\"result\":true,\"error\":null}\n");
+    std::string deniedFrames = early.input;
+    deniedFrames.replace(deniedFrames.rfind("true"), 4, "false");
+    early.readFrames = 1; session(early, protocol, 0, main);
+    assert(protocol.hasJob() && published == 1 && premature == 0 && polled >= 1);
+    protocol.reset(); poolConnected = false; published = premature = polled = 0;
+    WiFiClient denied(deniedFrames.c_str()); denied.readFrames = 1; session(denied, protocol, 0, main);
+    assert(!poolConnected && published == 0 && premature == 0 && polled == 0);
+    puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, automatic/manual identity, retry bounds and backup isolation passed");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-session-') as temp:

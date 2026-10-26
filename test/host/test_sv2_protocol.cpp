@@ -63,6 +63,32 @@ int main(int argc, char **) {
     Frame target(0x8000,0x21);u(target.payload,7);target.payload.resize(36,0);target.payload[4]=1;
     assert(p.handle(target)==Event::Target && p.job().exactShareTarget);
     assert(p.submit(s).payload.empty()); // recheck exact U256 after a target change
+
+    // Jobs received with an explicit ntime keep their original target. Future
+    // jobs, including one activated by SetNewPrevHash, follow SetTarget.
+    sv2::Protocol targets; assert(targets.handle(success())==Event::Setup); assert(targets.handle(channel())==Event::Opened);
+    assert(targets.handle(job(1,true))==Event::None); assert(targets.handle(previous(1))==Event::Job);
+    work::Work future; work::build(targets.job(),1,future); auto futureShare=share(future);
+    assert(targets.handle(job(2,false))==Event::Job);
+    work::Work fixed; work::build(targets.job(),2,fixed); auto fixedShare=share(fixed);
+    assert(targets.handle(target)==Event::Target);
+    assert(targets.job().difficulty==fixed.shareDifficulty);
+    work::Work unchanged; work::build(targets.job(),2,unchanged);
+    assert(!memcmp(unchanged.shareTarget,fixed.shareTarget,32));
+    assert(!targets.submit(fixedShare).payload.empty());
+    assert(targets.submit(futureShare).payload.empty());
+    assert(targets.handle(job(3,false))==Event::Job); work::Work harder; work::build(targets.job(),3,harder);
+    assert(!memcmp(harder.shareTarget,target.payload.data()+4,32));
+    // A pending future job adopts the newest target before activation, and
+    // keeps following target updates when it becomes the active work.
+    assert(targets.handle(job(4,true))==Event::None);
+    Frame easier=target; for(size_t i=4;i<36;++i)easier.payload[i]=255;
+    assert(targets.handle(easier)==Event::Target);
+    assert(targets.handle(previous(4))==Event::Job && targets.job().shareTarget[31]==255);
+    assert(targets.submit(fixedShare).payload.empty()); // previous-block work invalidated
+    assert(targets.handle(target)==Event::Target && targets.job().shareTarget[31]==0);
+    work::Work active;work::build(targets.job(),4,active);
+    assert(!memcmp(active.shareTarget,target.payload.data()+4,32));
     for (const auto &frame : {success(),channel(),job(42,true),previous(42),ack(2,2),target,rejected}) {
         for(size_t n=0;n<frame.payload.size();++n){
             sv2::Protocol parser;

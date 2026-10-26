@@ -5,6 +5,7 @@
 Settings settings;
 const SettingInfo kSettings[] = {
     {"pool", SettingType::Text, &settings.poolHost, 0, "", ""},
+    {"pool2", SettingType::Text, &settings.backupHost, 0, "", ""},
     {"port", SettingType::Number, &settings.poolPort, 16, "", ""},
     {"power", SettingType::Number, &settings.miningPower, 8, "", ""},
     {"webpass", SettingType::Secret, &settings.webPassword, 0, "", ""},
@@ -65,5 +66,15 @@ int main() {
     assert(settingsApply(pending,changes.as<JsonObjectConst>())==5);
     assert(pending.poolProtocol==1&&pending.backupProtocol==0&&!pending.userAgentAuto&&pending.userAgent=="CustomMiner");
     assert(settings.poolProtocol==0&&settings.userAgentAuto);
+    // Pasted V2 URLs select V2 during sanitization. Validate that effective
+    // protocol/key too, including backup URLs and whitespace around keys.
+    for (const char *raw : {R"({"pool":"stratum2+tcp://public-pool.io:23330","proto":0})",
+                           R"({"pool2":"stratum2+tcp://public-pool.io:23330/bad","proto2":0})"}) {
+        assert(!deserializeJson(changes,raw)); assert(settingsError(changes.as<JsonObjectConst>())!=nullptr);
+    }
+    assert(!deserializeJson(changes,R"({"pool":"stratum2+tcp://public-pool.io:23330/9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6","proto":1,"sv2key":""})"));
+    assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
+    assert(!deserializeJson(changes,R"({"proto":1,"sv2key":" 9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6  "})"));
+    assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
     puts("V1/V2 and automatic/manual settings: validation, staged isolation and preserved manual identity passed");
 }

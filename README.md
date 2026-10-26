@@ -5,15 +5,16 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.5.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.0)**
+**Latest release: [v1.5.1](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.1)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.5.0.md)
+· [Release notes](docs/releases/v1.5.1.md)
 
-Version 1.5.0 adds encrypted V2 mining, independent main/backup protocol settings,
-an **Automatic / Manual** user-agent selector, and Public Pool solo presets.
-Stratum V1 remains the default for existing installations. The illustrated device
-screens, local dashboard, history charts, 32/64-bit records, thermal protection
-and optimized hashing engines are retained.
+Version 1.5.1 fixes pool authorization timing, partial TCP writes, Stratum V2
+job-target handling, pasted V2 URL validation and pool-statistics isolation after
+failover. It also handles TLS lock allocation failures safely. Native V2, the
+Automatic / Manual user-agent selector, Public Pool presets, illustrated device
+screens and the local dashboard remain available. The optimized SHA-256d engines
+and thermal protection are retained.
 
 [Install](#install-a-release-no-build-tools) · [First-time setup](#first-time-setup)
 · [Choose a pool](#pools-for-esp32) · [V1 / V2 setup](#stratum-v1-and-stratum-v2)
@@ -24,7 +25,7 @@ and optimized hashing engines are retained.
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
-> **Validation:** v1.5.0 builds and packages all ten board variants. Checks cover
+> **Validation:** v1.5.1 builds and packages all ten board variants. Checks cover
 > SHA‑256d, V1/V2 protocol handling, an independent Noise responder, fragmented
 > socket sessions, settings persistence, physical-display rendering and 49 browser
 > regressions. The ten published firmware signatures, image checksums and update
@@ -143,7 +144,7 @@ host tests, firmware `X.Y.Z` for every board (the version comes from the tag), s
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.5.0 && git push origin v1.5.0
+git tag v1.5.1 && git push origin v1.5.1
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding

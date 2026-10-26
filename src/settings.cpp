@@ -10,6 +10,7 @@
 
 #include "log.h"
 #include "settings_store.h"
+#include "core/pool_identity.h"
 
 Settings settings;
 static std::atomic<uint8_t> liveBrightness{80};
@@ -102,11 +103,9 @@ static void cleanHost(String &host, uint16_t *port) {
 }
 
 static void poolURL(String &host, uint8_t &protocol, String &authority) {
-    host.trim();
-    if (!host.startsWith("stratum2+tcp://")) return;
-    protocol = 1;
-    int path = host.indexOf('/', 15);
-    if (path >= 0 && path + 1 < int(host.length())) authority = host.substring(path + 1);
+    auto identity = stratum::poolIdentity(host.c_str(), protocol, authority.c_str());
+    protocol = identity.protocol;
+    authority = identity.authority.c_str();
 }
 
 void settingsSanitize(Settings &settings) {

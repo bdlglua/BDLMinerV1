@@ -31,6 +31,7 @@ bool endpointValid[6] = {};
 
 MarketData data;
 PoolStats pool;
+bool poolBackup = false;  // identifies the endpoint that produced `pool`
 portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 
 // GET `path` on the TLS connection shared by one refresh and parse the JSON
@@ -200,10 +201,13 @@ int fetchJson(const String &host, uint16_t port, const String &path, JsonDocumen
 // Refreshes PoolStats for the pool in use; false when it could not.
 bool refreshPoolStats() {
     if (ESP.getFreeHeap() < kMinHeapForTls) return false;
-    String host = netPoolHost();
+    bool backup = netOnBackup();
+    String host = backup ? settings.backupHost : settings.poolHost;
     String addr = settings.btcAddress.substring(0, settings.btcAddress.indexOf('.') < 0 ? settings.btcAddress.length()
                                                                                        : settings.btcAddress.indexOf('.'));
-    PoolStats p = poolStatsGet();
+    portENTER_CRITICAL(&dataMux);
+    PoolStats p = poolBackup == backup ? pool : PoolStats{};
+    portEXIT_CRITICAL(&dataMux);
     JsonDocument filter, doc;
     int code;
     if (host.endsWith("public-pool.io")) {
@@ -234,6 +238,7 @@ bool refreshPoolStats() {
     if (code == HTTP_CODE_OK) p.updatedMs = millis();
     portENTER_CRITICAL(&dataMux);
     pool = p;
+    poolBackup = backup;
     portEXIT_CRITICAL(&dataMux);
     if (code == HTTP_CODE_OK)
         logf("[market] pool sees %.3g H/s, best %.4g, %u worker(s)\n", p.hashrate, p.bestEver, (unsigned)p.workers);
@@ -244,9 +249,15 @@ bool refreshPoolStats() {
 
 void marketTask(void *) {
     uint32_t nextMarket = 0, nextPool = 60000;  // pool stats once mining for a minute
+    bool lastPoolBackup = netOnBackup();
     uint32_t retry = kRetryMs;
     for (;;) {
         ghUpdatePoll();
+        bool backup = netOnBackup();
+        if (backup != lastPoolBackup) {
+            lastPoolBackup = backup;
+            nextPool = millis();  // do not wait up to an hour after failover
+        }
         if (WiFi.isConnected() && (int32_t)(millis() - nextMarket) >= 0) {
             bool ok = refresh();
             nextMarket = millis() + (ok ? kRefreshMs : retry);
@@ -272,8 +283,9 @@ void marketStart() {
 PoolStats poolStatsGet() {
     portENTER_CRITICAL(&dataMux);
     PoolStats p = pool;
+    bool backup = poolBackup;
     portEXIT_CRITICAL(&dataMux);
-    return p;
+    return backup == netOnBackup() ? p : PoolStats{};
 }
 
 MarketData marketGet() {
