@@ -26,6 +26,7 @@ uint32_t nonceAt(uint32_t position) { return position; }
 // that holds it here, while the miner sees `held` and hashes in software.
 static std::atomic<bool> held{false};
 static int holds = 0;  // hold() nests (an update download around tlsConnect())
+static bool sparseTextWrites = true;  // selected by selfTest(), before workers start
 
 void hold() {
     holds++;
@@ -64,25 +65,33 @@ void prepare(Job &job, const uint8_t header[80]) {
 bool fillAvailable() { return false; }
 void prepareFill(Fill &, const uint8_t *) {}
 
-uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
-              void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *) {
-    uint32_t second[16] = {0};
-    second[8] = 0x00000080;   // padding byte 0x80
-    second[15] = 0x00010000;  // 256 bits, big-endian length
+template<bool sparse>
+static uint32_t scanWithPadding(Job &job, uint32_t first, uint32_t count, uint32_t limit,
+                               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
+    uint32_t second[8];  // only the first digest changes; padding stays in the peripheral
+    volatile uint32_t *text = (volatile uint32_t *)SHA_TEXT_BASE;
     volatile uint32_t *h7 = (volatile uint32_t *)(SHA_H_BASE + 28);
 
     if (held) return 0;
     esp_sha_acquire_hardware();
+    // Words 9..14 are zero in both padded blocks. The peripheral reads TEXT
+    // without changing it; initialize these once while owning the engine.
+    // Reinitialize for every batch because TLS may have used it in between.
+    if (sparse) for (int i = 9; i < 15; ++i) REG_WRITE(text + i, 0);
     uint32_t nonce = first;
     for (uint32_t i = 0; i < count; i++, nonce++) {
         job.tail[3] = nonce;
         sha_ll_write_digest(SHA2_256, job.mid, 8);
-        sha_ll_fill_text_block(job.tail, 16);
+        sha_ll_fill_text_block(job.tail, sparse ? 9 : 16);
+        if (sparse) REG_WRITE(text + 15, job.tail[15]);
         sha_ll_continue_block(SHA2_256);
         waitIdle();
         sha_ll_read_digest(SHA2_256, second, 8);
 
-        sha_ll_fill_text_block(second, 16);
+        sha_ll_fill_text_block(second, 8);
+        REG_WRITE(text + 8, 0x00000080);   // padding byte 0x80
+        if (!sparse) for (int i = 9; i < 15; ++i) REG_WRITE(text + i, 0);
+        REG_WRITE(text + 15, 0x00010000);  // 256 bits, big-endian length
         sha_ll_start_block(SHA2_256);
         waitIdle();
         // Bytes 28..31 of the digest, read as a little-endian word, are the
@@ -95,6 +104,13 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
     }
     esp_sha_release_hardware();
     return count;
+}
+
+uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
+              void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *) {
+    // Specialize outside the nonce loop: no per-nonce mode checks.
+    return sparseTextWrites ? scanWithPadding<true>(job, first, count, limit, hit, ctx)
+                            : scanWithPadding<false>(job, first, count, limit, hit, ctx);
 }
 
 }  // namespace hwsha
@@ -633,11 +649,19 @@ bool selfTest() {
              t->hits++;
          },
          &t);
-    if (t.hits != 1 || t.nonce != kNonce) return false;
-
     uint8_t ref[32];
     sha::sha256d(header, 80, ref);
-    return memcmp(ref, t.hash, 32) == 0;
+    bool correct = t.hits == 1 && t.nonce == kNonce && memcmp(ref, t.hash, 32) == 0;
+#if SOC_SHA_SUPPORT_RESUME
+    if (!correct && sparseTextWrites) {
+        // A chip/SDK which does not retain TEXT padding keeps its working
+        // hardware path: retry the known answer with complete block writes.
+        sparseTextWrites = false;
+        logf("[miner] SHA padding reuse failed its self-test; retrying full block writes\n");
+        return selfTest();
+    }
+#endif
+    return correct;
 }
 
 }  // namespace hwsha

@@ -40,7 +40,10 @@ Hashing engines:
 * **Hardware** on one core, software on the other. On dual-core chips the hardware miner
   owns core 1 at high priority, and everything else (software miner, WiFi, pool, screen,
   web server, Arduino loop) runs on core 0, as in NerdMiner Modded:
-  * ESP32‑S2/S3/C3: SHA accelerator with state resume (two blocks per nonce);
+  * ESP32‑S2/S3/C3: SHA accelerator with state resume (two blocks per nonce).
+    Reuse the six padding words shared by both blocks: 20 text-register writes
+    per nonce instead of 32, plus six setup writes per batch. A boot known-answer
+    test automatically falls back to full block writes if padding reuse fails;
   * original ESP32 revision 3 and later (M5StickC Plus2, most current ESP32 boards): the
     accelerator cannot resume, so a nonce costs three blocks, but a cycle-counted assembly
     loop keeps it busy without a gap (~247 cycles per nonce, about 1 MH/s at 240 MHz).

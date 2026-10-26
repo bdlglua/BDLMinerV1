@@ -24,7 +24,7 @@ struct MidState {
     uint32_t mid[8];   // state after the first 64 header bytes
     uint32_t pre[8];   // `mid` advanced through rounds 0..2 of the 2nd block
     uint32_t w[18];    // second block message words 0..17 (w[3] = nonce)
-    uint32_t bake[15]; // what the assembly prefilter (sw_sha_prefilter.S) takes
+    uint32_t bake[15]; // assembly prefilter state; C also reuses the baked round 3
 };
 
 void prepare(MidState &ms, const uint8_t header[80]);

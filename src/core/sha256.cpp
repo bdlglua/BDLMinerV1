@@ -163,7 +163,11 @@ bool scan(const MidState &ms, uint32_t nonce, uint32_t limit, uint8_t out[32]) {
     uint32_t a = ms.pre[0], b = ms.pre[1], c = ms.pre[2], d = ms.pre[3];
     uint32_t e = ms.pre[4], f = ms.pre[5], g = ms.pre[6], h = ms.pre[7];
     // Resume at round 3: the rotating window is shifted by 3 positions.
-    ROUND(a, b, c, d, e, f, g, h, K[3], W[3]);
+    // prepare() already baked the nonce-independent parts of round 3 for
+    // the assembly path. Reuse them in C instead of recomputing both sigmas.
+    uint32_t t3 = ms.bake[13] + W[3];
+    d += t3;
+    h = t3 + ms.bake[14];
     ROUND(h, a, b, c, d, e, f, g, K[4], W[4]);
     ROUND(g, h, a, b, c, d, e, f, K[5], W[5]);
     ROUND(f, g, h, a, b, c, d, e, K[6], W[6]);
@@ -193,8 +197,8 @@ bool scan(const MidState &ms, uint32_t nonce, uint32_t limit, uint8_t out[32]) {
     W[8] = 0x80000000;
     for (int i = 9; i < 15; i++) W[i] = 0;
     W[15] = 256;
-#pragma GCC unroll 48
-    for (int i = 16; i < 64; i++) W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
+#pragma GCC unroll 45
+    for (int i = 16; i < 61; i++) W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
 
     a = IV[0]; b = IV[1]; c = IV[2]; d = IV[3];
     e = IV[4]; f = IV[5]; g = IV[6]; h = IV[7];
@@ -205,19 +209,26 @@ bool scan(const MidState &ms, uint32_t nonce, uint32_t limit, uint8_t out[32]) {
     ROUND8(32, W);
     ROUND8(40, W);
     ROUND8(48, W);
-    // Rounds 56..60. After round 60 the register that will end up as the
-    // final `h` is already known (h64 = g63 = f62 = e61), which lets us reject
-    // >99.99% of nonces without doing the last 3 rounds.
+    // After round 60, final h64 = e61 is known. Rounds 57..60 need only
+    // their e updates to compute it: their new a values cannot reach e61.
+    // Keep the full state after round 56 for the rare candidate's completion.
     ROUND(a, b, c, d, e, f, g, h, K[56], W[56]);
+    if (limit != UINT32_MAX) {
+        uint32_t e58 = c + g + S1(d) + ch(d, e, f) + K[57] + W[57];
+        uint32_t e59 = b + f + S1(e58) + ch(e58, d, e) + K[58] + W[58];
+        uint32_t e60 = a + e + S1(e59) + ch(e59, e58, d) + K[59] + W[59];
+        uint32_t e61 = h + d + S1(e60) + ch(e60, e59, e58) + K[60] + W[60];
+        if (bswap(IV[7] + e61) > limit) return false;
+    }
+
+    // Finish only hashes which pass the exact top-word filter. W[61..63]
+    // are not needed to decide rejection, either.
+#pragma GCC unroll 3
+    for (int i = 61; i < 64; i++) W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
     ROUND(h, a, b, c, d, e, f, g, K[57], W[57]);
     ROUND(g, h, a, b, c, d, e, f, K[58], W[58]);
     ROUND(f, g, h, a, b, c, d, e, K[59], W[59]);
     ROUND(e, f, g, h, a, b, c, d, K[60], W[60]);
-    // The logical `e` register now lives in variable `h`; three rounds later
-    // it becomes the final `h`, so H7 = IV[7] + h.
-    uint32_t h7 = IV[7] + h;
-    if (bswap(h7) > limit) return false;
-
     ROUND(d, e, f, g, h, a, b, c, K[61], W[61]);
     ROUND(c, d, e, f, g, h, a, b, K[62], W[62]);
     ROUND(b, c, d, e, f, g, h, a, K[63], W[63]);

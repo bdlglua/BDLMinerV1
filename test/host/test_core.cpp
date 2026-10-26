@@ -67,6 +67,34 @@ static void testSha() {
     CHECK(sha::scan(ms, kGenesisNonce, 0xFFFFFFFF, h2));
     CHECK(memcmp(out, h2, 32) == 0);
 
+    // Exercise the prepared rounds and early rejection with changing midstates,
+    // padding words, nonce byte order/wrap and exact equality at the top word.
+    uint32_t seed = 0x93ac5f17;
+    for (int job = 0; job < 64; ++job) {
+        uint8_t varied[80];
+        for (auto &byte : varied) byte = (seed = seed * 1664525u + 1013904223u) >> 24;
+        if (job < 2) memset(varied, job ? 0xff : 0, sizeof(varied));
+        sha::MidState prepared;
+        sha::prepare(prepared, varied);
+        for (int i = 0; i < 32; ++i) {
+            uint32_t nonce = i < 4 ? uint32_t(i - 2) : (seed = seed * 1664525u + 1013904223u);
+            for (int b = 0; b < 4; ++b) varied[76 + b] = nonce >> (8 * b);
+            uint8_t ref[32], fast[32];
+            sha::sha256d(varied, sizeof(varied), ref);
+            uint32_t top = uint32_t(ref[28]) | uint32_t(ref[29]) << 8 |
+                           uint32_t(ref[30]) << 16 | uint32_t(ref[31]) << 24;
+            const uint32_t limits[] = {0, 1, 0xffff, 0x0fffffff, UINT32_MAX, top, top ? top - 1 : 0};
+            for (uint32_t limit : limits) {
+                memset(fast, 0xa5, sizeof(fast));
+                bool hit = sha::scan(prepared, nonce, limit, fast);
+                CHECK(hit == (top <= limit));
+                if (hit) CHECK(memcmp(fast, ref, sizeof(ref)) == 0);
+                else for (auto byte : fast) CHECK(byte == 0xa5);
+            }
+        }
+    }
+    puts("SHA-256d: 2,048 varied headers/nonces and 14,336 exact filter checks passed");
+
     // Fast path must agree with the reference on random nonces.
     for (uint32_t n = 0; n < 2000; n++) {
         uint8_t ref[32], fast[32];
