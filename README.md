@@ -137,7 +137,7 @@ workflow runs the host tests and builds every board on each push and pull reques
 
 ## Build and flash
 
-Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio`).
+Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio==6.1.19`).
 
 ```sh
 pio run -e m5stickc-plus2 -t upload -t monitor   # M5StickC Plus2

@@ -28,7 +28,7 @@ import sys
 from urllib.parse import quote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PIO_HOME = os.path.expanduser("~/.platformio")
+PIO_HOME = os.path.expanduser(os.environ.get("PLATFORMIO_CORE_DIR", "~/.platformio"))
 PYTHON = os.path.join(PIO_HOME, "penv", "bin", "python")
 if not os.path.exists(PYTHON):  # PlatformIO installed with pip (CI)
     PYTHON = sys.executable
@@ -45,8 +45,19 @@ def version():
     return re.search(r'-DFW_VERSION=\\"([^"\\]+)\\"', text).group(1)
 
 
+def checked(args, **kwargs):
+    try:
+        return subprocess.run(args, check=True, capture_output=True, **kwargs)
+    except subprocess.CalledProcessError as error:
+        # A captured stderr must not disappear behind only "exit status 2".
+        for output in (error.stdout, error.stderr):
+            if output:
+                print(output.decode(errors="replace") if isinstance(output, bytes) else output, file=sys.stderr)
+        raise
+
+
 def run(*args):
-    return subprocess.run(args, cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    return checked(args, cwd=ROOT, text=True).stdout
 
 
 def flash_layout(env):
@@ -140,7 +151,7 @@ def main():
                 "--flash_mode", mode, "--flash_freq", freq, "--flash_size", size]
         for offset, path in images:
             args += [offset, path]
-        subprocess.run(args, check=True, capture_output=True)
+        checked(args)
         firmware = os.path.join(out, f"{env}-firmware.bin")
         # A previous signed build may already exist in this release folder.
         # Never leave its signature attached to the newly copied firmware.

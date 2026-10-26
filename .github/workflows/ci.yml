@@ -35,7 +35,7 @@ jobs:
             ~/.cache/pip
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-
-      - run: pip install platformio
+      - run: pip install platformio==6.1.19
       - run: python3 -m unittest discover -s test/tools -v
       - run: ./test/host/run.sh
 
@@ -58,5 +58,7 @@ jobs:
             ~/.cache/pip
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
-      - run: pip install platformio
+      - run: pip install platformio==6.1.19
       - run: pio run -e ${{ matrix.env }}
+      - name: Check USB factory image packaging
+        run: python3 tools/make_release.py "${{ matrix.env }}"

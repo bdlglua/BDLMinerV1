@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import subprocess
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
@@ -15,6 +16,15 @@ import miner_stats
 
 
 class ReleaseToolsTests(unittest.TestCase):
+    def test_packaging_failure_keeps_the_actual_tool_diagnostic(self):
+        output = io.StringIO()
+        error = subprocess.CalledProcessError(2, ["esptool"], output=b"tool output", stderr=b"missing input image")
+        with (patch.object(make_release.subprocess, "run", side_effect=error),
+              contextlib.redirect_stderr(output)):
+            with self.assertRaises(subprocess.CalledProcessError):
+                make_release.checked(["esptool"])
+        self.assertIn("missing input image", output.getvalue())
+
     def test_partial_unsigned_rebuild_removes_stale_signature_and_keeps_checksums(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

@@ -35,7 +35,7 @@ jobs:
             ~/.cache/pip
           key: pio-release-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-release-${{ runner.os }}-
-      - run: pip install platformio
+      - run: pip install platformio==6.1.19
 
       - name: Version from the tag
         run: |
