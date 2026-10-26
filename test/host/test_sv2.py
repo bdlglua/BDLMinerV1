@@ -196,6 +196,7 @@ assert payload[4]==14 and payload[5:19]==b'address.worker'
 share_target=bytes([255])*30+bytes(2) # a genuine 16-leading-zero-bit proof, not an all-accepting target
 peer.send(0x14,struct.pack('<II',1,7)+share_target+struct.pack('<H',8)+b'\x02\xaa\xbb'+struct.pack('<I',11))
 peer.send(0x1f,struct.pack('<IIBIBB',11,42,0,0x20000000,0,1)+bytes([0x11])*32+struct.pack('<H',2)+b'\x01\x02'+struct.pack('<H',1)+b'\x03',channel=True)
+peer.send(0x19,struct.pack('<I',7)+b'\x02\xcc\xdd',channel=True)
 current=int(time.time())
 peer.send(0x20,struct.pack('<II',11,42)+bytes([0x22])*32+struct.pack('<II',current,0x1d00ffff),channel=True)
 seen=[]
@@ -213,8 +214,21 @@ rejection=struct.pack('<II',7,0)+b'\x03bad'
 acknowledgment=struct.pack('<IIIQ',7,1,1,1)
 peer.send(0x1d,rejection,channel=True);peer.send(0x1c,acknowledgment,channel=True)
 peer.send(0x1d,rejection,channel=True);peer.send(0x1c,acknowledgment,channel=True)
+peer.send(0x25,struct.pack('<IHI',12,1,7)) # connection-level group reassignment
+peer.send(0x19,struct.pack('<I',12)+b'\x02\xee\xff',channel=True) # group prefixes must be ignored
+peer.send(0x18,struct.pack('<I',99)+b'\x00',channel=True) # unrelated channel closure
+peer.send(0x1f,struct.pack('<IIBIIBB',12,43,1,current+1,0x20000000,0,1)+bytes([0x11])*32+struct.pack('<H',2)+b'\x01\x02'+struct.pack('<H',1)+b'\x03',channel=True)
+for seq in (2,3):
+    extension,kind,payload=peer.receive();assert (extension,kind)==(0x8000,0x1b)
+    channel_id,sequence,job_id,nonce,ntime,version=struct.unpack('<6I',payload[:24])
+    assert (channel_id,sequence,job_id,ntime,version)==(7,seq,43,current+1,0x20000000)
+    extra=payload[25:];assert payload[24]==len(extra)==8 and extra not in seen;seen.append(extra)
+    merkle=sha(sha(b'\x01\x02\xcc\xdd'+extra+b'\x03'));merkle=sha(sha(merkle+bytes([0x11])*32))
+    candidate=struct.pack('<I',version)+bytes([0x22])*32+merkle+struct.pack('<III',ntime,0x1d00ffff,nonce)
+    assert int.from_bytes(sha(sha(candidate)),'little')<=int.from_bytes(share_target,'little')
+peer.send(0x1c,struct.pack('<IIIQ',7,3,2,2),channel=True)
 # Closing the write side leaves queued frames readable before EOF.
-result=peer.finish();assert result[:5]==['1','1','1','1','0'],result
+result=peer.finish();assert result[:5]==['1','3','1','2','0'],result
 
 peer=Peer(signer=(4).to_bytes(32,'big'))
 assert peer.sock.recv(1)==b''
@@ -225,4 +239,4 @@ result=peer.finish();assert result[:4]==['0','0','0','0'],result
 peer=Peer();peer.receive();reason=b'unsupported-user-agent';peer.send(2,struct.pack('<I',0)+bytes([len(reason)])+reason)
 assert peer.sock.recv(1)==b''
 result=peer.finish();assert result[:4]==['0','0','0','0'] and 'protocol refused' in result[-1],result
-print('Production SV2 session: fragmented TCP, partial writes, Noise, setup, channel, unique mining work, submitted shares, batch/reject accounting and no unverified/unauthenticated work passed')
+print('Production SV2 session: fragmented TCP, partial writes, Noise, prefix snapshots, group reassignment, independent proofs, share accounting and no unverified/unauthenticated work passed')

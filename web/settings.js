@@ -1,4 +1,17 @@
 let S=null,busy=false,restarting=false;const $=id=>document.getElementById(id);
+function poolURLChanged(key){
+ const input=$('k_'+key),value=input.value.trim();
+ if(!value.startsWith('stratum2+tcp://'))return;
+ try{
+  const url=new URL(value);
+  if(!url.hostname||url.username||url.password||url.search||url.hash||(url.port&&Number(url.port)<1))throw Error();
+  const suffix=key==='pool2'?'2':'';
+  input.value=url.hostname;$('k_proto'+suffix).value='1';
+  if(url.port)$('k_port'+suffix).value=url.port;
+  if(url.pathname.length>1)$('k_sv2key'+suffix).value=url.pathname.slice(1);
+  input.setCustomValidity('');dirtyState();sync();
+ }catch(e){input.setCustomValidity(t('Enter a valid value.'))}
+}
 function publicPoolPreset(protocolKey,version){
  const backup=protocolKey==='proto2',fields=[[backup?'pool2':'pool','public-pool.io'],[backup?'port2':'port',version===1?23330:3333],[protocolKey,version]];
  if(version===1)fields.push([backup?'sv2key2':'sv2key','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6']);
@@ -38,6 +51,7 @@ async function load(){
     if(k==='pool'||k==='addr')i.required=true;
    }
    i.addEventListener('input',()=>{i.setCustomValidity('');dirtyState();if(choice)sync()});
+   if(k==='pool'||k==='pool2')i.addEventListener('change',()=>poolURLChanged(k));
    const row=document.createElement('div');row.className='field'+(type==='bool'?' boolean':'');row.dataset.search=(l.textContent+' '+k).toLocaleLowerCase();row.appendChild(l);
    const control=document.createElement('div');control.className='field-control';control.appendChild(i);row.appendChild(control);
    if(type==='secret'){const show=document.createElement('button');show.type='button';show.className='secondary secret-toggle';show.textContent=t('Show');show.setAttribute('aria-label',t('Show')+' '+l.textContent);show.onclick=()=>{const visible=i.type==='password';i.type=visible?'text':'password';show.textContent=t(visible?'Hide':'Show');show.setAttribute('aria-label',t(visible?'Hide':'Show')+' '+l.textContent)};control.appendChild(show)}
@@ -70,7 +84,8 @@ function values(){
 }
 async function saveSettings(event){
  if(event)event.preventDefault();if(busy||restarting||!S)return;
- const v=values();if(!$('f').reportValidity())return;
+ const v=values();
+ if(!$('f').checkValidity()){$('settings-search').value='';filterSettings();$('f').reportValidity();return}
  busy=true;sync();
  try{await request('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},'text');restarting=true;$('msg').textContent=t('Saved, restarting… reload in 15 s')}
  catch(e){$('msg').textContent=errorText(e)}finally{busy=false;sync()}

@@ -12,6 +12,7 @@
 #include "mqtt.h"
 #include "net.h"
 #include "notify.h"
+#include "ota.h"
 #include "settings.h"
 #include "ui.h"
 #include "watch.h"
@@ -111,13 +112,16 @@ void loop() {
             ui::cycleBrightness();
             ui::render();
             break;
-        case board::Input::FactoryReset:
+        case board::Input::FactoryReset: {
+            ota::Guard reboot(ota::Owner::Restart);
+            if (!reboot) break;
             ui::showMessage("Reset", "Erasing settings...", "Rebooting into setup");
             logf("[cfg] factory reset\n");
             minerSaveStats();  // statistics survive a factory reset
             delay(1500);
             settingsFactoryReset();
             break;
+        }
         default:
             break;
     }

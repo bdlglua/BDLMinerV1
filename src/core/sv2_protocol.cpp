@@ -59,7 +59,6 @@ void Protocol::activate(Slot &slot, uint32_t time, bool clean) {
     current_ = slot.job;
     current_.ntime = time; current_.nbits = nbits_; current_.clean = clean;
     memcpy(current_.prevHash, previous_, 32);
-    current_.extranonce1 = prefix_; current_.extranonce2Size = extranonceSize_;
     haveCurrent_ = true; slot.future = false;
 }
 size_t Protocol::pendingIndex(uint32_t sequence) const {
@@ -115,6 +114,7 @@ Event Protocol::handle(const Frame &f) {
         slot.dynamicTarget = slot.future;
         slot.job.exactShareTarget = true; memcpy(slot.job.shareTarget, target_, 32);
         slot.job.difficulty = difficulty();
+        slot.job.extranonce1 = prefix_; slot.job.extranonce2Size = extranonceSize_;
         slot.job.id = std::to_string(id); slot.job.version = r.number(4);
         uint32_t rolling = r.number(1), branches = r.number(1);
         if (!r.ok || option > 1 || rolling > 1 || branches > 32) return fail("Invalid SV2 job fields");
@@ -179,7 +179,29 @@ Event Protocol::handle(const Frame &f) {
         for (size_t i = index + 1; i < pendingCount_; ++i) pending_[i - 1] = pending_[i];
         --pendingCount_; acknowledged_ = 1; error_ = error; return Event::Rejected;
     }
-    if (f.type == 0x18 || f.type == 0x19) return fail("SV2 channel closed or extranonce changed; reconnecting");
+    if (f.type == 0x18) {
+        uint32_t channel = r.number(4); auto reason = r.text();
+        if (!r.end()) return fail("Invalid SV2 channel closure");
+        if (channel != channel_ && channel != group_) return Event::None;
+        error_ = "SV2 channel closed: " + reason; return Event::Error;
+    }
+    if (f.type == 0x19) {
+        uint32_t channel = r.number(4); auto prefix = r.vector(r.number(1));
+        if (!r.end() || prefix.size() > 32) return fail("Invalid SV2 extranonce prefix");
+        // Prefix changes apply only to subsequently received jobs. Group
+        // prefixes are ignored; existing jobs retain their coinbase bytes.
+        if (channel == channel_) prefix_ = std::move(prefix);
+        return Event::None;
+    }
+    if (f.type == 0x25) {
+        uint32_t group = r.number(4), count = r.number(2);
+        if (!r.ok || count > (f.payload.size() - r.p) / 4) return fail("Invalid SV2 channel group");
+        bool member = false;
+        for (uint32_t i = 0; i < count; ++i) if (r.number(4) == channel_) member = true;
+        if (!r.end() || group == channel_) return fail("Invalid SV2 channel group");
+        if (member) group_ = group;
+        return Event::None;
+    }
     return Event::None; // optional messages do not mutate the current job
 }
 } // namespace sv2

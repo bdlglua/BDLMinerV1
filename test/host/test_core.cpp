@@ -397,6 +397,18 @@ static const char *kNotify =
 
 static void testStratumValidation() {
     stratum::Protocol p;
+    for (const char *line : {R"({"id":2,"result":"true","error":null})",
+                             R"({"id":2,"result":1,"error":null})",
+                             R"({"id":2,"result":[],"error":null})",
+                             R"({"id":2,"result":{},"error":null})"}) {
+        p.reset();
+        CHECK(p.handleLine(line) == stratum::Event::AuthFailed);
+        CHECK(!p.authorized() && !p.lastError().empty());
+    }
+    CHECK(p.handleLine(R"({"id":2,"result":true,"error":null})") == stratum::Event::Authorized);
+    CHECK(p.handleLine(R"({"id":2,"result":true,"error":null})") == stratum::Event::None);
+    CHECK(p.authorized());
+    p.reset();
     CHECK(p.handleLine(R"({"id":1,"result":[[],"aabb",4],"error":null})") == stratum::Event::Subscribed);
 
     // A broken subscribe response must not erase or partly change the session.
@@ -418,7 +430,7 @@ static void testStratumValidation() {
     work::Work original;
     work::build(p.job(), 7, original);
     struct BadField { int index; const char *json; } badFields[] = {
-        {0, "12"}, {0, "null"},
+        {0, "12"}, {0, "null"}, {0, R"("")"},
         {0, R"("0123456789012345678901234567890123456789012345678901234567890123456789")"},
         {1, R"("00")"}, {2, "null"}, {3, "false"},
         {4, "null"}, {4, "{}"}, {4, R"(["11"])"},

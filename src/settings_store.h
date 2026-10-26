@@ -104,10 +104,14 @@ template<class Storage>
 bool save(Storage &p, const Settings &values, uint32_t &sequence) {
     std::string payload;
     if (!encode(values, payload)) return false;
-    Header header{kMagic, sequence + 1, uint32_t(payload.size()), 0};
-    std::vector<uint8_t> bytes(sizeof(Header) + payload.size());
+    const size_t length = payload.size();
+    // Bound the addition and copy at the point of use too. This keeps the
+    // record builder safe independently of encode() and visible to FORTIFY.
+    if (!length || length > kMaxPayload) return false;
+    Header header{kMagic, sequence + 1, uint32_t(length), 0};
+    std::vector<uint8_t> bytes(sizeof(Header) + length);
     std::memcpy(bytes.data(), &header, sizeof(header));
-    std::memcpy(bytes.data() + sizeof(header), payload.data(), payload.size());
+    std::memcpy(bytes.data() + sizeof(header), payload.data(), length);
     header.crc = checksum(bytes.data(), bytes.size());
     std::memcpy(bytes.data(), &header, sizeof(header));
     const char *key = header.sequence & 1 ? "cfgB" : "cfgA";

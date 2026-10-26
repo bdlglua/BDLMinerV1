@@ -6,7 +6,7 @@
 
 namespace ota {
 
-enum class Owner : uint8_t { None, Web, Github };
+enum class Owner : uint8_t { None, Web, Github, Restart };
 inline std::atomic<Owner> &sessionOwner() {
     static std::atomic<Owner> owner{Owner::None};
     return owner;

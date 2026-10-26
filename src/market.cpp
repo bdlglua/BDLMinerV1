@@ -4,6 +4,9 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
 
 #include "ghupdate.h"
 #include "log.h"
@@ -173,6 +176,21 @@ bool refresh() {
     return ok == attempted;
 }
 
+// Pool APIs may serialize database numbers as either JSON numbers or text.
+// Missing/malformed values must not erase the last successfully read record.
+double poolNumber(JsonVariantConst value, double previous = 0) {
+    double number;
+    if (value.is<double>()) number = value.as<double>();
+    else if (value.is<const char *>()) {
+        const char *text = value.as<const char *>(); char *end;
+        number = std::strtod(text, &end);
+        if (end == text) return previous;
+        while (std::isspace(static_cast<unsigned char>(*end))) ++end;
+        if (*end) return previous;
+    } else return previous;
+    return std::isfinite(number) && number >= 0 ? number : previous;
+}
+
 // "856K" (ckpool hash rates) -> 856000
 double parseRate(const char *s) {
     if (!s) return 0;
@@ -203,6 +221,7 @@ bool refreshPoolStats() {
     if (ESP.getFreeHeap() < kMinHeapForTls) return false;
     bool backup = netOnBackup();
     String host = backup ? settings.backupHost : settings.poolHost;
+    host.toLowerCase();
     String addr = settings.btcAddress.substring(0, settings.btcAddress.indexOf('.') < 0 ? settings.btcAddress.length()
                                                                                        : settings.btcAddress.indexOf('.'));
     portENTER_CRITICAL(&dataMux);
@@ -210,18 +229,18 @@ bool refreshPoolStats() {
     portEXIT_CRITICAL(&dataMux);
     JsonDocument filter, doc;
     int code;
-    if (host.endsWith("public-pool.io")) {
+    if (host == "public-pool.io" || host.endsWith(".public-pool.io")) {
         filter["bestDifficulty"] = true;
         filter["workersCount"] = true;
         filter["workers"][0]["hashRate"] = true;
         filter["accounting"]["totalAcceptedShares"] = true;
         code = fetchJson("public-pool.io", 40557, "/api/client/" + addr, doc, filter);
         if (code == HTTP_CODE_OK) {
-            p.bestEver = atof(doc["bestDifficulty"] | "0");
+            p.bestEver = poolNumber(doc["bestDifficulty"], p.bestEver);
             p.workers = doc["workersCount"] | 0;
-            p.shares = doc["accounting"]["totalAcceptedShares"] | 0.0;
+            p.shares = poolNumber(doc["accounting"]["totalAcceptedShares"], p.shares);
             p.hashrate = 0;
-            for (JsonVariant w : doc["workers"].as<JsonArray>()) p.hashrate += w["hashRate"] | 0.0;
+            for (JsonVariant w : doc["workers"].as<JsonArray>()) p.hashrate += poolNumber(w["hashRate"]);
         }
     } else {
         // ckpool: https://<pool>/users/<address>
@@ -229,8 +248,8 @@ bool refreshPoolStats() {
         code = fetchJson(host, 443, "/users/" + addr, doc, filter);
         if (code == HTTP_CODE_OK) {
             p.hashrate = parseRate(doc["hashrate1hr"] | doc["hashrate5m"] | "0");
-            p.bestEver = doc["bestever"] | 0.0;
-            p.shares = doc["shares"] | 0.0;
+            p.bestEver = poolNumber(doc["bestever"], p.bestEver);
+            p.shares = poolNumber(doc["shares"], p.shares);
             p.workers = doc["workers"] | 0;
         }
     }

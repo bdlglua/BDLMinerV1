@@ -106,7 +106,10 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         setStatus(onBackup ? "Mining (backup pool)" : "Mining");
                         // Pools can send the first notify before authorization.
                         // Keep that work, but only start hashing once accepted.
-                        if (proto.hasJob()) minerPublishJob(proto.job(), proto.job().clean);
+                        if (proto.hasJob()) {
+                            minerPoolDifficulty(proto.job().difficulty);
+                            minerPublishJob(proto.job(), proto.job().clean);
+                        }
                         break;
                     case stratum::Event::AuthFailed:
                         setStatus("Auth failed: check address");
@@ -114,12 +117,13 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         return;
                     case stratum::Event::NewJob:
                         if (!proto.authorized() || !proto.hasJob()) break;
+                        minerPoolDifficulty(proto.job().difficulty);
                         minerPublishJob(proto.job(), proto.job().clean);
                         logf("[pool] job %s height=%u clean=%d diff=%g\n", proto.job().id.c_str(),
                              proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
                         break;
                     case stratum::Event::Difficulty:
-                        minerPoolDifficulty(proto.difficulty());
+                        if (!proto.hasJob()) minerPoolDifficulty(proto.difficulty());
                         logf("[pool] difficulty %g\n", proto.difficulty());
                         break;
                     case stratum::Event::ShareAccepted:

@@ -20,6 +20,7 @@ g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_pool_agent.cpp $CORE -o 
 python3 test/host/test_net_session.py
 python3 test/host/test_market_pool.py
 python3 test/host/test_tls.py
+python3 test/host/test_restart_ownership.py
 python3 test/host/test_sv2.py
 python3 test/host/test_hw_resume.py
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_line_buffer.cpp $CORE -o .pio/host/test_line_buffer

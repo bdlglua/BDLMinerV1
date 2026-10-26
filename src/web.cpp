@@ -78,7 +78,8 @@ bool authorized() {
 
 void restartSoon(const char *why) {
     restartWhy = why;
-    restartAt = millis() + 1500;
+    uint32_t due = millis() + 1500;
+    restartAt = due ? due : 1; // zero is reserved for "no restart", including at millis() wrap
 }
 
 const char *accentCss() {
@@ -717,6 +718,9 @@ void webStart() {
 
 void webHandle() {
     if (restartAt && (int32_t)(millis() - restartAt) >= 0) {
+        // A validated web upload deliberately retains its OTA ownership.
+        // Other reboots must reserve the slot without interrupting GitHub OTA.
+        if (!ota::owns(ota::Owner::Web) && !ota::acquire(ota::Owner::Restart)) return;
         minerSaveStats();  // does nothing after a restored backup
         setRestartReason(restartWhy.load());
         ESP.restart();

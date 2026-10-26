@@ -137,6 +137,7 @@ Event Protocol::handleLine(const char *line) {
         JsonArray params = doc["params"];
         if (!strcmp(method, "mining.notify")) {
             if (params.size() < 9 || !params[0].is<const char *>() ||
+                !params[0].as<const char *>()[0] ||
                 strlen(params[0].as<const char *>()) >= sizeof(Share::jobId) ||
                 !params[1].is<const char *>() || !params[2].is<const char *>() ||
                 !params[3].is<const char *>() || !params[4].is<JsonArray>() || !params[8].is<bool>())
@@ -242,6 +243,9 @@ Event Protocol::handleLine(const char *line) {
         return Event::Subscribed;
     }
     if (id == kIdAuthorize) {
+        ok = ok && result.is<bool>() && result.as<bool>();
+        if (ok && authorized_) return Event::None; // duplicate replies do not restart mining work
+        if (!ok && error.isNull()) lastError_ = result.is<bool>() ? "authorization refused" : "invalid authorization response";
         authorized_ = ok;
         return ok ? Event::Authorized : Event::AuthFailed;
     }

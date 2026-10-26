@@ -26,6 +26,8 @@ bool awake = false;
 uint32_t wakeStarted = 0;  // night mode suspended for 30 s after a button press
 
 void restart(const char *why) {
+    ota::Guard reboot(ota::Owner::Restart);
+    if (!reboot) return; // defer automatic restarts until the active OTA finishes
     logf("[watch] restarting: %s\n", why);
     minerSaveStats();  // what was mined since the last periodic save
     setRestartReason(why);

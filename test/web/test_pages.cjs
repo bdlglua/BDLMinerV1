@@ -128,6 +128,31 @@ check('Enter submits once, and actions remain locked until restart',()=>run({pos
   assert.match(await f.page.locator('#msg').textContent(),/restarting/);
 }));
 
+check('pasted V2 URLs fill protocol port and authority for main and backup',()=>run({},async f=>{
+  await loaded(f);
+  const key='9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6';
+  for(const suffix of ['', '2']){
+    await f.page.fill('#k_pool'+suffix,'stratum2+tcp://public-pool.io:23330/'+key);
+    await f.page.locator('#k_pool'+suffix).blur();
+    assert.equal(await f.page.locator('#k_pool'+suffix).inputValue(),'public-pool.io');
+    assert.equal(await f.page.locator('#k_port'+suffix).inputValue(),'23330');
+    assert.equal(await f.page.locator('#k_proto'+suffix).inputValue(),'1');
+    assert.equal(await f.page.locator('#k_sv2key'+suffix).inputValue(),key);
+    assert.equal(await f.page.locator('#k_sv2key'+suffix).isEnabled(),true);
+  }
+  await f.page.click('#save');await f.page.waitForTimeout(80);
+  assert.equal(f.state.posts.length,1);
+}));
+
+check('invalid filtered settings are revealed before browser validation',()=>run({},async f=>{
+  await loaded(f);await f.page.fill('#k_maxtemp','');
+  await f.page.fill('#settings-search','pool');
+  await f.page.click('#save');await f.page.waitForTimeout(80);
+  assert.equal(f.state.posts.length,0);
+  assert.equal(await f.page.locator('#k_maxtemp').isVisible(),true);
+  assert.equal(await f.page.locator('#k_maxtemp').evaluate(e=>e===document.activeElement),true);
+}));
+
 check('failed saves display an error and permit retry',()=>run({postStatus:500},async f=>{
   await loaded(f);await f.page.click('#save');
   await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('refused'));

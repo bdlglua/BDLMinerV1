@@ -16,6 +16,12 @@ Automatic / Manual user-agent selector, Public Pool presets, illustrated device
 screens and the local dashboard remain available. The optimized SHA-256d engines
 and thermal protection are retained.
 
+> **Development builds (`main`, after v1.5.1):** additional fixes for Stratum
+> responses and V2 session changes, restart/OTA coordination, settings storage,
+> pool statistics and web-form validation are documented in the
+> [2026-10-27 audit](docs/audits/2026-10-27.md). The published v1.5.1 binaries
+> remain unchanged.
+
 [Install](#install-a-release-no-build-tools) · [First-time setup](#first-time-setup)
 · [Choose a pool](#pools-for-esp32) · [V1 / V2 setup](#stratum-v1-and-stratum-v2)
 · [User agent](#automatic-or-manual-user-agent) · [Shares explained](#pool-shares-and-local-records)

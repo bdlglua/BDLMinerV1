@@ -61,7 +61,8 @@ bool poolConnected = false;
 int published = 0, premature = 0, polled = 0;
 void minerPoolConnected(bool v) { poolConnected = v; }
 void minerPublishJob(const work::Job &, bool) { ++published; if (!poolConnected) ++premature; }
-void minerPoolDifficulty(double) {}
+double poolDifficulty = 0;
+void minerPoolDifficulty(double value) { poolDifficulty = value; }
 void minerShareResult(bool) {}
 bool minerNextShare(stratum::Share &, uint32_t) { ++polled; if (!poolConnected) ++premature; return false; }
 '''
@@ -129,6 +130,13 @@ int main() {
     protocol.reset(); poolConnected = false; published = premature = polled = 0;
     WiFiClient denied(deniedFrames.c_str()); denied.readFrames = 1; session(denied, protocol, 0, main);
     assert(!poolConnected && published == 0 && premature == 0 && polled == 0);
+    protocol.reset(); poolConnected = false; poolDifficulty = 0;
+    std::string changingFrames=deniedFrames;
+    changingFrames.replace(changingFrames.rfind("false"),5,"true");
+    changingFrames+="{\"method\":\"mining.set_difficulty\",\"params\":[2]}\n";
+    WiFiClient changing(changingFrames.c_str());session(changing,protocol,0,main);
+    assert(protocol.hasJob() && protocol.difficulty()==2 && protocol.job().difficulty==1);
+    assert(poolDifficulty==protocol.job().difficulty); // active job, not the next-job difficulty
     puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, automatic/manual identity, retry bounds and backup isolation passed");
 }
 '''

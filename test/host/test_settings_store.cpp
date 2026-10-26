@@ -79,5 +79,16 @@ int main() {
     Settings restored;assert(settingsstore::load(modes,restored,modeSequence));
     assert(!restored.userAgentAuto&&restored.userAgent=="MyMiner"&&restored.poolProtocol==1&&restored.backupProtocol==0);
     assert(restored.poolAuthority=="authority-main"&&restored.backupAuthority=="authority-backup");
+    Storage boundary;uint32_t boundarySequence=0;
+    Settings maximum=original;std::string payload;
+    assert(settingsstore::encode(maximum,payload));
+    const size_t overhead=payload.size()-maximum.poolHost.size();
+    maximum.poolHost=std::string(settingsstore::kMaxPayload-overhead,'x');
+    assert(settingsstore::encode(maximum,payload) && payload.size()==settingsstore::kMaxPayload);
+    assert(settingsstore::save(boundary,maximum,boundarySequence));
+    maximum.poolHost+='x';
+    assert(!settingsstore::save(boundary,maximum,boundarySequence) && boundarySequence==1);
+    assert(settingsstore::load(boundary,restored,boundarySequence));
+    assert(restored.poolHost.size()==settingsstore::kMaxPayload-overhead);
     puts("Settings records: failed/truncated/corrupt writes, rollback, passwords and generation wrap passed");
 }

@@ -101,5 +101,29 @@ int main(int argc, char **) {
     auto malformed=job(44,true);malformed.payload[8]=2;assert(cache.handle(malformed)==Event::Error);
     Frame foreign=job(44,true);foreign.payload[0]=99;assert(cache.handle(foreign)==Event::Error);
     assert(cache.handle(job(44,true))==Event::None);assert(cache.handle(job(44,true))==Event::Error);
+    sv2::Protocol changes;assert(changes.handle(success())==Event::Setup);assert(changes.handle(channel())==Event::Opened);
+    assert(changes.handle(job(1,true))==Event::None);
+    Frame prefix(0x8000,0x19);u(prefix.payload,7);prefix.payload.insert(prefix.payload.end(),{2,0xcc,0xdd});
+    assert(changes.handle(prefix)==Event::None && !changes.hasJob());
+    assert(changes.handle(previous(1))==Event::Job);
+    assert(changes.job().extranonce1==std::vector<uint8_t>({0xaa,0xbb})); // old future job keeps its own prefix
+    work::Work oldPrefix;work::build(changes.job(),11,oldPrefix);auto oldShare=share(oldPrefix);
+    assert(changes.handle(job(2,false))==Event::Job);
+    assert(changes.job().extranonce1==std::vector<uint8_t>({0xcc,0xdd}));
+    assert(!changes.submit(oldShare).payload.empty()); // prefix change did not invalidate the old job
+    auto groupPrefix=prefix;groupPrefix.payload[0]=11;groupPrefix.payload[5]=0xee;
+    assert(changes.handle(groupPrefix)==Event::None);
+    assert(changes.handle(job(3,false))==Event::Job && changes.job().extranonce1[0]==0xcc);
+    Frame regroup(0,0x25);u(regroup.payload,12);u(regroup.payload,1,2);u(regroup.payload,7);
+    assert(changes.handle(regroup)==Event::None);
+    auto groupedJob=job(4,false);groupedJob.payload[0]=12;
+    assert(changes.handle(groupedJob)==Event::Job && changes.job().id=="4");
+    Frame close(0x8000,0x18);u(close.payload,99);close.payload.push_back(0);
+    assert(changes.handle(close)==Event::None && changes.opened());
+    close.payload[0]=12;assert(changes.handle(close)==Event::Error); // our group was closed
+    for(const auto &frame:{prefix,regroup,close})for(size_t n=0;n<frame.payload.size();++n){
+        sv2::Protocol parser;assert(parser.handle(success())==Event::Setup);assert(parser.handle(channel())==Event::Opened);
+        Frame cut=frame;cut.payload.resize(n);assert(parser.handle(cut)==Event::Error);
+    }
     puts("SV2 protocol: exact wire layout, extended jobs, unique extranonces, clean/non-clean jobs, exact targets, batched acknowledgments, duplicate rejection and all truncated frames passed");
 }
