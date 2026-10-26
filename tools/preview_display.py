@@ -10,6 +10,7 @@ assets are needed. Example readings are deliberately fictional.
 import argparse
 from pathlib import Path
 import os
+import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,9 +34,10 @@ def main():
     build = ROOT / ".pio" / "host" / "display"
     build.mkdir(parents=True, exist_ok=True)
     compiler = os.environ.get("CXX", "g++")
+    version = re.search(r'-DFW_VERSION=\\"([^"\\]+)\\"', (ROOT / 'platformio.ini').read_text()).group(1)
     flags = ["-std=c++17", "-O1", "-ffunction-sections", "-fdata-sections",
              "-DLGFX_LINUX_FB", "-DBDLMINER_DISPLAY_PREVIEW", "-Isrc",
-             "-Itest/host/stubs/miner", "-I" + str(library)]
+             "-Itest/host/stubs/miner", "-I" + str(library), '-DFW_VERSION="' + version + '"']
     run(os.environ.get("CC", "gcc"), "-O1", "-ffunction-sections", "-fdata-sections", "-c",
         library / "lgfx/utility/lgfx_qrcode.c", "-o", build / "qrcode.o")
     run(compiler, *flags, "test/host/test_display.cpp", "src/ui_view.cpp", "src/ui_art.cpp", "src/ui_font.cpp", "src/i18n.cpp",

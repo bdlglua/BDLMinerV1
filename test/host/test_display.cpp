@@ -64,7 +64,7 @@ Model example(int page, bool french) {
             break;
         case 4:
             m.title = french ? "APPAREIL" : "DEVICE";
-            metric(0, "BOARD", "M5StickC Plus2"); metric(1, "FIRMWARE", "v1.3.1"); metric(2, "FREE RAM", "124 KB");
+            metric(0, "BOARD", "M5StickC Plus2"); metric(1, "FIRMWARE", "v" FW_VERSION); metric(2, "FREE RAM", "124 KB");
             metric(3, "PAYOUT ADDRESS", "bc1q0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijkl");
             m.footer = "hw+sw+fill / A: next";
             break;
@@ -142,11 +142,11 @@ int main(int argc, char **argv) {
         m.points = nullptr; m.pointCount = 0; view.invalidate(); view.render(m);
         points[0].rate = 0; m.points = points.data(); m.pointCount = 1; ++m.graphRevision; view.render(m);
         points[1].rate = NAN; points[2].rate = 0; m.pointCount = 3; ++m.graphRevision; view.render(m);
-        view.update("Automatic update", "1.3.1 -> next", 50, "Installing");
+        view.update("Automatic update", FW_VERSION " -> next", 50, "Installing");
         if (!out.empty()) ppm(lcd, out + "/update_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
-        view.update("Automatic update", "1.3.1 -> next", 100, "Restarting...");
+        view.update("Automatic update", FW_VERSION " -> next", 100, "Restarting...");
         view.render(example(0, false)); // failed update restores the mining frame
-        view.message("BDLMiner V1", "M5StickC Plus2", "v1.3.1 / hold A: setup");
+        view.message("BDLMiner V1", "M5StickC Plus2", "v" FW_VERSION " / hold A: setup");
         if (!out.empty()) ppm(lcd, out + "/splash_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.message("WiFi", "Connecting...", "Hold A at boot: setup");
         if (!out.empty()) ppm(lcd, out + "/startup_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
