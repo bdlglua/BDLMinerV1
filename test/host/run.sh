@@ -15,6 +15,8 @@ if [ "$1" = "pool" ]; then
 fi
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_core.cpp $CORE -o .pio/host/test_core
 .pio/host/test_core
+g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_line_buffer.cpp $CORE -o .pio/host/test_line_buffer
+.pio/host/test_line_buffer
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_web_validation.cpp -o .pio/host/test_web_validation
 .pio/host/test_web_validation
 g++ -std=c++17 -O2 -Wall -Wno-unused-variable -ffunction-sections -fdata-sections \

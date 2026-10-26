@@ -11,6 +11,7 @@
 #include "hw_sha.h"
 #include "log.h"
 #include "ota.h"
+#include "runtime.h"
 
 #if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S3
 // Hand-scheduled assembly of sha::scan() up to its early exit, in IRAM
@@ -328,6 +329,7 @@ void minerTask(void *arg) {
 }  // namespace
 
 void minerPublishJob(const work::Job &job, bool clean) {
+    if (!jobMutex || !shareQueue) return;
     xSemaphoreTake(jobMutex, portMAX_DELAY);
     if (clean) {
         workGeneration++;
@@ -350,6 +352,7 @@ void minerPublishJob(const work::Job &job, bool clean) {
 }
 
 void minerInvalidate() {
+    if (!jobMutex || !shareQueue) return;
     xSemaphoreTake(jobMutex, portMAX_DELAY);
     boardValid = false;
     workGeneration++;
@@ -358,6 +361,7 @@ void minerInvalidate() {
 }
 
 bool minerNextShare(stratum::Share &share, uint32_t waitMs) {
+    if (!shareQueue) return false;
     QueuedShare queued;
     TickType_t wait = pdMS_TO_TICKS(waitMs);
     while (xQueueReceive(shareQueue, &queued, wait) == pdTRUE) {
@@ -375,10 +379,14 @@ bool minerNextShare(stratum::Share &share, uint32_t waitMs) {
 void minerStart() {
     jobMutex = xSemaphoreCreateMutex();
     shareQueue = xQueueCreate(16, sizeof(QueuedShare));
+    if (!runtime::started(jobMutex && shareQueue, runtime::Miner, "miner resources")) return;
     stats.startMillis = millis();
     lastTickMs = stats.startMillis;
 
     bool hw = hwsha::selfTest();
+    // The classic ESP32 self-test can leave the engines reserved between
+    // batches. Release them before task creation, including a failed start.
+    hwsha::idle();
     logf("[miner] hardware SHA: %s\n",
          hwsha::available() ? (hw ? "self-test OK" : "self-test FAILED, disabled") : "not supported");
 #ifdef HAVE_SW_PREFILTER
@@ -390,23 +398,28 @@ void minerStart() {
     // last one, away from WiFi on dual-core chips) and software runs on the rest.
     int cores = portNUM_PROCESSORS;
     int tasks = min(cores, MAX_MINERS);
-    if (hw && hwsha::fillAvailable() && tasks < MAX_MINERS) fillIndex = tasks;
+    bool canFill = hw && hwsha::fillAvailable() && tasks < MAX_MINERS;
+    bool hardwareStarted = false;
+    fillIndex = -1;
     stats.minerCount = 0;
     for (int core = cores - 1; core >= 0 && stats.minerCount < tasks; core--) {
         Miner &m = miners[stats.minerCount];
         m.index = stats.minerCount;
         m.hardware = hw && core == cores - 1;
-        m.useFill = m.hardware && fillIndex >= 0;
+        m.useFill = m.hardware && canFill;
         stats.engine[m.index] = m.hardware ? "hw" : "sw";
         char name[12];
         snprintf(name, sizeof(name), "miner%d", m.index);
         // On a single core the network needs the CPU more than any miner.
         m.ownsCore = m.hardware && cores > 1;
-        xTaskCreatePinnedToCore(minerTask, name, 6144, &m, m.ownsCore ? kHwMinerPriority : 1, nullptr, core);
+        if (!runtime::started(xTaskCreatePinnedToCore(minerTask, name, 6144, &m, m.ownsCore ? kHwMinerPriority : 1, nullptr, core) == pdPASS,
+                              runtime::Miner, name)) continue;
+        if (m.hardware) hardwareStarted = true;
         logf("[miner] %s engine=%s core=%d\n", name, stats.engine[m.index], core);
         stats.minerCount++;
     }
-    if (fillIndex >= 0) {
+    if (hardwareStarted && canFill) {
+        fillIndex = stats.minerCount;
         stats.engine[fillIndex] = "fill";
         stats.minerCount++;
         logf("[miner] engine=fill: a second work in the idle cycles of miner0\n");

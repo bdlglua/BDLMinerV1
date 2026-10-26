@@ -6,6 +6,7 @@
 #include "../../src/miner.cpp"
 
 int prefilterCalls = 0;
+int hardwareIdleCalls = 0;
 extern "C" bool sw_sha256d_prefilter(const uint32_t *, const uint8_t *, const uint32_t *) {
     ++prefilterCalls;
     return false;
@@ -13,6 +14,10 @@ extern "C" bool sw_sha256d_prefilter(const uint32_t *, const uint8_t *, const ui
 
 void logf(const char *, ...) {}
 namespace hwsha {
+void idle() { ++hardwareIdleCalls; }
+bool selfTest() { return true; }
+bool available() { return true; }
+bool fillAvailable() { return true; }
 void prepare(Job &, const uint8_t *) {}
 void prepareFill(Fill &, const uint8_t *) {}
 uint32_t nonceAt(uint32_t position) { return __builtin_bswap32(position); }
@@ -119,4 +124,26 @@ int main() {
     assert(minerPowerPercent() == 0);
     puts("Miner records, easy shares, uptime wrap and safety integration: passed");
     delete shareQueue;
+    // A hardware task that never started must not leave a phantom hardware
+    // or fill engine in the public statistics. A surviving hardware task
+    // still gets a contiguous fill slot if the software task fails.
+    testTaskStarts = 0;
+    testTaskFailAt = 0;
+    minerStart();
+    assert(hardwareIdleCalls > 0);
+    assert(stats.minerCount == 1 && !strcmp(stats.engine[0], "sw") && fillIndex == -1);
+    assert(runtime::failures().load() & runtime::Miner);
+    delete shareQueue;
+    testTaskStarts = 0;
+    testTaskFailAt = 1;
+    minerStart();
+    assert(stats.minerCount == 2 && !strcmp(stats.engine[0], "hw") && !strcmp(stats.engine[1], "fill"));
+    assert(fillIndex == 1);
+    delete shareQueue;
+    shareQueue = nullptr;
+    jobMutex = 0;
+    minerPublishJob(job, true);
+    minerInvalidate();
+    assert(!minerNextShare(result, 0));
+    puts("Miner startup failures: no phantom engines, contiguous fill and safe recovery passed");
 }

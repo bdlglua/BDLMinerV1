@@ -9,6 +9,7 @@
 #include "miner.h"
 #include "net.h"
 #include "notify.h"
+#include "ota.h"
 #include "settings.h"
 #include "ui.h"
 
@@ -19,6 +20,7 @@ constexpr uint32_t kOfflineNotifyMs = 10 * 60 * 1000;
 constexpr uint32_t kBestNotifyMs = 10 * 60 * 1000;   // at most one record notification per 10 min
 
 std::atomic<bool> night{false};
+std::atomic<const char *> limitReason{"supervision"};
 mining::ThermalPolicy thermal;
 bool awake = false;
 uint32_t wakeStarted = 0;  // night mode suspended for 30 s after a button press
@@ -46,6 +48,14 @@ void throttle() {
     bool wasHot = thermal.hot, wasFault = thermal.sensorFault;
     bool saver = settings.batterySaver && board::onBattery() == 1;
     uint8_t power = thermal.power(t, settings.maxTemp, settings.miningPower, saver);
+    const char *reason = "full";
+    if (!settings.miningPower) reason = "user_pause";
+    else if (thermal.sensorFault) reason = "sensor";
+    else if (thermal.hot) reason = "hot";
+    else if (settings.maxTemp && std::isfinite(t) && t >= settings.maxTemp - 10 && power < settings.miningPower) reason = "thermal";
+    else if (saver && settings.miningPower > 50) reason = "battery";
+    else if (settings.miningPower < 100) reason = "user";
+    limitReason = reason;
     if (thermal.hot != wasHot) {
         if (thermal.hot) {
             char msg[64];
@@ -174,6 +184,14 @@ void watchTick() {
 }
 
 bool watchNight() { return night; }
+
+const char *watchLimitReason() {
+    if (ota::busy()) return "ota";
+    const char *reason = limitReason.load();
+    if (!minerPowerPercent() && strcmp(reason, "hot") && strcmp(reason, "sensor") && strcmp(reason, "user_pause"))
+        return "supervision";
+    return reason;
+}
 
 void watchWake() {
     wakeStarted = millis();

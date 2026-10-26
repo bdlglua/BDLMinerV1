@@ -27,7 +27,7 @@ int main() {
     assert(pending.miningPower == 40 && pending.webPassword == "next-password");
     assert(pending.suggestedDifficulty == 0.5 && pending.batterySaver);
     assert(settings.poolHost == "original.pool" && settings.poolPort == DEFAULT_POOL_PORT);
-    assert(settings.miningPower == 75 && settings.webPassword == "original-password");
+    assert(settings.miningPower == 100 && settings.webPassword == "original-password");
     assert(settings.suggestedDifficulty == DEFAULT_DIFFICULTY && !settings.batterySaver);
 
     // Empty passwords keep access; partial backups leave other fields intact.

@@ -285,6 +285,9 @@ the serial monitor):
   [Updates from GitHub](#updates-from-github)), the reason of the last restart, and night / heat /
   battery state. With **Other miners** set, a *Miners* section shows each of them and the
   total hashrate (each miner's `/api/stats` allows other pages to read it).
+  The responsive interface separates mining, pool, Bitcoin network, device health and
+  GitHub updates. It shows both the 60-second average and the live 10-second hashrate,
+  configured/effective duty cycle and the reason for a limit or pause.
 * **Settings** (needs the web password set in the portal; user `admin`): every setting,
   grouped (pool, display, notifications, safety, network); *Save and restart*.
   **Backup**: *Download a backup* gives a JSON file with every setting (passwords
@@ -297,8 +300,19 @@ the serial monitor):
   takes the `firmware.bin` of this board (`.pio/build/<env>/firmware.bin`): no cable
   needed. Boards whose firmware does not fit twice in flash (M5Stack Core,
   ESP32-2432S028R CYD) can only be updated by USB.
-* **Log**: the last few KB of the serial log, refreshed every 5 s.
+  Settings can be searched, passwords revealed locally, and mining power selected
+  with **Full performance (100%)**, **Balanced (75%)** or **Quiet (50%)** presets.
+  Presets only edit the form; **Save and restart** applies them. Existing user limits
+  are kept on upgrade. Restart, backup and firmware controls are grouped in maintenance.
+* **Log**: the last few KB of the serial log, refreshed every 5 s, with filtering,
+  pause/resume and a download of the original unfiltered text.
 * **/api/stats** (JSON), **/api/log** (text) and **/metrics** (Prometheus).
+
+All styles and scripts are served by the miner itself: no CDN, external font or
+JavaScript framework is required. `tools/make_web.py` packs the sources in `web/`
+into gzip assets in flash during every PlatformIO build. Content-versioned asset URLs
+allow browser caching without stale assets after a firmware update. Hidden browser
+tabs pause polling, and resumed tabs never overlap their refresh requests.
 
 ```sh
 curl http://bdlminer-xxxx.local/api/stats
@@ -315,6 +329,13 @@ seconds since the last refresh (`-1` if none yet), `history.hashrate` up to 288
 limit. `temp_c` = `null` without a usable sensor; `temperature_source` identifies the
 session's sensor (`imu`, `chip`, or `unavailable`). The duty cycle is a limit on mining
 activity, not a measurement of electrical power.
+`hashrate_live` is the last 10-second average. `max_temp_c` is the configured thermal
+threshold; `limitation_reason` distinguishes `full`, `user`, `user_pause`, `thermal`,
+`hot`, `sensor`, `battery`, `supervision` and `ota`. `task_failures` is a diagnostic
+bitmask (miner=1, network=2, market/updates=4, MQTT=8, notifications=16, web=32).
+`github_update.supported` reports whether an OTA partition exists; USB-only boards
+link to the release instead of offering an installation that cannot succeed.
+The authenticated `POST /api/restart` preserves settings and lifetime statistics.
 
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).
@@ -341,9 +362,13 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 ## Safety, power and networks
 
 * **Mining power on USB and battery**: the web setting *Mining power* limits the
-  mining duty cycle to 0–100 %, default **75 %**. At 100 % the miners run at full
+  mining duty cycle to 0–100 %, default **100 %** for new configurations. At 100 % the miners run at full
   speed; 0 pauses them. Lower settings trade hashrate for idle time without changing
   the clock timing of the hardware SHA loops. The limit also applies on USB.
+  Previously saved limits are preserved. To restore full requested speed after an
+  earlier 75% default, choose **Full performance** and save. Around 1 MH/s is a
+  hardware-dependent target on compatible ESP32 revision 3 boards, not a guaranteed
+  sustained rate: temperature, power, pool availability and sensor health still apply.
 * **Too hot**: *Pause mining above this temperature* defaults to **65 °C** for new
   configurations (0 = off). Existing saved thresholds, including 0, are preserved;
   check this setting after upgrading. Within 10 °C of the threshold, mining is
@@ -434,6 +459,8 @@ src/
   net.*            network task: pool connection, reconnection, backup pool, share submission
   market.*         NTP time + mempool.space data (price, fees, hashrate, adjustment) + pool stats
   web.*            HTTP task: dashboard, settings, firmware update, log, /api/stats, /metrics, mDNS
+  runtime.h        observable task/allocation startup failures
+  core/line_buffer.h bounded Stratum framing and recovery after invalid/oversized lines
   watch.*          once-a-second supervision: heat / battery, night mode, notifications, watchdogs
   notify.*         ntfy push notifications
   mqtt.*           Home Assistant (MQTT discovery)

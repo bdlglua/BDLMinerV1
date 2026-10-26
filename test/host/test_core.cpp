@@ -413,6 +413,13 @@ static void testStratumValidation() {
         work::build(p.job(), 7, current);
         CHECK(memcmp(original.header, current.header, sizeof(original.header)) == 0);
     }
+    JsonDocument oversized;
+    CHECK(!deserializeJson(oversized, kNotify));
+    for (int i = 0; i < 33; ++i) oversized["params"][4].add(std::string(64, '0'));
+    std::string line;
+    serializeJson(oversized, line);
+    CHECK(p.handleLine(line.c_str()) == stratum::Event::Error);
+    CHECK(p.job().branches.empty());  // keep the previous valid job
 }
 
 static void testStratumSessionUpdates() {

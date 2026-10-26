@@ -7,6 +7,7 @@
 #include "log.h"
 #include "settings.h"
 #include "tls.h"
+#include "runtime.h"
 
 namespace {
 
@@ -62,7 +63,12 @@ void notifyTask(void *) {
 void notifyStart() {
     if (settings.ntfyTopic.isEmpty()) return;  // changes take effect after reboot
     queue = xQueueCreate(6, sizeof(Message));
-    xTaskCreatePinnedToCore(notifyTask, "notify", 10240, nullptr, 1, nullptr, 0);
+    if (!runtime::started(queue != nullptr, runtime::Notify, "notification queue")) return;
+    if (!runtime::started(xTaskCreatePinnedToCore(notifyTask, "notify", 10240, nullptr, 1, nullptr, 0) == pdPASS,
+                          runtime::Notify, "notifications")) {
+        vQueueDelete(queue);
+        queue = nullptr;
+    }
 }
 
 void notify(const char *title, const char *message, int priority, const char *tags) {

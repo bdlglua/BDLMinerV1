@@ -11,6 +11,7 @@
 #include "net.h"
 #include "settings.h"
 #include "tls.h"
+#include "runtime.h"
 
 namespace {
 
@@ -264,7 +265,8 @@ void marketTask(void *) {
 void marketStart() {
     configTzTime(settings.timezone.c_str(), "pool.ntp.org", "time.cloudflare.com");
     // 12 KB: the GitHub update check and install (ghUpdatePoll()) run here too.
-    xTaskCreatePinnedToCore(marketTask, "market", 12288, nullptr, 2, nullptr, 0);
+    runtime::started(xTaskCreatePinnedToCore(marketTask, "market", 12288, nullptr, 2, nullptr, 0) == pdPASS,
+                     runtime::Market, "market and GitHub updates");
 }
 
 PoolStats poolStatsGet() {

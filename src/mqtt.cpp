@@ -10,6 +10,7 @@
 #include "net.h"
 #include "settings.h"
 #include "web.h"
+#include "runtime.h"
 
 namespace {
 
@@ -122,5 +123,6 @@ void mqttTask(void *) {
 
 void mqttStart() {
     if (!settings.mqttHost.isEmpty())
-        xTaskCreatePinnedToCore(mqttTask, "mqtt", 6144, nullptr, 1, nullptr, 0);
+        runtime::started(xTaskCreatePinnedToCore(mqttTask, "mqtt", 6144, nullptr, 1, nullptr, 0) == pdPASS,
+                         runtime::Mqtt, "MQTT");
 }

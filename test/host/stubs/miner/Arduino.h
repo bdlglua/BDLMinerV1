@@ -20,6 +20,7 @@ constexpr int portNUM_PROCESSORS = 2;
 constexpr int portMUX_INITIALIZER_UNLOCKED = 0;
 constexpr uint32_t portMAX_DELAY = UINT32_MAX;
 constexpr int pdTRUE = 1;
+constexpr int pdPASS = 1;
 
 #define portENTER_CRITICAL(x) ((void)(x))
 #define portEXIT_CRITICAL(x) ((void)(x))
@@ -28,7 +29,11 @@ constexpr int pdTRUE = 1;
 inline uint32_t testMillis = 1000;
 inline uint32_t millis() { return testMillis; }
 inline void vTaskDelay(uint32_t) {}
-inline void xTaskCreatePinnedToCore(void (*)(void *), const char *, int, void *, unsigned, void *, int) {}
+inline int testTaskStarts = 0;
+inline int testTaskFailAt = -1;
+inline int xTaskCreatePinnedToCore(void (*)(void *), const char *, int, void *, unsigned, void *, int) {
+    return testTaskStarts++ == testTaskFailAt ? 0 : pdPASS;
+}
 
 // glibc >= 2.38 fournit déjà strlcpy dans <string.h> : on ne définit
 // notre version que si la libc du système ne l'a pas.

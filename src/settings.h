@@ -55,7 +55,7 @@ struct Settings {
     bool notify32 = false;  // also every 32-bit share
     // Safety
     uint8_t maxTemp = 65;    // 0 disables thermal limiting; existing choices are kept
-    uint8_t miningPower = 75; // duty cycle on USB and battery, 0..100 percent
+    uint8_t miningPower = 100; // full available speed; saved user limits are preserved
     uint8_t rebootHours = 0; // > 0: restart after N hours without an accepted share
     bool batterySaver = false;  // on battery: dim the screen, mine at half speed
     // Network

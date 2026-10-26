@@ -6,3 +6,4 @@ release/
 keys/
 __pycache__/
 test/web/node_modules/
+src/web_assets.generated.h

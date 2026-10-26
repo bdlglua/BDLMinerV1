@@ -8,6 +8,8 @@ void watchTick();
 
 // Night mode (settings.nightFrom..nightTo): screen off and no beep.
 bool watchNight();
+// Cached reason for a reduced duty cycle; no sensor/I2C access from HTTP.
+const char *watchLimitReason();
 
 // A button was pressed: lights the screen for 30 s even at night.
 void watchWake();

@@ -6,13 +6,16 @@
 #include <atomic>
 
 #include "core/stratum.h"
+#include "core/line_buffer.h"
 #include "log.h"
 #include "miner.h"
 #include "settings.h"
+#include "runtime.h"
 
 namespace {
 
 constexpr uint32_t kPoolSilenceTimeoutMs = 5 * 60 * 1000;  // no message -> reconnect
+constexpr uint32_t kHandshakeTimeoutMs = 30000;
 constexpr size_t kMaxLine = 16 * 1024;
 // Failover: after this many sessions in a row without a successful
 // authorization the backup pool is used, and the main pool is retried
@@ -48,7 +51,7 @@ const char *userAgent() { return useFallbackAgent ? kFallbackAgent : settings.us
 // Runs one pool session until the connection drops, or until `maxMs` has
 // elapsed when it is not 0.
 void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
-    std::string buf;
+    stratum::LineBuffer input(kMaxLine);
     uint8_t chunk[512];
     uint32_t start = millis();
     uint32_t lastRx = start;
@@ -57,18 +60,21 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
 
     while (client.connected() && WiFi.isConnected()) {
         int n;
-        while ((n = client.read(chunk, sizeof(chunk))) > 0) {
+        size_t received = 0;
+        while (received < 4096 && (n = client.read(chunk, sizeof(chunk))) > 0) {
+            received += n;
             lastRx = millis();
             for (int i = 0; i < n; i++) {
                 char c = (char)chunk[i];
-                if (c != '\n') {
-                    if (buf.size() < kMaxLine) buf += c;
+                auto result = input.push(c);
+                if (result == stratum::LineBuffer::Result::More) continue;
+                if (result == stratum::LineBuffer::Result::Oversized) {
+                    logf("[pool] invalid or oversized message discarded\n");
                     continue;
                 }
-                if (buf.empty()) continue;
-
-                stratum::Event ev = proto.handleLine(buf.c_str());
-                buf.clear();
+                if (input.line().empty()) continue;
+                stratum::Event ev = proto.handleLine(input.line().c_str());
+                input.clear();
                 switch (ev) {
                     case stratum::Event::Subscribed:
                         if (settings.suggestedDifficulty > 0 &&
@@ -117,6 +123,10 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
             }
         }
 
+        if (!proto.authorized() && millis() - start > kHandshakeTimeoutMs) {
+            setStatus("Pool handshake timed out");
+            return;
+        }
         if (millis() - lastRx > kPoolSilenceTimeoutMs) {
             setStatus("Pool silent, reconnecting");
             return;
@@ -190,7 +200,7 @@ void netTask(void *) {
 
         minerPoolConnected(false);
         minerInvalidate();
-        if (strncmp(status, "Mining", 6) == 0) setStatus("Disconnected");
+        if (netStatus().startsWith("Mining")) setStatus("Disconnected");
 
         failures = authorized ? 0 : failures + 1;
         if (rotate && sessionTimedOut) {
@@ -215,7 +225,10 @@ void netTask(void *) {
 
 }  // namespace
 
-void netStart() { xTaskCreatePinnedToCore(netTask, "stratum", 12288, nullptr, 3, nullptr, 0); }
+void netStart() {
+    if (!runtime::started(xTaskCreatePinnedToCore(netTask, "stratum", 12288, nullptr, 3, nullptr, 0) == pdPASS,
+                          runtime::Network, "stratum")) setStatus("Network task unavailable");
+}
 
 String netStatus() {
     char copy[sizeof(status)];

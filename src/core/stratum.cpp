@@ -139,7 +139,9 @@ Event Protocol::handleLine(const char *line) {
 
             if (!work::fromHex(params[2], j.coinb1) || !work::fromHex(params[3], j.coinb2))
                 return invalid("invalid coinbase hex");
-            for (JsonVariant br : params[4].as<JsonArray>()) {
+            JsonArray branches = params[4].as<JsonArray>();
+            if (branches.size() > 32) return invalid("too many merkle branches");
+            for (JsonVariant br : branches) {
                 std::vector<uint8_t> b;
                 if (!br.is<const char *>() || !work::fromHex(br, b) || b.size() != 32)
                     return invalid("invalid merkle branch");
