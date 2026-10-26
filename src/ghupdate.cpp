@@ -35,6 +35,9 @@ String firmwareUrl, signatureUrl;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
 std::atomic<bool> installRequested{false};
 std::atomic<bool> checkRequested{false};
+std::atomic<uint32_t> installRetryAt{0};
+bool retryInstall = false;
+uint8_t installFailures = 0;
 uint32_t nextCheck = kFirstCheckMs;  // millis()
 uint32_t nextPing = kFirstPingMs;
 
@@ -132,7 +135,7 @@ bool fetchRelease(const char *url, JsonDocument &doc, String &error) {
     return true;
 }
 
-// False when the release could not be read (retried sooner).
+// Unreadable or incomplete newer releases are retried sooner.
 bool check() {
     JsonDocument doc;
     String manifestError, apiError;
@@ -175,7 +178,7 @@ bool check() {
         snprintf(msg, sizeof(msg), "Version %s is available (this miner runs %s).", version, FW_VERSION);
         notify("Firmware update", msg, 3, "arrow_up");
     }
-    return true;
+    return !(newer && !available); // release assets can still be uploading; check again sooner
 }
 
 // 0 when `sig` is a valid signature of `hash` (SHA-256) by the release key.
@@ -188,15 +191,15 @@ int verifySignature(const uint8_t hash[32], const uint8_t *sig, size_t sigLen) {
     return r;
 }
 
-void install() {
+GithubInstallResult install() {
     ota::Guard update(ota::Owner::Github);
     if (!update) {
         setError("another firmware update is already running");
-        return;
+        return GithubInstallResult::Retry;
     }
     if (!esp_ota_get_next_update_partition(nullptr)) {
         setError("this board has no room for a second firmware: update by USB");
-        return;
+        return GithubInstallResult::Refused;
     }
     portENTER_CRITICAL(&stateMux);
     state.installing = true;
@@ -213,6 +216,7 @@ void install() {
     uint8_t sig[MBEDTLS_PK_SIGNATURE_MAX_SIZE];
     size_t sigLen = 0;
     bool ok = false;
+    GithubInstallResult result = GithubInstallResult::Retry;
     mbedtls_sha256_context sha;
     mbedtls_sha256_init(&sha);
     do {
@@ -220,8 +224,17 @@ void install() {
             setError("cannot download the signature (HTTP %s)", String(code).c_str());
             break;
         }
-        sigLen = http.getStream().readBytes(sig, sizeof(sig));
+        int signatureSize = http.getSize();
+        if (signatureSize <= 0 || signatureSize > int(sizeof(sig))) {
+            setError("invalid signature response length");
+            break;
+        }
+        sigLen = http.getStream().readBytes(sig, signatureSize);
         http.end();
+        if (sigLen != size_t(signatureSize)) {
+            setError("signature download interrupted");
+            break;
+        }
         if (!httpsGet(firmwareUrl, tls, http, &code)) {
             setError("cannot download the firmware (HTTP %s)", String(code).c_str());
             break;
@@ -233,6 +246,11 @@ void install() {
         }
         mbedtls_sha256_starts_ret(&sha, 0);
         WiFiClient *stream = http.getStreamPtr();
+        if (!stream) {
+            Update.abort();
+            setError("firmware stream disconnected");
+            break;
+        }
         static uint8_t buf[2048];
         int done = 0;
         uint32_t lastData = millis();
@@ -262,6 +280,7 @@ void install() {
         if (verifySignature(hash, sig, sigLen)) {
             Update.abort();
             setError("bad signature: update refused");
+            result = GithubInstallResult::Refused;
             break;
         }
         if (!Update.end(true)) {
@@ -287,6 +306,7 @@ void install() {
         delay(500);
         ESP.restart();
     }
+    return ok ? GithubInstallResult::Done : result;
 }
 
 // The anonymous usage count: GitHub counts the downloads of each release
@@ -332,7 +352,26 @@ void ghUpdatePoll() {
             state.checking = false;
             portEXIT_CRITICAL(&stateMux);
         }
-        if (ready && (requestedInstall || settings.githubUpdate == 2) && ghUpdateState().available) install();
+        if (ready && (requestedInstall || retryInstall || settings.githubUpdate == 2) && ghUpdateState().available) {
+            GithubInstallResult result = install();
+            retryInstall = result == GithubInstallResult::Retry;
+            if (retryInstall) {
+                if (installFailures < 4) ++installFailures;
+                uint32_t delay = min<uint32_t>(kRetryMs << (installFailures - 1), 30 * 60 * 1000UL);
+                nextCheck = millis() + delay;
+                installRetryAt = nextCheck ? nextCheck : 1;
+                logf("[update] will retry the installation in %u seconds\n", (unsigned)(delay / 1000));
+            } else {
+                installFailures = 0;
+                installRetryAt = 0;
+            }
+        } else if (ready && !ghUpdateState().available) {
+            retryInstall = false;
+            installFailures = 0;
+            installRetryAt = 0;
+        } else if (!ready && retryInstall) {
+            installRetryAt = nextCheck ? nextCheck : 1;
+        }
         // Metadata checks and requested installations take priority over the
         // optional usage ping. Keep this poll to one operation on the network.
         return;
@@ -350,6 +389,9 @@ GithubUpdate ghUpdateState() {
     portEXIT_CRITICAL(&stateMux);
     s.checking = s.checking || checkRequested.load();
     s.installing = s.installing || installRequested.load();
+    uint32_t retryAt = installRetryAt.load();
+    int32_t remaining = retryAt - millis();
+    s.retrySeconds = retryAt && remaining > 0 ? (uint32_t(remaining) + 999) / 1000 : 0;
     return s;
 }
 

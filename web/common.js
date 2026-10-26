@@ -139,3 +139,14 @@ function startPolling(task,delay){
 Object.assign(FR,{'Show':'Voir','Hide':'Masquer','unsaved changes':'modifications non enregistrées','largest block':'plus grand bloc'});
 Object.assign(FR,{'A service could not start: not enough memory. Restart the miner.':'Un service n’a pas pu démarrer par manque de mémoire. Redémarre le miner.'});
 Object.assign(FR,{'Throttling starts at':'Le ralentissement commence à','Mining pauses at':'Le minage s’arrête à','Thermal protection is disabled.':'La protection thermique est désactivée.'});
+Object.assign(FR,{
+ 'Settings could not be saved. Previous configuration kept; try again.':'Les réglages n’ont pas pu être enregistrés. La configuration précédente est conservée. Réessaie.',
+ 'Settings saved, but statistics could not be restored. Retry before restarting.':'Réglages enregistrés, mais statistiques non restaurées. Réessaie avant de redémarrer.',
+ 'Next retry in':'Prochaine tentative dans','Retry now':'Réessayer maintenant','awaiting response':'en attente de réponse',
+ 'Temperature & power history':'Historique température et puissance','Download CSV':'Télécharger le CSV','Five-minute sample averages. Gaps mean missing observations.':'Moyennes des mesures sur cinq minutes. Les interruptions indiquent des observations manquantes.',
+ 'No observations yet.':'Pas encore de mesures.','Mining measurements':'Mesures du minage','Batch times are elapsed worker time, not CPU usage. TLS handshakes do not pause hardware mining on classic ESP32.':'Les durées des lots mesurent le temps écoulé du moteur, pas son utilisation CPU. Les connexions TLS ne suspendent pas le minage matériel de l’ESP32 classique.',
+ 'TLS handshakes':'Connexions TLS','Elapsed time':'Durée cumulée','failures':'échecs','Mining worker':'Moteur','Batch time':'Temps dans les lots de calcul','Rest':'Repos','Waiting for work':'Attente de travail','Paused':'Pause',
+ 'Ten-minute measurement':'Mesure sur dix minutes','Measure actual hashes over device uptime, with temperature and effective power samples. Keep this tab visible.':'Mesure les hashes réellement calculés pendant le temps de fonctionnement de la carte, avec des relevés de température et de puissance effective. Garde cet onglet visible.',
+ 'Start measurement':'Démarrer la mesure','Finish now':'Terminer maintenant','Download report':'Télécharger le rapport','Preparing measurement…':'Préparation de la mesure…','Measurement running…':'Mesure en cours…','Measurement cancelled. Keep this tab visible.':'Mesure annulée. Garde cet onglet visible.',
+ 'Miner restarted. Start a new measurement.':'Le miner a redémarré. Lance une nouvelle mesure.','Waiting for a new sample.':'En attente d’un nouveau relevé.','Measured hashrate':'Hashrate mesuré','Temperature samples contain gaps.':'Les relevés de température comportent des interruptions.'
+});

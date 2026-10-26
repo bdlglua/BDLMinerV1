@@ -58,6 +58,7 @@ void Protocol::reset() {
     hasJob_ = false;
     authorized_ = false;
     nextId_ = 10;
+    pendingCount_ = 0;
     lastError_.clear();
 }
 
@@ -92,12 +93,21 @@ std::string Protocol::suggestDifficulty(double diff) {
 }
 
 std::string Protocol::submit(const Share &share) {
+    if (!canSubmit()) return {};
     char ntime[9], nonce[9];
     snprintf(ntime, sizeof(ntime), "%08x", (unsigned)share.ntime);
     snprintf(nonce, sizeof(nonce), "%08x", (unsigned)share.nonce);
 
     JsonDocument doc;
-    doc["id"] = nextId_++;
+    uint32_t id;
+    bool used;
+    do {
+        id = nextId_++;
+        if (nextId_ < 10) nextId_ = 10;
+        used = false;
+        for (size_t i = 0; i < pendingCount_; ++i) if (pendingIds_[i] == id) used = true;
+    } while (used);
+    doc["id"] = id;
     doc["method"] = "mining.submit";
     JsonArray p = doc["params"].to<JsonArray>();
     p.add(user_);
@@ -105,7 +115,10 @@ std::string Protocol::submit(const Share &share) {
     p.add(share.extranonce2);
     p.add(ntime);
     p.add(nonce);
-    return serialize(doc);
+    std::string line = serialize(doc);
+    if (!doc.overflowed()) pendingIds_[pendingCount_++] = id;
+    else line.clear();
+    return line;
 }
 
 Event Protocol::handleLine(const char *line) {
@@ -185,7 +198,13 @@ Event Protocol::handleLine(const char *line) {
     }
 
     // Response to one of our requests.
-    uint32_t id = doc["id"] | 0u;
+    if (!doc["id"].is<uint32_t>()) return Event::None;
+    uint32_t id = doc["id"].as<uint32_t>();
+    size_t pending = pendingCount_;
+    if (id >= 10) {
+        for (size_t i = 0; i < pendingCount_; ++i) if (pendingIds_[i] == id) { pending = i; break; }
+        if (pending == pendingCount_) return Event::None;
+    }
     JsonVariant result = doc["result"];
     JsonVariant error = doc["error"];
     bool ok = !result.isNull() && !(result.is<bool>() && !result.as<bool>()) && error.isNull();
@@ -227,7 +246,11 @@ Event Protocol::handleLine(const char *line) {
         return ok ? Event::Authorized : Event::AuthFailed;
     }
     if (id == kIdSuggest) return Event::None;
-    if (id >= 10) return ok ? Event::ShareAccepted : Event::ShareRejected;
+    if (id >= 10) {
+        if (!result.is<bool>() && error.isNull()) return invalid("invalid share response");
+        pendingIds_[pending] = pendingIds_[--pendingCount_];
+        return ok ? Event::ShareAccepted : Event::ShareRejected;
+    }
     return Event::None;
 }
 

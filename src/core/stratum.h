@@ -40,6 +40,9 @@ public:
     std::string authorize();
     std::string suggestDifficulty(double diff);
     std::string submit(const Share &share);
+    static constexpr size_t kMaxPendingShares = 32;
+    size_t pendingShares() const { return pendingCount_; }
+    bool canSubmit() const { return pendingCount_ < kMaxPendingShares; }
 
     Event handleLine(const char *line);
 
@@ -59,6 +62,8 @@ private:
     bool hasJob_ = false;
     bool authorized_ = false;
     uint32_t nextId_ = 10;
+    uint32_t pendingIds_[kMaxPendingShares] = {};
+    size_t pendingCount_ = 0;
     std::string lastError_;
 };
 

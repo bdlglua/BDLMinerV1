@@ -11,3 +11,8 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port = 443);
 // Turn core 0's idle-task watchdog off and back on for a handshake.
 void core0WdtPause();
 void core0WdtResume();
+struct TlsProfile {
+    uint32_t handshakes = 0, failures = 0, lastMs = 0;
+    uint64_t handshakeMs = 0;
+};
+TlsProfile tlsProfile();

@@ -87,10 +87,14 @@ uint32_t baseShares = 0, baseBlocks = 0, baseSeconds = 0;
 uint32_t savedBlocks = 0;
 
 // Ring buffer of HISTORY_INTERVAL_S averages.
-float history[HISTORY_LEN];
+HistoryPoint history[HISTORY_LEN];
 int historyLen = 0, historyHead = 0;
+uint32_t historyRevision = 0;
 uint64_t historyHashes = 0;
 uint32_t historyMs = 0;
+float temperatureSum = 0;
+uint32_t temperatureSamples = 0, powerSum = 0, observationSamples = 0;
+MinerProfile profiles[MAX_MINERS];
 
 struct MiningWork : work::Work {
     uint32_t generation;
@@ -261,16 +265,25 @@ void minerTask(void *arg) {
         if (!boardValid) {
             haveWork = false;
             if (m.hardware) hwsha::idle();
+            uint32_t started = millis();
             vTaskDelay(pdMS_TO_TICKS(100));
+            portENTER_CRITICAL(&statsMux);
+            profiles[m.index].waitingMs += uint32_t(millis() - started);
+            portEXIT_CRITICAL(&statsMux);
             continue;
         }
         uint8_t power = minerPowerPercent();
         if (!power) {
             if (m.hardware) hwsha::idle();
+            uint32_t started = millis();
             vTaskDelay(pdMS_TO_TICKS(200));
+            portENTER_CRITICAL(&statsMux);
+            profiles[m.index].pausedMs += uint32_t(millis() - started);
+            portEXIT_CRITICAL(&statsMux);
             continue;
         }
         uint32_t batchStart = millis();
+        uint32_t batchStartUs = micros();
         // New job, or the whole 32-bit nonce space of this work is done.
         if (!haveWork || seq != boardSeq) {
             haveWork = fetchWork(m, seq);
@@ -302,11 +315,13 @@ void minerTask(void *arg) {
         }
         portENTER_CRITICAL(&statsMux);
         stats.hashes[m.index] += done;
+        profiles[m.index].hashingUs += uint32_t(micros() - batchStartUs);
         portEXIT_CRITICAL(&statsMux);
         nonce += done;
         if (nonce == 0) haveWork = false;  // wrapped: 2^32 nonces exhausted
 
         if (power < 100) {
+            uint32_t restStarted = millis();
             if (m.hardware) hwsha::idle();
             uint32_t rest = mining::restMs(millis() - batchStart, power);
             // Release hardware before sleeping; revisit controls frequently.
@@ -317,10 +332,17 @@ void minerTask(void *arg) {
                 if (minerPowerPercent() != power || seq != boardSeq || !boardValid) break;
             }
             lastPause = millis();
+            portENTER_CRITICAL(&statsMux);
+            profiles[m.index].restMs += uint32_t(millis() - restStarted);
+            portEXIT_CRITICAL(&statsMux);
         }
         // Let the idle task and lower-priority tasks run.
         if (!m.ownsCore || millis() - lastPause >= kOwnCorePauseMs) {
+            uint32_t restStarted = millis();
             vTaskDelay(1);
+            portENTER_CRITICAL(&statsMux);
+            profiles[m.index].restMs += uint32_t(millis() - restStarted);
+            portEXIT_CRITICAL(&statsMux);
             lastPause = millis();
         }
     }
@@ -539,8 +561,15 @@ void minerTick() {
         historyMs = now;
         historyHashes = totalHashes;
     } else if (now - historyMs >= HISTORY_INTERVAL_S * 1000UL) {
-        history[historyHead] = (totalHashes - historyHashes) * 1000.0 / (now - historyMs);
+        HistoryPoint &point = history[historyHead];
+        point.hashrate = (totalHashes - historyHashes) * 1000.0 / (now - historyMs);
+        point.temperatureDeciC = temperatureSamples ? int16_t(lroundf(temperatureSum * 10 / temperatureSamples)) : INT16_MIN;
+        point.powerPercent = observationSamples ? uint8_t(powerSum / observationSamples) : 0;
+        point.coveragePercent = min<uint32_t>(100, uint64_t(observationSamples) * 100000 / (now - historyMs));
+        temperatureSum = 0;
+        temperatureSamples = powerSum = observationSamples = 0;
         historyHead = (historyHead + 1) % HISTORY_LEN;
+        ++historyRevision;
         if (historyLen < HISTORY_LEN) historyLen++;
         historyMs = now;
         historyHashes = totalHashes;
@@ -548,12 +577,13 @@ void minerTick() {
 
     // Flash wear: a found block is saved at once, a new best difficulty at
     // most once a minute, the lifetime totals every 10 minutes.
-    static uint32_t lastSave = 0;
-    bool save = stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000;
+    static uint32_t lastSave = 0, retrySaveAt = 0;
+    bool save = int32_t(now - retrySaveAt) >= 0 &&
+                (stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000);
     portEXIT_CRITICAL(&statsMux);
     if (save) {
-        lastSave = now;
-        minerSaveStats();
+        if (minerSaveStats()) { lastSave = now; retrySaveAt = now; }
+        else retrySaveAt = now + 30000;
     }
 }
 
@@ -592,9 +622,42 @@ Throttle minerThrottle() {
 int minerHistory(float *out, int capacity) {
     portENTER_CRITICAL(&statsMux);
     int n = min(historyLen, capacity);
-    for (int i = 0; i < n; i++) out[i] = history[(historyHead - n + i + HISTORY_LEN) % HISTORY_LEN];
+    for (int i = 0; i < n; i++) out[i] = history[(historyHead - n + i + HISTORY_LEN) % HISTORY_LEN].hashrate;
     portEXIT_CRITICAL(&statsMux);
     return n;
+}
+
+int minerHistoryPoints(HistoryPoint *out, int capacity, uint32_t *revision) {
+    portENTER_CRITICAL(&statsMux);
+    int n = min(historyLen, capacity);
+    for (int i = 0; i < n; ++i) out[i] = history[(historyHead - n + i + HISTORY_LEN) % HISTORY_LEN];
+    if (revision) *revision = historyRevision;
+    portEXIT_CRITICAL(&statsMux);
+    return n;
+}
+
+uint32_t minerHistoryRevision() {
+    portENTER_CRITICAL(&statsMux);
+    uint32_t revision = historyRevision;
+    portEXIT_CRITICAL(&statsMux);
+    return revision;
+}
+
+void minerObserve(float temperature, uint8_t effectivePower) {
+    portENTER_CRITICAL(&statsMux);
+    if (std::isfinite(temperature) && temperature > -100 && temperature < 200) {
+        temperatureSum += temperature;
+        ++temperatureSamples;
+    }
+    powerSum += effectivePower > 100 ? 100 : effectivePower;
+    ++observationSamples;
+    portEXIT_CRITICAL(&statsMux);
+}
+
+void minerProfiles(MinerProfile *out, int capacity) {
+    portENTER_CRITICAL(&statsMux);
+    for (int i = 0; i < min(capacity, MAX_MINERS); ++i) out[i] = profiles[i];
+    portEXIT_CRITICAL(&statsMux);
 }
 
 namespace {
@@ -620,21 +683,26 @@ uint32_t recordCrc(const StatsRecord &r) {
 
 bool readSlot(Preferences &p, const char *key, StatsRecord &r) {
     if (p.getBytesLength(key) != sizeof(r)) return false;
-    p.getBytes(key, &r, sizeof(r));
+    if (p.getBytes(key, &r, sizeof(r)) != sizeof(r)) return false;
     return r.magic == kStatsMagic && r.crc == recordCrc(r);
 }
 
-void writeRecord(const StatsSnapshot &s) {
+bool writeRecord(const StatsSnapshot &s) {
     StatsRecord r;
     memset(&r, 0, sizeof(r));
     r.magic = kStatsMagic;
-    r.seq = ++statsSeq;
+    r.seq = statsSeq + 1;
     r.s = s;
     r.crc = recordCrc(r);
     Preferences p;
-    p.begin("stats", false);
-    if (p.putBytes(r.seq & 1 ? "statB" : "statA", &r, sizeof(r)) != sizeof(r)) logf("[stats] save failed\n");
+    if (!p.begin("stats", false)) return false;
+    const char *key = r.seq & 1 ? "statB" : "statA";
+    StatsRecord verified;
+    bool ok = p.putBytes(key, &r, sizeof(r)) == sizeof(r) && readSlot(p, key, verified) && verified.seq == r.seq;
     p.end();
+    if (!ok) logf("[stats] save failed; previous record kept\n");
+    else statsSeq = r.seq;
+    return ok;
 }
 
 }  // namespace
@@ -687,25 +755,31 @@ void minerStatsSnapshot(StatsSnapshot &out) {
     portEXIT_CRITICAL(&statsMux);
 }
 
-void minerSaveStats() {
+bool minerSaveStats() {
+    if (!saveMutex) return false;
     xSemaphoreTake(saveMutex, portMAX_DELAY);
     if (!statsLoaded || statsFrozen) {
         xSemaphoreGive(saveMutex);
-        return;
+        return true;
     }
-    portENTER_CRITICAL(&statsMux);
-    bestDirty = false;
-    savedBlocks = stats.blocksFound;
-    portEXIT_CRITICAL(&statsMux);
     StatsSnapshot s;
     minerStatsSnapshot(s);
-    writeRecord(s);
+    bool ok = writeRecord(s);
+    if (ok) {
+        portENTER_CRITICAL(&statsMux);
+        bestDirty = stats.bestDiff > s.bestDiff;
+        savedBlocks = s.blocks - baseBlocks;
+        portEXIT_CRITICAL(&statsMux);
+    }
     xSemaphoreGive(saveMutex);
+    return ok;
 }
 
-void minerStatsRestore(const StatsSnapshot &s) {
+bool minerStatsRestore(const StatsSnapshot &s) {
+    if (!saveMutex) return false;
     xSemaphoreTake(saveMutex, portMAX_DELAY);
-    writeRecord(s);
-    statsFrozen = true;
+    bool ok = writeRecord(s);
+    if (ok) statsFrozen = true;
     xSemaphoreGive(saveMutex);
+    return ok;
 }

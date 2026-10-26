@@ -72,7 +72,7 @@ struct Settings {
 extern Settings settings;
 
 void settingsLoad();
-void settingsSave(const Settings &values = settings, bool forRestart = false);
+bool settingsSave(const Settings &values = settings, bool forRestart = false);
 uint8_t settingsBrightness();
 void settingsSetBrightness(uint8_t percent);
 // Trims texts and brings out-of-range values back to defaults.

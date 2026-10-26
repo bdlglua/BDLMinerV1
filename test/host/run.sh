@@ -28,5 +28,8 @@ g++ -std=c++17 -O2 -Wall -pthread -Isrc test/host/test_mining_safety.cpp -o .pio
 g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" \
     test/host/test_settings_apply.cpp -o .pio/host/test_settings_apply
 .pio/host/test_settings_apply
+g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_store.cpp -o .pio/host/test_settings_store
+.pio/host/test_settings_store
+python3 test/host/test_settings_persistence.py
 python3 test/host/test_web_upload.py
 python3 test/host/test_ghupdate.py

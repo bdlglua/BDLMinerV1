@@ -94,6 +94,9 @@ disabled updates and checks waiting for WiFi or enough free memory. **Check now*
 requests a fresh check without restarting the miner. New releases include a small
 `update.json` discovery file, avoiding GitHub's shared unauthenticated API quota;
 the releases API remains a fallback for older releases.
+Failed installation downloads retry after 5 minutes, then 10, 20 and at most 30
+minutes. The dashboard shows the countdown and **Retry now**. A refused signature
+or a board without an OTA slot does not enter this automatic retry loop.
 The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
 key built into the firmware (`src/update_key.h`), so a modified file is refused. For that
 reason **Install** works without a web password too (with one set, it is asked). Settings
@@ -304,6 +307,9 @@ the serial monitor):
   with **Full performance (100%)**, **Balanced (75%)** or **Quiet (50%)** presets.
   Presets only edit the form; **Save and restart** applies them. Existing user limits
   are kept on upgrade. Restart, backup and firmware controls are grouped in maintenance.
+  Saves use two complete CRC-protected records and verify the written record before
+  scheduling a restart. A failed save reports an error and retains the previous valid
+  record. Export a JSON backup before downgrading: older firmware reads legacy keys.
 * **Log**: the last few KB of the serial log, refreshed every 5 s, with filtering,
   pause/resume and a download of the original unfiltered text.
 * **/api/stats** (JSON), **/api/log** (text) and **/metrics** (Prometheus).
@@ -313,6 +319,25 @@ JavaScript framework is required. `tools/make_web.py` packs the sources in `web/
 into gzip assets in flash during every PlatformIO build. Content-versioned asset URLs
 allow browser caching without stale assets after a firmware update. Hidden browser
 tabs pause polling, and resumed tabs never overlap their refresh requests.
+
+The dashboard uses `/api/stats?history=0` for live values and requests
+`/api/history` only when its revision changes. This keeps the 288 history points
+out of every three-second refresh. History aligns hashrate with sampled temperature
+and effective power, includes observation coverage and can be downloaded as CSV.
+Temperature averages use valid sensor samples; missing readings stay empty.
+
+**Mining measurements** shows time spent in worker batches, deliberate rest,
+waiting for jobs and safety/OTA pauses, plus TLS handshake counts and durations.
+These are elapsed times, not CPU-utilization measurements; the classic ESP32 can
+continue hardware hashing during TLS. Profiling runs between batches, never inside
+the nonce loop. `/api/diagnostics` exposes the counters.
+
+**Ten-minute measurement** computes hashrate from actual total-hash and device-uptime
+deltas, recording temperature and effective-power observations. It exports a JSON
+report with before/after profiling counters and their differences, without passwords.
+Keep the tab visible: hiding it or detecting a different boot cancels the measurement.
+Sampling gaps over 15 seconds are marked, and temperatures are observed values rather
+than a guarantee of the physical peak. No telemetry history is written to flash.
 
 ```sh
 curl http://bdlminer-xxxx.local/api/stats
@@ -336,6 +361,11 @@ bitmask (miner=1, network=2, market/updates=4, MQTT=8, notifications=16, web=32)
 `github_update.supported` reports whether an OTA partition exists; USB-only boards
 link to the release instead of offering an installation that cannot succeed.
 The authenticated `POST /api/restart` preserves settings and lifetime statistics.
+`boot_id` identifies a boot so a reconnect cannot silently mix measurements across
+restarts. `history_revision` changes when a new history point is added;
+`github_update.retry_in_s` is the current installation retry countdown.
+`pool.pending_shares` counts submissions awaiting a reply. Only outstanding request
+IDs can affect accepted/rejected counters; duplicate and unknown replies are ignored.
 
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).

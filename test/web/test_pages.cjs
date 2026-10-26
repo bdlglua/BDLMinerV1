@@ -36,7 +36,7 @@ function check(name,fn){ cases.push({name,fn}); }
 function json(res,value,status=200){res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));}
 
 async function fixture(options={}){
-  const state={settings:clone(settings),requests:[],stats:clone(baseStats),posts:[],inflight:0,peak:0,settingsCalls:0,logCalls:0,failLog:!!options.logFailure};
+  const state={settings:clone(settings),postStatus:options.postStatus||200,postText:options.postText||null,requests:[],stats:clone(baseStats),posts:[],inflight:0,peak:0,settingsCalls:0,logCalls:0,failLog:!!options.logFailure,historyCalls:0,history:options.history||{hashrate:[1000000,900000],temperature_c:[45,55],power_percent:[100,50],coverage_percent:[100,100],interval_s:300,revision:1},diagnostics:options.diagnostics||{uptime_s:0,firmware:'test',tls:{handshakes:2,failures:0,total_ms:1000,last_ms:500},engines:[{index:0,name:'hw',hashing_ms:10000,rest_ms:20,waiting_ms:30,paused_ms:40}]}};
   if(options.stats) Object.assign(state.stats,options.stats);
   if(options.capabilities)state.settings.capabilities=options.capabilities;
   const server=http.createServer(async(req,res)=>{
@@ -61,12 +61,14 @@ async function fixture(options={}){
       if(options.settingsDenied){res.writeHead(403);return res.end('Set a web password in the setup portal first (hold the main button while the miner starts).')}
       return json(res,state.settings);
     }
-    if(req.url==='/api/stats'){
+    if(req.url.split('?')[0]==='/api/stats'){
       state.peak=Math.max(state.peak,++state.inflight);
       if(options.statsDelay)await new Promise(r=>setTimeout(r,options.statsDelay));
       state.inflight--;
       return json(res,state.stats);
     }
+    if(req.url==='/api/history'){state.historyCalls++;if(options.historyFailure){res.writeHead(503);return res.end('History unavailable')}return json(res,state.history)}
+    if(req.url==='/api/diagnostics'){return json(res,{...state.diagnostics,uptime_s:state.stats.uptime_s})}
     if(req.url==='/api/log'){
       state.logCalls++;
       if(state.failLog){res.writeHead(500);return res.end('Log unavailable')}
@@ -78,7 +80,7 @@ async function fixture(options={}){
     }
     if(req.method==='POST'){
       if(options.postDelay)await new Promise(r=>setTimeout(r,options.postDelay));
-      res.writeHead(options.postStatus||200,{'Content-Type':'text/plain'});return res.end(options.postStatus?'Operation refused':'Saved, restarting');
+      res.writeHead(state.postStatus,{'Content-Type':'text/plain'});return res.end(state.postText||(state.postStatus>=400?'Operation refused':'Saved, restarting'));
     }
     res.writeHead(404);res.end('Not found');
   });
@@ -142,8 +144,8 @@ check('a stalled response body is also covered by the timeout',()=>run({},async 
 }));
 
 check('peer URLs are normalized and fresh results appear on the first poll',()=>run({stats:{hashrate:1000,peers:['http://peer.test/','peer.test','bad.test']}},async f=>{
-  await f.page.route('http://peer.test/api/stats',route=>route.fulfill({json:{hashrate:2000,pool:{connected:true},shares:{accepted:3},best:{ever:1}}}));
-  await f.page.route('http://bad.test/api/stats',route=>route.fulfill({json:{broken:true}}));
+  await f.page.route('http://peer.test/api/stats?history=0',route=>route.fulfill({json:{hashrate:2000,pool:{connected:true},shares:{accepted:3},best:{ever:1}}}));
+  await f.page.route('http://bad.test/api/stats?history=0',route=>route.fulfill({json:{broken:true}}));
   await f.page.goto(f.url);await f.page.waitForSelector('#p .t');
   assert.match(await f.page.locator('#p .t').first().textContent(),/3\.00 kH\/s/);
   assert.equal(await f.page.locator('#p .t').count(),3);
@@ -274,10 +276,10 @@ check('hidden tabs stop polling and visibility resumes without overlap',()=>run(
   await f.page.addInitScript(()=>{window.__hidden=false;Object.defineProperty(document,'hidden',{get:()=>window.__hidden})});
   await f.page.goto(f.url);await f.page.waitForSelector('#m .t');
   await f.page.evaluate(()=>{window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'))});
-  await f.page.waitForTimeout(100);const paused=f.state.requests.filter(x=>x==='GET /api/stats').length;
-  await f.page.waitForTimeout(100);assert.equal(f.state.requests.filter(x=>x==='GET /api/stats').length,paused);
+  await f.page.waitForTimeout(100);const paused=f.state.requests.filter(x=>x.startsWith('GET /api/stats')).length;
+  await f.page.waitForTimeout(100);assert.equal(f.state.requests.filter(x=>x.startsWith('GET /api/stats')).length,paused);
   await f.page.evaluate(()=>{window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'))});
-  await f.page.waitForTimeout(120);assert.ok(f.state.requests.filter(x=>x==='GET /api/stats').length>paused);assert.equal(f.state.peak,1);
+  await f.page.waitForTimeout(120);assert.ok(f.state.requests.filter(x=>x.startsWith('GET /api/stats')).length>paused);assert.equal(f.state.peak,1);
 }));
 
 check('log filtering and pause leave the original text available for download',()=>run({},async f=>{
@@ -300,10 +302,78 @@ check('mobile dashboard and log remain within the viewport',()=>run({mobile:true
   for(const page of ['/','/log']){await f.page.goto(f.url+page);await f.page.waitForTimeout(100);assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)}
 }));
 
+
+check('light polls fetch history only when its revision changes',()=>run({stats:{history:undefined,history_revision:1}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#history-grid .t');
+  assert.equal(f.state.historyCalls,1);await f.page.waitForTimeout(150);assert.equal(f.state.historyCalls,1);
+  assert.ok(f.state.requests.some(x=>x==='GET /api/stats?history=0'));
+  f.state.history={...f.state.history,revision:2};f.state.stats.history_revision=2;
+  await f.page.waitForTimeout(120);assert.equal(f.state.historyCalls,2);
+}));
+check('history failures do not mark mining offline and do not hammer the endpoint',()=>run({stats:{history:undefined,history_revision:1},historyFailure:true},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#history-status').textContent.length>0);
+  await f.page.waitForTimeout(160);assert.equal(f.state.historyCalls,1);assert.equal(await f.page.locator('#st').textContent(),'ONLINE');
+}));
+check('history CSV retains sensor gaps and power limits',()=>run({stats:{history:undefined,history_revision:1},history:{hashrate:[1000000,500000],temperature_c:[null,60],power_percent:[100,50],coverage_percent:[100,98],interval_s:300,revision:1}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#history-grid .t');
+  const waiting=f.page.waitForEvent('download');await f.page.click('#download-history');const download=await waiting;
+  const stream=await download.createReadStream();let text='';for await(const chunk of stream)text+=chunk.toString();
+  assert.match(text,/5,1000000,,100,100/);assert.match(text,/0,500000,60,50,98/);
+}));
+check('diagnostics show worker wall times and TLS counts',()=>run({},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#profile-grid .t');assert.match(await f.page.locator('#profile-grid').textContent(),/TLS handshakes/);
+  assert.match(await f.page.locator('#profile-grid').textContent(),/Mining worker 0/);
+}));
+check('failed flash saves stay translated and allow another attempt',()=>run({language:'fr',postStatus:500,postText:'Settings could not be saved. Previous configuration kept; try again.'},async f=>{
+  await loaded(f);await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('configuration précédente'));
+  assert.equal(await f.page.locator('#save').isEnabled(),true);assert.equal(await f.page.locator('#restart').isEnabled(),true);
+  f.state.postStatus=200;f.state.postText=null;await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('redémarrage'));assert.equal(f.state.posts.length,2);assert.equal(await f.page.locator('#save').isDisabled(),true);
+}));
+check('GitHub download retries are visible and can be requested immediately',()=>run({language:'fr',stats:{github_update:{available:true,mode:2,version:'1.2.0',retry_in_s:300,error:'download failed'}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('.gh-install');assert.equal(await f.page.locator('.gh-install').textContent(),'Réessayer maintenant');
+  assert.match(await f.page.locator('#updates').textContent(),/Prochaine tentative dans 5m/);
+}));
+check('measurement uses actual hash deltas and exports no settings secrets',()=>run({},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');
+  await f.page.waitForSelector('#stop-benchmark:enabled');f.state.stats.uptime_s=300;f.state.stats.total_hashes=300000000;f.state.stats.temp_c=60;f.state.stats.power_percent=50;
+  await f.page.waitForFunction(()=>document.querySelector('#benchmark-status').textContent.includes('5m'));
+  await f.page.click('#stop-benchmark');await f.page.waitForSelector('#download-benchmark:enabled');
+  const waiting=f.page.waitForEvent('download');await f.page.click('#download-benchmark');const download=await waiting;
+  const stream=await download.createReadStream();let text='';for await(const chunk of stream)text+=chunk.toString();const report=JSON.parse(text);
+  assert.equal(report.hashrate_hps,1000000);assert.equal(report.elapsed_s,300);assert.equal(report.temperature_max_c,60);assert.equal(report.power_min_percent,50);
+  assert.equal(report.sample_gaps,true);assert.ok(report.profiling_start&&report.profiling_end);assert.equal(text.includes('password'),false);
+}));
+check('measurement is cancelled by a restart or a hidden tab',()=>run({},async f=>{
+  f.state.stats.uptime_s=100;f.state.stats.total_hashes=100000000;
+  await f.page.addInitScript(()=>{window.__hidden=false;Object.defineProperty(document,'hidden',{get:()=>window.__hidden})});
+  await f.page.goto(f.url);await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
+  f.state.stats.uptime_s=2;f.state.stats.total_hashes=1000;await f.page.waitForFunction(()=>document.querySelector('#benchmark-status').textContent.includes('restarted'));
+  assert.equal(await f.page.locator('#download-benchmark').isDisabled(),true);
+  await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
+  await f.page.evaluate(()=>{window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'))});
+  assert.match(await f.page.locator('#benchmark-status').textContent(),/cancelled/);assert.equal(await f.page.locator('#stop-benchmark').isDisabled(),true);
+}));
+
+
+check('measurement automatically finishes after ten minutes of device uptime',()=>run({},async f=>{
+  f.state.stats.uptime_s=100;f.state.stats.total_hashes=100000000;
+  await f.page.goto(f.url);await f.page.waitForSelector('#start-benchmark:enabled');await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
+  f.state.stats.uptime_s=700;f.state.stats.total_hashes=700000000;
+  await f.page.waitForSelector('#download-benchmark:enabled');assert.match(await f.page.locator('#benchmark-status').textContent(),/1\.00 MH\/s/);
+  assert.equal(await f.page.locator('#stop-benchmark').isDisabled(),true);
+}));
+check('boot identity invalidates history and measurements even with higher counters',()=>run({stats:{history:undefined,history_revision:1,boot_id:'old',uptime_s:100,total_hashes:100000000}},async f=>{
+  f.state.diagnostics.boot_id='old';await f.page.goto(f.url);await f.page.waitForSelector('#history-grid .t');
+  await f.page.click('#start-benchmark');await f.page.waitForSelector('#stop-benchmark:enabled');
+  f.state.stats.boot_id='new';f.state.stats.uptime_s=200;f.state.stats.total_hashes=200000000;
+  await f.page.waitForFunction(()=>document.querySelector('#benchmark-status').textContent.includes('restarted'));
+  assert.equal(await f.page.locator('#download-benchmark').isDisabled(),true);assert.equal(f.state.historyCalls,2);
+}));
+
 if(process.env.BDL_SCREENSHOT_DIR){
  fs.mkdirSync(process.env.BDL_SCREENSHOT_DIR,{recursive:true});
  for(const [name,options,route]of [['dashboard',{language:'fr'},'/'],['mobile',{mobile:true,language:'fr'},'/'],['settings',{language:'fr'},'/settings'],['log',{language:'fr'},'/log']]){
-  check('visual preview '+name,()=>run({...options,stats:{hashrate:1001240,hashrate_live:1004820,engines:[{name:'hw',rate:968500},{name:'sw',rate:27000},{name:'fill',rate:5740}],power_percent:100,power_limit_percent:100,throttle:'full',limitation_reason:'full',max_temp_c:65,uptime_s:18432,shares:{accepted:247,rejected:1},best:{session:0.0034,ever:1.28},history:{hashrate:[980000,990000,995000,1000000,982000,1001200,998200,1001240],interval_s:300},github_update:{mode:2,checked:true,version:'1.1.0',available:false},board:'M5StickC Plus2'}},async f=>{
+  check('visual preview '+name,()=>run({...options,stats:{hashrate:1001240,hashrate_live:1004820,engines:[{name:'hw',rate:968500},{name:'sw',rate:27000},{name:'fill',rate:5740}],power_percent:100,power_limit_percent:100,throttle:'full',limitation_reason:'full',max_temp_c:65,uptime_s:18432,shares:{accepted:247,rejected:1},best:{session:0.0034,ever:1.28},history:undefined,history_revision:1,boot_id:'preview',github_update:{mode:2,checked:true,version:'1.1.0',available:false},board:'M5StickC Plus2'}},async f=>{
    await f.page.goto(f.url+route);await f.page.waitForTimeout(200);
    await f.page.screenshot({path:path.join(process.env.BDL_SCREENSHOT_DIR,name+'.png'),fullPage:true});
   }));

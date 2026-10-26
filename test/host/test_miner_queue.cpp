@@ -146,4 +146,43 @@ int main() {
     minerInvalidate();
     assert(!minerNextShare(result, 0));
     puts("Miner startup failures: no phantom engines, contiguous fill and safe recovery passed");
+    // Flash faults must not freeze a failed restore or discard dirty records.
+    Preferences::data.clear(); statsLoaded = true; statsFrozen = false; statsSeq = 0;
+    stats.lifetimeHashes = 123; stats.lifetimeBlocks = baseBlocks; stats.bestDiff = 2;
+    bestDirty = true;
+    assert(minerSaveStats() && statsSeq == 1);
+    StatsSnapshot replacement{}; replacement.hashes = 777; replacement.bestDiff = 3;
+    Preferences::failOpen = true; bestDirty = true;
+    assert(!minerSaveStats() && bestDirty);
+    Preferences::failOpen = false; Preferences::failWrite = true;
+    assert(!minerStatsRestore(replacement) && !statsFrozen && statsSeq == 1);
+    Preferences::failWrite = false;
+    assert(minerStatsRestore(replacement) && statsFrozen && statsSeq == 2);
+    stats = {}; minerLoadStats(); assert(baseHashes == 777);
+    Preferences::data["statA"][offsetof(StatsRecord, s)] ^= 1;
+    stats = {}; minerLoadStats(); assert(baseHashes == 123 && statsSeq == 1);
+    puts("Statistics: storage failures preserve dirty state and old records; corrupt latest record falls back");
+    // Hashrate, temperature and power share one ring and one revision.
+    historyLen = historyHead = historyRevision = 0; historyMs = 1000; historyHashes = totalHashes = 0;
+    temperatureSum = 0; temperatureSamples = observationSamples = powerSum = 0;
+    statsLoaded = false; lastTickMs = 1000; stats = {}; stats.minerCount = 1; lastHashes[0] = 0;
+    testMillis = 1000;
+    for (int i = 0; i < 300; ++i) {
+        minerObserve(i < 150 ? 40 : 60, i < 150 ? 100 : 50);
+        stats.hashes[0] += 1000000; testMillis += 1000; minerTick();
+    }
+    HistoryPoint points[HISTORY_LEN]; uint32_t revision = 0;
+    assert(minerHistoryPoints(points, HISTORY_LEN, &revision) == 1 && revision == 1);
+    assert(points[0].hashrate == 1000000 && points[0].temperatureDeciC == 500);
+    assert(points[0].powerPercent == 75 && points[0].coveragePercent == 100);
+    for (int i = 0; i < 300; ++i) { minerObserve(NAN, 0); testMillis += 1000; minerTick(); }
+    assert(minerHistoryPoints(points, HISTORY_LEN, &revision) == 2 && revision == 2);
+    assert(points[1].temperatureDeciC == INT16_MIN && points[1].powerPercent == 0);
+    for (int i = 0; i < HISTORY_LEN + 2; ++i) {
+        minerObserve(50, 100); stats.hashes[0] += uint32_t(i + 1) * 300000;
+        testMillis += 300000; minerTick();
+    }
+    assert(minerHistoryPoints(points, HISTORY_LEN, &revision) == HISTORY_LEN);
+    assert(points[0].hashrate == 3000 && points[HISTORY_LEN - 1].hashrate == (HISTORY_LEN + 2) * 1000);
+    puts("Aligned history: weighted hashrate, temperature/power samples, missing sensors, coverage and ring wrap passed");
 }

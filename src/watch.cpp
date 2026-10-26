@@ -72,6 +72,7 @@ void throttle() {
         notify("Temperature unavailable", power ? "No usable sensor: mining limited to 25%" : "Mining paused until a valid temperature returns", 4, "thermometer");
     }
     minerSetPower(power, saver);
+    minerObserve(t, minerPowerPercent());
 
     uint8_t b = settingsBrightness();
     if (awake && millis() - wakeStarted >= 30000) awake = false;

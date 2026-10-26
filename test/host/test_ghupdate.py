@@ -13,6 +13,8 @@ scheduler = source[source.index('void ghUpdatePoll()'):]
 prefix = r'''
 #include <ArduinoJson.h>
 #include <atomic>
+#include <algorithm>
+using std::min;
 #include <cassert>
 #include <cctype>
 #include <cstdio>
@@ -67,7 +69,8 @@ bool httpsGet(String url, WiFiClientSecure &, HTTPClient &http, int *code) {
     http.body=r.body; http.chunked=r.chunked; *code=r.code; return *code==200;
 }
 int installs=0, pings=0;
-void install() { ++installs; }
+GithubInstallResult installResult=GithubInstallResult::Done;
+GithubInstallResult install() { ++installs; return installResult; }
 void ping() { ++pings; }
 '''
 tests = r'''
@@ -77,7 +80,7 @@ const char *valid=R"({"tag_name":"v1.0.11","assets":[
  {"name":"test-firmware.bin.sig","browser_download_url":"signature"}]})";
 void reset() {
     state=GithubUpdate(); firmwareUrl=""; signatureUrl="";
-    installRequested=false; checkRequested=false; nextCheck=kFirstCheckMs; nextPing=kFirstPingMs;
+    installRequested=false; checkRequested=false; retryInstall=false; installFailures=0; installRetryAt=0; installResult=GithubInstallResult::Done; nextCheck=kFirstCheckMs; nextPing=kFirstPingMs;
     nowMs=0; settings.githubUpdate=1; settings.usageCount=false; WiFi.connected=true; ESP.heap=100000;
     installs=pings=0; requests.clear(); manifest={200,valid,false}; api={403,"",false};
     ota::release(ota::Owner::Web); ota::release(ota::Owner::Github);
@@ -96,7 +99,7 @@ int main() {
     reset(); manifest={200,"{invalid",false}; api={200,valid,false}; assert(check() && requests.size()==2);
     reset(); manifest={404,"",false}; assert(!check());
     assert(strstr(state.error,"HTTP 404") && strstr(state.error,"HTTP 403"));
-    reset(); manifest.body=R"({"tag_name":"v1.0.12","assets":[]})"; assert(check());
+    reset(); manifest.body=R"({"tag_name":"v1.0.12","assets":[]})"; assert(!check());
     assert(!state.available && strstr(state.error,"no signed firmware"));
     reset(); manifest.body=R"({"tag_name":"v1.0.10","assets":[]})"; assert(check());
     assert(state.checked && !state.available && !state.error[0]);
@@ -125,6 +128,21 @@ int main() {
     manifest={200,valid,false}; nowMs=nextCheck; ghUpdatePoll(); assert(state.checked);
     reset(); settings.usageCount=true; nowMs=kFirstPingMs; ghUpdatePoll();
     assert(state.checked && pings==0); ghUpdatePoll(); assert(pings==1);
+    reset(); settings.githubUpdate=2; installResult=GithubInstallResult::Retry;
+    nowMs=kFirstCheckMs; ghUpdatePoll(); assert(installs==1 && retryInstall);
+    assert(nextCheck==nowMs+kRetryMs && ghUpdateState().retrySeconds==300);
+    nowMs=nextCheck-1; ghUpdatePoll(); assert(installs==1);
+    nowMs=nextCheck; ghUpdatePoll(); assert(installs==2 && ghUpdateState().retrySeconds==600);
+    installResult=GithubInstallResult::Done; nowMs=nextCheck; ghUpdatePoll();
+    assert(installs==3 && !retryInstall && ghUpdateState().retrySeconds==0);
+    reset(); assert(check()); installResult=GithubInstallResult::Retry;
+    assert(ghUpdateInstall()); ghUpdatePoll(); assert(retryInstall);
+    nowMs=nextCheck; ghUpdatePoll(); assert(installs==2); // manual install is retried even in offer-only mode
+    reset(); settings.githubUpdate=2; installResult=GithubInstallResult::Refused;
+    nowMs=kFirstCheckMs; ghUpdatePoll(); assert(installs==1 && !retryInstall && nextCheck==nowMs+kCheckMs);
+    reset(); settings.githubUpdate=2; installResult=GithubInstallResult::Retry;
+    nowMs=kFirstCheckMs; ghUpdatePoll(); manifest.code=404; api.code=403;
+    nowMs=nextCheck; ghUpdatePoll(); assert(installs==1 && retryInstall && ghUpdateState().retrySeconds==300);
     puts("GitHub discovery and scheduling: manifest, API fallback, retries, status and OTA isolation passed");
 }
 '''

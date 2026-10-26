@@ -16,6 +16,7 @@ namespace {
 
 constexpr uint32_t kPoolSilenceTimeoutMs = 5 * 60 * 1000;  // no message -> reconnect
 constexpr uint32_t kHandshakeTimeoutMs = 30000;
+constexpr uint32_t kShareAckTimeoutMs = 60000;
 constexpr size_t kMaxLine = 16 * 1024;
 // Failover: after this many sessions in a row without a successful
 // authorization the backup pool is used, and the main pool is retried
@@ -26,6 +27,7 @@ constexpr uint32_t kBackupSessionMs = 30 * 60 * 1000;
 char status[48] = "Starting";
 portMUX_TYPE statusMux = portMUX_INITIALIZER_UNLOCKED;
 std::atomic<bool> onBackup{false};
+std::atomic<uint8_t> pendingShares{0};
 
 void setStatus(const char *s) {
     portENTER_CRITICAL(&statusMux);
@@ -55,6 +57,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
     uint8_t chunk[512];
     uint32_t start = millis();
     uint32_t lastRx = start;
+    uint32_t lastShareReply = start;
 
     if (!sendLine(client, proto.subscribe(userAgent()))) return;
 
@@ -110,10 +113,12 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
                         logf("[pool] difficulty %g\n", proto.difficulty());
                         break;
                     case stratum::Event::ShareAccepted:
+                        lastShareReply = millis();
                         minerShareResult(true);
                         logf("[pool] share accepted\n");
                         break;
                     case stratum::Event::ShareRejected:
+                        lastShareReply = millis();
                         minerShareResult(false);
                         logf("[pool] share rejected: %s\n", proto.lastError().c_str());
                         break;
@@ -136,9 +141,16 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
             sessionTimedOut = true;
             return;
         }
+        pendingShares = proto.pendingShares();
+        if (proto.pendingShares() && millis() - lastShareReply > kShareAckTimeoutMs) {
+            setStatus("Share acknowledgments timed out");
+            return;
+        }
         // Waiting for a share also paces the socket polling.
         stratum::Share share;
-        if (minerNextShare(share, 20)) {
+        if (!proto.canSubmit()) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+        } else if (minerNextShare(share, 20)) {
             // A clean job voids every older one; shares found on those by a
             // batch still running when it came would only be rejected.
             if (proto.job().clean && strncmp(proto.job().id.c_str(), share.jobId, sizeof(share.jobId) - 1) != 0) {
@@ -147,7 +159,10 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs) {
             }
             logf("[pool] submit nonce=%08x diff=%.4g job=%s\n", (unsigned)share.nonce, share.difficulty,
                  share.jobId);
-            if (!sendLine(client, proto.submit(share))) return;
+            if (!proto.pendingShares()) lastShareReply = millis();
+            std::string line = proto.submit(share);
+            if (line.empty() || !sendLine(client, line)) return;
+            pendingShares = proto.pendingShares();
         }
     }
 }
@@ -199,6 +214,7 @@ void netTask(void *) {
         }
 
         minerPoolConnected(false);
+        pendingShares = 0;
         minerInvalidate();
         if (netStatus().startsWith("Mining")) setStatus("Disconnected");
 
@@ -243,3 +259,4 @@ const String &netPoolHost() { return onBackup ? settings.backupHost : settings.p
 uint16_t netPoolPort() { return onBackup ? settings.backupPort : settings.poolPort; }
 
 bool netOnBackup() { return onBackup; }
+uint8_t netPendingShares() { return pendingShares.load(); }

@@ -6,12 +6,15 @@
 #include <esp_wifi.h>
 #include <freertos/semphr.h>
 #include <atomic>
+#include <cmath>
 
 #include "log.h"
+#include "settings_store.h"
 
 Settings settings;
 static std::atomic<uint8_t> liveBrightness{80};
 static SemaphoreHandle_t settingsSaveMutex = xSemaphoreCreateMutex();
+static uint32_t settingsSequence = 0;
 
 static const char *kNamespace = "bdlminer";
 
@@ -102,7 +105,7 @@ void settingsSanitize(Settings &settings) {
     cleanHost(settings.mqttHost, &settings.mqttPort);
     if (!settings.poolPort) settings.poolPort = DEFAULT_POOL_PORT;
     if (!settings.backupPort) settings.backupPort = DEFAULT_BACKUP_PORT;
-    if (!(settings.suggestedDifficulty > 0)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
+    if (!(settings.suggestedDifficulty > 0) || !std::isfinite(settings.suggestedDifficulty)) settings.suggestedDifficulty = DEFAULT_DIFFICULTY;
     // "BDLMinerV1/x.y.z" was the default before 1.0.4: saved settings still
     // carry it, and pool.nerdminers.org refuses it.
     if (settings.userAgent.isEmpty() || settings.userAgent.startsWith("BDLMinerV1/"))
@@ -123,6 +126,12 @@ void settingsSanitize(Settings &settings) {
 void settingsLoad() {
     Preferences p;
     p.begin(kNamespace, true);
+    if (settingsstore::load(p, settings, settingsSequence)) {
+        p.end();
+        settingsSanitize();
+        liveBrightness = settings.brightness;
+        return;
+    }
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
         switch (s.type) {
@@ -158,35 +167,28 @@ void settingsSetBrightness(uint8_t percent) {
     settingsSave(copy);
 }
 
-void settingsSave(const Settings &values, bool forRestart) {
+bool settingsSave(const Settings &values, bool forRestart) {
+    if (!settingsSaveMutex) return false;
     xSemaphoreTake(settingsSaveMutex, portMAX_DELAY);
     static bool stagedForRestart = false;
     // A brightness button during the reboot delay must not overwrite a
     // staged web/backup configuration with the old live settings.
     if (stagedForRestart && !forRestart) {
         xSemaphoreGive(settingsSaveMutex);
-        return;
+        return false;
     }
     Preferences p;
-    p.begin(kNamespace, false);
-    for (size_t i = 0; i < kSettingCount; i++) {
-        const SettingInfo &s = kSettings[i];
-        const void *value = settingValue(s, values);
-        switch (s.type) {
-            case SettingType::Text:
-            case SettingType::Secret: p.putString(s.key, *(const String *)value); break;
-            case SettingType::Number:
-                if (s.bits == 8) p.putUChar(s.key, *(const uint8_t *)value);
-                else p.putUShort(s.key, *(const uint16_t *)value);
-                break;
-            case SettingType::Decimal: p.putDouble(s.key, *(const double *)value); break;
-            case SettingType::Bool: p.putBool(s.key, *(const bool *)value); break;
-        }
+    if (!p.begin(kNamespace, false)) {
+        xSemaphoreGive(settingsSaveMutex);
+        logf("[cfg] cannot open settings storage\n");
+        return false;
     }
-    p.putUChar("updv", 1);  // see settingsLoad()
+    bool saved = settingsstore::save(p, values, settingsSequence);
     p.end();
-    if (forRestart) stagedForRestart = true;
+    if (saved && forRestart) stagedForRestart = true;
     xSemaphoreGive(settingsSaveMutex);
+    if (!saved) logf("[cfg] settings save failed; previous configuration kept\n");
+    return saved;
 }
 
 String portalApName() {
@@ -323,8 +325,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.webPassword = pWeb.getValue();
         settings.language = atoi(pLang.getValue());
         settingsSanitize();
-        settingsSave();
-        logf("[cfg] settings saved\n");
+        logf(settingsSave() ? "[cfg] settings saved\n" : "[cfg] settings could not be saved\n");
     }
 
     if (!connected || settings.btcAddress.isEmpty()) {

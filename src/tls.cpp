@@ -36,6 +36,15 @@ void *tlsCalloc(size_t n, size_t size) {
 }
 
 static std::atomic<int> wdtPauses{0};
+static TlsProfile profile;
+static portMUX_TYPE profileMux = portMUX_INITIALIZER_UNLOCKED;
+
+TlsProfile tlsProfile() {
+    portENTER_CRITICAL(&profileMux);
+    TlsProfile copy = profile;
+    portEXIT_CRITICAL(&profileMux);
+    return copy;
+}
 
 void core0WdtPause() {
     if (wdtPauses++ == 0) disableCore0WDT();
@@ -63,6 +72,13 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
     core0WdtPause();
     uint32_t t0 = millis();
     bool ok = tls.connect(host, port);
+    uint32_t elapsed = millis() - t0;
+    portENTER_CRITICAL(&profileMux);
+    ++profile.handshakes;
+    if (!ok) ++profile.failures;
+    profile.lastMs = elapsed;
+    profile.handshakeMs += elapsed;
+    portEXIT_CRITICAL(&profileMux);
     char why[80] = "";
     if (!ok) {
         why[0] = ' ';

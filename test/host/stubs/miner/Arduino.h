@@ -28,6 +28,7 @@ constexpr int pdPASS = 1;
 
 inline uint32_t testMillis = 1000;
 inline uint32_t millis() { return testMillis; }
+inline uint32_t micros() { return testMillis * 1000; }
 inline void vTaskDelay(uint32_t) {}
 inline int testTaskStarts = 0;
 inline int testTaskFailAt = -1;

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+enum class GithubInstallResult { Done, Retry, Refused };
 
 struct GithubUpdate {
     bool checked = false;    // a release was found at least once
@@ -15,6 +16,7 @@ struct GithubUpdate {
     bool installing = false;
     uint8_t progress = 0;    // percent, while installing
     uint32_t installRequest = 0;  // acknowledges an accepted dashboard command
+    uint32_t retrySeconds = 0;
     char version[24] = "";   // of the latest release
     char error[80] = "";     // last problem, "" when none
 };

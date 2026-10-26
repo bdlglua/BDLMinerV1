@@ -6,6 +6,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <esp_ota_ops.h>
+#include <esp_system.h>
 
 #include "board.h"
 #include "core/address.h"
@@ -19,6 +20,7 @@
 #include "settings_apply.h"
 #include "watch.h"
 #include "runtime.h"
+#include "tls.h"
 #include "web_validation.h"
 
 #ifndef FW_ENV
@@ -31,6 +33,8 @@ WebServer server(80);
 String hostName;
 std::atomic<uint32_t> restartAt{0};  // restart due at this millis(), 0 = none
 std::atomic<const char *> restartWhy{""};
+HistoryPoint historyScratch[HISTORY_LEN]; // one HTTP worker; shared between its history handlers
+uint32_t bootSession = 0;
 
 // Generated from the maintainable web/ sources before every firmware build.
 #include "web_assets.generated.h"
@@ -87,6 +91,7 @@ void handleStats() {
     JsonDocument j;
     j["board"] = board::modelName();
     j["firmware"] = FW_VERSION;
+    j["boot_id"] = String(bootSession, HEX);
     j["uptime_s"] = minerUptimeSeconds();
     j["hashrate"] = minerHashrate();
     j["hashrate_live"] = minerHashrateLive();
@@ -118,6 +123,7 @@ void handleStats() {
     j["pool"]["connected"] = stats.poolConnected;
     j["pool"]["status"] = netStatus();
     j["pool"]["difficulty"] = stats.poolDiff;
+    j["pool"]["pending_shares"] = netPendingShares();
     PoolStats pv = poolStatsGet();
     j["pool_view"]["updated_s"] = pv.updatedMs ? (long)((millis() - pv.updatedMs) / 1000) : -1;
     j["pool_view"]["supported"] = pv.supported;
@@ -133,11 +139,13 @@ void handleStats() {
     j["lifetime"]["shares"] = stats.lifetimeShares;
     j["lifetime"]["blocks"] = stats.lifetimeBlocks;
     j["lifetime"]["seconds"] = stats.lifetimeSeconds;
-    static float hist[HISTORY_LEN];
-    int n = minerHistory(hist, HISTORY_LEN);
-    j["history"]["interval_s"] = HISTORY_INTERVAL_S;
-    JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
-    for (int i = 0; i < n; i++) hr.add((long)hist[i]);
+    j["history_revision"] = minerHistoryRevision();
+    if (server.arg("history") != "0") {
+        int n = minerHistoryPoints(historyScratch, HISTORY_LEN);
+        j["history"]["interval_s"] = HISTORY_INTERVAL_S;
+        JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
+        for (int i = 0; i < n; i++) hr.add((long)historyScratch[i].hashrate);
+    }
     j["heap"] = ESP.getFreeHeap();
     j["task_failures"] = runtime::failures().load();
     j["heap_max_block"] = ESP.getMaxAllocHeap();
@@ -215,6 +223,7 @@ void handleStats() {
     up["version"] = gu.version;
     up["installing"] = gu.installing;
     up["progress"] = gu.progress;
+    up["retry_in_s"] = gu.retrySeconds;
     up["supported"] = esp_ota_get_next_update_partition(nullptr) != nullptr;
     up["release_url"] = String("https://github.com/" GITHUB_REPO "/releases/") + (gu.version[0] ? String("tag/v") + gu.version : "latest");
     up["error"] = gu.error;
@@ -224,6 +233,60 @@ void handleStats() {
     serializeJson(j, body);
     server.sendHeader("Cache-Control", "no-store");
     server.sendHeader("Access-Control-Allow-Origin", "*");  // read by the other miners' dashboards
+    server.send(200, "application/json", body);
+}
+
+void handleHistory() {
+    uint32_t revision;
+    int n = minerHistoryPoints(historyScratch, HISTORY_LEN, &revision);
+    String body;
+    body.reserve(n * 32 + 160);
+    body = String("{\"boot_id\":\"") + String(bootSession, HEX) + "\",\"interval_s\":" + HISTORY_INTERVAL_S + ",\"revision\":" + revision;
+    const char *keys[] = {"hashrate", "temperature_c", "power_percent", "coverage_percent"};
+    for (int field = 0; field < 4; ++field) {
+        body += String(",\"") + keys[field] + "\":[";
+        for (int i = 0; i < n; ++i) {
+            if (i) body += ',';
+            const auto &p = historyScratch[i];
+            if (field == 0) body += String(p.hashrate, 0);
+            else if (field == 1) body += p.temperatureDeciC == INT16_MIN ? String("null") : String(p.temperatureDeciC / 10.0f, 1);
+            else if (field == 2) body += p.coveragePercent ? String(p.powerPercent) : String("null");
+            else body += String(p.coveragePercent);
+        }
+        body += ']';
+    }
+    body += '}';
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", body);
+}
+
+void handleDiagnostics() {
+    const MinerStats stats = minerStats();
+    MinerProfile workers[MAX_MINERS];
+    minerProfiles(workers, MAX_MINERS);
+    TlsProfile tls = tlsProfile();
+    JsonDocument j;
+    j["uptime_s"] = minerUptimeSeconds();
+    j["firmware"] = FW_VERSION;
+    j["tls"]["handshakes"] = tls.handshakes;
+    j["boot_id"] = String(bootSession, HEX);
+    j["tls"]["failures"] = tls.failures;
+    j["tls"]["total_ms"] = tls.handshakeMs;
+    j["tls"]["last_ms"] = tls.lastMs;
+    JsonArray engines = j["engines"].to<JsonArray>();
+    for (int i = 0; i < stats.minerCount; ++i) {
+        if (!strcmp(stats.engine[i], "fill")) continue; // fill shares its hardware worker's time
+        JsonObject engine = engines.add<JsonObject>();
+        engine["index"] = i;
+        engine["name"] = stats.engine[i];
+        engine["hashing_ms"] = workers[i].hashingUs / 1000;
+        engine["rest_ms"] = workers[i].restMs;
+        engine["waiting_ms"] = workers[i].waitingMs;
+        engine["paused_ms"] = workers[i].pausedMs;
+    }
+    String body;
+    serializeJson(j, body);
+    server.sendHeader("Cache-Control", "no-store");
     server.send(200, "application/json", body);
 }
 
@@ -254,8 +317,8 @@ int applySettings(JsonObjectConst values) {
     int changed = settingsApply(pending, values);
     if (changed) {
         settingsSanitize(pending);
-        if (pending.poolHost.isEmpty() || pending.btcAddress.isEmpty()) return -1;
-        settingsSave(pending, true);
+        if (!pending.poolHost.length() || !pending.btcAddress.length()) return -1;
+        if (!settingsSave(pending, true)) return -2;
     }
     return changed;
 }
@@ -306,6 +369,10 @@ void handlePostSettings() {
         return;
     }
     int changed = applySettings(j.as<JsonObjectConst>());
+    if (changed == -2) {
+        server.send(500, "text/plain", "Settings could not be saved. Previous configuration kept; try again.");
+        return;
+    }
     if (changed < 0) {
         server.send(400, "text/plain", "Pool host and payout address cannot be empty");
         return;
@@ -377,6 +444,10 @@ void handlePostBackup() {
         return;
     }
     int settingsCount = applySettings(values);
+    if (settingsCount == -2) {
+        server.send(500, "text/plain", "Settings could not be saved. Previous configuration kept; try again.");
+        return;
+    }
     if (settingsCount < 0) {
         server.send(400, "text/plain", "Pool host and payout address cannot be empty");
         return;
@@ -395,7 +466,10 @@ void handlePostBackup() {
             if (i == TOP_SHARES) break;
             s.top[i++] = {o["d"] | 0.0, o["t"] | 0u};
         }
-        minerStatsRestore(s);
+        if (!minerStatsRestore(s)) {
+            server.send(500, "text/plain", "Settings saved, but statistics could not be restored. Retry before restarting.");
+            return;
+        }
     }
     if (!settingsCount && !withStats) {
         server.send(400, "text/plain", "Nothing to restore in this file");
@@ -574,6 +648,7 @@ void webTask(void *) {
 }  // namespace
 
 void webStart() {
+    bootSession = esp_random();
     char name[24];
     snprintf(name, sizeof(name), "bdlminer-%04x", (unsigned)((ESP.getEfuseMac() >> 32) & 0xFFFF));
     hostName = name;
@@ -588,6 +663,8 @@ void webStart() {
     server.on("/settings", HTTP_GET, []() { sendPage("BDLMiner settings", kSettingsPage, "settings"); });
     server.on("/log", HTTP_GET, []() { sendPage("BDLMiner log", kLogPage, "log"); });
     server.on("/api/stats", HTTP_GET, handleStats);
+    server.on("/api/history", HTTP_GET, handleHistory);
+    server.on("/api/diagnostics", HTTP_GET, handleDiagnostics);
     server.on("/api/log", HTTP_GET, []() {
         server.sendHeader("Cache-Control", "no-store");
         server.send(200, "text/plain", logText());

@@ -517,8 +517,24 @@ static void testStratumJob() {
     std::string line = p.submit(s);
     CHECK(line == "{\"id\":10,\"method\":\"mining.submit\",\"params\":[\"addr.worker\",\"bf\",\"00000001\",\"4dd7f5c7\",\"9546a142\"]}\n");
     CHECK(p.handleLine(R"({"id":10,"result":true,"error":null})") == stratum::Event::ShareAccepted);
+    CHECK(p.handleLine(R"({"id":10,"result":true,"error":null})") == stratum::Event::None);
+    CHECK(p.handleLine(R"({"id":999,"result":true,"error":null})") == stratum::Event::None);
+    p.submit(s);
     CHECK(p.handleLine(R"({"id":11,"result":null,"error":[23,"Low difficulty share",null]})") == stratum::Event::ShareRejected);
     CHECK(p.lastError() == "Low difficulty share");
+    CHECK(p.handleLine(R"({"id":11,"result":false,"error":null})") == stratum::Event::None);
+    CHECK(p.pendingShares() == 0);
+    for (size_t i = 0; i < stratum::Protocol::kMaxPendingShares; ++i) CHECK(!p.submit(s).empty());
+    CHECK(!p.canSubmit() && p.submit(s).empty());
+    CHECK(p.handleLine(R"({"id":13,"result":{},"error":null})") == stratum::Event::Error);
+    CHECK(p.pendingShares() == stratum::Protocol::kMaxPendingShares);
+    CHECK(p.handleLine(R"({"id":"13","result":true,"error":null})") == stratum::Event::None);
+    CHECK(p.handleLine(R"({"id":13.5,"result":true,"error":null})") == stratum::Event::None);
+    CHECK(p.handleLine(R"({"id":13,"result":true,"error":null})") == stratum::Event::ShareAccepted);
+    CHECK(p.canSubmit());
+    p.reset();
+    CHECK(p.pendingShares() == 0);
+    CHECK(p.handleLine(R"({"id":12,"result":true,"error":null})") == stratum::Event::None);
 }
 
 // Known-good addresses (genesis coinbase, BIP13, BIP173 and BIP350 vectors)
