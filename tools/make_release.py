@@ -11,6 +11,7 @@
                       counts are the anonymous usage count (tools/miner_stats.py)
   SHA256SUMS.txt
   boards.json         the chip of each board, for tools/make_installer.py
+  update.json         compact discovery metadata for GitHub firmware updates
 
     python3 tools/make_release.py [--version X.Y.Z] [env ...]
 
@@ -24,6 +25,7 @@ import re
 import shutil
 import subprocess
 import sys
+from urllib.parse import quote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PIO_HOME = os.path.expanduser("~/.platformio")
@@ -104,6 +106,19 @@ def write_checksums(out):
         output.write("\n".join(sums) + "\n")
 
 
+def write_update_manifest(out, release_version):
+    """Small discovery document, with the same asset fields as the releases API."""
+    repository = os.environ.get("GITHUB_REPOSITORY", "bdlglua/BDLMinerV1")
+    base = f"https://github.com/{repository}/releases/download/v{quote(release_version, safe='')}/"
+    assets = []
+    for name in sorted(os.listdir(out)):
+        if name.endswith("-firmware.bin") and os.path.isfile(os.path.join(out, name + ".sig")):
+            for asset in (name, name + ".sig"):
+                assets.append({"name": asset, "browser_download_url": base + quote(asset, safe='')})
+    with open(os.path.join(out, "update.json"), "w") as output:
+        json.dump({"tag_name": "v" + release_version, "assets": assets}, output, separators=(",", ":"))
+
+
 def main():
     args = sys.argv[1:]
     if args[:1] == ["--version"]:
@@ -140,6 +155,7 @@ def main():
         print(f"[{env}] {mcu}, {size} flash, {mode} {freq}: "
               f"{os.path.getsize(factory)} + {os.path.getsize(firmware)} bytes", flush=True)
     write_checksums(out)
+    write_update_manifest(out, version())
     path = os.path.join(out, "boards.json")
     old = {}
     if os.path.exists(path):

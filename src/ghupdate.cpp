@@ -23,9 +23,9 @@
 
 namespace {
 
-constexpr uint32_t kFirstCheckMs = 2 * 60 * 1000;
-constexpr uint32_t kCheckMs = 12 * 3600 * 1000UL;
-constexpr uint32_t kRetryMs = 30 * 60 * 1000;
+constexpr uint32_t kFirstCheckMs = 30 * 1000;
+constexpr uint32_t kCheckMs = 3600 * 1000UL;
+constexpr uint32_t kRetryMs = 5 * 60 * 1000;
 constexpr uint32_t kFirstPingMs = 5 * 60 * 1000;
 constexpr uint32_t kPingMs = 24 * 3600 * 1000UL;
 constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
@@ -34,6 +34,7 @@ GithubUpdate state;
 String firmwareUrl, signatureUrl;
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
 std::atomic<bool> installRequested{false};
+std::atomic<bool> checkRequested{false};
 uint32_t nextCheck = kFirstCheckMs;  // millis()
 uint32_t nextPing = kFirstPingMs;
 
@@ -104,16 +105,18 @@ bool httpsGet(String url, WiFiClientSecure &tls, HTTPClient &http, int *code) {
     return false;
 }
 
-// False when the release could not be read (retried sooner).
-bool check() {
+// Prefer the small release manifest: it is served as a release asset and does
+// not consume GitHub's unauthenticated API quota shared by miners on one IP.
+// The API fallback keeps older releases, which have no manifest, discoverable.
+bool fetchRelease(const char *url, JsonDocument &doc, String &error) {
     WiFiClientSecure tls;
     HTTPClient http;
     int code = 0;
-    if (!httpsGet("https://api.github.com/repos/" GITHUB_REPO "/releases/latest", tls, http, &code)) {
-        setError("cannot read the latest release (HTTP %s)", String(code).c_str());
+    if (!httpsGet(url, tls, http, &code)) {
+        error = "HTTP " + String(code);
         return false;
     }
-    JsonDocument filter, doc;
+    JsonDocument filter;
     filter["tag_name"] = true;
     filter["name"] = true;
     filter["assets"][0]["name"] = true;
@@ -123,8 +126,22 @@ bool check() {
                            : deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter));
     http.end();
     if (err) {
-        setError("release: %s", err.c_str());
+        error = err.c_str();
         return false;
+    }
+    return true;
+}
+
+// False when the release could not be read (retried sooner).
+bool check() {
+    JsonDocument doc;
+    String manifestError, apiError;
+    if (!fetchRelease("https://github.com/" GITHUB_REPO "/releases/latest/download/update.json", doc, manifestError)) {
+        doc.clear();
+        if (!fetchRelease("https://api.github.com/repos/" GITHUB_REPO "/releases/latest", doc, apiError)) {
+            setError("release unavailable: %s", ("manifest " + manifestError + "; API " + apiError).c_str());
+            return false;
+        }
     }
     char version[24];
     if (!findVersion(doc["tag_name"] | "", version, sizeof(version)) &&
@@ -291,35 +308,63 @@ void ping() {
 
 void ghUpdatePoll() {
     if (ota::busy()) return;
+    bool due = settings.githubUpdate && (installRequested || checkRequested || (int32_t)(millis() - nextCheck) >= 0);
+    if (due) {
+        if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) {
+            static uint8_t lastWait = 0;
+            uint8_t wait = WiFi.isConnected() ? 1 : 2;
+            if (wait != lastWait || !ghUpdateState().error[0]) {
+                setError("update waiting: %s", wait == 1 ? "low memory" : "no WiFi");
+                lastWait = wait;
+            }
+            return;
+        }
+        bool requestedInstall = installRequested.exchange(false);
+        bool requestedCheck = checkRequested.exchange(false);
+        bool ready = true;
+        if (requestedCheck || !requestedInstall) {
+            portENTER_CRITICAL(&stateMux);
+            state.checking = true;
+            portEXIT_CRITICAL(&stateMux);
+            ready = check();
+            nextCheck = millis() + (ready ? kCheckMs : kRetryMs);
+            portENTER_CRITICAL(&stateMux);
+            state.checking = false;
+            portEXIT_CRITICAL(&stateMux);
+        }
+        if (ready && (requestedInstall || settings.githubUpdate == 2) && ghUpdateState().available) install();
+        // Metadata checks and requested installations take priority over the
+        // optional usage ping. Keep this poll to one operation on the network.
+        return;
+    }
     if (settings.usageCount && (int32_t)(millis() - nextPing) >= 0 && WiFi.isConnected() &&
         ESP.getFreeHeap() >= kMinHeap) {
         nextPing = millis() + kPingMs;
         ping();
     }
-    if (!settings.githubUpdate || !(installRequested || (int32_t)(millis() - nextCheck) >= 0)) return;
-    if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) {
-        static uint32_t lastLog = 0;
-        if (installRequested && millis() - lastLog > 60000) {
-            lastLog = millis();
-            logf("[update] install waiting: %s\n", WiFi.isConnected() ? "low memory" : "no WiFi");
-        }
-        return;
-    }
-    if (!installRequested) nextCheck = millis() + (check() ? kCheckMs : kRetryMs);
-    if ((installRequested || settings.githubUpdate == 2) && ghUpdateState().available) install();
-    installRequested = false;
 }
 
 GithubUpdate ghUpdateState() {
     portENTER_CRITICAL(&stateMux);
     GithubUpdate s = state;
     portEXIT_CRITICAL(&stateMux);
+    s.checking = s.checking || checkRequested.load();
+    s.installing = s.installing || installRequested.load();
     return s;
+}
+
+bool ghUpdateCheck() {
+    GithubUpdate current = ghUpdateState();
+    if (!settings.githubUpdate || current.checking || current.installing || ota::busy()) return false;
+    return !checkRequested.exchange(true);
 }
 
 bool ghUpdateInstall() {
     GithubUpdate current = ghUpdateState();
-    if (!current.available || current.installing || ota::busy()) return false;
-    installRequested = true;
+    if (!settings.githubUpdate || !current.available || current.checking || current.installing || ota::busy()) return false;
+    if (installRequested.exchange(true)) return false;
+    portENTER_CRITICAL(&stateMux);
+    ++state.installRequest;
+    portEXIT_CRITICAL(&stateMux);
     return true;
 }

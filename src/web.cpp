@@ -112,6 +112,11 @@ Object.assign(FR,{
  'Upload timed out. Please try again.':'Le délai d’envoi est dépassé. Réessaie.',
  'Upload cancelled.':'Envoi annulé.',
  'Installing…':'Installation…','Installation requested.':'Installation demandée.',
+ 'GitHub updates':'Mises à jour GitHub','Check now':'Vérifier maintenant',
+ 'Checking…':'Vérification…','Check requested.':'Vérification demandée.',
+ 'Updates disabled in settings.':'Mises à jour désactivées dans les réglages.',
+ 'Waiting for the first check.':'En attente de la première vérification.',
+ 'Latest release checked.':'Dernière release vérifiée.',
  'Could not refresh the log.':'Impossible d’actualiser le journal.'
 });
 Object.assign(FR,{
@@ -174,20 +179,36 @@ function chart(h={}){const v=Array.isArray(h.hashrate)?h.hashrate.filter(Number.
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
 
-let installPending=false,installError='';
+let installPending=false,installRequestId=0,installError='',checkPending=false;
 function upd(u){
- if(!u||!u.available)return;
- if(installPending&&!u.installing&&u.error)installPending=false;
- const e=tile(t('Update available'),u.version,u.notes||installError||'',true),b=document.createElement('button');
- b.type='button';b.disabled=installPending||u.installing;b.textContent=t(b.disabled?'Installing…':'Install');
+ if(!u)return;
+ if(installPending&&(u.request_id||0)!==installRequestId)installPending=false;
+ const status=u.mode===0?'Updates disabled in settings.':u.checking?'Checking…':u.checked?'Latest release checked.':'Waiting for the first check.';
+ const e=tile(t(u.available?'Update available':'GitHub updates'),u.version||'-',u.error||u.notes||installError||t(status),true);
+ if(u.available){
+ const b=document.createElement('button');b.className='gh-install';
+ b.type='button';b.disabled=installPending||u.installing||u.checking;b.textContent=t(u.checking?'Checking…':b.disabled?'Installing…':'Install');
  b.onclick=async()=>{
-  if(installPending||u.installing)return;
-  installPending=true;installError='';b.disabled=true;b.textContent=t('Installing…');
+  if(installPending||u.installing||u.checking)return;
+  installRequestId=u.request_id||0;installPending=true;installError='';b.disabled=true;b.textContent=t('Installing…');
   try{await request('/api/github-update',{method:'POST'},'text');installError=t('Installation requested.')}
   catch(err){installPending=false;installError=errorText(err);b.disabled=false;b.textContent=t('Install')}
   e.querySelector('.s').textContent=installError;
  };
- e.appendChild(b);return e;
+ e.appendChild(b);
+ }
+ const c=document.createElement('button');c.className='gh-check';c.type='button';
+ c.disabled=checkPending||installPending||u.checking||u.installing||u.mode===0;
+ c.textContent=t(checkPending||u.checking?'Checking…':'Check now');
+ c.onclick=async()=>{
+  if(c.disabled)return;
+  checkPending=true;c.disabled=true;c.textContent=t('Checking…');
+  try{await request('/api/github-check',{method:'POST'},'text');installError=t('Check requested.')}
+  catch(err){installError=errorText(err);c.disabled=false;c.textContent=t('Check now')}
+  finally{checkPending=false}
+  e.querySelector('.s').textContent=installError;
+ };
+ e.appendChild(c);return e;
 }
 function peerHosts(list,ip){
  const seen=new Set(),hosts=[];
@@ -522,6 +543,10 @@ void handleStats() {
     GithubUpdate gu = ghUpdateState();
     JsonObject up = j["github_update"].to<JsonObject>();
     up["available"] = gu.available;
+    up["mode"] = settings.githubUpdate;
+    up["checked"] = gu.checked;
+    up["checking"] = gu.checking;
+    up["request_id"] = gu.installRequest;
     up["version"] = gu.version;
     up["installing"] = gu.installing;
     up["progress"] = gu.progress;
@@ -900,6 +925,11 @@ void webStart() {
     server.on("/api/backup", HTTP_GET, handleGetBackup);
     server.on("/api/backup", HTTP_POST, handlePostBackup);
     server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
+    server.on("/api/github-check", HTTP_POST, []() {
+        if (!settings.webPassword.isEmpty() && !authorized()) return;
+        if (ghUpdateCheck()) server.send(202, "text/plain", "Check requested");
+        else server.send(409, "text/plain", "GitHub updates are disabled or busy");
+    });
     server.on("/api/github-update", HTTP_POST, []() {
         // Only installs the latest release, and only when it carries the
         // release key's signature: without a web password (read-only

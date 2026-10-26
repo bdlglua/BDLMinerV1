@@ -245,6 +245,7 @@ void marketTask(void *) {
     uint32_t nextMarket = 0, nextPool = 60000;  // pool stats once mining for a minute
     uint32_t retry = kRetryMs;
     for (;;) {
+        ghUpdatePoll();
         if (WiFi.isConnected() && (int32_t)(millis() - nextMarket) >= 0) {
             bool ok = refresh();
             nextMarket = millis() + (ok ? kRefreshMs : retry);
@@ -254,7 +255,6 @@ void marketTask(void *) {
             bool ok = refreshPoolStats();
             nextPool = millis() + (ok ? kPoolStatsMs : kPoolStatsRetryMs);
         }
-        ghUpdatePoll();
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }

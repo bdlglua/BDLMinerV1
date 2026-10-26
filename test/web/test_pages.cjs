@@ -122,7 +122,9 @@ check('failed saves display an error and permit retry',()=>run({postStatus:500},
 
 check('polling never overlaps slow requests, and zero hashrate is displayed',()=>run({statsDelay:140},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#m .t');await f.page.waitForTimeout(450);
-  assert.equal(f.state.peak,1);assert.match(await f.page.locator('#m .t').first().textContent(),/0 H\/s/);
+  assert.equal(f.state.peak,1);
+  const rate=f.page.locator('#m .t').filter({has:f.page.locator('.l').filter({hasText:/^Hashrate$/})});
+  assert.match(await rate.textContent(),/0 H\/s/);
 }));
 
 check('a stalled response body is also covered by the timeout',()=>run({},async f=>{
@@ -141,9 +143,9 @@ check('peer URLs are normalized and fresh results appear on the first poll',()=>
 }));
 
 check('GitHub installation stays disabled across dashboard refreshes',()=>run({stats:{github_update:{available:true,version:'1.0.11',installing:true,notes:'45 %'}}},async f=>{
-  await f.page.goto(f.url);await f.page.waitForSelector('#m button');
-  assert.equal(await f.page.locator('#m button').isDisabled(),true);
-  await f.page.waitForTimeout(120);assert.equal(await f.page.locator('#m button').isDisabled(),true);
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .gh-install');
+  assert.equal(await f.page.locator('#m .gh-install').isDisabled(),true);
+  await f.page.waitForTimeout(120);assert.equal(await f.page.locator('#m .gh-install').isDisabled(),true);
   assert.equal(f.state.posts.length,0);
 }));
 
@@ -158,9 +160,35 @@ check('backup restore preserves uint64 integers and cancellation is harmless',()
 }));
 
 check('an accepted install request cannot be submitted again while waiting',()=>run({stats:{github_update:{available:true,version:'1.0.11',installing:false,notes:''}},postDelay:100},async f=>{
-  await f.page.goto(f.url);await f.page.waitForSelector('#m button');await f.page.click('#m button');
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .gh-install');await f.page.click('#m .gh-install');
   await f.page.waitForTimeout(220);assert.equal(f.state.posts.length,1);
-  assert.equal(await f.page.locator('#m button').isDisabled(),true);
+  assert.equal(await f.page.locator('#m .gh-install').isDisabled(),true);
+}));
+
+check('GitHub errors stay visible when no update is available and a manual check is queued once',()=>run({language:'fr',stats:{github_update:{mode:1,checked:false,available:false,error:'release unavailable: HTTP 403'}},postDelay:100},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .gh-check');
+  assert.match(await f.page.locator('#m').textContent(),/HTTP 403/);
+  assert.equal(await f.page.locator('#m .gh-check').textContent(),'Vérifier maintenant');
+  await f.page.click('#m .gh-check');await f.page.waitForTimeout(60);
+  assert.equal(f.state.posts.length,1);assert.equal(f.state.posts[0].url,'/api/github-check');
+  assert.equal(await f.page.locator('#m .gh-check').isDisabled(),true);
+}));
+
+check('an installation failing before the next poll can be retried',()=>run({stats:{github_update:{available:true,version:'1.0.11',request_id:0}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .gh-install');await f.page.click('#m .gh-install');
+  await f.page.waitForTimeout(80);
+  f.state.stats.github_update={available:true,version:'1.0.11',request_id:1,installing:false,error:'this board requires USB'};
+  await f.page.waitForFunction(()=>!document.querySelector('.gh-install').disabled);
+  assert.match(await f.page.locator('#m').textContent(),/requires USB/);
+}));
+
+check('disabled updates and pending checks are shown on the dashboard',()=>run({stats:{github_update:{mode:0,available:false,checked:false}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .gh-check');
+  assert.equal(await f.page.locator('#m .gh-check').isDisabled(),true);
+  assert.match(await f.page.locator('#m').textContent(),/disabled in settings/);
+  f.state.stats.github_update={mode:1,checking:true,available:false};
+  await f.page.waitForFunction(()=>document.querySelector('.gh-check').textContent==='Checking…');
+  assert.equal(await f.page.locator('#m .gh-check').isDisabled(),true);
 }));
 
 check('invalid backup files produce a translated message and can be retried',()=>run({language:'fr'},async f=>{

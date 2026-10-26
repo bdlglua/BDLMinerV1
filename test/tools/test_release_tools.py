@@ -50,6 +50,23 @@ class ReleaseToolsTests(unittest.TestCase):
             with self.subTest("checksums for all boards"):
                 self.assertEqual(checksums, binaries)
             self.assertEqual(json.loads((out / "boards.json").read_text()), {"alpha": "esp32", "beta": "esp32c3"})
+            self.assertEqual(json.loads((out / "update.json").read_text())["assets"], [])
+
+    def test_update_manifest_advertises_only_signed_firmware_with_matching_version(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            for name in ("alpha-firmware.bin", "alpha-firmware.bin.sig", "alpha-factory.bin",
+                         "beta-firmware.bin", "orphan-firmware.bin.sig"):
+                (out / name).write_bytes(b"test")
+            with patch.dict(make_release.os.environ, {"GITHUB_REPOSITORY": "bdlglua/BDLMinerV1"}):
+                make_release.write_update_manifest(temp, "1.0.11")
+            manifest = json.loads((out / "update.json").read_text())
+            self.assertEqual(manifest["tag_name"], "v1.0.11")
+            self.assertEqual([asset["name"] for asset in manifest["assets"]],
+                             ["alpha-firmware.bin", "alpha-firmware.bin.sig"])
+            for asset in manifest["assets"]:
+                self.assertEqual(asset["browser_download_url"],
+                                 "https://github.com/bdlglua/BDLMinerV1/releases/download/v1.0.11/" + asset["name"])
 
     def test_usage_report_accepts_two_and_three_component_versions(self):
         releases = [

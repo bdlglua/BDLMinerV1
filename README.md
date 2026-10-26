@@ -83,17 +83,25 @@ that updates from GitHub check.
 
 ### Updates from GitHub
 
-Two minutes after boot and then every 12 hours (30 minutes after a failed check), the
+Thirty seconds after boot and then every hour (5 minutes after a failed check), the
 miner looks at the latest release of
 this repository. When it is newer than its own firmware, it installs it by itself (the
 *Updates from GitHub* setting, `2` by default) and the screen shows the progress. At `1`
 it only offers it: an *Update available* tile with an **Install** button on the dashboard
 (and a notification); `0` turns the check off.
+The dashboard always shows the GitHub update status, including connection errors,
+disabled updates and checks waiting for WiFi or enough free memory. **Check now**
+requests a fresh check without restarting the miner. New releases include a small
+`update.json` discovery file, avoiding GitHub's shared unauthenticated API quota;
+the releases API remains a fallback for older releases.
 The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
 key built into the firmware (`src/update_key.h`), so a modified file is refused. For that
 reason **Install** works without a web password too (with one set, it is asked). Settings
 and statistics are kept. Like web updates, it needs a board with room for two firmwares
 (not M5Stack Core or CYD).
+If an older firmware cannot reach GitHub to update itself, install the matching
+`<board>-firmware.bin` once through *Settings → Firmware update* (or by USB on a
+board without two app slots). Future checks then use the updated discovery code.
 
 ### Anonymous usage count
 

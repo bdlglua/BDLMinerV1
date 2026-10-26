@@ -64,9 +64,17 @@ jobs:
       - run: rm -f "$RELEASE_SIGNING_KEY_FILE"
         if: always()
 
+      - name: Release notes
+        run: |
+          NOTES="docs/releases/v$VERSION.md"
+          if [ -f "$NOTES" ]; then
+            echo "RELEASE_NOTES_PATH=$NOTES" >> "$GITHUB_ENV"
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
           name: BDLMiner V1 ${{ env.VERSION }}
+          body_path: ${{ env.RELEASE_NOTES_PATH }}
           generate_release_notes: true
           files: release/${{ env.VERSION }}/*
 
