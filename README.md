@@ -5,17 +5,20 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.5.3](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.3)**
+**Latest release: [v1.6.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.0)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.5.3.md)
+· [Release notes](docs/releases/v1.6.0.md)
 
-Version 1.5.3 fixes local dashboard update controls, slow polling, history errors,
-measurement availability and log pause. It also hardens release/installer generation,
-signature publication, usage reporting and pool hashrate parsing. The default identity
-is **BDLMinerV1/1.5.3**. Optimized SHA-256d engines, thermal protection and the V1/V2
-reliability fixes from 1.5.2 are retained. See the
-[dashboard review](docs/audits/2026-10-27-dashboard.md) and
-[script review](docs/audits/2026-10-27-scripts.md).
+Version **1.6.0** adds **experimental native Bitaxe Gamma 601** firmware: BM1370
+mining, TPS546 regulator control, EMC2101 temperature/fan monitoring, compact OLED
+pages and ASIC diagnostics in the local dashboard. BIP310 version rolling and
+TH/s-scale counters/history are included. The default identity is
+**BDLMinerV1/1.6.0**; existing ESP32 SHA-256d kernels and safety settings are retained.
+
+**Gamma 601 support has not been validated on a physical board.** Use the dedicated
+`bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
+[installation and validation guide](docs/hardware/bitaxe-gamma-601.md) before replacing
+AxeOS. Other Bitaxe models/revisions are not covered.
 
 [Install](#install-a-release-no-build-tools) · [First-time setup](#first-time-setup)
 · [Choose a pool](#pools-for-esp32) · [V1 / V2 setup](#stratum-v1-and-stratum-v2)
@@ -26,12 +29,13 @@ reliability fixes from 1.5.2 are retained. See the
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
-> **Validation:** v1.5.3 builds and packages all ten board variants. Checks cover
-> SHA‑256d, V1/V2 protocol handling, an independent Noise responder, fragmented
-> socket sessions, settings persistence, physical-display rendering, 60 browser
-> regressions and 15 asset/release-tool tests. Firmware signatures, checksums and the update
-> manifest were verified. Live Public Pool V2 connectivity and physical-device V2
-> throughput still require hardware validation.
+> **Validation:** eleven board variants compile and package successfully. Checks
+> cover SHA-256d, V1/V2 and BIP310 masks, independent Noise/proof checks, fragmented
+> socket sessions, persistence/OTA, simulated Gamma hardware faults and 64-bit
+> accounting, physical-display rendering, **62 browser regressions** and **15
+> asset/release-tool tests**. Real Gamma hashrate, temperatures and accepted shares
+> still require a physical-board test. Public Pool's public endpoint uses V1;
+> V2 requires a separate compatible server and authority key.
 
 ## Supported boards
 
@@ -165,7 +169,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.5.3 && git push origin v1.5.3
+git tag v1.6.0 && git push origin v1.6.0
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -189,7 +193,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections included in v1.5.3.
+corrections shipped in v1.5.3 and retained in v1.6.0.
 
 ## Build and flash
 
