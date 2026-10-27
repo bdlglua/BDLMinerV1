@@ -192,13 +192,22 @@ double poolNumber(JsonVariantConst value, double previous = 0) {
 }
 
 // "856K" (ckpool hash rates) -> 856000
-double parseRate(const char *s) {
-    if (!s) return 0;
+double parseRate(const char *s, double previous = 0) {
+    if (!s) return previous;
     char *end;
     double v = strtod(s, &end);
+    if (end == s || !std::isfinite(v) || v < 0) return previous;
+    while (std::isspace(static_cast<unsigned char>(*end))) ++end;
     const char *units = "KMGTPE";
-    const char *u = *end ? strchr(units, *end) : nullptr;
-    return u ? v * pow(1000.0, u - units + 1) : v;
+    if (*end) {
+        const char *u = strchr(units, std::toupper(static_cast<unsigned char>(*end)));
+        if (!u) return previous;
+        v *= pow(1000.0, u - units + 1);
+        ++end;
+        while (std::isspace(static_cast<unsigned char>(*end))) ++end;
+        if (*end) return previous;
+    }
+    return std::isfinite(v) ? v : previous;
 }
 
 // GET https://host:port/path with its own TLS connection; the body as JSON
@@ -247,7 +256,7 @@ bool refreshPoolStats() {
         for (const char *k : {"hashrate1hr", "hashrate5m", "bestever", "shares", "workers"}) filter[k] = true;
         code = fetchJson(host, 443, "/users/" + addr, doc, filter);
         if (code == HTTP_CODE_OK) {
-            p.hashrate = parseRate(doc["hashrate1hr"] | doc["hashrate5m"] | "0");
+            p.hashrate = parseRate(doc["hashrate1hr"] | doc["hashrate5m"] | "", p.hashrate);
             p.bestEver = poolNumber(doc["bestever"], p.bestEver);
             p.shares = poolNumber(doc["shares"], p.shares);
             p.workers = doc["workers"] | 0;

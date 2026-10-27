@@ -18,14 +18,18 @@
 --version first sets FW_VERSION in platformio.ini (the release workflow takes
 it from the git tag, so that a v1.0.1 release really contains firmware 1.0.1).
 """
+import argparse
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from urllib.parse import quote
+from build_output import staged_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PIO_HOME = os.path.expanduser(os.environ.get("PLATFORMIO_CORE_DIR", "~/.platformio"))
@@ -36,12 +40,12 @@ ESPTOOL = os.path.join(PIO_HOME, "packages", "tool-esptoolpy", "esptool.py")
 
 
 def envs():
-    text = open(os.path.join(ROOT, "platformio.ini")).read()
+    text = (Path(ROOT) / "platformio.ini").read_text(encoding="utf-8")
     return re.findall(r"^\[env:([^\]]+)\]", text, re.M)
 
 
 def version():
-    text = open(os.path.join(ROOT, "platformio.ini")).read()
+    text = (Path(ROOT) / "platformio.ini").read_text(encoding="utf-8")
     return re.search(r'-DFW_VERSION=\\"([^"\\]+)\\"', text).group(1)
 
 
@@ -77,31 +81,36 @@ def flash_layout(env):
 
 def signing_key():
     path = os.environ.get("RELEASE_SIGNING_KEY_FILE") or os.path.join(ROOT, "keys", "release-signing-key.pem")
-    return path if os.path.exists(path) else None
+    if os.environ.get("RELEASE_SIGNING_KEY_FILE") and not os.path.isfile(path):
+        raise FileNotFoundError("Configured release signing key file is missing")
+    return path if os.path.isfile(path) else None
 
 
 def sign(key, path):
     """Writes path.sig and checks it against the public key built into the firmware."""
-    subprocess.run(["openssl", "dgst", "-sha256", "-sign", key, "-out", path + ".sig", path], check=True)
-    header = open(os.path.join(ROOT, "src", "update_key.h")).read()
-    lines = re.findall(r'"([^"]*)\\n"', header)  # the PEM, one line per string literal
-    pem = "\n".join(lines)
-    pub = path + ".pub.pem"
-    open(pub, "w").write(pem + "\n")
-    try:
-        subprocess.run(["openssl", "dgst", "-sha256", "-verify", pub, "-signature", path + ".sig", path],
+    # Failed or wrong-key signatures must never become discoverable by update.json.
+    with tempfile.TemporaryDirectory(prefix=".sign-", dir=os.path.dirname(path)) as temp:
+        signature = os.path.join(temp, "signature")
+        subprocess.run(["openssl", "dgst", "-sha256", "-sign", key, "-out", signature, path], check=True)
+        header = (Path(ROOT) / "src/update_key.h").read_text(encoding="utf-8")
+        lines = re.findall(r'"([^"]*)\\n"', header)
+        pub = os.path.join(temp, "public.pem")
+        with open(pub, "w") as output:
+            output.write("\n".join(lines) + "\n")
+        subprocess.run(["openssl", "dgst", "-sha256", "-verify", pub, "-signature", signature, path],
                        check=True, capture_output=True)
-    finally:
-        os.remove(pub)
+        os.replace(signature, path + ".sig")
 
 
 def set_version(v):
+    if not re.fullmatch(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?", v):
+        raise ValueError("version must be X.Y or X.Y.Z")
     path = os.path.join(ROOT, "platformio.ini")
-    text = open(path).read()
+    text = Path(path).read_text(encoding="utf-8")
     new = re.sub(r'(-DFW_VERSION=\\")[^"\\]+(\\")', lambda m: m.group(1) + v + m.group(2), text)
     if new == text and f'-DFW_VERSION=\\"{v}\\"' not in text:
         sys.exit("FW_VERSION not found in platformio.ini")
-    open(path, "w").write(new)
+    Path(path).write_text(new, encoding="utf-8")
 
 
 def write_checksums(out):
@@ -130,16 +139,9 @@ def write_update_manifest(out, release_version):
         json.dump({"tag_name": "v" + release_version, "assets": assets}, output, separators=(",", ":"))
 
 
-def main():
-    args = sys.argv[1:]
-    if args[:1] == ["--version"]:
-        set_version(args[1])
-        args = args[2:]
-    targets = args or envs()
-    out = os.path.join(ROOT, "release", version())
-    os.makedirs(out, exist_ok=True)
+def build_release(targets, out, release_version, key):
+    """Assemble artifacts in staging; a failed build cannot alter a release."""
     boards = {}
-    key = signing_key()
     if not key:
         print("no signing key: the firmware is not signed, GitHub updates will refuse it")
     for env in targets:
@@ -172,7 +174,7 @@ def main():
         print(f"[{env}] {mcu}, {size} flash, {mode} {freq}: "
               f"{os.path.getsize(factory)} + {os.path.getsize(firmware)} bytes", flush=True)
     write_checksums(out)
-    write_update_manifest(out, version())
+    write_update_manifest(out, release_version)
     path = os.path.join(out, "boards.json")
     old = {}
     if os.path.exists(path):
@@ -180,6 +182,27 @@ def main():
             old = json.load(previous)
     with open(path, "w") as output:
         json.dump({**old, **boards}, output, indent=1)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version")
+    parser.add_argument("targets", nargs="*")
+    args = parser.parse_args()
+    known = envs()
+    targets = args.targets or known
+    unknown = sorted(set(targets) - set(known))
+    if unknown:
+        parser.error("unknown board(s): " + ", ".join(unknown))
+    if args.version:
+        try:
+            set_version(args.version)
+        except ValueError as error:
+            parser.error(str(error))
+    release_version = version()
+    out = os.path.join(ROOT, "release", release_version)
+    with staged_directory(out, preserve=True) as staged:
+        build_release(targets, staged, release_version, signing_key())
     print(f"written to {out}")
 
 

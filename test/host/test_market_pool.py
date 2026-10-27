@@ -7,6 +7,7 @@ root = Path(__file__).resolve().parents[2]
 source = (root / 'src/market.cpp').read_text()
 getter = source[source.index('PoolStats poolStatsGet()'):source.index('MarketData marketGet()')]
 number = source[source.index('double poolNumber('):source.index('// "856K"')] if 'double poolNumber(' in source else ''
+rate = source[source.index('double parseRate('):source.index('// GET https://host:port/path')]
 best_assignment = next(line.strip() for line in source.splitlines() if 'p.bestEver =' in line)
 prefix = r'''
 #include <cassert>
@@ -40,11 +41,19 @@ int main() {
   BEST_ASSIGNMENT
   assert(p.bestEver==9);
  }
+ for(const char *text:{"", "bad", "-1K", "nan", "inf", "1e309", "1e308E", "12oops", "12KK", "12Kgarbage"})
+  assert(parseRate(text, 123)==123);
+ assert(parseRate(nullptr, 123)==123);
+ assert(parseRate("0K", 123)==0);
+ assert(parseRate(" 1.25 k ")==1250);
+ assert(parseRate("856K")==856000);
+ assert(parseRate("1.25M")==1250000);
+ assert(parseRate("125")==125);
  puts("Production pool stats: main/backup isolation, numeric and text values, invalid-response preservation passed");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-pool-view-') as temp:
  cpp=Path(temp)/'test.cpp';exe=Path(temp)/'test'
- cpp.write_text(prefix+number+getter+tests.replace('BEST_ASSIGNMENT',best_assignment))
+ cpp.write_text(prefix+number+rate+getter+tests.replace('BEST_ASSIGNMENT',best_assignment))
  subprocess.run(['g++','-std=c++17','-O2','-Itest/host/stubs/miner','-Isrc','-I.pio/libdeps/esp32-headless/ArduinoJson/src',str(cpp),'-o',str(exe)],cwd=root,check=True)
  subprocess.run([str(exe)],check=True)

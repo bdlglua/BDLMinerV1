@@ -139,7 +139,7 @@ by default; turn it off with the *Anonymous usage count* setting (`count`).
 ### Making a release
 
 Pushing a tag **`vX.Y.Z`** runs the *Release* workflow (`.github/workflows/release.yml`):
-host tests, firmware `X.Y.Z` for every board (the version comes from the tag), signatures,
+browser and host tests, firmware `X.Y.Z` for every board (the version comes from the tag), signatures,
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
@@ -158,6 +158,15 @@ Locally, `python3 tools/make_release.py [--version X.Y.Z] [board...]` writes
 `release/<version>/` (signed when `keys/release-signing-key.pem` exists) and
 `python3 tools/make_installer.py release/<version> site` the installer site. The *CI*
 workflow runs the host tests and builds every board on each push and pull request.
+
+Both generators prepare their output in a temporary directory and replace the previous
+output only after success. A partial release rebuild retains the other boards; rebuilding
+an installer removes obsolete board files. Missing factory images stop installer generation.
+An explicitly configured `RELEASE_SIGNING_KEY_FILE` must exist; a missing file stops the
+build instead of silently producing unsigned firmware.
+
+The [repository and script review](docs/audits/2026-10-27-scripts.md) documents the
+additional corrections prepared after v1.5.2.
 
 ## Build and flash
 

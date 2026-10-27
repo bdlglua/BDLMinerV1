@@ -10,10 +10,12 @@
 The GitHub workflow publishes <out> on GitHub Pages: the browser can only
 flash files from the same site (release downloads are not CORS-enabled).
 """
+import argparse
 import json
 import os
+from pathlib import Path
 import shutil
-import sys
+from build_output import staged_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -33,16 +35,19 @@ BOARDS = [
 CHIP_FAMILY = {"esp32": "ESP32", "esp32s2": "ESP32-S2", "esp32s3": "ESP32-S3", "esp32c3": "ESP32-C3"}
 
 
-def main():
-    release, out = sys.argv[1], sys.argv[2]
+def build_installer(release, out):
     version = os.path.basename(os.path.normpath(release))
-    chips = json.load(open(os.path.join(release, "boards.json")))
+    chips = json.loads((Path(release) / "boards.json").read_text(encoding="utf-8"))
     os.makedirs(out, exist_ok=True)
     listed = []
     for env, name in BOARDS:
         image = f"{env}-factory.bin"
-        if env not in chips or not os.path.exists(os.path.join(release, image)):
+        if env not in chips:
             continue
+        if chips[env] not in CHIP_FAMILY:
+            raise ValueError(f"Unsupported chip for {env}: {chips[env]}")
+        if not os.path.isfile(os.path.join(release, image)):
+            raise ValueError(f"Missing factory image: {image}")
         shutil.copyfile(os.path.join(release, image), os.path.join(out, image))
         manifest = {
             "name": f"BDLMiner V1 - {name}",
@@ -50,12 +55,28 @@ def main():
             "new_install_prompt_erase": True,
             "builds": [{"chipFamily": CHIP_FAMILY[chips[env]], "parts": [{"path": image, "offset": 0}]}],
         }
-        json.dump(manifest, open(os.path.join(out, f"manifest-{env}.json"), "w"), indent=1)
+        (Path(out) / f"manifest-{env}.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
         listed.append({"env": env, "name": name})
-    page = open(os.path.join(ROOT, "installer", "index.html")).read()
+    if not listed:
+        raise ValueError("No supported boards with factory images in this release")
+    page = (Path(ROOT) / "installer/index.html").read_text(encoding="utf-8")
     page = page.replace("__BOARDS__", json.dumps(listed)).replace("__VERSION__", version)
-    open(os.path.join(out, "index.html"), "w").write(page)
-    print(f"installer for {version}: {len(listed)} boards in {out}")
+    (Path(out) / "index.html").write_text(page, encoding="utf-8")
+    return version, len(listed)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("release", type=Path)
+    parser.add_argument("out", type=Path)
+    args = parser.parse_args()
+    release, out = args.release.resolve(), args.out.resolve()
+    # Replacing a source directory (or its parent) would destroy the inputs.
+    if out == release or out in release.parents:
+        parser.error("installer output must not contain the source release")
+    with staged_directory(out) as staged:
+        version, count = build_installer(str(release), str(staged))
+    print(f"installer for {version}: {count} boards in {out}")
 
 
 if __name__ == "__main__":

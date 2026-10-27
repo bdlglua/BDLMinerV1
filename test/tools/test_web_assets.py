@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
 import make_web
@@ -33,6 +34,21 @@ class WebAssetsTests(unittest.TestCase):
             make_web.generate(root)
             version = lambda text: re.search(r'kWebVersion\[\] = "([^"]+)"', text)[1]
             self.assertNotEqual(version(first), version(output.read_text()))
+
+    def test_failed_asset_publication_preserves_complete_previous_header(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            shutil.copytree(make_web.ROOT / 'web', root / 'web')
+            (root / 'src').mkdir()
+            output = make_web.generate(root)
+            original = output.read_bytes()
+            with (root / 'web/style.css').open('a') as stream:
+                stream.write('\n/* changed source */\n')
+            with patch.object(make_web.os, 'replace', side_effect=OSError('disk error')):
+                with self.assertRaisesRegex(OSError, 'disk error'):
+                    make_web.generate(root)
+            self.assertEqual(output.read_bytes(), original)
+            self.assertEqual(list(output.parent.iterdir()), [output])
 
 
 if __name__ == '__main__':

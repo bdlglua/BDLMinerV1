@@ -2,6 +2,8 @@
 """Pack the offline miner UI into deterministic, gzip-compressed flash assets."""
 import gzip
 import hashlib
+import os
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,14 +26,24 @@ def generate(root=ROOT):
         lines.append('};')
     for name, symbol in [('header', 'kHeader'), ('dashboard', 'kDashboard'),
                          ('settings', 'kSettingsPage'), ('log', 'kLogPage')]:
-        html = (web / (name + '.html')).read_text()
+        html = (web / (name + '.html')).read_text(encoding='utf-8')
         if ')WEB"' in html:
             raise ValueError('Reserved C++ delimiter in ' + name)
         lines.append('const char ' + symbol + '[] PROGMEM = R"WEB(' + html + ')WEB";')
     output = root / 'src' / 'web_assets.generated.h'
     content = '\n'.join(lines) + '\n'
-    if not output.exists() or output.read_text() != content:
-        output.write_text(content)
+    if not output.exists() or output.read_text(encoding='utf-8') != content:
+        # Separate PlatformIO invocations can generate the same header. Never
+        # expose a truncated file to a compiler or leave one after a failure.
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=output.parent, delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(content)
+            os.replace(temporary, output)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     return output
 
 

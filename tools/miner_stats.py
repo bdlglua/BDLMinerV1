@@ -15,9 +15,12 @@ release file. So for each version and board:
 The previous counts are kept in ~/.cache/bdlminer_stats.json.
 """
 import json
+import math
 import os
 import re
+import sys
 import time
+import tempfile
 import urllib.request
 
 REPO = "bdlglua/BDLMinerV1"
@@ -36,7 +39,8 @@ def releases():
     while True:
         url = f"https://api.github.com/repos/{REPO}/releases?per_page=100&page={page}"
         req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
-        batch = json.load(urllib.request.urlopen(req, timeout=30))
+        with urllib.request.urlopen(req, timeout=30) as response:
+            batch = json.load(response)
         out += batch
         if len(batch) < 100:
             return out
@@ -53,8 +57,18 @@ def main():
 
     previous = {}
     if os.path.exists(STATE):
-        with open(STATE) as saved:
-            previous = json.load(saved)
+        try:
+            with open(STATE) as saved:
+                previous = json.load(saved)
+            if (not isinstance(previous, dict) or
+                    not isinstance(previous.get("time"), (int, float)) or
+                    not math.isfinite(previous["time"]) or
+                    not isinstance(previous.get("counts"), dict) or
+                    any(not isinstance(n, int) or n < 0 for n in previous["counts"].values())):
+                raise ValueError("Invalid usage snapshot")
+        except (ValueError, TypeError):
+            print("Previous usage snapshot is invalid; starting a new baseline.", file=sys.stderr)
+            previous = {}
     now = time.time()
     days = (now - previous["time"]) / 86400 if previous else 0
 
@@ -63,22 +77,34 @@ def main():
     else:
         print(f"{'version':10} {'board':22} {'miner-days':>10} {'active':>8}")
         total_active = 0.0
+        comparable = 0
         for key in sorted(counts, key=version_order, reverse=True):
             version, board = key.split()
             active = ""
-            if days > 0:
-                rate = (counts[key] - previous["counts"].get(key, 0)) / days
+            before = previous.get("counts", {}).get(key)
+            # A new or re-uploaded asset has no comparable baseline. Its full
+            # historical count is not a day's activity, nor a negative rate.
+            if days > 0 and before is not None and counts[key] >= before:
+                comparable += 1
+                rate = (counts[key] - before) / days
                 total_active += rate
                 active = f"{rate:.1f}"
             print(f"{version:10} {board:22} {counts[key]:>10} {active:>8}")
-        if days > 0:
+        if days > 0 and comparable:
             print(f"\nabout {total_active:.0f} active miners (over the last {days:.1f} days)")
         else:
             print("\nrun again in a day or more to see how many miners are active")
 
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
-    with open(STATE, "w") as saved:
-        json.dump({"time": now, "counts": counts}, saved)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=os.path.dirname(STATE), delete=False) as saved:
+            temporary = saved.name
+            json.dump({"time": now, "counts": counts}, saved)
+        os.replace(temporary, STATE)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.remove(temporary)
 
 
 if __name__ == "__main__":
