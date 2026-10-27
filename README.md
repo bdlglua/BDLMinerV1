@@ -5,15 +5,15 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.1](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.1)**
+**Latest release: [v1.6.2](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.2)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.1.md)
+· [Release notes](docs/releases/v1.6.2.md)
 
-Version **1.6.1** adds selectable **525 / 550 / 575 / 600 MHz** profiles for the
-experimental Bitaxe Gamma 601 target, with **600 MHz / 1150 mV** as the default,
-automatic stock-frequency fallback, and hardware-error diagnostics. It also fixes
-regulator-limit ratios and supervises the full startup ramp. The default identity
-is **BDLMinerV1/1.6.1**; existing ESP32 SHA-256d kernels and safety settings are retained.
+Version **1.6.2** extends experimental Bitaxe Gamma 601 profiles to **525–800 MHz
+in 25 MHz steps**. The default stays **600 MHz / 1150 mV**, with automatic 525 MHz
+fallback and hardware-error diagnostics. Regulator/startup fixes and hard safety
+limits are retained. The default identity is **BDLMinerV1/1.6.2**; existing ESP32
+SHA-256d kernels and safety settings are retained.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -55,12 +55,11 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 
 ### Bitaxe Gamma 601: experimental native firmware
 
-**Development after v1.6.1:** `main` extends the selectable profiles to
-**525–800 MHz in 25 MHz steps**. The default stays **600 MHz / 1150 mV**, with
-the same 525 MHz fallback and hard safety limits. The additional profiles require
-a newer build; they are **not in the v1.6.1 release** and have not been validated
-on a physical Gamma 601. Selecting 800 MHz does not guarantee stable mining or a
-specific hashrate.
+**New in v1.6.2:** selectable profiles cover **525–800 MHz in 25 MHz steps**.
+The default stays **600 MHz / 1150 mV**, with the same 525 MHz fallback and hard
+safety limits. Profiles above 600 MHz require v1.6.2 or newer. They have not been
+validated on a physical Gamma 601; selecting 800 MHz does not guarantee stable
+mining or a specific hashrate.
 
 **Fixed in v1.6.1:** [comparison with ESP-Miner](docs/audits/2026-10-27-gamma-reference.md)
 identified incorrect regulator-limit ratios and overly fast startup ramping in
@@ -74,7 +73,7 @@ support pending physical-board validation**, not a measured hashrate claim.
 Use **5 V DC through the barrel connector, at least 4 A**, with the heatsink and
 working 4-pin fan fitted. USB is for programming; USB alone cannot power ASIC mining.
 Since v1.6.1, the target defaults to an **experimental 600 MHz profile at
-1150 mV**. On `main`, the local settings offer **525–800 MHz in 25 MHz steps**. Sustained hardware
+1150 mV**. Since v1.6.2, the local settings offer **525–800 MHz in 25 MHz steps**. Sustained hardware
 errors or missing/stalled ASIC telemetry trigger a **525 MHz fallback until restart**;
 hard thermal, fan and supply protections still stop mining. No overclock gain has
 been measured on a physical board. It uses a 100% fan and
@@ -184,7 +183,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.1 && git push origin v1.6.1
+git tag v1.6.2 && git push origin v1.6.2
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -208,7 +207,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.1.
+corrections shipped in v1.5.3 and retained in v1.6.2.
 
 ## Build and flash
 

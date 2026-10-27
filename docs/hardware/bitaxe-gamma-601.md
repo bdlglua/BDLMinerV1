@@ -38,7 +38,7 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    rollback, back up the flash with esptool before erasing it. BDLMiner does not
    import AxeOS NVS settings.
 2. Download **`bitaxe-gamma-601-factory.bin`** from the
-   [v1.6.1 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.1) and
+   [v1.6.2 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.2) and
    flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
    the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
    Alternatively, build with PlatformIO 6.1.19:
@@ -77,7 +77,7 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 ## Controls, telemetry and safety
 
 * Since v1.6.1, the firmware defaults to an **experimental 600 MHz profile** at
-  **1150 mV**. Development builds after v1.6.1 extend local Settings > Safety to
+  **1150 mV**. Since v1.6.2, local Settings > Safety offers
   **525–800 MHz in 25 MHz steps** (v1.6.1 only offers 525 / 550 / 575 / 600 MHz);
   changes apply after restart and are included in backups. Older Gamma settings
   without this new key inherit the requested 600 MHz default. Invalid stored profile
@@ -150,8 +150,7 @@ fault injection instead.
 
 The 600 MHz controls, automatic fallback and regulator/startup corrections ship
 in v1.6.1. They are not in v1.6.0. Stock 525 MHz remains selectable.
-Profiles above 600 MHz are subsequent development changes on `main`, not included
-in v1.6.1; they require a build containing the extended range.
+Profiles above 600 MHz ship in v1.6.2 and are not included in v1.6.1.
 
 The reference comparison and fixes after v1.6.0 are recorded in
 [the Gamma integration review](../audits/2026-10-27-gamma-reference.md).
