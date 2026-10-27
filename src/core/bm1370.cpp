@@ -61,7 +61,7 @@ Packet job(uint8_t slot, const uint8_t header[80]) {
     return command(0x21, payload, sizeof(payload));
 }
 Packet frequency(float target, float *actual) {
-    if (!std::isfinite(target) || target < 50 || target > 525) return {};
+    if (!std::isfinite(target) || target < 50 || target > kMaxMHz) return {};
     float best = 0, error = std::numeric_limits<float>::max(), vcoBest = error;
     int productBest = 65535, fbBest = 0, refBest = 0, p1Best = 0, p2Best = 0;
     for (int ref = 2; ref >= 1; --ref) for (int p1 = 7; p1 >= 1; --p1) for (int p2 = 7; p2 >= 1; --p2) {
@@ -141,6 +141,17 @@ const char *Health::fault(bool powered, bool requireDiode) const {
         return "ASIC voltage fault; restart required";
     if (status & (powered ? 0xfb7fu : 0xf33fu)) return "Regulator reports a fault; restart required";
     return nullptr;
+}
+bool ErrorMonitor::update(uint32_t errorValue, uint32_t totalValue, uint32_t now) {
+    if (!ready) { errors=errorValue; total=totalValue; at=now; ready=true; return false; }
+    uint32_t elapsed=now-at;
+    if (elapsed<10000) return false;
+    uint32_t e=errorValue-errors, t=totalValue-total;
+    errors=errorValue; total=totalValue; at=now;
+    if (elapsed>15000 || !t || uint64_t(t)>uint64_t(elapsed)) { percent=-1; badWindows=0; return false; }
+    percent=100.0f*double(e)/t;
+    badWindows=percent>=2 ? uint8_t(badWindows<3?badWindows+1:3) : 0;
+    return badWindows>=3;
 }
 uint64_t Counter::update(uint32_t value, uint32_t now) {
     uint32_t elapsed = now - at, delta = value - previous;

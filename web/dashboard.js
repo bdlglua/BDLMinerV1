@@ -130,7 +130,7 @@ async function tick(){
    tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB'+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason),
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
   if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):'—';
-   const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz · '+number(a.core_v,3)+' V · '+number(a.current_a,1)+' A',t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C',t('Input')+': '+number(a.input_v)+' V'].join('\n'),true);
+   const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz · '+number(a.core_v,3)+' V · '+number(a.current_a,1)+' A',t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C',t('Input')+': '+number(a.input_v)+' V',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
    hardware.dataset.group='device';T.push(hardware);
   }
   for(const [group,id]of Object.entries({pool:'pool-grid',market:'market-grid',device:'device-grid',records:'records-grid',main:'m'}))syncTiles(id,T.filter(e=>(e.dataset.group||'main')===group));
@@ -169,7 +169,7 @@ const historyPoll=startPolling(async()=>{if(statsOnline&&latestStats)await refre
 
 function renderHealth(j){
  const reasons={sensor:'No usable temperature sensor.',thermal:'Temperature protection is limiting mining.',hot:'Temperature protection has paused mining.',user_pause:'Mining is paused by your power setting.',ota:'Mining is paused during a firmware update.',supervision:'Mining is waiting for fresh supervision.',battery:'Battery saver is limiting mining.',user:'Mining is limited by your power setting.'};
- const reason=(j.asic&&!j.asic.running?j.asic.state:'')||(j.task_failures?'A service could not start: not enough memory. Restart the miner.':'')||reasons[j.limitation_reason]||(!j.pool.connected?'Waiting for a pool connection.':'');
+ const reason=(j.asic&&!j.asic.running?j.asic.state:'')||(j.task_failures?'A service could not start: not enough memory. Restart the miner.':'')||reasons[j.limitation_reason]||(!j.pool.connected?'Waiting for a pool connection.':'')||(j.asic?.stock_fallback?'Overclock fallback: mining at the stock profile.':'');
  const box=document.getElementById('health');box.hidden=!reason;box.textContent=t(reason);box.dataset.level=(j.asic&&!j.asic.running)||['sensor','hot','supervision'].includes(j.limitation_reason)?'bad':'info';
 }
 

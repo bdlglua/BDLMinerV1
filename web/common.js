@@ -20,7 +20,7 @@ const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','
 'backup_help':'Le fichier de sauvegarde contient tous les réglages (mots de passe compris : garde-le privé) et les statistiques à vie : meilleure difficulté, les 10 meilleures shares, hashes, shares, blocs, durée de fonctionnement. Le restaurer sur un autre miner lui donne aussi ces statistiques.',
 'Display':'Affichage','Notifications':'Notifications','Safety':'Sécurité','Network':'Réseau'};
 // Settings labels by key.
-const FR_SET={pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
+const FR_SET={asicmhz:'Fréquence ASIC Gamma (MHz)',pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
 diff:'Difficulté de share suggérée',pool2:'Pool de secours (vide = aucune)',port2:'Port de la pool de secours',
 proto:'Protocole du pool principal',proto2:'Protocole du pool de secours',sv2key:'Clé d’autorité V2 du pool principal',sv2key2:'Clé d’autorité V2 du pool de secours',uaauto:'Mode du user agent',ua:'User agent manuel',
 rotateh:'Alterner pool principale / secours toutes les N heures (0 = seulement en cas de panne)',bright:'Luminosité (%)',rot:'Rotation (0-3)',
@@ -37,6 +37,14 @@ count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fich
 function t(s){return LANG=='fr'&&FR[s]||s}
 
 Object.assign(FR,{
+ '525 MHz (stock)':'525 MHz (origine)',
+ '600 MHz is experimental. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.':'600 MHz est expérimental. La tension reste à 1 150 mV. En cas d’instabilité, repli à 525 MHz jusqu’au redémarrage.',
+ 'Requested profile':'Profil demandé','ASIC hardware errors':'Erreurs matérielles ASIC','Stock fallback':'Repli à la fréquence d’origine',
+ 'Overclock fallback: mining at the stock profile.':'Repli de l’overclock : minage à la fréquence d’origine.',
+ 'Mining (525 MHz fallback profile)':'Minage à 525 MHz (repli)',
+ 'High ASIC hardware error rate':'Taux élevé d’erreurs matérielles ASIC',
+ 'ASIC error telemetry unavailable':'Mesure des erreurs ASIC indisponible',
+
  'Experimental hardware support':'Prise en charge matérielle expérimentale',
  'Fan':'Ventilateur','Regulator':'Régulateur','Input':'Entrée',
  'Mining (experimental)':'Minage (expérimental)',

@@ -9,6 +9,9 @@
 #include <cmath>
 
 #include "log.h"
+#ifdef BOARD_GAMMA601
+#include "core/bm1370.h"
+#endif
 #include "settings_store.h"
 #include "core/pool_identity.h"
 
@@ -52,6 +55,9 @@ const SettingInfo kSettings[] = {
     S("ntfysrv", Text, ntfyServer, "Notifications", "ntfy server"),
     S("notify32", Bool, notify32, "Notifications", "Also notify every 32-bit share"),
     N("maxtemp", maxTemp, "Safety", "Pause mining above this temperature in C (0 = off)"),
+#ifdef BOARD_GAMMA601
+    N("asicmhz", asicFrequency, "Safety", "Gamma ASIC frequency (MHz)"),
+#endif
     N("power", miningPower, "Safety", "Mining power on USB and battery (0-100%, 0 = paused)"),
     N("rebooth", rebootHours, "Safety", "Restart after N hours without an accepted share (0 = off)"),
     S("saver", Bool, batterySaver, "Safety", "Battery saver: dim and mine at half speed on battery"),
@@ -131,6 +137,9 @@ void settingsSanitize(Settings &settings) {
     if (settings.language > 1) settings.language = 0;
     if (settings.githubUpdate > 2) settings.githubUpdate = 2;
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
+#ifdef BOARD_GAMMA601
+    if (!bm1370::validProfile(settings.asicFrequency)) settings.asicFrequency = bm1370::kStockMHz;
+#endif
     if (settings.miningPower > 100) settings.miningPower = 100;
     if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;

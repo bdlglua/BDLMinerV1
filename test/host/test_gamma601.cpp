@@ -2,6 +2,7 @@
 #include "../../src/gamma601.cpp"
 #include <cassert>
 void logf(const char *, ...) {}
+Settings settings;
 static uint8_t power=100;
 static uint32_t generation=1, powerUntil=UINT32_MAX;
 static uint64_t hashes=0;
@@ -23,7 +24,8 @@ static void health(){
     word(0x8d,bm1370::encodeLinear11(50));word(0x79,0);
 }
 static void reset(){
-    latched=powered=configured=false;live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting"};publish();
+    latched=powered=configured=forceStock=false;settings=Settings();settings.asicFrequency=525;
+    live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1};publish();
     testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
     testUartTx.clear();testUartTxTimes.clear();testUartRx.clear();testDelayHook=nullptr;testMillis=1000;testReset=1;power=100;generation=1;powerUntil=UINT32_MAX;
     bytes(0x4c,0xfd,{0x16});bytes(0x24,0xad,{6,0x54,0x49,0x54,0x6d,0x24,0x41});bytes(0x24,0x20,{0x17});health();
@@ -104,5 +106,35 @@ int main(){
     assert(initAsic(w)&&live.running&&temperature()==50);
     reset();begin();testUartFail=true;assert(!initAsic(w));off("UART failed",true);assert(latched&&testReset==0);
     reset();begin();testTaskFailAt=testTaskStarts;assert(!start()&&latched&&testReset==0);
+    assert(Settings().asicFrequency==600);
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w)&&live.frequency==600);
+    // Error/total register values are independent cumulative counters, paired by time.
+    bm1370::Response totalReply{};totalReply.reg=0x8c;
+    bm1370::Response errorReply{};errorReply.reg=0x4c;
+    for(int i=0;i<=30;++i){testMillis+=1000;errorReply.value=i*10;totalReply.value=i*300;
+        registerResult(errorReply);registerResult(totalReply);
+    }
+    assert(forceStock&&live.stockFallback&&!powered&&!latched&&testReset==0);
+    assert(!strcmp(live.fallbackReason,"High ASIC hardware error rate"));
+    assert(targetFrequency()==525&&initAsic(w)&&live.frequency==525);
+    off("Pool reconnect");assert(forceStock&&targetFrequency()==525); // no automatic OC retry
+    assert(initAsic(w));instability("ASIC counter stalled; restart required");assert(latched&&!powered);
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    instability("ASIC not responding; restart required");assert(forceStock&&!latched&&testReset==0);
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    testMillis+=3100;checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    testMillis+=5100;lastHashReply=lastHashProgress=testMillis;
+    checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
+    assert(!strcmp(live.fallbackReason,"ASIC error telemetry unavailable"));
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    testMillis+=5100;lastHashReply=testMillis;lastErrorReply=testMillis;
+    checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
+    assert(!strcmp(live.fallbackReason,"ASIC counter stalled; restart required"));
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    testI2cFail=true;instability("High ASIC hardware error rate");
+    assert(latched&&!powered&&testReset==0); // failed shutdown cannot auto-restart
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!forceStock&&!powered); // hard limits still stop
     puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, relative VOUT limits, supervised PLL ramp, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
 }

@@ -67,7 +67,11 @@ support pending physical-board validation**, not a measured hashrate claim.
 
 Use **5 V DC through the barrel connector, at least 4 A**, with the heatsink and
 working 4-pin fan fitted. USB is for programming; USB alone cannot power ASIC mining.
-The initial configuration uses stock **525 MHz / 1150 mV**, a 100% fan, and
+The current development target defaults to an **experimental 600 MHz profile at
+1150 mV**. The local settings offer **525 / 550 / 575 / 600 MHz**. Sustained hardware
+errors or missing/stalled ASIC telemetry trigger a **525 MHz fallback until restart**;
+hard thermal, fan and supply protections still stop mining. No overclock gain has
+been measured on a physical board. It uses a 100% fan and
 `public-pool.io:3333` with suggested difficulty **1024**. A pool must negotiate at
 least eight version-rolling bits and assign difficulty >= 16; incompatible pools
 are reported explicitly and the ASIC stays off. Public Pool uses Stratum V1;

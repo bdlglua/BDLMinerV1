@@ -19,7 +19,8 @@ one BM1370, TPS546D24A/S, EMC2101, 128×32 SSD1306 OLED at 0x3c.
 | BOOT / screen button | GPIO0 |
 
 Use a regulated **5 V barrel supply rated for at least 4 A** (preferably 25–30 W),
-a properly mounted heatsink and the 5 V 4-pin PWM fan. USB-C provides programming;
+a properly mounted heatsink and the 5 V 4-pin PWM fan. For the 600 MHz profile,
+prefer a 5 V / 6 A (30 W) supply for headroom. USB-C provides programming;
 USB alone is insufficient for ASIC mining. This target must not be flashed onto a
 Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
 
@@ -62,9 +63,24 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 
 ## Controls, telemetry and safety
 
-* Stock maximum **525 MHz / 1150 mV**, no overclock controls. Mining power 10–100%
-  reduces PLL frequency (minimum 50 MHz); 0 pauses. Values 1–9 keep the ASIC off
-  with an explanatory status. The fan runs at **100%** in this initial integration.
+* The development firmware now defaults to an **experimental 600 MHz profile** at
+  **1150 mV**. In local Settings > Safety, choose **525 / 550 / 575 / 600 MHz**;
+  changes apply after restart and are included in backups. Older Gamma settings
+  without this new key inherit the requested 600 MHz default. Invalid stored profile
+  values fall back to 525 MHz; API requests outside the four choices are rejected.
+* Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
+  Values 1–9 keep the ASIC off with an explanatory status. The fan remains **100%**.
+  Thermal limiting may reduce the actual frequency below the requested profile.
+* Three consecutive ten-second hardware-error windows at **>=2%**, a missing/stalled
+  hash counter, or unavailable hardware-error telemetry trigger a reset/power-off and
+  one restart at **525 MHz** when running above stock. The fallback stays active across
+  pool reconnects and ordinary pauses until the next reboot; it never raises voltage.
+  A failure at stock still stops mining. Temperature/fan/supply/sensor faults keep
+  their latched shutdown behavior and never use this retry path.
+* The dashboard shows requested/actual frequency, measured hardware-error percentage
+  (unavailable until a complete window), fallback state and its reason. Rates still
+  come from the physical hash counter, not from clock settings. **600 MHz and its
+  expected gain have not been validated on a physical Gamma 601.**
 * BOOT short press cycles the three compact OLED pages; a long press follows the
   existing reset/setup behavior. OLED rotation maps 0/1 to normal and 2/3 to 180°.
 * No ASIC power during provisioning. Startup checks device identities and verifies
@@ -115,6 +131,10 @@ induce overheating or a fan fault under load for testing; use controlled sensor/
 fault injection instead.
 
 ## Attribution and references
+
+The 600 MHz controls and automatic fallback are development changes after v1.6.0;
+they are not in that published release. Flash a build containing these changes to
+use them. Stock 525 MHz remains selectable.
 
 The reference comparison and fixes after v1.6.0 are recorded in
 [the Gamma integration review](../audits/2026-10-27-gamma-reference.md).

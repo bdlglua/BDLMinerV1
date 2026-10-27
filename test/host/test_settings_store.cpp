@@ -4,6 +4,9 @@
 #include "settings_store.h"
 Settings settings;
 const SettingInfo kSettings[] = {
+#ifdef BOARD_GAMMA601
+    {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
+#endif
     {"pool", SettingType::Text, &settings.poolHost, 0, "", ""},
     {"power", SettingType::Number, &settings.miningPower, 8, "", ""},
     {"webpass", SettingType::Secret, &settings.webPassword, 0, "", ""},
@@ -34,6 +37,17 @@ struct Storage {
     }
 };
 int main() {
+#ifdef BOARD_GAMMA601
+    Settings oldGammaSettings;const char *old=R"({"power":100})";
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(old),strlen(old),oldGammaSettings));
+    assert(oldGammaSettings.asicFrequency==600); // old Gamma records gain the requested default
+    for(unsigned frequency:{525,550,575,600}) {
+        Settings profile;profile.asicFrequency=frequency;std::string encoded;
+        assert(settingsstore::encode(profile,encoded));Settings decoded;
+        assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(encoded.data()),encoded.size(),decoded));
+        assert(decoded.asicFrequency==frequency);
+    }
+#endif
     Storage storage;
     uint32_t sequence = 0;
     Settings original; original.poolHost = "original.pool"; original.miningPower = 75;

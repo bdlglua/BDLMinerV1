@@ -167,6 +167,10 @@ void handleStats() {
     a["input_v"] = asic.inputVoltage; a["core_v"] = asic.coreVoltage;
     a["current_a"] = asic.current; a["regulator_temp_c"] = asic.regulatorTemperature;
     a["regulator_status"] = asic.regulatorStatus;
+    a["profile_mhz"] = asic.requestedMHz; a["stock_fallback"] = asic.stockFallback;
+    a["fallback_reason"] = asic.fallbackReason;
+    if (asic.hardwareErrorPercent < 0) a["hardware_error_percent"] = nullptr;
+    else a["hardware_error_percent"] = asic.hardwareErrorPercent;
 #endif
     if (isnan(temp)) j["temp_c"] = nullptr;
     else j["temp_c"] = (int)lroundf(temp);

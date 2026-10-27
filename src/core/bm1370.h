@@ -9,6 +9,17 @@
 namespace bm1370 {
 constexpr uint32_t kVersionMask = 0x1fffe000;
 constexpr size_t kSlots = 16;
+constexpr uint16_t kStockMHz = 525, kMaxMHz = 600;
+inline bool validProfile(unsigned mhz) { return mhz >= kStockMHz && mhz <= kMaxMHz && (mhz-kStockMHz)%25 == 0; }
+// Compare cumulative ASIC error/total counters in ten-second windows.
+struct ErrorMonitor {
+    uint32_t errors = 0, total = 0, at = 0;
+    uint8_t badWindows = 0;
+    bool ready = false;
+    float percent = -1;
+    void reset() { ready = false; badWindows = 0; percent = -1; }
+    bool update(uint32_t errorValue, uint32_t totalValue, uint32_t now);
+};
 struct Packet { std::array<uint8_t, 128> bytes{}; size_t size = 0; };
 uint8_t crc5(const uint8_t *data, size_t length);
 Packet command(uint8_t header, const uint8_t *data, size_t length);

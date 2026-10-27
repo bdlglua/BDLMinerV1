@@ -42,7 +42,7 @@ void render() {
     auto s = minerStats(); auto a = gamma601::status();
     String temp = std::isfinite(a.temperature)?String(a.temperature,1):"--";
     if (!a.running) { lines("Gamma 601 / BM1370",a.state,temp+" C  Fan "+String(a.rpm),WiFi.localIP().toString()); return; }
-    if (page == 0) lines("BDLMiner / BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
+    if (page == 0) lines(a.stockFallback?"BM1370 525M FALLBACK":"BDLMiner / BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
         temp+" C  Fan "+String(a.rpm),String("Accepted ")+s.accepted+" / "+s.rejected);
     else if (page == 1) lines("Power / thermal",String(a.inputVoltage,2)+"V in  "+String(a.coreVoltage,3)+"V core",
         String(a.frequency,0)+" MHz  "+String(a.current,1)+"A",String("VR ")+String(a.regulatorTemperature,1)+" C");

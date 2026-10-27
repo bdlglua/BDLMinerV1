@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "core/bm1370.h"
 #include "miner.h"
+#include "settings.h"
 #include "log.h"
 #include "runtime.h"
 
@@ -15,13 +16,20 @@ constexpr uint8_t kTps = 0x24, kEmc = 0x4c;
 constexpr int kReset = 1;
 HardwareSerial uart(1);
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting"};
+Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting", 600, false, "", -1};
 Status live = snapshot;
 bool configured = false, latched = false, powered = false;
 uint8_t voltageMode = 0;
 uint32_t powerEnabledAt = 0, lastHealthSample = 0;
 bm1370::Receiver receiver;
 bm1370::Counter counter;
+bm1370::ErrorMonitor errors;
+bool forceStock = false, errorSeen = false;
+uint32_t errorValue = 0, lastErrorReply = 0;
+float targetFrequency() {
+    unsigned requested = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
+    return std::max(50.0f, float(forceStock ? bm1370::kStockMHz : requested)*minerPowerPercent()/100);
+}
 struct Slot {
     AsicWork work;
     uint32_t sent = 0;
@@ -63,7 +71,7 @@ bool voltage(uint8_t reg, float value) {
 }
 void invalidate() {
     for (auto &slot : slots) slot.valid = false;
-    receiver.clear(); counter.reset(); nextSlot = 0;
+    receiver.clear(); counter.reset(); errors.reset(); errorSeen=false; nextSlot = 0;
 }
 void off(const char *reason, bool fault = false) {
     // Assert reset first: even a broken I2C bus must stop the ASIC immediately.
@@ -74,6 +82,34 @@ void off(const char *reason, bool fault = false) {
     if (fault || !disabled || !fan) latched = true;
     live.state = !disabled || !fan ? "I2C shutdown fault; restart required" : reason;
     invalidate(); publish();
+}
+void instability(const char *reason) {
+    if (!forceStock && live.frequency > bm1370::kStockMHz) {
+        logf("[gamma] %s at %.2f MHz; falling back to 525 MHz\n", reason, live.frequency);
+        forceStock=true; live.stockFallback=true; live.fallbackReason=reason;
+        off("Restarting at 525 MHz (fallback)");
+    } else off(reason, true);
+}
+void registerResult(const bm1370::Response &r) {
+    if (!powered || r.address) return;
+    uint32_t now=millis();
+    if (r.reg==0x4c) { errorValue=r.value; lastErrorReply=now; errorSeen=true; return; }
+    if (r.reg!=0x8c) return;
+    uint64_t delta=counter.update(r.value,now);
+    minerAsicHashes(delta); lastHashReply=now;
+    if (delta) lastHashProgress=now;
+    if (errorSeen && now-lastErrorReply<=2000) {
+        bool unstable=errors.update(errorValue,r.value,now);
+        live.hardwareErrorPercent=errors.percent; publish();
+        if (unstable && live.frequency>bm1370::kStockMHz) instability("High ASIC hardware error rate");
+    } else { errors.reset(); live.hardwareErrorPercent=-1; }
+}
+void checkWatchdogs(uint32_t now) {
+    if (!powered || !live.running) return;
+    if (now-lastHashReply>3000) instability("ASIC not responding; restart required");
+    else if (now-lastHashProgress>5000) instability("ASIC counter stalled; restart required");
+    else if (live.frequency>bm1370::kStockMHz && now-lastErrorReply>5000)
+        instability("ASIC error telemetry unavailable");
 }
 bool send(const bm1370::Packet &p) {
     return p.size && uart.write(p.bytes.data(), p.size) == p.size;
@@ -119,6 +155,8 @@ bool waitSafe(uint32_t ms, bool requireDiode = false) {
 }
 bool initAsic(const AsicWork &first) {
     activeGeneration = first.generation; activeMask = first.versionMask;
+    live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
+    live.hardwareErrorPercent=-1; errors.reset(); errorSeen=false;
     if (!collect(false)) return false;
     if (minerPowerPercent() < 10 || !minerAsicCurrent(activeGeneration)) return false;
     if (!write8(kTps, 0x01, 0x80)) { off("ASIC power enable failed", true); return false; }
@@ -159,16 +197,18 @@ bool initAsic(const AsicWork &first) {
     // Let the external-diode conversion settle after configuring the ASIC mux.
     if (!waitSafe(100) || !collect(true)) return false;
     // Match ESP-Miner's 6.25 MHz / 100 ms steps, with live safety checks.
-    float target = std::max(50.0f, 525.0f * minerPowerPercent() / 100);
+    float target = targetFrequency();
     for (float f = 50; f < target; f += 6.25f) {
-        if (!send(bm1370::frequency(f)) || !waitSafe(100, true)) return false;
-        target = std::max(50.0f, 525.0f * minerPowerPercent() / 100);
+        if (!send(bm1370::frequency(f, &live.frequency)) || !waitSafe(100, true)) return false;
+        target = targetFrequency();
     }
     if (!send(bm1370::frequency(target, &live.frequency))) return false;
     uint32_t hcn = uint32_t((4294967296.0 / 128 * 25 / live.frequency * 0.5) - 268);
     if (!reg(0x10, hcn) || !collect(true)) return false;
-    counter.reset(); lastHashReply = lastHashProgress = millis();
-    live.running = true; live.state = "Mining (experimental)"; publish(); return true;
+    counter.reset(); lastHashReply = lastHashProgress = lastErrorReply = millis();
+    live.running = true; live.state = forceStock ? "Mining (525 MHz fallback profile)" : "Mining (experimental)";
+    logf("[gamma] BM1370 %.2f MHz, requested profile %u MHz%s\n", live.frequency, live.requestedMHz, forceStock ? " (stock fallback)" : "");
+    publish(); return true;
 }
 void worker(void *) {
     if (!configured) { off("Hardware initialization failed; restart required", true); vTaskDelete(nullptr); return; }
@@ -201,7 +241,7 @@ void worker(void *) {
                 if (!initAsic(next)) { if (!latched && powered) off("BM1370 initialization failed", true); continue; }
                 now = millis(); sampled = now;
             }
-            float target = std::max(50.0f, 525.0f * minerPowerPercent() / 100);
+            float target = targetFrequency();
             if (std::fabs(live.frequency - target) > 3) {
                 // Power changes reset the chip: no mixing of in-flight results/PLL state.
                 off("Applying power limit"); continue;
@@ -213,13 +253,9 @@ void worker(void *) {
         }
         bm1370::Response response;
         size_t budget = 2048;
-        while (budget-- && uart.available()) if (receiver.push(uart.read(), response)) {
+        while (powered && budget-- && uart.available()) if (receiver.push(uart.read(), response)) {
             if (!response.job) {
-                if (response.reg == 0x8c && response.address == 0) {
-                    uint64_t delta = counter.update(response.value, millis());
-                    minerAsicHashes(delta); lastHashReply = millis();
-                    if (delta) lastHashProgress = millis();
-                }
+                registerResult(response);
                 continue;
             }
             Slot &slot = slots[response.slot];
@@ -232,13 +268,12 @@ void worker(void *) {
             if (slot.proofCount < 32) ++slot.proofCount;
             minerAsicCandidate(slot.work, response.nonce, response.versionBits);
         }
+        if (!powered) continue;
         if (now - requested >= 1000) {
             requested = now;
-            if (!request(0x8c, false)) { off("ASIC counter request failed", true); continue; }
+            if (!request(0x4c, false) || !request(0x8c, false)) { off("ASIC counter request failed", true); continue; }
         }
-        uint32_t checkedAt = millis();
-        if (checkedAt - lastHashReply > 3000) off("ASIC not responding; restart required", true);
-        else if (checkedAt - lastHashProgress > 5000) off("ASIC counter stalled; restart required", true);
+        checkWatchdogs(millis());
         delay(2);
     }
 }
@@ -273,6 +308,8 @@ void begin() {
     else { live.state = "Ready / waiting for pool"; publish(); }
 }
 bool start() {
+    live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
+    publish();
     if (!configured) return false;
     bool ok = runtime::started(xTaskCreatePinnedToCore(worker, "bm1370", 8192, nullptr, 3, nullptr, 1) == pdPASS,
         runtime::Miner, "BM1370 task");

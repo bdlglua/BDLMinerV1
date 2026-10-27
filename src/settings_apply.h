@@ -7,6 +7,9 @@
 #include <cstring>
 #include <utility>
 #include "settings.h"
+#ifdef BOARD_GAMMA601
+#include "core/bm1370.h"
+#endif
 #include "core/sv2_noise.h"
 #include "core/pool_identity.h"
 
@@ -20,6 +23,9 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "theme")) limits.maximum = 4;
     if (!strcmp(s.key, "proto") || !strcmp(s.key, "proto2")) limits.maximum = 1;
     if (!strcmp(s.key, "update")) limits.maximum = 2;
+#ifdef BOARD_GAMMA601
+    if (!strcmp(s.key, "asicmhz")) { limits.minimum=525; limits.maximum=600; }
+#endif
     return limits;
 }
 
@@ -47,6 +53,10 @@ inline const char *settingsError(JsonObjectConst values) {
                 if (!v.is<long>() || v.as<long>() < limits.minimum || v.as<long>() > limits.maximum)
                     return "Setting outside its allowed range";
                 long n = v.as<long>();
+#ifdef BOARD_GAMMA601
+                if (!strcmp(s.key, "asicmhz") && !bm1370::validProfile(unsigned(n)))
+                    return "Gamma frequency must be 525, 550, 575 or 600 MHz";
+#endif
                 if (!strcmp(s.key, "maxtemp") && n && n < 30) return "Temperature must be 0 or at least 30 C";
                 if ((!strcmp(s.key, "nightfrom") || !strcmp(s.key, "nightto")) && n > 23 && n != 255)
                     return "Night hours must be 0-23 or 255";

@@ -26,8 +26,8 @@ int main() {
     assert(!ticketMask(32).size);
     float actual=0;auto pll=frequency(525,&actual);
     assert(pll.size==11&&std::fabs(actual-525)<.01);
-    assert(!frequency(NAN).size&&!frequency(526).size&&!frequency(0).size);
-    for(int f=50;f<=525;++f){assert(frequency(f,&actual).size&&std::fabs(actual-f)<3);}
+    assert(!frequency(NAN).size&&!frequency(601).size&&!frequency(0).size);
+    for(int f=50;f<=600;++f){assert(frequency(f,&actual).size&&std::fabs(actual-f)<3);}
     uint8_t header[80];for(int i=0;i<80;++i)header[i]=i;
     auto p=job(15,header);assert(p.size==88&&p.bytes[4]==120&&p.bytes[5]==1);
     assert(!memcmp(p.bytes.data()+6,header+76,4));
@@ -71,6 +71,18 @@ int main() {
         h=healthy;h.status=flag;assert(h.fault(true)&&h.fault(false,false));
     }
     h=healthy;h.status=0x0840;h.coreVoltage=0;assert(!h.fault(false));assert(h.fault(true));
+    assert(validProfile(525)&&validProfile(550)&&validProfile(575)&&validProfile(600));
+    assert(!validProfile(524)&&!validProfile(601)&&!validProfile(526));
+    ErrorMonitor guard;assert(!guard.update(100,1000,0));
+    assert(!guard.update(110,1300,1000)); // short samples do not count as windows
+    assert(!guard.update(200,4000,10000)&&guard.percent>3);
+    assert(!guard.update(300,7000,20000));
+    assert(guard.update(400,10000,30000)); // 3 windows >=2 percent
+    guard.reset();assert(!guard.update(UINT32_MAX-20,UINT32_MAX-200,100));
+    assert(!guard.update(9,2799,10100)&&guard.percent==1.0f); // both counters wrap
+    assert(!guard.update(20,2800,30101)&&guard.percent<0); // stale window
+    guard.reset();guard.update(0,0,0);guard.update(100,3000,10000);
+    assert(!guard.update(100,6000,20000)&&guard.badWindows==0); // healthy window breaks the streak
     Counter c;assert(!c.update(UINT32_MAX-100,100));
     assert(c.update(99,1100)==(uint64_t(200)<<32));
     assert(!c.update(0,2100));assert(c.update(250,3100)==(uint64_t(250)<<32));

@@ -64,6 +64,9 @@ struct Settings {
     String ntfyTopic;  // empty = off
     String ntfyServer = DEFAULT_NTFY_SERVER;
     bool notify32 = false;  // also every 32-bit share
+#ifdef BOARD_GAMMA601
+    uint16_t asicFrequency = 600; // requested Gamma profile; automatic stock fallback
+#endif
     // Safety
     uint8_t maxTemp = 65;    // 0 disables thermal limiting; existing choices are kept
     uint8_t miningPower = 100; // full available speed; saved user limits are preserved

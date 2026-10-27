@@ -8,6 +8,10 @@ struct Status {
     uint16_t rpm, regulatorStatus;
     bool running;
     const char *state;
+    uint16_t requestedMHz;
+    bool stockFallback;
+    const char *fallbackReason;
+    float hardwareErrorPercent; // -1 until a complete measurement window
 };
 // Call with reset already asserted, after the shared LGFX I2C bus is initialized.
 void begin();

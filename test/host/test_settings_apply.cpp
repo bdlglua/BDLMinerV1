@@ -4,6 +4,9 @@
 
 Settings settings;
 const SettingInfo kSettings[] = {
+#ifdef BOARD_GAMMA601
+    {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
+#endif
     {"pool", SettingType::Text, &settings.poolHost, 0, "", ""},
     {"pool2", SettingType::Text, &settings.backupHost, 0, "", ""},
     {"port", SettingType::Number, &settings.poolPort, 16, "", ""},
@@ -92,5 +95,16 @@ int main() {
     assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
     assert(!deserializeJson(changes,R"({"proto":1,"sv2key":" 9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6  "})"));
     assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
+#ifdef BOARD_GAMMA601
+    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":600.5})",R"({"asicmhz":"600"})"}) {
+        assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
+    }
+    for(int mhz:{525,550,575,600}) {
+        changes.clear();changes["asicmhz"]=mhz;
+        assert(!settingsError(changes.as<JsonObjectConst>()));
+        Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);
+        assert(staged.asicFrequency==mhz&&settings.asicFrequency==600);
+    }
+#endif
     puts("V1/V2 and automatic/manual settings: validation, staged isolation and preserved manual identity passed");
 }
