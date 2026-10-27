@@ -5,6 +5,14 @@ SHA on the ESP32 as a substitute. **No physical Gamma 601 was available during
 implementation. Electrical behavior, real hashrate and accepted pool shares still
 need validation on a board.** Do not interpret simulated TH/s tests as measurements.
 
+### OLED preview (v1.6.1)
+
+The three pages below use the firmware's 128×32 monochrome rendering and font,
+enlarged for readability. **All values are fictional demo data**, not hardware
+measurements. Press BOOT to switch pages.
+
+![Gamma 601 OLED pages with fictional demo data](../images/gamma601-oled-v1.6.1.png)
+
 ## Supported hardware
 
 Only revision **601**, ESP32-S3-WROOM-1 **N16R8** (16 MB flash / 8 MB octal PSRAM),
