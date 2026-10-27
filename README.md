@@ -5,15 +5,15 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.0)**
+**Latest release: [v1.6.1](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.1)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.0.md)
+· [Release notes](docs/releases/v1.6.1.md)
 
-Version **1.6.0** adds **experimental native Bitaxe Gamma 601** firmware: BM1370
-mining, TPS546 regulator control, EMC2101 temperature/fan monitoring, compact OLED
-pages and ASIC diagnostics in the local dashboard. BIP310 version rolling and
-TH/s-scale counters/history are included. The default identity is
-**BDLMinerV1/1.6.0**; existing ESP32 SHA-256d kernels and safety settings are retained.
+Version **1.6.1** adds selectable **525 / 550 / 575 / 600 MHz** profiles for the
+experimental Bitaxe Gamma 601 target, with **600 MHz / 1150 mV** as the default,
+automatic stock-frequency fallback, and hardware-error diagnostics. It also fixes
+regulator-limit ratios and supervises the full startup ramp. The default identity
+is **BDLMinerV1/1.6.1**; existing ESP32 SHA-256d kernels and safety settings are retained.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -32,7 +32,7 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 > **Validation:** eleven board variants compile and package successfully. Checks
 > cover SHA-256d, V1/V2 and BIP310 masks, independent Noise/proof checks, fragmented
 > socket sessions, persistence/OTA, simulated Gamma hardware faults and 64-bit
-> accounting, physical-display rendering, **62 browser regressions** and **15
+> accounting, physical-display rendering, **64 browser regressions** and **15
 > asset/release-tool tests**. Real Gamma hashrate, temperatures and accepted shares
 > still require a physical-board test. Public Pool's public endpoint uses V1;
 > V2 requires a separate compatible server and authority key.
@@ -55,10 +55,9 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 
 ### Bitaxe Gamma 601: experimental native firmware
 
-**After v1.6.0:** [comparison with ESP-Miner](docs/audits/2026-10-27-gamma-reference.md)
-identified incorrect regulator-limit ratios and overly fast startup ramping. Fixes
-are on `main`; they are **not included in the published v1.6.0 binaries**. Use a
-subsequent Gamma build for these corrections.
+**Fixed in v1.6.1:** [comparison with ESP-Miner](docs/audits/2026-10-27-gamma-reference.md)
+identified incorrect regulator-limit ratios and overly fast startup ramping in
+v1.6.0. The new release corrects both and supervises power and temperature throughout startup.
 
 `bitaxe-gamma-601` replaces AxeOS and mines with the **BM1370 ASIC**. It includes
 TPS546 regulator control, the EMC2101 ASIC temperature sensor/fan tachometer, the
@@ -67,7 +66,7 @@ support pending physical-board validation**, not a measured hashrate claim.
 
 Use **5 V DC through the barrel connector, at least 4 A**, with the heatsink and
 working 4-pin fan fitted. USB is for programming; USB alone cannot power ASIC mining.
-The current development target defaults to an **experimental 600 MHz profile at
+Since v1.6.1, the target defaults to an **experimental 600 MHz profile at
 1150 mV**. The local settings offer **525 / 550 / 575 / 600 MHz**. Sustained hardware
 errors or missing/stalled ASIC telemetry trigger a **525 MHz fallback until restart**;
 hard thermal, fan and supply protections still stop mining. No overclock gain has
@@ -178,7 +177,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.0 && git push origin v1.6.0
+git tag v1.6.1 && git push origin v1.6.1
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -202,7 +201,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.0.
+corrections shipped in v1.5.3 and retained in v1.6.1.
 
 ## Build and flash
 

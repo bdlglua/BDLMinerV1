@@ -29,8 +29,11 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
 1. Save your AxeOS settings and pool/worker configuration. If you need an exact
    rollback, back up the flash with esptool before erasing it. BDLMiner does not
    import AxeOS NVS settings.
-2. Build with PlatformIO 6.1.19 (or download the **bitaxe-gamma-601-experimental**
-   artifact from a successful GitHub Actions CI run for the desired commit):
+2. Download **`bitaxe-gamma-601-factory.bin`** from the
+   [v1.6.1 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.1) and
+   flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
+   the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
+   Alternatively, build with PlatformIO 6.1.19:
 
    ```sh
    pio run -e bitaxe-gamma-601
@@ -39,7 +42,9 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    ```
 
    If USB is not detected, hold BOOT while reconnecting USB, then release BOOT.
-   CI images are unsigned development builds for USB testing, not a stable release.
+   Factory flashing erases settings/statistics. Existing BDLMiner installations
+   can use the matching signed `bitaxe-gamma-601-firmware.bin` for OTA.
+   CI artifacts remain unsigned development builds for USB testing.
    A packaged factory image is flashed at **0x0**; the app-only
    `firmware.bin` is not a complete image for offset 0.
 3. Connect to `BDLMinerV1-XXXX`, password `MineYourCoins`, and open
@@ -63,7 +68,7 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 
 ## Controls, telemetry and safety
 
-* The development firmware now defaults to an **experimental 600 MHz profile** at
+* Since v1.6.1, the firmware defaults to an **experimental 600 MHz profile** at
   **1150 mV**. In local Settings > Safety, choose **525 / 550 / 575 / 600 MHz**;
   changes apply after restart and are included in backups. Older Gamma settings
   without this new key inherit the requested 600 MHz default. Invalid stored profile
@@ -132,9 +137,8 @@ fault injection instead.
 
 ## Attribution and references
 
-The 600 MHz controls and automatic fallback are development changes after v1.6.0;
-they are not in that published release. Flash a build containing these changes to
-use them. Stock 525 MHz remains selectable.
+The 600 MHz controls, automatic fallback and regulator/startup corrections ship
+in v1.6.1. They are not in v1.6.0. Stock 525 MHz remains selectable.
 
 The reference comparison and fixes after v1.6.0 are recorded in
 [the Gamma integration review](../audits/2026-10-27-gamma-reference.md).
