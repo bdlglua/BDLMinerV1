@@ -42,6 +42,7 @@ function json(res,value,status=200){res.writeHead(status,{'Content-Type':'applic
 async function fixture(options={}){
   const state={settings:clone(settings),postStatus:options.postStatus||200,postText:options.postText||null,requests:[],stats:clone(baseStats),posts:[],inflight:0,peak:0,settingsCalls:0,logCalls:0,failLog:!!options.logFailure,historyCalls:0,history:options.history||{hashrate:[1000000,900000],temperature_c:[45,55],power_percent:[100,50],coverage_percent:[100,100],interval_s:300,revision:1},diagnostics:options.diagnostics||{uptime_s:0,firmware:'test',tls:{handshakes:2,failures:0,total_ms:1000,last_ms:500},engines:[{index:0,name:'hw',hashing_ms:10000,rest_ms:20,waiting_ms:30,paused_ms:40}]}};
   if(options.stats) Object.assign(state.stats,options.stats);
+  state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
   if(options.capabilities)state.settings.capabilities=options.capabilities;
   const server=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
@@ -69,14 +70,15 @@ async function fixture(options={}){
       state.peak=Math.max(state.peak,++state.inflight);
       if(options.statsDelay)await new Promise(r=>setTimeout(r,options.statsDelay));
       state.inflight--;
-      return json(res,state.stats);
+      return json(res,state.stats,state.statsStatus);
     }
     if(req.url==='/api/history'){state.historyCalls++;if(options.historyFailure){res.writeHead(503);return res.end('History unavailable')}return json(res,state.history)}
     if(req.url==='/api/diagnostics'){return json(res,{...state.diagnostics,uptime_s:state.stats.uptime_s})}
     if(req.url==='/api/log'){
       state.logCalls++;
+      const text=state.logText;if(state.logDelay)await new Promise(r=>setTimeout(r,state.logDelay));
       if(state.failLog){res.writeHead(500);return res.end('Log unavailable')}
-      return res.end('Miner log is available');
+      return res.end(text);
     }
     if(req.url==='/slow-body'){
       res.writeHead(200,{'Content-Type':'application/json'});res.write('{');
@@ -196,6 +198,99 @@ check('peer URLs are normalized and fresh results appear on the first poll',()=>
   assert.match(await f.page.locator('#p .t').first().textContent(),/3\.00 kH\/s/);
   assert.equal(await f.page.locator('#p .t').count(),3);
   assert.equal(await f.page.locator('#st').textContent(),'ONLINE');
+}));
+
+check('regression: repeated GitHub checks unlock when unchanged statistics return',()=>run({stats:{github_update:{mode:1,checked:true,available:false}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('.gh-check:enabled');
+  for(let i=0;i<3;i++){
+    await f.page.click('.gh-check');
+    await f.page.waitForFunction(()=>!document.querySelector('.gh-check').disabled,{},{timeout:1000});
+  }
+  assert.equal(f.state.posts.filter(p=>p.url==='/api/github-check').length,3);
+}));
+
+check('regression: GitHub check and install cannot start together',()=>run({postDelay:200,stats:{github_update:{mode:1,available:true,version:'1.5.3'}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('.gh-install:enabled');
+  const locked=await f.page.evaluate(()=>{
+    document.querySelector('.gh-check').click();
+    const locked=document.querySelector('.gh-install').disabled;
+    document.querySelector('.gh-install').click();
+    return locked;
+  });
+  assert.equal(locked,true);await f.page.waitForTimeout(50);assert.equal(f.state.posts.length,1);
+}));
+
+check('regression: disabled update mode also disables an available install',()=>run({stats:{github_update:{mode:0,available:true,version:'1.5.3'}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('.gh-install');
+  assert.equal(await f.page.locator('.gh-install').isDisabled(),true);
+}));
+
+check('regression: GitHub command errors remain visible above old metadata errors',()=>run({postStatus:500,postText:'Operation refused',stats:{github_update:{mode:1,checked:true,available:false,error:'old metadata error'}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('.gh-check:enabled');await f.page.click('.gh-check');
+  await f.page.waitForFunction(()=>document.querySelector('#updates').textContent.includes('Operation refused'),{},{timeout:1000});
+  await f.page.waitForTimeout(100);assert.match(await f.page.locator('#updates').textContent(),/Operation refused/);
+  assert.equal(await f.page.locator('.gh-check').isEnabled(),true);
+}));
+
+check('regression: malformed inline history preserves charts and pool status',()=>run({},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#st').textContent==='ONLINE');
+  const count=await f.page.locator('#chart-count').textContent();
+  f.state.stats.history={hashrate:[-1],interval_s:300};
+  await f.page.waitForTimeout(150);
+  assert.equal(await f.page.locator('#st').textContent(),'ONLINE');
+  assert.equal(await f.page.locator('#chart-count').textContent(),count);
+  assert.match(await f.page.locator('#history-status').textContent(),/Invalid response/);
+}));
+
+check('regression: lost statistics disable measurements until a fresh response',()=>run({},async f=>{
+  await f.page.goto(f.url);await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#start-benchmark:enabled');
+  f.state.statsStatus=503;
+  await f.page.waitForFunction(()=>document.querySelector('#st').textContent==='NO CONNECTION');
+  assert.equal(await f.page.locator('#start-benchmark').isDisabled(),true);
+  f.state.statsStatus=200;await f.page.waitForSelector('#start-benchmark:enabled');
+}));
+
+check('regression: pausing the log discards an in-flight response',()=>run({},async f=>{
+  await f.page.goto(f.url+'/log');await f.page.waitForFunction(()=>document.querySelector('#l').textContent.includes('available'));
+  f.state.logDelay=200;f.state.logText='late log response';const previous=f.state.logCalls;
+  for(let i=0;i<100&&f.state.logCalls===previous;i++)await f.page.waitForTimeout(10);
+  assert.ok(f.state.logCalls>previous);
+  await f.page.click('#pause-log');const text=await f.page.locator('#l').textContent();
+  await f.page.waitForTimeout(250);assert.equal(await f.page.locator('#l').textContent(),text);
+  await f.page.click('#pause-log');await f.page.waitForFunction(()=>document.querySelector('#l').textContent==='late log response');
+}));
+
+check('regression: slow history and peers do not delay live statistics',()=>run({stats:{history:undefined,history_revision:1,peers:['slow-peer.test']}},async f=>{
+  let releaseHistory,releasePeer,peerStarted=false;
+  const historyGate=new Promise(resolve=>releaseHistory=resolve),peerGate=new Promise(resolve=>releasePeer=resolve);
+  await f.page.route('**/api/history',async route=>{await historyGate;await route.fulfill({json:f.state.history})});
+  await f.page.route('http://slow-peer.test/**',async route=>{peerStarted=true;await peerGate;await route.fulfill({json:{hashrate:1,pool:{connected:true},shares:{accepted:0},best:{ever:0}}})});
+  try{
+    await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#st').textContent==='ONLINE');
+    f.state.stats.shares.accepted=123;
+    await f.page.waitForFunction(()=>Array.from(document.querySelectorAll('#m .t')).some(e=>e.querySelector('.l')?.textContent==='Shares'&&e.querySelector('.v')?.textContent==='123'),{},{timeout:2000});
+    assert.equal(peerStarted,true);
+  }finally{releaseHistory();releasePeer()}
+}));
+
+check('late history responses from a previous boot cannot replace current data',()=>run({stats:{history:undefined,history_revision:1,boot_id:'old',uptime_s:100}},async f=>{
+  let releaseFirst,historyCalls=0;
+  const gate=new Promise(resolve=>releaseFirst=resolve);
+  await f.page.route('**/api/history',async route=>{
+    const first=++historyCalls===1;
+    if(first)await gate;
+    await route.fulfill({json:{boot_id:first?'old':'new',revision:first?1:2,interval_s:300,hashrate:[first?999000:2000]}});
+  });
+  try{
+    await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#st').textContent==='ONLINE');
+    for(let i=0;i<100&&!historyCalls;i++)await f.page.waitForTimeout(10);
+    assert.equal(historyCalls,1);
+    f.state.stats={...f.state.stats,boot_id:'new',uptime_s:200,history_revision:2,shares:{accepted:77,rejected:0}};
+    await f.page.waitForFunction(()=>Array.from(document.querySelectorAll('#m .t')).some(e=>e.querySelector('.l')?.textContent==='Shares'&&e.querySelector('.v')?.textContent==='77'));
+    releaseFirst();await f.page.waitForFunction(()=>document.querySelector('#chart-average').textContent==='2.00 kH/s');
+    assert.equal(await f.page.locator('#chart-count').textContent(),'1');
+    assert.equal(await f.page.locator('#st').textContent(),'ONLINE');
+  }finally{releaseFirst()}
 }));
 
 check('GitHub installation stays disabled across dashboard refreshes',()=>run({stats:{github_update:{available:true,version:'1.0.11',installing:true,notes:'45 %'}}},async f=>{

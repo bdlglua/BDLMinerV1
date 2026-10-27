@@ -167,6 +167,8 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) documents the
 additional corrections prepared after v1.5.2.
+The [local dashboard review](docs/audits/2026-10-27-dashboard.md) covers subsequent
+fixes to update controls, independent polling, history, measurements and log pause.
 
 ## Build and flash
 

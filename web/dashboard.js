@@ -1,4 +1,5 @@
 let cachedHistory={hashrate:[],interval_s:300},historyRevision=null,historyRetryAt=0,lastUptime=-1,lastBootId=null,latestStats=null;
+let statsOnline=false,statsSession=0;
 let historyRange=21600,historySelected=null,plotViews=[],historyWidth=0,historySignature='',lastChartLimit=null;
 let historyPointerFrame=0,peerCacheKey='',peerCache=[],peerCacheAt=0;
 try{const saved=Number(localStorage.getItem('bdl-history-range'));if([3600,21600,86400].includes(saved))historyRange=saved}catch(e){}
@@ -25,42 +26,42 @@ function syncTiles(id,nodes){
  old.forEach(node=>node.remove());
 }
 
-let installPending=false,installRequestId=0,installError='',checkPending=false;
+let installPending=false,installRequestId=0,updateError='',updateNotice='',checkPending=false,updateBusy=false,latestUpdate=null;
 let updateSignature='';
 function renderUpdate(u){
- const signature=JSON.stringify([u,installPending,installError,checkPending]);if(signature===updateSignature)return;
+ latestUpdate=u;
+ if(installPending&&!updateBusy&&(u?.request_id||0)!==installRequestId)installPending=false;
+ const signature=JSON.stringify([u,installPending,updateError,updateNotice,checkPending,statsOnline]);if(signature===updateSignature)return;
  updateSignature=signature;const focused=document.activeElement?.classList.contains('gh-check')?'gh-check':document.activeElement?.classList.contains('gh-install')?'gh-install':null;
  const card=upd(u);document.getElementById('updates').replaceChildren(...(card?[card]:[]));
  if(focused)document.querySelector('#updates .'+focused+':enabled')?.focus({preventScroll:true});
 }
 function upd(u){
  if(!u)return;
- if(installPending&&(u.request_id||0)!==installRequestId)installPending=false;
  const status=u.mode===0?'Updates disabled in settings.':u.checking?'Checking…':u.checked?'Latest release checked.':'Waiting for the first check.';
- const e=tile(t(u.available?'Update available':'GitHub updates'),u.version||'-',[u.error||u.notes||installError||t(status),u.retry_in_s?t('Next retry in')+' '+dur(u.retry_in_s):''].filter(Boolean).join('\n'),true);
+ const e=tile(t(u.available?'Update available':'GitHub updates'),u.version||'-',[updateError||u.error||u.notes||updateNotice||t(status),u.retry_in_s?t('Next retry in')+' '+dur(u.retry_in_s):''].filter(Boolean).join('\n'),true);
  if(u.available&&u.supported!==false){
  const b=document.createElement('button');b.className='gh-install';
- b.type='button';b.disabled=installPending||u.installing||u.checking;b.textContent=t(u.checking?'Checking…':b.disabled?'Installing…':u.retry_in_s?'Retry now':'Install');
+ b.type='button';b.disabled=!statsOnline||checkPending||installPending||u.installing||u.checking||u.mode===0;b.textContent=t(checkPending||u.checking?'Checking…':installPending||u.installing?'Installing…':u.retry_in_s?'Retry now':'Install');
  b.onclick=async()=>{
-  if(installPending||u.installing||u.checking)return;
-  installRequestId=u.request_id||0;installPending=true;installError='';b.disabled=true;b.textContent=t('Installing…');
-  try{await request('/api/github-update',{method:'POST'},'text');installError=t('Installation requested.')}
-  catch(err){installPending=false;installError=errorText(err);b.disabled=false;b.textContent=t('Install')}
-  e.querySelector('.s').textContent=installError;
+  if(updateBusy||!statsOnline||installPending||latestUpdate?.installing||latestUpdate?.checking||latestUpdate?.mode===0)return;
+  installRequestId=latestUpdate?.request_id||0;installPending=true;updateBusy=true;updateError=updateNotice='';renderUpdate(latestUpdate);
+  try{await request('/api/github-update',{method:'POST'},'text');updateNotice=t('Installation requested.')}
+  catch(err){installPending=false;updateError=errorText(err)}
+  finally{updateBusy=false;renderUpdate(latestUpdate)}
  };
  e.appendChild(b);
  }
  if(u.available&&u.supported===false){const link=document.createElement('a');link.className='button secondary';link.textContent=t('Download via USB');if(u.release_url&&/^https:\/\/github\.com\//.test(u.release_url)){link.href=u.release_url;link.target='_blank';link.rel='noopener noreferrer';e.appendChild(link)}}
  const c=document.createElement('button');c.className='gh-check';c.type='button';
- c.disabled=checkPending||installPending||u.checking||u.installing||u.mode===0;
+ c.disabled=!statsOnline||checkPending||installPending||u.checking||u.installing||u.mode===0;
  c.textContent=t(checkPending||u.checking?'Checking…':'Check now');
  c.onclick=async()=>{
-  if(c.disabled)return;
-  checkPending=true;c.disabled=true;c.textContent=t('Checking…');
-  try{await request('/api/github-check',{method:'POST'},'text');installError=t('Check requested.')}
-  catch(err){installError=errorText(err);c.disabled=false;c.textContent=t('Check now')}
-  finally{checkPending=false}
-  e.querySelector('.s').textContent=installError;
+  if(updateBusy||!statsOnline||installPending||latestUpdate?.checking||latestUpdate?.installing||latestUpdate?.mode===0)return;
+  checkPending=true;updateBusy=true;updateError=updateNotice='';renderUpdate(latestUpdate);
+  try{await request('/api/github-check',{method:'POST'},'text');updateNotice=t('Check requested.')}
+  catch(err){updateError=errorText(err)}
+  finally{checkPending=false;updateBusy=false;renderUpdate(latestUpdate)}
  };
  e.appendChild(c);return e;
 }
@@ -85,13 +86,19 @@ async function peer(u){
  }catch(e){return null}
 }
 async function tick(){
- try{const j=await request('/api/stats?history=0');const m=j.market,pv=j.pool_view;
-  if(!m||!pv||!j.pool||!Array.isArray(j.engines))throw Error(t('Invalid response from the miner.'));
-  if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;renderHistory()}
+ try{const j=await request('/api/stats?history=0');const m=j?.market,pv=j?.pool_view;
+  if(!m||!pv||!j.pool||!j.shares||!j.best||!j.network||!j.lifetime||!Array.isArray(j.engines)||
+     ![j.hashrate,j.uptime_s,j.total_hashes,j.shares.accepted,j.shares.rejected].every(v=>Number.isFinite(v)&&v>=0))
+   throw Error(t('Invalid response from the miner.'));
+  statsOnline=true;
+  if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){++statsSession;historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;textAt('history-status','');renderHistory()}
   lastUptime=j.uptime_s;lastBootId=j.boot_id||null;latestStats=j;
-  if(j.history){const signature=JSON.stringify(j.history);if(signature!==historySignature){cachedHistory=normalizeHistory(j.history);historySignature=signature;renderHistory()}}
+  if(j.history){
+   try{const signature=JSON.stringify(j.history);if(signature!==historySignature){cachedHistory=normalizeHistory(j.history);historySignature=signature;renderHistory()}textAt('history-status','')}
+   catch(e){textAt('history-status',errorText(e))}
+  }
   sampleBenchmark(j);
-  document.getElementById('start-benchmark').disabled=benchmarkBusy||!!benchmark;
+  benchmarkControls();
   document.documentElement.style.setProperty('--accent',j.accent);
   const st=document.getElementById('st');textAt('st',t(j.pool.connected?'ONLINE':'OFFLINE'));st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';st.dataset.state=j.pool.connected?'online':'disconnected';
   const state=j.throttle=='paused'?'⚠ '+t('mining paused'):j.throttle=='half'?t('battery saver: half speed'):j.throttle=='reduced'?t('power limited'):'';
@@ -129,19 +136,32 @@ async function tick(){
   renderHealth(j);
   document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
 
-  await refreshHistory(j);
-  const hosts=peerHosts(j.peers,j.ip);
-  document.getElementById('ph').hidden=!hosts.length;
-  document.getElementById('peers-section').hidden=!hosts.length;
-  if(hosts.length){
-   const key=hosts.map(u=>u.origin).join('|');if(key!==peerCacheKey||Date.now()-peerCacheAt>=15000){peerCache=await Promise.all(hosts.map(peer));peerCacheKey=key;peerCacheAt=Date.now()}
-   const replies=peerCache;let total=j.hashrate;
-   const P=hosts.map((u,i)=>{const p=replies[i];if(!p)return tile(u.host,'-',t('no answer'));total+=p.hashrate;return tile(u.host,si(p.hashrate,'H/s'),(p.pool.connected?t('online'):t('OFFLINE'))+' · '+p.shares.accepted+' '+t('shares')+' · '+t('best')+' '+diff(p.best.ever))});
-   P.unshift(tile(t('All miners'),si(total,'H/s'),(hosts.length+1)+' '+t('miners'),true));syncTiles('p',P);
-  }else{document.getElementById('p').replaceChildren();peerCacheKey='';peerCache=[]}
- }catch(e){const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
+  // Auxiliary requests have their own non-overlapping schedulers. A slow
+  // history response or unreachable peer must not hold up local readings.
+  historyPoll.refresh();peersPoll.refresh();
+ }catch(e){statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
 }
 startPolling(tick,3000);
+
+async function refreshPeers(){
+ if(!statsOnline||!latestStats)return;
+ const hosts=peerHosts(latestStats.peers,latestStats.ip);
+ document.getElementById('ph').hidden=!hosts.length;
+ document.getElementById('peers-section').hidden=!hosts.length;
+ if(hosts.length){
+  const key=hosts.map(u=>u.origin).join('|');
+  if(key!==peerCacheKey||Date.now()-peerCacheAt>=15000){
+   const replies=await Promise.all(hosts.map(peer));
+   if(!statsOnline||key!==peerHosts(latestStats.peers,latestStats.ip).map(u=>u.origin).join('|'))return;
+   peerCache=replies;peerCacheKey=key;peerCacheAt=Date.now();
+  }
+  const replies=peerCache;let total=latestStats.hashrate;
+  const P=hosts.map((u,i)=>{const p=replies[i];if(!p)return tile(u.host,'-',t('no answer'));total+=p.hashrate;return tile(u.host,si(p.hashrate,'H/s'),(p.pool.connected?t('online'):t('OFFLINE'))+' · '+p.shares.accepted+' '+t('shares')+' · '+t('best')+' '+diff(p.best.ever))});
+  P.unshift(tile(t('All miners'),si(total,'H/s'),(hosts.length+1)+' '+t('miners'),true));syncTiles('p',P);
+ }else{document.getElementById('p').replaceChildren();peerCacheKey='';peerCache=[]}
+}
+const peersPoll=startPolling(refreshPeers,15000);
+const historyPoll=startPolling(async()=>{if(statsOnline&&latestStats)await refreshHistory(latestStats)},3000);
 
 function renderHealth(j){
  const reasons={sensor:'No usable temperature sensor.',thermal:'Temperature protection is limiting mining.',hot:'Temperature protection has paused mining.',user_pause:'Mining is paused by your power setting.',ota:'Mining is paused during a firmware update.',supervision:'Mining is waiting for fresh supervision.',battery:'Battery saver is limiting mining.',user:'Mining is limited by your power setting.'};
@@ -157,14 +177,16 @@ function renderOverview(j){
 
 async function refreshHistory(j){
  if(j.history||j.history_revision==null||historyRevision===j.history_revision||Date.now()<historyRetryAt)return;
+ const session=statsSession;
  try{
   const h=await request('/api/history');
   const normalized=normalizeHistory(h);
+  if(session!==statsSession)return; // the device rebooted while this response was in flight
   if(h.boot_id&&j.boot_id&&h.boot_id!==j.boot_id)return;
   cachedHistory=normalized;historyRevision=h.revision??j.history_revision;historyRetryAt=0;historySelected=null;
   renderHistory();
   document.getElementById('history-status').textContent='';
- }catch(e){historyRetryAt=Date.now()+60000;document.getElementById('history-status').textContent=errorText(e)}
+ }catch(e){if(session!==statsSession)return;historyRetryAt=Date.now()+60000;document.getElementById('history-status').textContent=errorText(e)}
 }
 function normalizeHistory(h){
  if(!h||!Array.isArray(h.hashrate)||h.hashrate.length>288||!Number.isFinite(h.interval_s)||h.interval_s<1||h.interval_s>86400)throw Error(t('Invalid response from the miner.'));
@@ -299,13 +321,14 @@ renderHistory();
 let benchmark=null,benchmarkBusy=false,benchmarkReport=null,benchmarkCancelled=false,benchmarkFinishing=false;
 const benchmarkStatus=document.getElementById('benchmark-status');
 function measurementSample(j){return {uptime_s:j.uptime_s,total_hashes:j.total_hashes,temperature_c:j.temp_c??null,power_percent:j.power_percent,configured_power_percent:j.power_limit_percent,max_temperature_c:j.max_temp_c??null,temperature_source:j.temperature_source||'unavailable',reason:j.limitation_reason||'unknown'}}
-function benchmarkControls(){document.getElementById('start-benchmark').disabled=!latestStats||benchmarkBusy||!!benchmark;document.getElementById('stop-benchmark').disabled=!benchmark||benchmarkBusy;document.getElementById('download-benchmark').disabled=!benchmarkReport||benchmarkBusy}
+function benchmarkControls(){document.getElementById('start-benchmark').disabled=!statsOnline||!latestStats||benchmarkBusy||!!benchmark;document.getElementById('stop-benchmark').disabled=!benchmark||benchmarkBusy;document.getElementById('download-benchmark').disabled=!benchmarkReport||benchmarkBusy}
 async function startBenchmark(){
- if(!latestStats||benchmark||benchmarkBusy)return;
+ if(!statsOnline||!latestStats||benchmark||benchmarkBusy)return;
  benchmarkBusy=true;benchmarkCancelled=false;benchmarkControls();benchmarkStatus.textContent=t('Preparing measurement…');
  const start=measurementSample(latestStats),firmware=latestStats.firmware,bootId=latestStats.boot_id;
  try{
   const profile=await request('/api/diagnostics');
+  if(!statsOnline)throw Error(t('Connection failed. Please try again.'));
   if(!profile?.tls||!Array.isArray(profile.engines)||!Number.isFinite(profile.uptime_s))throw Error(t('Invalid response from the miner.'));
   if(benchmarkCancelled||document.hidden||!latestStats||latestStats.uptime_s<start.uptime_s||(bootId&&profile.boot_id&&bootId!==profile.boot_id)){benchmarkStatus.textContent=t('Measurement cancelled. Keep this tab visible.');return}
   benchmark={start,firmware,bootId,board:latestStats.board,profileStart:profile,samples:[start],gap:false,startedAt:new Date().toISOString()};benchmarkReport=null;
