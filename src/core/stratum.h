@@ -30,6 +30,7 @@ struct Share {
     uint32_t nonce;
     double difficulty;
     uint32_t version;
+    uint32_t versionMask = 0;
     uint8_t hash[32]; // exact SV2 target recheck if the pool changes target before submission
 };
 
@@ -38,6 +39,7 @@ public:
     void reset();
     void setCredentials(const std::string &user, const std::string &password);
 
+    std::string configureVersionRolling();
     std::string subscribe(const char *agent);
     std::string authorize();
     std::string suggestDifficulty(double diff);
@@ -63,6 +65,8 @@ private:
     double difficulty_ = 1.0;
     bool hasJob_ = false;
     bool authorized_ = false;
+    uint32_t versionMask_ = 0;
+    bool configureRequested_ = false;
     uint32_t nextId_ = 10;
     uint32_t pendingIds_[kMaxPendingShares] = {};
     size_t pendingCount_ = 0;

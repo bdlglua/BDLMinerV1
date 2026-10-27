@@ -37,6 +37,18 @@ count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fich
 function t(s){return LANG=='fr'&&FR[s]||s}
 
 Object.assign(FR,{
+ 'Experimental hardware support':'Prise en charge matérielle expérimentale',
+ 'Fan':'Ventilateur','Regulator':'Régulateur','Input':'Entrée',
+ 'Mining (experimental)':'Minage (expérimental)',
+ 'Fan stopped; restart required':'Ventilateur arrêté ; redémarrage nécessaire',
+ 'ASIC overtemperature; restart required':'Surchauffe ASIC ; redémarrage nécessaire',
+ 'ASIC temperature sensor fault; restart required':'Sonde ASIC en défaut ; redémarrage nécessaire',
+ 'Regulator temperature fault; restart required':'Température du régulateur en défaut ; redémarrage nécessaire',
+ '5V supply fault; restart required':'Alimentation 5 V en défaut ; redémarrage nécessaire',
+ 'Pool needs version rolling and difficulty >= 16':'Le pool doit accepter le version rolling et une difficulté >= 16',
+ 'Paused / waiting for pool':'En pause / en attente du pool',
+ 'Ready / waiting for pool':'Prêt / en attente du pool',
+
  'automatic':'automatique',
  'manual':'manuel','Automatic':'Automatique','Manual':'Manuel',
  'Choose automatic or manual user agent below. Each pool has its own protocol and authority key.':'Choisis le user agent automatique ou manuel ci-dessous. Chaque pool a son protocole et sa clé d’autorité.',

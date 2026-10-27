@@ -5,7 +5,7 @@
 #include <Arduino.h>
 
 #if defined(DISPLAY_M5UNIFIED) || defined(DISPLAY_LGFX_T_DISPLAY) || defined(DISPLAY_LGFX_T_DISPLAY_S3) || \
-    defined(DISPLAY_LGFX_CYD)
+    defined(DISPLAY_LGFX_CYD) || defined(DISPLAY_LGFX_GAMMA601)
 #define HAS_DISPLAY 1
 #include <M5GFX.h>
 #endif

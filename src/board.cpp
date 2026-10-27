@@ -1,4 +1,7 @@
 #include "board.h"
+#ifdef BOARD_GAMMA601
+#include "gamma601.h"
+#endif
 #include <atomic>
 #include "core/mining_safety.h"
 
@@ -8,7 +11,21 @@
 // Displays for third-party boards (M5GFX device definitions)
 // ---------------------------------------------------------------------------
 
-#if defined(DISPLAY_LGFX_T_DISPLAY)
+#if defined(DISPLAY_LGFX_GAMMA601)
+#include <lgfx/v1/panel/Panel_SSD1306.hpp>
+class LGFX : public lgfx::LGFX_Device {
+    lgfx::Panel_SSD1306 panel_;
+    lgfx::Bus_I2C bus_;
+public:
+    LGFX() {
+        auto b = bus_.config(); b.i2c_port = 0; b.pin_sda = 47; b.pin_scl = 48; b.i2c_addr = 0x3c;
+        b.freq_write = b.freq_read = 400000; bus_.config(b); panel_.setBus(&bus_);
+        auto p = panel_.config(); p.memory_width = p.panel_width = 128;
+        p.memory_height = p.panel_height = 32; p.offset_x = p.offset_y = 0; panel_.config(p);
+        panel_.setComPins(0x02); setPanel(&panel_);
+    }
+};
+#elif defined(DISPLAY_LGFX_T_DISPLAY)
 
 #include <lgfx/v1/panel/Panel_ST7789.hpp>
 
@@ -219,11 +236,14 @@ Button btnA, btnB;
 
 namespace board {
 
-#if defined(DISPLAY_LGFX_T_DISPLAY) || defined(DISPLAY_LGFX_T_DISPLAY_S3) || defined(DISPLAY_LGFX_CYD)
+#if defined(DISPLAY_LGFX_T_DISPLAY) || defined(DISPLAY_LGFX_T_DISPLAY_S3) || defined(DISPLAY_LGFX_CYD) || defined(DISPLAY_LGFX_GAMMA601)
 static LGFX lcd;
 #endif
 
 void begin() {
+#ifdef BOARD_GAMMA601
+    pinMode(1, OUTPUT); digitalWrite(1, LOW);
+#endif
 #ifdef POWER_ON_PIN
     pinMode(POWER_ON_PIN, OUTPUT);  // T-Display-S3: keeps the panel powered on battery
     digitalWrite(POWER_ON_PIN, HIGH);
@@ -253,6 +273,9 @@ void begin() {
 
 #if defined(HAS_DISPLAY) && !defined(DISPLAY_M5UNIFIED)
     lcd.init();
+#ifdef BOARD_GAMMA601
+    gamma601::begin();
+#endif
 #endif
 }
 
@@ -406,6 +429,10 @@ static mining::Thermometer thermometer;
 static std::atomic<mining::TemperatureSource> temperatureSensor{mining::TemperatureSource::Unknown};
 
 void sampleTemperature() {
+#ifdef BOARD_GAMMA601
+    lastTemperature = gamma601::temperature();
+    return;
+#endif
     float imu = NAN, chip = NAN;
 #ifdef DISPLAY_M5UNIFIED
     if (thermometer.source != mining::TemperatureSource::Chip && M5.Imu.isEnabled()) {
@@ -427,6 +454,9 @@ void sampleTemperature() {
 float temperature() { return lastTemperature; }
 
 const char *temperatureSource() {
+#ifdef BOARD_GAMMA601
+    return "asic";
+#endif
     switch (temperatureSensor.load()) {
         case mining::TemperatureSource::Imu: return "imu";
         case mining::TemperatureSource::Chip: return "chip";

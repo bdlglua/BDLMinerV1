@@ -1,4 +1,7 @@
 #include "miner.h"
+#ifdef BOARD_GAMMA601
+#include "gamma601.h"
+#endif
 
 #include <Preferences.h>
 #include <esp_rom_crc.h>
@@ -63,7 +66,12 @@ int blockHead = 0;
 mining::SafetyLease safety;
 std::atomic<bool> batteryLimited{false};
 
-uint32_t lastHashes[MAX_MINERS];
+#ifdef BOARD_GAMMA601
+using HashCount = uint64_t;
+#else
+using HashCount = uint32_t;
+#endif
+HashCount lastHashes[MAX_MINERS];
 uint64_t totalHashes = 0;
 // Hash rates are averages over the last 60 one-second ticks (like a pool's
 // "1m" rate): the second or two the hardware loop pauses for a TLS handshake
@@ -71,7 +79,7 @@ uint64_t totalHashes = 0;
 constexpr int kRateWindow = 60;
 struct RateSample {
     uint32_t ms;
-    uint32_t hashes[MAX_MINERS];
+    HashCount hashes[MAX_MINERS];
 };
 RateSample rateRing[kRateWindow];
 int rateCount = 0, rateHead = 0;
@@ -96,10 +104,14 @@ float temperatureSum = 0;
 uint32_t temperatureSamples = 0, powerSum = 0, observationSamples = 0;
 MinerProfile profiles[MAX_MINERS];
 
+#ifdef BOARD_GAMMA601
+using MiningWork = AsicWork;
+#else
 struct MiningWork : work::Work {
     uint32_t generation;
     uint32_t height;
 };
+#endif
 
 struct Miner {
     uint8_t index;
@@ -166,6 +178,7 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         s.ntime = w.ntime;
         s.nonce = nonce;
         s.difficulty = d;
+        s.versionMask = w.versionMask;
         s.version = uint32_t(w.header[0]) | uint32_t(w.header[1]) << 8 | uint32_t(w.header[2]) << 16 | uint32_t(w.header[3]) << 24;
         memcpy(s.hash, hash, 32);
         QueuedShare queued{s, w.generation};
@@ -411,6 +424,11 @@ void minerStart() {
     stats.startMillis = millis();
     lastTickMs = stats.startMillis;
 
+#ifdef BOARD_GAMMA601
+    stats.engine[0] = "BM1370";
+    stats.minerCount = gamma601::start() ? 1 : 0;
+    return;
+#endif
     bool hw = hwsha::selfTest();
     // The classic ESP32 self-test can leave the engines reserved between
     // batches. Release them before task creation, including a failed start.
@@ -519,9 +537,9 @@ void minerTick() {
     uint32_t now = millis();
     portENTER_CRITICAL(&statsMux);
     sessionMs += uint32_t(now - lastTickMs);
-    uint32_t delta = 0, engineDelta[MAX_MINERS];
+    HashCount delta = 0, engineDelta[MAX_MINERS];
     for (int i = 0; i < stats.minerCount; i++) {
-        uint32_t h = stats.hashes[i];
+        HashCount h = stats.hashes[i];
         engineDelta[i] = h - lastHashes[i];
         delta += engineDelta[i];
         lastHashes[i] = h;
@@ -789,3 +807,32 @@ bool minerStatsRestore(const StatsSnapshot &s) {
     xSemaphoreGive(saveMutex);
     return ok;
 }
+
+#ifdef BOARD_GAMMA601
+bool minerAsicWork(AsicWork &out) {
+    if (!jobMutex || xSemaphoreTake(jobMutex, pdMS_TO_TICKS(20)) != pdTRUE) return false;
+    bool valid = boardValid;
+    if (valid) {
+        work::build(board, extranonce2Counter++, out);
+        out.generation = workGeneration; out.height = board.blockHeight();
+        // The ASIC ORs its rolling bits into the job version. Clear only negotiated bits.
+        uint32_t version = board.version & ~out.versionMask;
+        memcpy(out.header, &version, 4);
+    }
+    xSemaphoreGive(jobMutex);
+    return valid;
+}
+bool minerAsicCurrent(uint32_t generation) { return boardValid && generation == workGeneration.load(); }
+void minerAsicCandidate(AsicWork &w, uint32_t nonce, uint32_t bits) {
+    if (!minerAsicCurrent(w.generation) || (bits & ~w.versionMask)) return;
+    AsicWork candidate = w;
+    uint32_t version; memcpy(&version, candidate.header, 4); version |= bits;
+    memcpy(candidate.header, &version, 4); memcpy(candidate.header + 76, &nonce, 4);
+    uint8_t hash[32]; sha::sha256d(candidate.header, 80, hash);
+    // Independently reject UART corruption/hardware errors before counting a share.
+    if (work::hashDifficulty(hash) >= 1.0 && minerAsicCurrent(w.generation)) onCandidate(nonce, hash, &candidate);
+}
+void minerAsicHashes(uint64_t hashes) {
+    portENTER_CRITICAL(&statsMux); stats.hashes[0] += hashes; portEXIT_CRITICAL(&statsMux);
+}
+#endif

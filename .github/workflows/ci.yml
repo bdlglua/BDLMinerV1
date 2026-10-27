@@ -51,7 +51,7 @@ jobs:
       fail-fast: false
       matrix:
         env: [m5stickc-plus2, m5stack-esp32, m5stack-s3, lilygo-t-display, lilygo-t-display-s3,
-              esp32-2432s028r, esp32-headless, esp32s3-headless, esp32s2-headless, esp32c3-headless]
+              esp32-2432s028r, esp32-headless, esp32s3-headless, esp32s2-headless, esp32c3-headless, bitaxe-gamma-601]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -70,3 +70,16 @@ jobs:
       - name: Physical display rendering regressions
         if: matrix.env == 'm5stickc-plus2'
         run: python3 tools/preview_display.py --check
+
+      - name: Experimental Gamma 601 USB build
+        if: matrix.env == 'bitaxe-gamma-601'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitaxe-gamma-601-experimental-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            release/*/bitaxe-gamma-601-factory.bin
+            release/*/bitaxe-gamma-601-firmware.bin
+            release/*/SHA256SUMS.txt
+            docs/hardware/bitaxe-gamma-601.md

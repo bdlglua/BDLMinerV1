@@ -10,10 +10,15 @@ inline bool legacyManualAgent(const char *agent) {
 }
 
 #define DEFAULT_POOL_HOST "public-pool.io"
+#ifdef BOARD_GAMMA601
+#define DEFAULT_POOL_PORT 3333
+#define DEFAULT_DIFFICULTY 1024.0
+#else
 #define DEFAULT_POOL_PORT 21496
+#define DEFAULT_DIFFICULTY 0.0002
+#endif
 #define DEFAULT_POOL_PASSWORD "x"
 #define DEFAULT_BACKUP_PORT 3333
-#define DEFAULT_DIFFICULTY 0.0002
 #define PORTAL_AP_PASSWORD "MineYourCoins"
 #define PORTAL_TIMEOUT_S 180
 // POSIX TZ string (Central European Time with daylight saving by default).
@@ -71,7 +76,12 @@ struct Settings {
     String mqttUser, mqttPass;
     String peers;  // other miners for the dashboard: "192.168.1.41, miner2.local"
     String webPassword;  // empty = settings and firmware cannot be changed from the web
-    uint8_t githubUpdate = 2;  // 0 off, 1 check and offer, 2 install by itself
+    uint8_t githubUpdate =
+#ifdef BOARD_GAMMA601
+        1; // experimental hardware: offer updates for review
+#else
+        2;
+#endif  // 0 off, 1 check and offer, 2 install by itself
     bool usageCount = true;    // daily download of this version's ping-<board>.txt (ghupdate.h)
 };
 

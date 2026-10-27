@@ -1,0 +1,51 @@
+#define BOARD_GAMMA601 1
+#include "../../src/gamma601.cpp"
+#include <cassert>
+void logf(const char *, ...) {}
+static uint8_t power=100;
+static uint32_t generation=1, powerUntil=UINT32_MAX;
+static uint64_t hashes=0;
+uint8_t minerPowerPercent(){return testMillis < powerUntil ? power : 0;}
+bool minerAsicCurrent(uint32_t g){return g==generation;}
+bool minerAsicWork(AsicWork &){return false;}
+void minerAsicCandidate(AsicWork &,uint32_t,uint32_t){}
+void minerAsicHashes(uint64_t n){hashes+=n;}
+using namespace gamma601;
+static void bytes(int addr,int reg,std::initializer_list<uint8_t> value){testI2c[{addr,reg}]=value;}
+static void word(int reg,uint16_t v){bytes(0x24,reg,{uint8_t(v),uint8_t(v>>8)});}
+static void health(){
+    bytes(0x4c,1,{50});bytes(0x4c,0x10,{0});bytes(0x4c,0x46,{0x08});bytes(0x4c,0x47,{0x07});
+    word(0x88,bm1370::encodeLinear11(5));word(0x8b,589);word(0x8c,bm1370::encodeLinear11(15));
+    word(0x8d,bm1370::encodeLinear11(50));word(0x79,0);
+}
+static void reset(){
+    latched=powered=configured=false;live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting"};publish();
+    testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
+    testUartTx.clear();testUartRx.clear();testMillis=1000;testReset=1;power=100;generation=1;powerUntil=UINT32_MAX;
+    bytes(0x4c,0xfd,{0x16});bytes(0x24,0xad,{6,0x54,0x49,0x54,0x6d,0x24,0x41});bytes(0x24,0x20,{0x17});health();
+    testChipReply={0xaa,0x55,0x13,0x70,0,0,0,0,0,0,0};
+    for(int crc=0;crc<32;++crc){testChipReply[10]=crc;if(bm1370::crc5(testChipReply.data()+2,9)==0)break;}
+}
+int main(){
+    reset();begin();assert(configured&&!latched&&testReset==0);
+    assert(testI2c[std::make_pair(0x24,1)][0]==0);
+    assert(testI2c[std::make_pair(0x4c,0x4c)][0]==63);
+    for(auto &w:testI2cWrites)assert(w[0]!=0x11&&w[0]!=0x15&&w[0]!=0x16); // no STORE/RESTORE NVM commands
+    AsicWork w;w.generation=1;w.versionMask=bm1370::kVersionMask;
+    assert(initAsic(w)&&live.running&&powered&&testReset==1&&live.frequency==525);
+    assert(testI2c[std::make_pair(0x24,1)][0]==0x80);
+    bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!powered&&testReset==0);
+    assert(testI2c[std::make_pair(0x24,1)][0]==0&&testI2c[std::make_pair(0x4c,0x4c)][0]==63);
+    reset();begin();assert(initAsic(w));off("Thermal pause");assert(!latched&&testReset==0);
+    bytes(0x4c,1,{40});assert(collect(false)&&temperature()==40); // cooldown still observable while unpowered
+    reset();bytes(0x24,0xad,{6,0,0,0,0,0,0});begin();assert(!configured&&latched&&testReset==0);
+    reset();testFailRegister=0x21;begin();assert(!configured&&latched&&testReset==0);
+    reset();begin();assert(initAsic(w));testI2cFail=true;assert(!collect(true)&&latched&&testReset==0&&!powered);
+    reset();begin();bytes(0x4c,0x46,{0xff});bytes(0x4c,0x47,{0xff});assert(!initAsic(w)&&latched&&testReset==0);
+    reset();begin();power=0;assert(!initAsic(w)&&!powered&&testReset==0&&!latched);
+    reset();begin();generation=2;assert(!initAsic(w)&&!powered&&testReset==0);
+    reset();begin();powerUntil=1250;assert(!initAsic(w)&&!powered&&testReset==0&&!latched);
+    reset();begin();testUartFail=true;assert(!initAsic(w));off("UART failed",true);assert(latched&&testReset==0);
+    reset();begin();testTaskFailAt=testTaskStarts;assert(!start()&&latched&&testReset==0);
+    puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
+}

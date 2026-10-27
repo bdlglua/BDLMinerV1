@@ -118,6 +118,10 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
             }
             if (event == Event::Setup) {
                 double rate = minerHashrate();
+#ifdef BOARD_GAMMA601
+                // Channel negotiation hint only; measured rate still comes from ASIC counters.
+                if (!(rate > 0)) rate = 1e12;
+#endif
                 if (!transport->send(client, protocol->open(settings.btcAddress.c_str(), rate > 0 ? rate : 100000))) return result;
             }
             if (event == Event::Opened) {

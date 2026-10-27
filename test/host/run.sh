@@ -15,6 +15,12 @@ if [ "$1" = "pool" ]; then
 fi
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_core.cpp $CORE -o .pio/host/test_core
 .pio/host/test_core
+g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_bm1370.cpp src/core/bm1370.cpp $CORE -o .pio/host/test_bm1370
+.pio/host/test_bm1370
+g++ -std=c++17 -O2 -Wall -Itest/host/stubs/gamma -Itest/host/stubs/miner -Isrc test/host/test_gamma601.cpp src/core/bm1370.cpp -o .pio/host/test_gamma601
+.pio/host/test_gamma601
+g++ -std=c++17 -O2 -Wall -Wno-unused-variable -ffunction-sections -fdata-sections -Itest/host/stubs/miner -Isrc test/host/test_asic_miner.cpp src/core/sha256.cpp src/core/work.cpp -Wl,--gc-sections -o .pio/host/test_asic_miner
+.pio/host/test_asic_miner
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_pool_agent.cpp $CORE -o .pio/host/test_pool_agent
 .pio/host/test_pool_agent
 python3 test/host/test_net_session.py

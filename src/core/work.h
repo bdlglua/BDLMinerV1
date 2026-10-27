@@ -19,6 +19,7 @@ struct Job {
     std::vector<uint8_t> coinb2;
     std::vector<std::vector<uint8_t>> branches;  // 32 bytes each
     uint32_t version = 0;
+    uint32_t versionMask = 0; // explicitly negotiated BIP310/BIP320 bits
     uint32_t nbits = 0;
     uint32_t ntime = 0;
     bool clean = false;
@@ -38,6 +39,7 @@ struct Work {
     std::string jobId;
     std::string extranonce2Hex;
     uint32_t ntime = 0;
+    uint32_t versionMask = 0;
     uint8_t header[80];
     sha::MidState mid;
     double shareDifficulty = 1.0;

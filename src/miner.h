@@ -13,7 +13,11 @@
 #define HISTORY_LEN 288
 
 struct MinerStats {
-    volatile uint32_t hashes[MAX_MINERS];   // per-miner counters (wrap around)
+#ifdef BOARD_GAMMA601
+    volatile uint64_t hashes[MAX_MINERS];
+#else
+    volatile uint32_t hashes[MAX_MINERS];
+#endif // per-engine counters (unsigned wrap)
     uint8_t minerCount;
     const char *engine[MAX_MINERS];        // "sw" / "hw"
 
@@ -128,3 +132,11 @@ enum class Throttle : uint8_t { Full, Half, Paused, Reduced };
 void minerSetPower(uint8_t percent, bool batterySaver = false);
 uint8_t minerPowerPercent();
 Throttle minerThrottle();
+
+#ifdef BOARD_GAMMA601
+struct AsicWork : work::Work { uint32_t generation = 0, height = 0; };
+bool minerAsicWork(AsicWork &out);
+bool minerAsicCurrent(uint32_t generation);
+void minerAsicCandidate(AsicWork &work, uint32_t nonce, uint32_t versionBits);
+void minerAsicHashes(uint64_t hashes);
+#endif

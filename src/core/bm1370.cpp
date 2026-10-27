@@ -1,0 +1,152 @@
+#include "bm1370.h"
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <limits>
+
+namespace bm1370 {
+uint8_t crc5(const uint8_t *data, size_t length) {
+    uint8_t crc = 31;
+    for (size_t i = 0; i < length; ++i) for (int bit = 7; bit >= 0; --bit) {
+        uint8_t next = ((crc >> 4) ^ (data[i] >> bit)) & 1;
+        crc = ((crc << 1) | next) ^ (next << 2);
+        crc &= 31;
+    }
+    return crc;
+}
+Packet command(uint8_t type, const uint8_t *data, size_t length) {
+    Packet p;
+    bool job = (type & 0x20) != 0;
+    size_t extra = job ? 6 : 5;
+    if (length > p.bytes.size() - extra) return p;
+    p.size = length + extra;
+    p.bytes[0] = 0x55; p.bytes[1] = 0xaa;
+    p.bytes[2] = type; p.bytes[3] = length + (job ? 4 : 3);
+    if (length) std::memcpy(p.bytes.data() + 4, data, length);
+    if (job) {
+        uint16_t crc = 0xffff;
+        for (size_t i = 2; i < length + 4; ++i) {
+            crc ^= uint16_t(p.bytes[i]) << 8;
+            for (int bit = 0; bit < 8; ++bit) crc = (crc << 1) ^ ((crc & 0x8000) ? 0x1021 : 0);
+        }
+        p.bytes[length + 4] = crc >> 8; p.bytes[length + 5] = crc;
+    } else p.bytes[length + 4] = crc5(p.bytes.data() + 2, length + 2);
+    return p;
+}
+Packet reg(uint8_t address, uint32_t value, bool broadcast) {
+    uint8_t data[] = {0, address, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value)};
+    return command(broadcast ? 0x51 : 0x41, data, sizeof(data));
+}
+Packet versionMask(uint32_t mask) { return reg(0xa4, 0x90000000 | ((mask & kVersionMask) >> 13)); }
+Packet ticketMask(uint8_t power) {
+    if (power > 31) return {};
+    uint32_t mask = power ? (uint32_t(1) << power) - 1 : 0;
+    uint32_t reversed = 0;
+    for (int byte = 0; byte < 4; ++byte)
+        for (int bit = 0; bit < 8; ++bit) reversed |= ((mask >> (byte * 8 + bit)) & 1) << (byte * 8 + 7 - bit);
+    return reg(0x14, reversed);
+}
+Packet job(uint8_t slot, const uint8_t header[80]) {
+    if (slot >= kSlots) return {};
+    uint8_t payload[82]{};
+    payload[0] = slot << 3; payload[1] = 1;
+    std::memcpy(payload + 2, header + 76, 4);
+    std::memcpy(payload + 6, header + 72, 4);
+    std::memcpy(payload + 10, header + 68, 4);
+    for (int w = 0; w < 8; ++w) {
+        std::memcpy(payload + 14 + 4 * w, header + 36 + 4 * (7 - w), 4);
+        std::memcpy(payload + 46 + 4 * w, header + 4 + 4 * (7 - w), 4);
+    }
+    std::memcpy(payload + 78, header, 4);
+    return command(0x21, payload, sizeof(payload));
+}
+Packet frequency(float target, float *actual) {
+    if (!std::isfinite(target) || target < 50 || target > 525) return {};
+    float best = 0, error = std::numeric_limits<float>::max(), vcoBest = error;
+    int productBest = 65535, fbBest = 0, refBest = 0, p1Best = 0, p2Best = 0;
+    for (int ref = 2; ref >= 1; --ref) for (int p1 = 7; p1 >= 1; --p1) for (int p2 = 7; p2 >= 1; --p2) {
+        int fb = std::lround(target / 25 * ref * p1 * p2);
+        if (p1 <= p2 || fb < 160 || fb > 239) continue;
+        float f = 25.0f * fb / (ref * p1 * p2), e = std::fabs(f - target), vco = 25.0f * fb / ref;
+        if (e < error || (std::fabs(e - error) < 0.0001f &&
+            (vco < vcoBest || (std::fabs(vco - vcoBest) < 0.0001f && p1 * p2 < productBest)))) {
+            best = f; error = e; vcoBest = vco; productBest = p1 * p2;
+            fbBest = fb; refBest = ref; p1Best = p1; p2Best = p2;
+        }
+    }
+    if (!fbBest) return {};
+    if (actual) *actual = best;
+    return reg(0x08, (uint32_t(vcoBest >= 2400 ? 0x50 : 0x40) << 24) |
+        uint32_t(fbBest) << 16 | uint32_t(refBest) << 8 | ((p1Best - 1) << 4) | (p2Best - 1));
+}
+bool Receiver::push(uint8_t byte, Response &out) {
+    if (length == bytes.size()) length = 0;
+    bytes[length++] = byte;
+    while (length && (bytes[0] != 0xaa || (length > 1 && bytes[1] != 0x55))) {
+        std::memmove(bytes.data(), bytes.data() + 1, --length);
+    }
+    if (length != bytes.size()) return false;
+    if (crc5(bytes.data() + 2, 9) != 0) {
+        std::memmove(bytes.data(), bytes.data() + 1, --length);
+        return false;
+    }
+    out = {};
+    out.job = (bytes[10] & 0x80) != 0;
+    out.slot = bytes[7] >> 4;
+    out.nonce = uint32_t(bytes[2]) | uint32_t(bytes[3]) << 8 | uint32_t(bytes[4]) << 16 | uint32_t(bytes[5]) << 24;
+    out.versionBits = (uint32_t(bytes[8]) << 8 | bytes[9]) << 13;
+    out.value = uint32_t(bytes[2]) << 24 | uint32_t(bytes[3]) << 16 | uint32_t(bytes[4]) << 8 | bytes[5];
+    out.address = bytes[6]; out.reg = bytes[7]; length = 0;
+    return true;
+}
+float linear11(uint16_t word) {
+    int exponent = (word >> 11) & 31, mantissa = word & 2047;
+    if (exponent & 16) exponent -= 32;
+    if (mantissa & 1024) mantissa -= 2048;
+    return std::ldexp(float(mantissa), exponent);
+}
+uint16_t encodeLinear11(float value) {
+    for (int e = -16; e <= 15; ++e) {
+        float m = std::round(std::ldexp(value, -e));
+        if (std::isfinite(m) && m >= -1024 && m <= 1023)
+            return ((e & 31) << 11) | (int(m) & 2047);
+    }
+    return 0;
+}
+bool voltageWord(float volts, uint8_t mode, uint16_t &out) {
+    int e = mode & 31; if (e & 16) e -= 32;
+    if ((mode & 0xe0) || e >= 0 || e < -16 || !std::isfinite(volts) || volts < 0.7f || volts > 2.0f) return false;
+    float word = std::round(std::ldexp(volts, -e));
+    if (word < 0 || word > 65535) return false;
+    out = uint16_t(word); return true;
+}
+float diodeTemperature(uint8_t msb, uint8_t lsb) {
+    int value = (uint16_t(msb) << 8 | lsb) >> 5;
+    if (value == 0x3f8 || value == 0x3ff) return NAN;
+    if (value & 0x400) value -= 0x800;
+    float t = value / 8.0f;
+    return t >= 0 && t <= 120 ? t : NAN;
+}
+uint16_t fanRpm(uint16_t tach) { return tach < 83 || tach >= 0xfff0 ? 0 : 5400000UL / tach; }
+const char *Health::fault(bool powered, bool requireDiode) const {
+    if (requireDiode && !std::isfinite(temperature)) return "ASIC temperature sensor fault; restart required";
+    if (std::isfinite(temperature) && temperature >= 70) return "ASIC overtemperature; restart required";
+    if (!std::isfinite(regulatorTemperature) || regulatorTemperature < -20 || regulatorTemperature >= 90)
+        return "Regulator temperature fault; restart required";
+    if (!std::isfinite(inputVoltage) || inputVoltage < 4.8f || inputVoltage > 5.5f)
+        return "5V supply fault; restart required";
+    if (rpm < 500) return "Fan stopped; restart required";
+    if (!std::isfinite(current) || current < -1 || current >= 30) return "ASIC current fault; restart required";
+    if (powered && (!std::isfinite(coreVoltage) || coreVoltage < 1.0f || coreVoltage > 1.25f))
+        return "ASIC voltage fault; restart required";
+    if (status & (powered ? 0xfb7fu : 0xf33fu)) return "Regulator reports a fault; restart required";
+    return nullptr;
+}
+uint64_t Counter::update(uint32_t value, uint32_t now) {
+    uint32_t elapsed = now - at, delta = value - previous;
+    bool valid = ready && elapsed > 0 && elapsed <= 5000 && uint64_t(delta) * 1000 <= uint64_t(elapsed) * 1000;
+    previous = value; at = now; ready = true;
+    // Hardware counter units are 2^32 hashes. Reject resets/out-of-range bursts.
+    return valid ? uint64_t(delta) << 32 : 0;
+}
+} // namespace bm1370

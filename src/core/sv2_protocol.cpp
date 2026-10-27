@@ -41,7 +41,13 @@ Frame Protocol::setup(const char *host, uint16_t port, const char *agent, const 
     auto &b = f.payload; put(b, 0, 1); put(b, 2, 2); put(b, 2, 2); put(b, 0); // mining, version 2, extended jobs
     if (!text(b, host)) return {};
     put(b, port, 2);
-    if (!text(b, agent) || !text(b, "ESP32") || !text(b, firmware) || !text(b, "")) return {};
+    const char *hardware =
+#ifdef BOARD_GAMMA601
+        "Bitaxe Gamma 601 / BM1370";
+#else
+        "ESP32";
+#endif
+    if (!text(b, agent) || !text(b, hardware) || !text(b, firmware) || !text(b, "")) return {};
     return f;
 }
 Frame Protocol::open(const char *user, float hashrate) {
@@ -68,7 +74,7 @@ size_t Protocol::pendingIndex(uint32_t sequence) const {
 Frame Protocol::submit(const stratum::Share &s) {
     if (!opened() || pendingCount_ >= 32 || !haveCurrent_) return {};
     bool valid = false; uint32_t id = 0;
-    for (const auto &slot : jobs_) if (slot.valid && !slot.future && slot.job.id == s.jobId && slot.job.version == s.version) {
+    for (const auto &slot : jobs_) if (slot.valid && !slot.future && slot.job.id == s.jobId && ((slot.job.version ^ s.version) & ~slot.job.versionMask) == 0) {
         if (!work::meetsTarget(s.hash, slot.job.shareTarget)) return {};
         valid = true; id = slot.id; break;
     }
@@ -117,6 +123,7 @@ Event Protocol::handle(const Frame &f) {
         slot.job.extranonce1 = prefix_; slot.job.extranonce2Size = extranonceSize_;
         slot.job.id = std::to_string(id); slot.job.version = r.number(4);
         uint32_t rolling = r.number(1), branches = r.number(1);
+        slot.job.versionMask = rolling ? 0x1fffe000u : 0;
         if (!r.ok || option > 1 || rolling > 1 || branches > 32) return fail("Invalid SV2 job fields");
         for (uint32_t i = 0; i < branches; ++i) slot.job.branches.push_back(r.vector(32));
         slot.job.coinb1 = r.vector(r.number(2)); slot.job.coinb2 = r.vector(r.number(2));

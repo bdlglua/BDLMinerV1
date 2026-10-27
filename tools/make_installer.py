@@ -31,6 +31,7 @@ BOARDS = [
     ("esp32s3-headless", "ESP32-S3 without a screen"),
     ("esp32s2-headless", "ESP32-S2 without a screen"),
     ("esp32c3-headless", "ESP32-C3 without a screen"),
+    ("bitaxe-gamma-601", "Bitaxe Gamma 601 (experimental; 5V barrel supply + fan required)"),
 ]
 CHIP_FAMILY = {"esp32": "ESP32", "esp32s2": "ESP32-S2", "esp32s3": "ESP32-S3", "esp32c3": "ESP32-C3"}
 

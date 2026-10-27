@@ -10,10 +10,10 @@ static Frame channel() {
     Frame f(0, 0x14); auto &v = f.payload; u(v,1); u(v,7); v.insert(v.end(),32,255);
     u(v,8,2); v.push_back(2); v.push_back(0xaa); v.push_back(0xbb); u(v,11); return f;
 }
-static Frame job(uint32_t id, bool future, uint32_t time = 1800000000) {
+static Frame job(uint32_t id, bool future, uint32_t time = 1800000000, bool rolling = false) {
     Frame f(0x8000, 0x1f); auto &v=f.payload; u(v,11); u(v,id); v.push_back(!future);
     if (!future) u(v,time);
-    u(v,0x20000000); v.push_back(0); v.push_back(1); v.insert(v.end(),32,0x11);
+    u(v,0x20000000); v.push_back(rolling); v.push_back(1); v.insert(v.end(),32,0x11);
     u(v,2,2); v.push_back(1); v.push_back(2); u(v,1,2); v.push_back(3); return f;
 }
 static Frame previous(uint32_t id) {
@@ -125,5 +125,13 @@ int main(int argc, char **) {
         sv2::Protocol parser;assert(parser.handle(success())==Event::Setup);assert(parser.handle(channel())==Event::Opened);
         Frame cut=frame;cut.payload.resize(n);assert(parser.handle(cut)==Event::Error);
     }
+    sv2::Protocol roll; assert(roll.handle(success())==Event::Setup);assert(roll.handle(channel())==Event::Opened);
+    assert(roll.handle(job(1,true,1800000000,true))==Event::None);
+    assert(roll.handle(previous(1))==Event::Job&&roll.job().versionMask==0x1fffe000);
+    work::Work rw;work::build(roll.job(),1,rw);auto rs=share(rw);
+    rs.version=0x20002000;memcpy(rw.header,&rs.version,4);memcpy(rw.header+76,&rs.nonce,4);
+    sha::sha256d(rw.header,80,rs.hash);assert(!roll.submit(rs).payload.empty());
+    rs.version^=1;assert(roll.submit(rs).payload.empty()); // outside negotiated BIP320 mask
+    rs.version=0x20002000;assert(p.submit(rs).payload.empty()); // other job: no rolling permission
     puts("SV2 protocol: exact wire layout, extended jobs, unique extranonces, clean/non-clean jobs, exact targets, batched acknowledgments, duplicate rejection and all truncated frames passed");
 }

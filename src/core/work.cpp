@@ -103,6 +103,7 @@ void build(const Job &job, uint64_t extranonce2, Work &out) {
     out.jobId = job.id;
     out.extranonce2Hex = toHex(en2.data(), en2.size());
     out.ntime = job.ntime;
+    out.versionMask = job.versionMask;
     out.shareDifficulty = job.difficulty;
     out.quickLimit = quickLimitFor(job.difficulty);
     out.exactShareTarget = job.exactShareTarget;

@@ -37,6 +37,7 @@ reliability fixes from 1.5.2 are retained. See the
 
 | PlatformIO environment | Boards | Display |
 |---|---|---|
+| `bitaxe-gamma-601` **experimental** | Bitaxe Gamma **601**, one BM1370, ESP32-S3 N16R8 | SSD1306 OLED 128×32 |
 | `m5stickc-plus2` (default) | M5StickC Plus2 | ST7789V2 135×240 |
 | `m5stack-esp32` | StickC / StickC Plus, Core Basic/Gray/Fire, Core2, Tough, Atom Lite/Matrix, Stamp Pico… (auto-detected) | depends on model |
 | `m5stack-s3` | AtomS3 / S3R / S3 Lite, CoreS3 / SE, Cardputer / ADV, StampS3, Dial, DinMeter, StickS3… | depends on model |
@@ -48,7 +49,26 @@ reliability fixes from 1.5.2 are retained. See the
 | `esp32s2-headless` | any ESP32‑S2 board | — (serial + web) |
 | `esp32c3-headless` | any ESP32‑C3 board | — (serial + web) |
 
-Hashing engines:
+### Bitaxe Gamma 601: experimental native firmware
+
+`bitaxe-gamma-601` replaces AxeOS and mines with the **BM1370 ASIC**. It includes
+TPS546 regulator control, the EMC2101 ASIC temperature sensor/fan tachometer, the
+128×32 OLED, and ASIC diagnostics in the local dashboard. This is **source/build
+support pending physical-board validation**, not a measured hashrate claim.
+
+Use **5 V DC through the barrel connector, at least 4 A**, with the heatsink and
+working 4-pin fan fitted. USB is for programming; USB alone cannot power ASIC mining.
+The initial configuration uses stock **525 MHz / 1150 mV**, a 100% fan, and
+`public-pool.io:3333` with suggested difficulty **1024**. A pool must negotiate at
+least eight version-rolling bits and assign difficulty >= 16; incompatible pools
+are reported explicitly and the ASIC stays off. Public Pool uses Stratum V1;
+selecting V2 requires a separate compatible V2 server and authority key.
+
+See [the Gamma 601 installation and validation guide](docs/hardware/bitaxe-gamma-601.md)
+for USB flashing, safeguards, limitations and restoring AxeOS. Other Gamma revisions
+and other Bitaxe models are not covered by this target.
+
+Hashing engines (ESP32-only boards):
 
 * **Software** on each core, optimized SHA‑256d (midstate, first 3 rounds and
   `W[16..17]` precomputed per job, early rejection at round 61). On the original ESP32
@@ -776,6 +796,11 @@ not connect to a physical miner; the host tests also execute the production uplo
 callbacks with simulated flash/HTTP interfaces.
 
 ## Credits
+
+* Native Gamma 601 board configuration, BM1370 register/packet sequences and
+  TPS546/EMC2101 references derive from [ESP-Miner / AxeOS](https://github.com/bitaxeorg/ESP-Miner)
+  (GPL-3.0), revision `bb4fd0c7e589858bbeef00ec89342216c1510671`, and
+  [bitaxeGamma hardware](https://github.com/bitaxeorg/bitaxeGamma).
 
 * The earlier bitmap screen design was inspired by
   [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).

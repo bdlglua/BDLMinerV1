@@ -1,4 +1,7 @@
 #include "web.h"
+#ifdef BOARD_GAMMA601
+#include "gamma601.h"
+#endif
 
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
@@ -149,13 +152,22 @@ void handleStats() {
         int n = minerHistoryPoints(historyScratch, HISTORY_LEN);
         j["history"]["interval_s"] = HISTORY_INTERVAL_S;
         JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
-        for (int i = 0; i < n; i++) hr.add((long)historyScratch[i].hashrate);
+        for (int i = 0; i < n; i++) hr.add(double(historyScratch[i].hashrate));
     }
     j["heap"] = ESP.getFreeHeap();
     j["task_failures"] = runtime::failures().load();
     j["heap_max_block"] = ESP.getMaxAllocHeap();
     float temp = board::temperature();
     j["temperature_source"] = board::temperatureSource();
+#ifdef BOARD_GAMMA601
+    auto asic = gamma601::status();
+    JsonObject a = j["asic"].to<JsonObject>();
+    a["model"] = "BM1370"; a["experimental"] = true; a["running"] = asic.running; a["state"] = asic.state;
+    a["frequency_mhz"] = asic.frequency; a["fan_rpm"] = asic.rpm; a["fan_percent"] = 100;
+    a["input_v"] = asic.inputVoltage; a["core_v"] = asic.coreVoltage;
+    a["current_a"] = asic.current; a["regulator_temp_c"] = asic.regulatorTemperature;
+    a["regulator_status"] = asic.regulatorStatus;
+#endif
     if (isnan(temp)) j["temp_c"] = nullptr;
     else j["temp_c"] = (int)lroundf(temp);
     j["throttle"] = minerThrottle() == Throttle::Paused ? "paused" : minerThrottle() == Throttle::Half ? "half" : "full";

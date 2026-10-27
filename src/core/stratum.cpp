@@ -1,4 +1,5 @@
 #include "stratum.h"
+#include "bm1370.h"
 
 #include <ArduinoJson.h>
 #include <math.h>
@@ -58,6 +59,8 @@ void Protocol::reset() {
     hasJob_ = false;
     authorized_ = false;
     nextId_ = 10;
+    versionMask_ = 0;
+    configureRequested_ = false;
     pendingCount_ = 0;
     lastError_.clear();
 }
@@ -65,6 +68,18 @@ void Protocol::reset() {
 void Protocol::setCredentials(const std::string &user, const std::string &password) {
     user_ = user;
     password_ = password;
+}
+
+std::string Protocol::configureVersionRolling() {
+    configureRequested_ = true;
+    JsonDocument doc;
+    doc["id"] = 4; doc["method"] = "mining.configure";
+    JsonArray params = doc["params"].to<JsonArray>();
+    params.add<JsonArray>().add("version-rolling");
+    JsonObject options = params.add<JsonObject>();
+    options["version-rolling.mask"] = "1fffe000";
+    options["version-rolling.min-bit-count"] = 8;
+    return serialize(doc);
 }
 
 std::string Protocol::subscribe(const char *agent) {
@@ -93,7 +108,7 @@ std::string Protocol::suggestDifficulty(double diff) {
 }
 
 std::string Protocol::submit(const Share &share) {
-    if (!canSubmit()) return {};
+    if (!canSubmit() || share.versionMask != versionMask_) return {};
     char ntime[9], nonce[9];
     snprintf(ntime, sizeof(ntime), "%08x", (unsigned)share.ntime);
     snprintf(nonce, sizeof(nonce), "%08x", (unsigned)share.nonce);
@@ -115,6 +130,10 @@ std::string Protocol::submit(const Share &share) {
     p.add(share.extranonce2);
     p.add(ntime);
     p.add(nonce);
+    if (versionMask_) {
+        char bits[9]; snprintf(bits, sizeof(bits), "%08x", unsigned(share.version & versionMask_));
+        p.add(bits);
+    }
     std::string line = serialize(doc);
     if (!doc.overflowed()) pendingIds_[pendingCount_++] = id;
     else line.clear();
@@ -165,6 +184,7 @@ Event Protocol::handleLine(const char *line) {
                 !parseHex32(params[7], j.ntime))
                 return invalid("invalid block header hex");
             j.clean = params[8].as<bool>();
+            j.versionMask = versionMask_;
 
             j.extranonce1 = extranonce1_;
             j.extranonce2Size = extranonce2Size_;
@@ -172,6 +192,14 @@ Event Protocol::handleLine(const char *line) {
             job_ = std::move(j);
             hasJob_ = true;
             return Event::NewJob;
+        }
+        if (!strcmp(method, "mining.set_version_mask")) {
+            uint32_t mask;
+            if (!configureRequested_ || !versionMask_ || !parseHex32(params[0], mask) ||
+                (mask & ~bm1370::kVersionMask)) return invalid("invalid version rolling mask");
+            versionMask_ = mask;
+            if (hasJob_) { job_.versionMask = mask; job_.clean = true; return Event::NewJob; }
+            return Event::None;
         }
         if (!strcmp(method, "mining.set_difficulty")) {
             if (!params[0].is<double>()) return invalid("invalid difficulty");
@@ -215,6 +243,16 @@ Event Protocol::handleLine(const char *line) {
         else serializeJson(error, lastError_);
     }
 
+    if (id == 4) {
+        if (!configureRequested_) return Event::None;
+        uint32_t mask = 0;
+        bool rolling = ok && result["version-rolling"].is<bool>() && result["version-rolling"].as<bool>();
+        if (rolling && (!parseHex32(result["version-rolling.mask"], mask) || (mask & ~bm1370::kVersionMask)))
+            return invalid("invalid configured version mask");
+        versionMask_ = rolling ? mask : 0;
+        if (hasJob_) { job_.versionMask = versionMask_; job_.clean = true; return Event::NewJob; }
+        return Event::None;
+    }
     if (id == kIdSubscribe) {
         // [[subscriptions...], extranonce1, extranonce2_size]. Some pools put
         // a refusal message in "result" instead, with a null error.

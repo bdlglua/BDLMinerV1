@@ -1,7 +1,7 @@
 #include "ui.h"
 #include "board.h"
 
-#ifdef HAS_DISPLAY
+#if defined(HAS_DISPLAY) && !defined(BOARD_GAMMA601)
 #include <WiFi.h>
 #include <cmath>
 #include <memory>
@@ -275,7 +275,7 @@ void render() {
     buildModel(minerStats(), now); view->render(model);
 }
 }  // namespace ui
-#else
+#elif !defined(BOARD_GAMMA601)
 namespace ui {
 void begin() {}
 void showSplash() {}

@@ -593,6 +593,21 @@ check('empty and single-point histories show honest states without invented samp
  await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='1');assert.equal(await f.page.locator('#chart-average').textContent(),'0 H/s');assert.equal(await f.page.locator('#download-history').isEnabled(),true);assert.match(await f.page.locator('#history-grid').textContent(),/usable temperature sensor/);
 }));
 
+check('Gamma ASIC dashboard displays hardware diagnostics and TH/s history',()=>run({stats:{board:'Bitaxe-Gamma-601',hashrate:1.2e12,hashrate_live:1.19e12,history:undefined,history_revision:1,asic:{model:'BM1370',experimental:true,running:true,state:'Mining (experimental)',frequency_mhz:525,fan_rpm:5000,core_v:1.15,current_a:15,input_v:5.1,regulator_temp_c:55}},history:{hashrate:[1.1e12,1.2e12],temperature_c:[55,56],power_percent:[100,100],coverage_percent:[100,100],interval_s:300,revision:1}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#chart-count').textContent==='2');
+ assert.match(await f.page.locator('#m .hero .v').textContent(),/1\.20 TH\/s/);
+ assert.match(await f.page.locator('#device-grid').textContent(),/ASIC · BM1370.*Mining.*Experimental.*525 MHz.*1\.150 V.*5000 RPM/s);
+ assert.match(await f.page.locator('#hashrate-history').textContent(),/TH\/s/);
+ assert.equal(await f.page.locator('#health').isHidden(),true);
+}));
+check('Gamma stopped ASIC overrides pool-online status and escapes fault text',()=>run({stats:{asic:{model:'BM1370',running:false,state:'Fan stopped <script>bad()</script>',frequency_mhz:0,fan_rpm:0,core_v:null,current_a:null,input_v:null,regulator_temp_c:null}}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');
+ assert.equal(await f.page.locator('#health').textContent(),'Fan stopped <script>bad()</script>');
+ assert.equal(await f.page.locator('#health').getAttribute('data-level'),'bad');
+ assert.equal(await f.page.locator('#device-grid script').count(),0);
+ assert.match(await f.page.locator('#device-grid').textContent(),/— V/);
+}));
+
 if(process.env.BDL_SCREENSHOT_DIR){
  const previewHistory={hashrate:[],temperature_c:[],power_percent:[],coverage_percent:[],interval_s:300,revision:1};
  for(let i=0;i<288;i++){const limited=i>=244&&i<252,gap=i>=262&&i<265;previewHistory.hashrate.push(gap?null:Math.round((limited?510000:997000)+17000*Math.sin(i/9)+8000*Math.cos(i/3)));previewHistory.temperature_c.push(gap?null:Math.round((51+8*Math.sin(i/19)+(limited?3:0))*10)/10);previewHistory.power_percent.push(gap?null:limited?50:100);previewHistory.coverage_percent.push(gap?0:100)}
