@@ -1,6 +1,6 @@
 # Local dashboard corrections — 2026-10-27
 
-Prepared after v1.5.2. Published release files and tags are unchanged.
+These corrections are included in v1.5.3. Earlier published releases are unchanged.
 
 ## Reproduced bugs
 

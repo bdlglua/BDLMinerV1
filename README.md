@@ -5,15 +5,17 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.5.2](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.2)**
+**Latest release: [v1.5.3](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.3)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.5.2.md)
+· [Release notes](docs/releases/v1.5.3.md)
 
-Version 1.5.2 uses **BDLMinerV1/<version>** as the default identity on every
-pool. It fixes malformed Stratum responses, V2 prefix/group changes, active-job
-difficulty reporting, restart/OTA coordination, settings persistence, pool API
-statistics and web-form validation. The optimized SHA-256d engines and thermal
-protection are retained. See the [2026-10-27 audit](docs/audits/2026-10-27.md).
+Version 1.5.3 fixes local dashboard update controls, slow polling, history errors,
+measurement availability and log pause. It also hardens release/installer generation,
+signature publication, usage reporting and pool hashrate parsing. The default identity
+is **BDLMinerV1/1.5.3**. Optimized SHA-256d engines, thermal protection and the V1/V2
+reliability fixes from 1.5.2 are retained. See the
+[dashboard review](docs/audits/2026-10-27-dashboard.md) and
+[script review](docs/audits/2026-10-27-scripts.md).
 
 [Install](#install-a-release-no-build-tools) · [First-time setup](#first-time-setup)
 · [Choose a pool](#pools-for-esp32) · [V1 / V2 setup](#stratum-v1-and-stratum-v2)
@@ -24,10 +26,10 @@ protection are retained. See the [2026-10-27 audit](docs/audits/2026-10-27.md).
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
-> **Validation:** v1.5.2 builds and packages all ten board variants. Checks cover
+> **Validation:** v1.5.3 builds and packages all ten board variants. Checks cover
 > SHA‑256d, V1/V2 protocol handling, an independent Noise responder, fragmented
-> socket sessions, settings persistence, physical-display rendering and 51 browser
-> regressions. The ten published firmware signatures, image checksums and update
+> socket sessions, settings persistence, physical-display rendering, 60 browser
+> regressions and 15 asset/release-tool tests. Firmware signatures, checksums and the update
 > manifest were verified. Live Public Pool V2 connectivity and physical-device V2
 > throughput still require hardware validation.
 
@@ -143,7 +145,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.5.2 && git push origin v1.5.2
+git tag v1.5.3 && git push origin v1.5.3
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -165,10 +167,9 @@ an installer removes obsolete board files. Missing factory images stop installer
 An explicitly configured `RELEASE_SIGNING_KEY_FILE` must exist; a missing file stops the
 build instead of silently producing unsigned firmware.
 
-The [repository and script review](docs/audits/2026-10-27-scripts.md) documents the
-additional corrections prepared after v1.5.2.
-The [local dashboard review](docs/audits/2026-10-27-dashboard.md) covers subsequent
-fixes to update controls, independent polling, history, measurements and log pause.
+The [repository and script review](docs/audits/2026-10-27-scripts.md) and
+[local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
+corrections included in v1.5.3.
 
 ## Build and flash
 
