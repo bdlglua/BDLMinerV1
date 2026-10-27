@@ -41,7 +41,7 @@ int main() {
     Settings oldGammaSettings;const char *old=R"({"power":100})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(old),strlen(old),oldGammaSettings));
     assert(oldGammaSettings.asicFrequency==600); // old Gamma records gain the requested default
-    for(unsigned frequency:{525,550,575,600}) {
+    for(unsigned frequency=525;frequency<=800;frequency+=25) {
         Settings profile;profile.asicFrequency=frequency;std::string encoded;
         assert(settingsstore::encode(profile,encoded));Settings decoded;
         assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(encoded.data()),encoded.size(),decoded));

@@ -9,7 +9,7 @@
 namespace bm1370 {
 constexpr uint32_t kVersionMask = 0x1fffe000;
 constexpr size_t kSlots = 16;
-constexpr uint16_t kStockMHz = 525, kMaxMHz = 600;
+constexpr uint16_t kStockMHz = 525, kMaxMHz = 800;
 inline bool validProfile(unsigned mhz) { return mhz >= kStockMHz && mhz <= kMaxMHz && (mhz-kStockMHz)%25 == 0; }
 // Compare cumulative ASIC error/total counters in ten-second windows.
 struct ErrorMonitor {

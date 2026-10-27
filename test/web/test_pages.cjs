@@ -44,7 +44,7 @@ async function fixture(options={}){
   if(options.stats) Object.assign(state.stats,options.stats);
   state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
   if(options.capabilities)state.settings.capabilities=options.capabilities;
-  if(options.gamma){state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:600}]);state.settings.values.asicmhz=600;}
+  if(options.gamma){state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}]);state.settings.values.asicmhz=600;}
   const server=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
     const body=Buffer.concat(chunks).toString();state.requests.push(req.method+' '+req.url);
@@ -609,14 +609,21 @@ check('Gamma stopped ASIC overrides pool-online status and escapes fault text',(
  assert.match(await f.page.locator('#device-grid').textContent(),/— V/);
 }));
 
-check('Gamma profile defaults to 600 MHz and saves only the selected numeric frequency',()=>run({gamma:true},async f=>{
+check('Gamma profile defaults to 600 MHz and saves the selected 800 MHz numeric frequency',()=>run({gamma:true},async f=>{
  await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_asicmhz');
  assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'600');
- assert.deepEqual(await f.page.locator('#k_asicmhz option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[525,550,575,600]);
+ assert.deepEqual(await f.page.locator('#k_asicmhz option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[525,550,575,600,625,650,675,700,725,750,775,800]);
  assert.match(await f.page.locator('#performance').textContent(),/1150 mV.*525 MHz fallback/s);
- await f.page.selectOption('#k_asicmhz','550');await f.page.click('#save');
+ await f.page.selectOption('#k_asicmhz','800');await f.page.click('#save');
  await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('Saved'));
- assert.equal(JSON.parse(f.state.posts.find(p=>p.url==='/api/settings').body).asicmhz,550);
+ assert.equal(JSON.parse(f.state.posts.find(p=>p.url==='/api/settings').body).asicmhz,800);
+}));
+check('Gamma saved 800 MHz profile stays selected and explained in French',()=>run({gamma:true,language:'fr'},async f=>{
+ f.state.settings.values.asicmhz=800;
+ await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_asicmhz');
+ assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'800');
+ assert.equal(await f.page.locator('label[for="k_asicmhz"]').textContent(),'Fréquence ASIC Gamma (MHz)');
+ assert.match(await f.page.locator('#performance').textContent(),/jusqu’à 800 MHz.*600 MHz.*1 150 mV.*525 MHz/s);
 }));
 check('Gamma overclock fallback remains visible with requested clock and measured errors',()=>run({stats:{asic:{model:'BM1370',running:true,state:'Mining (525 MHz fallback profile)',frequency_mhz:525,profile_mhz:600,stock_fallback:true,fallback_reason:'High ASIC hardware error rate',hardware_error_percent:3.5,fan_rpm:5000,core_v:1.15,current_a:15,input_v:5.1,regulator_temp_c:55}}},async f=>{
  await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');

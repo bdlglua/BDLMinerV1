@@ -24,7 +24,7 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "proto") || !strcmp(s.key, "proto2")) limits.maximum = 1;
     if (!strcmp(s.key, "update")) limits.maximum = 2;
 #ifdef BOARD_GAMMA601
-    if (!strcmp(s.key, "asicmhz")) { limits.minimum=525; limits.maximum=600; }
+    if (!strcmp(s.key, "asicmhz")) { limits.minimum=bm1370::kStockMHz; limits.maximum=bm1370::kMaxMHz; }
 #endif
     return limits;
 }
@@ -55,7 +55,7 @@ inline const char *settingsError(JsonObjectConst values) {
                 long n = v.as<long>();
 #ifdef BOARD_GAMMA601
                 if (!strcmp(s.key, "asicmhz") && !bm1370::validProfile(unsigned(n)))
-                    return "Gamma frequency must be 525, 550, 575 or 600 MHz";
+                    return "Gamma frequency must be 525-800 MHz in 25 MHz steps";
 #endif
                 if (!strcmp(s.key, "maxtemp") && n && n < 30) return "Temperature must be 0 or at least 30 C";
                 if ((!strcmp(s.key, "nightfrom") || !strcmp(s.key, "nightto")) && n > 23 && n != 255)

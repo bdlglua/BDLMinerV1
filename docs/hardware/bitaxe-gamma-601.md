@@ -77,10 +77,11 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 ## Controls, telemetry and safety
 
 * Since v1.6.1, the firmware defaults to an **experimental 600 MHz profile** at
-  **1150 mV**. In local Settings > Safety, choose **525 / 550 / 575 / 600 MHz**;
+  **1150 mV**. Development builds after v1.6.1 extend local Settings > Safety to
+  **525–800 MHz in 25 MHz steps** (v1.6.1 only offers 525 / 550 / 575 / 600 MHz);
   changes apply after restart and are included in backups. Older Gamma settings
   without this new key inherit the requested 600 MHz default. Invalid stored profile
-  values fall back to 525 MHz; API requests outside the four choices are rejected.
+  values fall back to 525 MHz; API requests outside the available profiles are rejected.
 * Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
   Values 1–9 keep the ASIC off with an explanatory status. The fan remains **100%**.
   Thermal limiting may reduce the actual frequency below the requested profile.
@@ -92,8 +93,10 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   their latched shutdown behavior and never use this retry path.
 * The dashboard shows requested/actual frequency, measured hardware-error percentage
   (unavailable until a complete window), fallback state and its reason. Rates still
-  come from the physical hash counter, not from clock settings. **600 MHz and its
-  expected gain have not been validated on a physical Gamma 601.**
+  come from the physical hash counter, not from clock settings. **Overclock profiles,
+  including 600 and 800 MHz, have not been validated on a physical Gamma 601.**
+  The 800 MHz setting does not guarantee stability at the fixed 1150 mV; no voltage,
+  current, temperature or fan limits are raised to reach the requested frequency.
 * BOOT short press cycles the three compact OLED pages; a long press follows the
   existing reset/setup behavior. OLED rotation maps 0/1 to normal and 2/3 to 180°.
 * No ASIC power during provisioning. Startup checks device identities and verifies
@@ -147,6 +150,8 @@ fault injection instead.
 
 The 600 MHz controls, automatic fallback and regulator/startup corrections ship
 in v1.6.1. They are not in v1.6.0. Stock 525 MHz remains selectable.
+Profiles above 600 MHz are subsequent development changes on `main`, not included
+in v1.6.1; they require a build containing the extended range.
 
 The reference comparison and fixes after v1.6.0 are recorded in
 [the Gamma integration review](../audits/2026-10-27-gamma-reference.md).

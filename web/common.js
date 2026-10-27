@@ -38,7 +38,7 @@ function t(s){return LANG=='fr'&&FR[s]||s}
 
 Object.assign(FR,{
  '525 MHz (stock)':'525 MHz (origine)',
- '600 MHz is experimental. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.':'600 MHz est expérimental. La tension reste à 1 150 mV. En cas d’instabilité, repli à 525 MHz jusqu’au redémarrage.',
+ 'Profiles above 525 MHz are experimental, up to 800 MHz. Default: 600 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.':'Les profils au-dessus de 525 MHz sont expérimentaux, jusqu’à 800 MHz. Par défaut : 600 MHz. La tension reste à 1 150 mV. En cas d’instabilité, repli à 525 MHz jusqu’au redémarrage.',
  'Requested profile':'Profil demandé','ASIC hardware errors':'Erreurs matérielles ASIC','Stock fallback':'Repli à la fréquence d’origine',
  'Overclock fallback: mining at the stock profile.':'Repli de l’overclock : minage à la fréquence d’origine.',
  'Mining (525 MHz fallback profile)':'Minage à 525 MHz (repli)',

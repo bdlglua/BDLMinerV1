@@ -26,8 +26,16 @@ int main() {
     assert(!ticketMask(32).size);
     float actual=0;auto pll=frequency(525,&actual);
     assert(pll.size==11&&std::fabs(actual-525)<.01);
-    assert(!frequency(NAN).size&&!frequency(601).size&&!frequency(0).size);
-    for(int f=50;f<=600;++f){assert(frequency(f,&actual).size&&std::fabs(actual-f)<3);}
+    assert(!frequency(NAN).size&&!frequency(801).size&&!frequency(0).size);
+    for(float f=50;f<=800;f+=6.25f){
+        auto packet=frequency(f,&actual);assert(packet.size==11&&std::fabs(actual-f)<3);
+        // Decode the actual PLL wire fields independently of the encoder's result.
+        unsigned fb=packet.bytes[7],ref=packet.bytes[8];
+        unsigned p1=(packet.bytes[9]>>4)+1,p2=(packet.bytes[9]&15)+1;
+        assert(fb>=160&&fb<=239&&(ref==1||ref==2)&&p1<=7&&p2<=7&&p1>p2);
+        assert(std::fabs(25.0*fb/(ref*p1*p2)-actual)<.001);
+    }
+    assert(frequency(800,&actual).size&&actual==800);
     uint8_t header[80];for(int i=0;i<80;++i)header[i]=i;
     auto p=job(15,header);assert(p.size==88&&p.bytes[4]==120&&p.bytes[5]==1);
     assert(!memcmp(p.bytes.data()+6,header+76,4));
@@ -71,8 +79,8 @@ int main() {
         h=healthy;h.status=flag;assert(h.fault(true)&&h.fault(false,false));
     }
     h=healthy;h.status=0x0840;h.coreVoltage=0;assert(!h.fault(false));assert(h.fault(true));
-    assert(validProfile(525)&&validProfile(550)&&validProfile(575)&&validProfile(600));
-    assert(!validProfile(524)&&!validProfile(601)&&!validProfile(526));
+    for(unsigned mhz=525;mhz<=800;mhz+=25)assert(validProfile(mhz));
+    assert(!validProfile(524)&&!validProfile(801)&&!validProfile(825)&&!validProfile(601)&&!validProfile(526));
     ErrorMonitor guard;assert(!guard.update(100,1000,0));
     assert(!guard.update(110,1300,1000)); // short samples do not count as windows
     assert(!guard.update(200,4000,10000)&&guard.percent>3);

@@ -32,7 +32,7 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 > **Validation:** eleven board variants compile and package successfully. Checks
 > cover SHA-256d, V1/V2 and BIP310 masks, independent Noise/proof checks, fragmented
 > socket sessions, persistence/OTA, simulated Gamma hardware faults and 64-bit
-> accounting, physical-display rendering, **64 browser regressions** and **15
+> accounting, physical-display rendering, **65 browser regressions** and **15
 > asset/release-tool tests**. Real Gamma hashrate, temperatures and accepted shares
 > still require a physical-board test. Public Pool's public endpoint uses V1;
 > V2 requires a separate compatible server and authority key.
@@ -55,6 +55,13 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 
 ### Bitaxe Gamma 601: experimental native firmware
 
+**Development after v1.6.1:** `main` extends the selectable profiles to
+**525–800 MHz in 25 MHz steps**. The default stays **600 MHz / 1150 mV**, with
+the same 525 MHz fallback and hard safety limits. The additional profiles require
+a newer build; they are **not in the v1.6.1 release** and have not been validated
+on a physical Gamma 601. Selecting 800 MHz does not guarantee stable mining or a
+specific hashrate.
+
 **Fixed in v1.6.1:** [comparison with ESP-Miner](docs/audits/2026-10-27-gamma-reference.md)
 identified incorrect regulator-limit ratios and overly fast startup ramping in
 v1.6.0. The new release corrects both and supervises power and temperature throughout startup.
@@ -67,7 +74,7 @@ support pending physical-board validation**, not a measured hashrate claim.
 Use **5 V DC through the barrel connector, at least 4 A**, with the heatsink and
 working 4-pin fan fitted. USB is for programming; USB alone cannot power ASIC mining.
 Since v1.6.1, the target defaults to an **experimental 600 MHz profile at
-1150 mV**. The local settings offer **525 / 550 / 575 / 600 MHz**. Sustained hardware
+1150 mV**. On `main`, the local settings offer **525–800 MHz in 25 MHz steps**. Sustained hardware
 errors or missing/stalled ASIC telemetry trigger a **525 MHz fallback until restart**;
 hard thermal, fan and supply protections still stop mining. No overclock gain has
 been measured on a physical board. It uses a 100% fan and

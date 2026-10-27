@@ -96,10 +96,10 @@ int main() {
     assert(!deserializeJson(changes,R"({"proto":1,"sv2key":" 9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6  "})"));
     assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
 #ifdef BOARD_GAMMA601
-    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":600.5})",R"({"asicmhz":"600"})"}) {
+    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":801})",R"({"asicmhz":825})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":800.5})",R"({"asicmhz":"800"})"}) {
         assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
     }
-    for(int mhz:{525,550,575,600}) {
+    for(int mhz=525;mhz<=800;mhz+=25) {
         changes.clear();changes["asicmhz"]=mhz;
         assert(!settingsError(changes.as<JsonObjectConst>()));
         Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);

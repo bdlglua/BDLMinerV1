@@ -107,7 +107,13 @@ int main(){
     reset();begin();testUartFail=true;assert(!initAsic(w));off("UART failed",true);assert(latched&&testReset==0);
     reset();begin();testTaskFailAt=testTaskStarts;assert(!start()&&latched&&testReset==0);
     assert(Settings().asicFrequency==600);
-    reset();settings.asicFrequency=600;begin();assert(initAsic(w)&&live.frequency==600);
+    for(unsigned profile=525;profile<=800;profile+=25){
+        reset();settings.asicFrequency=profile;begin();
+        assert(initAsic(w)&&live.running&&live.frequency==profile&&live.requestedMHz==profile);
+        assert(storedWord(0x21)==589); // 1150 mV, including at 800 MHz
+        assert(testI2c[std::make_pair(0x4c,0x4c)][0]==63); // full fan
+    }
+    reset();settings.asicFrequency=800;begin();assert(initAsic(w)&&live.frequency==800);
     // Error/total register values are independent cumulative counters, paired by time.
     bm1370::Response totalReply{};totalReply.reg=0x8c;
     bm1370::Response errorReply{};errorReply.reg=0x4c;
@@ -136,5 +142,10 @@ int main(){
     assert(latched&&!powered&&testReset==0); // failed shutdown cannot auto-restart
     reset();settings.asicFrequency=600;begin();assert(initAsic(w));
     bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!forceStock&&!powered); // hard limits still stop
+    reset();settings.asicFrequency=800;begin();assert(initAsic(w));
+    testMillis+=3100;checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
+    assert(initAsic(w)&&live.frequency==525); // highest profile still falls back to stock
+    reset();settings.asicFrequency=800;begin();assert(initAsic(w));
+    bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!forceStock&&!powered);
     puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, relative VOUT limits, supervised PLL ramp, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
 }
