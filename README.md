@@ -5,22 +5,15 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.5.1](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.1)**
+**Latest release: [v1.5.2](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.5.2)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.5.1.md)
+· [Release notes](docs/releases/v1.5.2.md)
 
-Version 1.5.1 fixes pool authorization timing, partial TCP writes, Stratum V2
-job-target handling, pasted V2 URL validation and pool-statistics isolation after
-failover. It also handles TLS lock allocation failures safely. Native V2, the
-Automatic / Manual user-agent selector, Public Pool presets, illustrated device
-screens and the local dashboard remain available. The optimized SHA-256d engines
-and thermal protection are retained.
-
-> **Development builds (`main`, after v1.5.1):** additional fixes for Stratum
-> responses and V2 session changes, restart/OTA coordination, settings storage,
-> pool statistics and web-form validation are documented in the
-> [2026-10-27 audit](docs/audits/2026-10-27.md). The published v1.5.1 binaries
-> remain unchanged.
+Version 1.5.2 uses **BDLMinerV1/<version>** as the default identity on every
+pool. It fixes malformed Stratum responses, V2 prefix/group changes, active-job
+difficulty reporting, restart/OTA coordination, settings persistence, pool API
+statistics and web-form validation. The optimized SHA-256d engines and thermal
+protection are retained. See the [2026-10-27 audit](docs/audits/2026-10-27.md).
 
 [Install](#install-a-release-no-build-tools) · [First-time setup](#first-time-setup)
 · [Choose a pool](#pools-for-esp32) · [V1 / V2 setup](#stratum-v1-and-stratum-v2)
@@ -31,9 +24,9 @@ and thermal protection are retained.
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
-> **Validation:** v1.5.1 builds and packages all ten board variants. Checks cover
+> **Validation:** v1.5.2 builds and packages all ten board variants. Checks cover
 > SHA‑256d, V1/V2 protocol handling, an independent Noise responder, fragmented
-> socket sessions, settings persistence, physical-display rendering and 49 browser
+> socket sessions, settings persistence, physical-display rendering and 51 browser
 > regressions. The ten published firmware signatures, image checksums and update
 > manifest were verified. Live Public Pool V2 connectivity and physical-device V2
 > throughput still require hardware validation.
@@ -150,7 +143,7 @@ host tests, firmware `X.Y.Z` for every board (the version comes from the tag), s
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.5.1 && git push origin v1.5.1
+git tag v1.5.2 && git push origin v1.5.2
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -271,9 +264,6 @@ or channel difficulty determines how often accepted shares can appear; see
 <a id="automatic-pool-identity-and-stratum-versions"></a>
 
 ### Automatic or manual user agent
-
-> The native-default behavior below applies to development builds on `main`
-> after v1.5.1; the published v1.5.1 firmware retains its previous defaults.
 
 Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
 Automatic is the default; it requires no manual identity entry.
