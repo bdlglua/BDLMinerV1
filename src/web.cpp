@@ -43,20 +43,25 @@ uint32_t bootSession = 0;
 #include "web_assets.generated.h"
 
 void sendPage(const char *title, const char *body, const char *script) {
+    // Send one complete head and three fixed-length body segments instead of
+    // framing every small tag as a separate HTTP chunk/TCP write.
+    String head;
+    head.reserve(768);
+    head = "<!doctype html><html lang=\"";
+    head += settings.language == 1 ? "fr" : "en";
+    head += "\"><head><title>"; head += title; head += "</title>";
+    head += "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"dark\">";
+    head += "<link rel=\"stylesheet\" href=\"/assets/style.css?v="; head += kWebVersion; head += "\">";
+    head += "<script>const LANG='"; head += settings.language == 1 ? "fr" : "en"; head += "';</script>";
+    head += "<script defer src=\"/assets/common.js?v="; head += kWebVersion; head += "\"></script>";
+    head += "<script defer src=\"/assets/"; head += script; head += ".js?v="; head += kWebVersion; head += "\"></script></head><body>";
+    static const char end[] = "</div></div></body></html>";
     server.sendHeader("Cache-Control", "no-store");
-    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    server.send(200, "text/html", "");
-    server.sendContent(String("<!doctype html><html lang=\"en\"><head><title>") + title + "</title>");
-    server.sendContent("<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"dark\">");
-    server.sendContent(String("<link rel=\"stylesheet\" href=\"/assets/style.css?v=") + kWebVersion + "\">");
-    server.sendContent(String("<script>const LANG='") + (settings.language == 1 ? "fr" : "en") + "';</script>");
-    server.sendContent(String("<script defer src=\"/assets/common.js?v=") + kWebVersion + "\"></script>");
-    server.sendContent(String("<script defer src=\"/assets/") + script + ".js?v=" + kWebVersion + "\"></script>");
-    server.sendContent("</head><body>");
+    server.setContentLength(head.length() + strlen_P(kHeader) + strlen_P(body) + sizeof(end) - 1);
+    server.send(200, "text/html; charset=utf-8", head);
     server.sendContent_P(kHeader);
     server.sendContent_P(body);
-    server.sendContent("</div></div></body></html>");
-    server.sendContent("");
+    server.sendContent(end);
 }
 
 void sendAsset(const char *mime, const uint8_t *data, size_t size) {
@@ -251,6 +256,7 @@ void handleStats() {
     up["notes"] = gu.installing ? String(gu.progress) + " %" : String(gu.error);
 
     String body;
+    body.reserve(measureJson(j));
     serializeJson(j, body);
     server.sendHeader("Cache-Control", "no-store");
     server.sendHeader("Access-Control-Allow-Origin", "*");  // read by the other miners' dashboards
@@ -723,7 +729,9 @@ void webStart() {
     server.begin();
     // Slow HTTP clients must never stop the loop that owns the I2C sensors,
     // thermal control, buttons and screen. The worker uses cached snapshots.
-    if (!runtime::started(xTaskCreatePinnedToCore(webTask, "web", 6144, nullptr, 2, nullptr, 0) == pdPASS,
+    // Share core 0 with its software miner rather than preempting it for an
+    // entire HTTP response. The hardware miner stays alone on core 1.
+    if (!runtime::started(xTaskCreatePinnedToCore(webTask, "web", 6144, nullptr, 1, nullptr, 0) == pdPASS,
                           runtime::Web, "web")) {
         server.stop();
         logf("[web] not enough memory to start the web task\n");

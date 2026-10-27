@@ -32,7 +32,7 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 > **Validation:** eleven board variants compile and package successfully. Checks
 > cover SHA-256d, V1/V2 and BIP310 masks, independent Noise/proof checks, fragmented
 > socket sessions, persistence/OTA, simulated Gamma hardware faults and 64-bit
-> accounting, physical-display rendering, **65 browser regressions** and **15
+> accounting, physical-display rendering, **66 browser regressions** and **15
 > asset/release-tool tests**. Real Gamma hashrate, temperatures and accepted shares
 > still require a physical-board test. Public Pool's public endpoint uses V1;
 > V2 requires a separate compatible server and authority key.
@@ -681,6 +681,7 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 | Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
 | Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
 | Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](#pool-shares-and-local-records). |
+| M5StickC Plus2 slows down with the local dashboard open | Development builds after v1.6.2 reduce HTTP/page overhead and refresh statistics every 10 seconds. See the [dashboard-load review and test firmware](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
 | `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. The Public Pool V2 solo preset fills both; an altered or expired server certificate is refused. |
 | `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
 | A manually selected user agent is refused | Enter an identity accepted by that pool or select Automatic. Manual mode preserves your choice rather than replacing it after a refusal. |

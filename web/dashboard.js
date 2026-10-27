@@ -145,7 +145,9 @@ async function tick(){
   historyPoll.refresh();peersPoll.refresh();
  }catch(e){statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
 }
-startPolling(tick,3000);
+// The live rate already averages ten seconds. Poll at that cadence to avoid
+// making an open dashboard compete continuously with the ESP32 miners.
+startPolling(tick,10000);
 
 async function refreshPeers(){
  if(!statsOnline||!latestStats)return;

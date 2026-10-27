@@ -46,6 +46,7 @@ g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_
 .pio/host/test_settings_store
 python3 test/host/test_settings_persistence.py
 python3 test/host/test_web_upload.py
+python3 test/host/test_web_delivery.py
 python3 test/host/test_ghupdate.py
 
 # Gamma-only schema: frequency bounds, staged values and old-record migration.

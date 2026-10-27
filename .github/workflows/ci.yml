@@ -83,3 +83,16 @@ jobs:
             release/*/bitaxe-gamma-601-firmware.bin
             release/*/SHA256SUMS.txt
             docs/hardware/bitaxe-gamma-601.md
+
+      - name: M5StickC Plus2 dashboard test build
+        if: matrix.env == 'm5stickc-plus2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m5stickc-plus2-dashboard-test-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            release/*/m5stickc-plus2-factory.bin
+            release/*/m5stickc-plus2-firmware.bin
+            release/*/SHA256SUMS.txt
+            docs/audits/2026-10-27-m5-dashboard-load.md

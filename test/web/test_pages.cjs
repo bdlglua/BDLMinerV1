@@ -86,6 +86,7 @@ async function fixture(options={}){
       return setTimeout(()=>res.end('"ok":true}'),500);
     }
     if(req.method==='POST'){
+      if(options.postGate)await options.postGate;
       if(options.postDelay)await new Promise(r=>setTimeout(r,options.postDelay));
       res.writeHead(state.postStatus,{'Content-Type':'text/plain'});return res.end(state.postText||(state.postStatus>=400?'Operation refused':'Saved, restarting'));
     }
@@ -95,10 +96,10 @@ async function fixture(options={}){
   const context=await browser.newContext({viewport:options.mobile?{width:375,height:812}:{width:1100,height:800}});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   // Speed up polling without changing request timeouts or server timing.
-  await page.addInitScript(()=>{
+  if(!options.realPolling)await page.addInitScript(()=>{
     const timeout=window.setTimeout.bind(window),interval=window.setInterval.bind(window);
-    window.setTimeout=(fn,ms,...args)=>timeout(fn,ms===3000?30:ms===5000?50:ms,...args);
-    window.setInterval=(fn,ms,...args)=>interval(fn,ms===3000?30:ms===5000?50:ms,...args);
+    window.setTimeout=(fn,ms,...args)=>timeout(fn,ms===3000||ms===10000?30:ms===5000?50:ms,...args);
+    window.setInterval=(fn,ms,...args)=>interval(fn,ms===3000||ms===10000?30:ms===5000?50:ms,...args);
   });
   return {page,state,errors,url:'http://127.0.0.1:'+server.address().port,
     async close(){await context.close();server.closeAllConnections();await new Promise(r=>server.close(r));}};
@@ -167,6 +168,18 @@ check('polling never overlaps slow requests, and zero hashrate is displayed',()=
   assert.equal(f.state.peak,1);
   const rate=f.page.locator('#m .t').filter({has:f.page.locator('.l').filter({hasText:/^Hashrate$/})});
   assert.match(await rate.textContent(),/0 H\/s/);
+}));
+
+check('dashboard polls once per ten seconds without accelerated test timers',()=>run({realPolling:true,stats:{history:undefined,history_revision:1}},async f=>{
+  await f.page.clock.install();
+  await f.page.goto(f.url);await f.page.waitForSelector('#m .t');
+  const calls=()=>f.state.requests.filter(r=>r.startsWith('GET /api/stats')).length;
+  assert.equal(calls(),1);
+  await f.page.clock.runFor(8000);assert.equal(calls(),1);
+  f.state.stats.hashrate=800000;
+  await f.page.clock.runFor(2500);
+  await f.page.waitForFunction(()=>document.querySelector('#m .hero .v').textContent==='800 kH/s');
+  assert.equal(calls(),2);assert.equal(f.state.historyCalls,1);assert.equal(f.state.peak,1);
 }));
 
 check('a stalled response body is also covered by the timeout',()=>run({},async f=>{
@@ -317,14 +330,18 @@ check('an accepted install request cannot be submitted again while waiting',()=>
   assert.equal(await f.page.locator('.gh-install').isDisabled(),true);
 }));
 
-check('GitHub errors stay visible when no update is available and a manual check is queued once',()=>run({language:'fr',stats:{github_update:{mode:1,checked:false,available:false,error:'release unavailable: HTTP 403'}},postDelay:100},async f=>{
+check('GitHub errors stay visible when no update is available and a manual check is queued once',async()=>{
+ let release;const postGate=new Promise(resolve=>release=resolve);
+ try{await run({language:'fr',stats:{github_update:{mode:1,checked:false,available:false,error:'release unavailable: HTTP 403'}},postGate},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('.gh-check');
   assert.match(await f.page.locator('#updates').textContent(),/HTTP 403/);
   assert.equal(await f.page.locator('.gh-check').textContent(),'Vérifier maintenant');
   await f.page.click('.gh-check');await f.page.waitForTimeout(60);
   assert.equal(f.state.posts.length,1);assert.equal(f.state.posts[0].url,'/api/github-check');
   assert.equal(await f.page.locator('.gh-check').isDisabled(),true);
-}));
+  release();await f.page.waitForFunction(()=>!document.querySelector('.gh-check').disabled);
+ })}finally{release()}
+});
 
 check('an installation failing before the next poll can be retried',()=>run({stats:{github_update:{available:true,version:'1.0.11',request_id:0}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('.gh-install');await f.page.click('.gh-install');
@@ -571,7 +588,7 @@ check('live polls retain metric and chart nodes and a focused update button',()=
  f.state.stats.hashrate=1234567;await f.page.waitForFunction(()=>document.querySelector('#m .hero .v').textContent==='1.23 MH/s');
  assert.equal(await f.page.evaluate(()=>window.__chart===document.querySelector('#hashrate-history svg')&&window.__rate===document.querySelector('#m .hero .v')),true);assert.equal(await f.page.locator('.gh-check').evaluate(e=>e===document.activeElement),true);assert.equal(f.state.historyCalls,1);
 }));
-check('diagnostics load on demand and peer polling is paced independently',()=>run({stats:{peers:['peer.test'],hashrate:1000}},async f=>{
+check('diagnostics load on demand and peer polling is paced independently',()=>run({realPolling:true,stats:{peers:['peer.test'],hashrate:1000}},async f=>{
  let calls=0;await f.page.route('http://peer.test/api/stats?history=0',route=>{calls++;return route.fulfill({json:{hashrate:2000,pool:{connected:true},shares:{accepted:3},best:{ever:1}}})});
  await f.page.goto(f.url);await f.page.waitForSelector('#p .t');await f.page.waitForTimeout(180);assert.equal(calls,1);assert.equal(f.state.requests.some(r=>r==='GET /api/diagnostics'),false);
  await f.page.locator('#diagnostics>summary').click();await f.page.waitForSelector('#profile-grid .t');assert.equal(f.state.requests.filter(r=>r==='GET /api/diagnostics').length,1);
