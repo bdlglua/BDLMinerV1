@@ -7,7 +7,7 @@ The miner's local display was around 1 MH/s while FindMyBlock showed about
 M5StickC Plus2 or user-device logs were available during this review; the exact
 hardware slowdown and the size of any improvement have not been measured.
 
-## Changes after v1.6.2
+## Changes shipped in v1.6.3
 
 - Refresh dashboard statistics every ten seconds instead of three: about 70% fewer
   recurring local statistics requests when responses are fast. The first request
@@ -52,12 +52,17 @@ that its current rate is estimated from accepted shares and recommends its 24-ho
 average for comparison. A persistent loss should be checked against both local
 counter measurements and accepted-share statistics.
 
-## Test firmware
+## Released and test firmware
+
+The signed [v1.6.3 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.3)
+includes these changes for all supported variants. Existing M5StickC Plus2 devices
+can install the matching signed firmware through GitHub update discovery or the
+local update page. Reload the dashboard afterwards. v1.6.2 does not contain these
+changes. Real-board performance validation remains outstanding.
 
 The `m5stickc-plus2-dashboard-test-<commit>` artifact from a successful CI run
 contains unsigned development images and this note. It is not a new signed
 GitHub release. For an existing BDLMiner installation, the matching
 `m5stickc-plus2-firmware.bin` can be installed through the password-protected local
 firmware-update form. The factory image is for a USB install and erases settings.
-Reload the dashboard after updating. The published v1.6.2 does not contain these
-changes.
+Reload the dashboard after updating.

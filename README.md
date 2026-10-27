@@ -5,15 +5,16 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.2](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.2)**
+**Latest release: [v1.6.3](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.3)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.2.md)
+· [Release notes](docs/releases/v1.6.3.md)
 
-Version **1.6.2** extends experimental Bitaxe Gamma 601 profiles to **525–800 MHz
-in 25 MHz steps**. The default stays **600 MHz / 1150 mV**, with automatic 525 MHz
-fallback and hardware-error diagnostics. Regulator/startup fixes and hard safety
-limits are retained. The default identity is **BDLMinerV1/1.6.2**; existing ESP32
-SHA-256d kernels and safety settings are retained.
+Version **1.6.3** reduces the load of an open local dashboard: statistics refresh
+every **10 seconds**, HTML uses fewer writes, and the HTTP worker shares priority
+with the software miner. ESP32 SHA-256d kernels and safety settings are retained;
+the physical hashrate improvement remains to be measured. Experimental Gamma 601
+profiles still cover **525–800 MHz**, defaulting to **600 MHz / 1150 mV**, with
+525 MHz fallback. The default identity is **BDLMinerV1/1.6.3**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -183,7 +184,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.2 && git push origin v1.6.2
+git tag v1.6.3 && git push origin v1.6.3
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -207,7 +208,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.2.
+corrections shipped in v1.5.3 and retained in v1.6.3.
 
 ## Build and flash
 
@@ -681,7 +682,7 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 | Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
 | Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
 | Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](#pool-shares-and-local-records). |
-| M5StickC Plus2 slows down with the local dashboard open | Development builds after v1.6.2 reduce HTTP/page overhead and refresh statistics every 10 seconds. See the [dashboard-load review and test firmware](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
+| M5StickC Plus2 slows down with the local dashboard open | v1.6.3 reduces HTTP/page overhead and refreshes statistics every 10 seconds. See the [dashboard-load review](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
 | `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. The Public Pool V2 solo preset fills both; an altered or expired server certificate is refused. |
 | `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
 | A manually selected user agent is refused | Enter an identity accepted by that pool or select Automatic. Manual mode preserves your choice rather than replacing it after a refusal. |
