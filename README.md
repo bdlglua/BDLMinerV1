@@ -55,6 +55,11 @@ AxeOS. Other Bitaxe models/revisions are not covered.
 
 ### Bitaxe Gamma 601: experimental native firmware
 
+**After v1.6.0:** [comparison with ESP-Miner](docs/audits/2026-10-27-gamma-reference.md)
+identified incorrect regulator-limit ratios and overly fast startup ramping. Fixes
+are on `main`; they are **not included in the published v1.6.0 binaries**. Use a
+subsequent Gamma build for these corrections.
+
 `bitaxe-gamma-601` replaces AxeOS and mines with the **BM1370 ASIC**. It includes
 TPS546 regulator control, the EMC2101 ASIC temperature sensor/fan tachometer, the
 128×32 OLED, and ASIC diagnostics in the local dashboard. This is **source/build

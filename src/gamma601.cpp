@@ -19,6 +19,7 @@ Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting"};
 Status live = snapshot;
 bool configured = false, latched = false, powered = false;
 uint8_t voltageMode = 0;
+uint32_t powerEnabledAt = 0, lastHealthSample = 0;
 bm1370::Receiver receiver;
 bm1370::Counter counter;
 struct Slot {
@@ -78,10 +79,11 @@ bool send(const bm1370::Packet &p) {
     return p.size && uart.write(p.bytes.data(), p.size) == p.size;
 }
 bool reg(uint8_t address, uint32_t value, bool all = true) { return send(bm1370::reg(address, value, all)); }
-bool request(uint8_t address) {
-    uint8_t payload[]{0, address}; return send(bm1370::command(0x52, payload, 2));
+bool request(uint8_t address, bool broadcast = true) {
+    uint8_t payload[]{0, address}; return send(bm1370::command(broadcast ? 0x52 : 0x42, payload, 2));
 }
 bool collect(bool requireDiode) {
+    lastHealthSample = millis();
     uint8_t msb, lsb, tachLow, tachHigh; uint16_t vin, vout, current, vr;
     bool ok = read(kEmc, 0x01, &msb, 1) && read(kEmc, 0x10, &lsb, 1) &&
         read(kEmc, 0x46, &tachLow, 1) && read(kEmc, 0x47, &tachHigh, 1) && read16(kTps, 0x88, vin) && read16(kTps, 0x8b, vout) &&
@@ -100,10 +102,17 @@ bool collect(bool requireDiode) {
     publish(); return true;
 }
 // All startup waits are short and keep the main-loop/OTA safety lease checked.
-bool waitSafe(uint32_t ms) {
+bool waitSafe(uint32_t ms, bool requireDiode = false) {
     uint32_t since = millis();
     do {
-        if (!minerPowerPercent() || !minerAsicCurrent(activeGeneration)) { off("Paused / waiting for pool"); return false; }
+        uint8_t power = minerPowerPercent();
+        if (power < 10 || !minerAsicCurrent(activeGeneration)) {
+            off(power && power < 10 ? "Gamma power limit must be 10-100% or paused" : "Paused / waiting for pool");
+            return false;
+        }
+        // Respect TPS546 power-good settling; continue monitoring during long PLL ramps.
+        uint32_t now = millis();
+        if (powered && now - powerEnabledAt >= 250 && now - lastHealthSample >= 100 && !collect(requireDiode)) return false;
         delay(5);
     } while (millis() - since < ms);
     return true;
@@ -111,10 +120,11 @@ bool waitSafe(uint32_t ms) {
 bool initAsic(const AsicWork &first) {
     activeGeneration = first.generation; activeMask = first.versionMask;
     if (!collect(false)) return false;
-    if (!minerPowerPercent() || !minerAsicCurrent(activeGeneration)) return false;
+    if (minerPowerPercent() < 10 || !minerAsicCurrent(activeGeneration)) return false;
     if (!write8(kTps, 0x01, 0x80)) { off("ASIC power enable failed", true); return false; }
-    powered = true; live.state = "Initializing BM1370"; publish();
-    if (!waitSafe(100)) return false;
+    powered = true; powerEnabledAt = lastHealthSample = millis();
+    live.state = "Initializing BM1370"; publish();
+    if (!waitSafe(500)) return false;
     digitalWrite(kReset, HIGH);
     if (!waitSafe(100)) return false;
     uart.end(); uart.setRxBufferSize(4096); uart.begin(115200, SERIAL_8N1, 18, 17);
@@ -146,10 +156,13 @@ bool initAsic(const AsicWork &first) {
     if (!send(bm1370::ticketMask(4))) return false;
     if (!reg(0x28, 0x11300200)) return false;
     uart.flush(); uart.updateBaudRate(1000000);
-    // Start low, then ramp using the same PLL range as upstream stock firmware.
+    // Let the external-diode conversion settle after configuring the ASIC mux.
+    if (!waitSafe(100) || !collect(true)) return false;
+    // Match ESP-Miner's 6.25 MHz / 100 ms steps, with live safety checks.
     float target = std::max(50.0f, 525.0f * minerPowerPercent() / 100);
-    for (float f = 50; f < target; f += 25) {
-        if (!send(bm1370::frequency(f)) || !waitSafe(10)) return false;
+    for (float f = 50; f < target; f += 6.25f) {
+        if (!send(bm1370::frequency(f)) || !waitSafe(100, true)) return false;
+        target = std::max(50.0f, 525.0f * minerPowerPercent() / 100);
     }
     if (!send(bm1370::frequency(target, &live.frequency))) return false;
     uint32_t hcn = uint32_t((4294967296.0 / 128 * 25 / live.frequency * 0.5) - 268);
@@ -221,7 +234,7 @@ void worker(void *) {
         }
         if (now - requested >= 1000) {
             requested = now;
-            if (!request(0x8c)) { off("ASIC counter request failed", true); continue; }
+            if (!request(0x8c, false)) { off("ASIC counter request failed", true); continue; }
         }
         uint32_t checkedAt = millis();
         if (checkedAt - lastHashReply > 3000) off("ASIC not responding; restart required", true);
@@ -247,8 +260,9 @@ void begin() {
         verify8(kTps,0x04,0) && linear(0x33,650) && linear(0x35,4.8) && linear(0x36,4.5) &&
         linear(0x55,6.5) && verify8(kTps,0x56,0xb7) && linear(0x29,0.25) &&
         voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,1.15) &&
-        voltage(0x40,1.15*1.25) && voltage(0x42,1.15*1.16) && voltage(0x25,1.15*1.1) &&
-        voltage(0x26,1.15*0.9) && voltage(0x43,1.15*0.9) && voltage(0x44,1.15*0.75) &&
+        // These registers are multipliers of VOUT_COMMAND, not absolute voltages.
+        voltage(0x40,1.25) && voltage(0x42,1.16) && voltage(0x25,1.1) &&
+        voltage(0x26,0.9) && voltage(0x43,0.9) && voltage(0x44,0.75) &&
         linear(0x4a,25) && linear(0x46,30) && verify8(kTps,0x47,0xc0) &&
         linear(0x51,105) && linear(0x4f,145) && verify8(kTps,0x50,0xff) &&
         linear(0x60,0) && linear(0x61,3) && linear(0x62,0) && verify8(kTps,0x63,0x3b) &&

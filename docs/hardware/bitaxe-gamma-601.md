@@ -68,12 +68,19 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 * BOOT short press cycles the three compact OLED pages; a long press follows the
   existing reset/setup behavior. OLED rotation maps 0/1 to normal and 2/3 to 180°.
 * No ASIC power during provisioning. Startup checks device identities and verifies
-  volatile PMBus writes. **No regulator NVM/STORE commands are sent.**
+  volatile PMBus writes. VOUT warning/fault/margin registers are programmed as
+  ratios of `VOUT_COMMAND`, while command/min/max registers use absolute voltage.
+  **No regulator NVM/STORE commands are sent.**
 * The user thermal limit (default 65°C) still throttles/pauses mining. Independent
   hard interlocks stop at **70°C ASIC**, **90°C regulator**, lost sensors, fan
   <500 RPM, input outside **4.8–5.5 V**, core voltage outside **1.0–1.25 V** while
   powered, output current >=30 A or regulator faults. Hard limits remain active
   even if the user temperature setting is disabled. Faults latch until restart.
+* Startup waits 500 ms for core power stabilization, then ramps the PLL in
+  6.25 MHz steps spaced by 100 ms, following ESP-Miner. Fan, voltage/current and
+  regulator temperature are sampled throughout startup after the power-good grace
+  period; the ASIC diode is required once its mux/conversion has settled. The ramp
+  responds to live power limits and stops on faults, stale work or expired permission.
 * Reset is asserted **before** the I2C power-off command. On a failed I2C shutdown,
   the dashboard explicitly reports a shutdown fault; remove power and investigate.
 * The ASIC task checks the existing three-second supervision lease and OTA state.
@@ -108,6 +115,9 @@ induce overheating or a fan fault under load for testing; use controlled sensor/
 fault injection instead.
 
 ## Attribution and references
+
+The reference comparison and fixes after v1.6.0 are recorded in
+[the Gamma integration review](../audits/2026-10-27-gamma-reference.md).
 
 The BM1370 register sequence, ASIC framing/CRC/PLL conventions, stock board 601
 configuration and TPS546/EMC2101 register references were adapted from
