@@ -5,17 +5,17 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.4](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.4)**
+**Latest release: [v1.6.5](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.5)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.4.md)
+· [Release notes](docs/releases/v1.6.5.md)
 
-Version **1.6.4** is a reliability release: a refused GitHub update is no longer
-retried every hour, paused mining no longer triggers the "no share" restart, pools
-without an HTTPS statistics API stop stalling the market task, and restored backups
-keep the best shares in order. It keeps the 10-second dashboard refresh of 1.6.3.
+Version **1.6.5** updates ArduinoJson (security fix), M5GFX and M5Unified, keeps
+hours of events in the log instead of about a minute, and makes a saved
+`BDLMinerV1/<version>` user agent follow the firmware version. It includes the
+reliability fixes of 1.6.4.
 Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
 **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.6.4**.
+**BDLMinerV1/1.6.5**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -185,7 +185,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.4 && git push origin v1.6.4
+git tag v1.6.5 && git push origin v1.6.5
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -209,7 +209,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.4.
+corrections shipped in v1.5.3 and retained in v1.6.5.
 
 ## Build and flash
 

@@ -127,7 +127,7 @@ async function tick(){
    tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+': '+j.max_temp_c+' °C':'')),
    tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+': '+(j.power_limit_percent??'-')+' %'),
    tile(t('Memory'),si(j.heap,'B'),t('largest block')+': '+si(j.heap_max_block,'B')),
-   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+Math.round(j.heap/1024)+' KB'+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason),
+   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+si(j.heap,'B')+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason),
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
   if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):'—';
    const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz · '+number(a.core_v,3)+' V · '+number(a.current_a,1)+' A',t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C',t('Input')+': '+number(a.input_v)+' V',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
@@ -233,7 +233,7 @@ function drawPlot(host,key,values,color,small=false){
  const x=i=>values.length===1?right:left+i*(right-left)/Math.max(1,values.length-1),y=v=>bottom-(v-low)*(bottom-top)/(high-low||1);
  const svg=svgNode('svg',{viewBox:`0 0 ${width} ${height}`,preserveAspectRatio:'none','aria-hidden':'true'});
  svg.appendChild(svgNode('text',{x:small?10:12,y:11,class:'plot-axis'},axisUnit));
- for(let i=0;i<=Math.round((high-low)/step);++i){const value=low+i*step,py=y(value);svg.append(svgNode('line',{x1:left,y1:py,x2:right,y2:py,class:'plot-grid'}),svgNode('text',{x:left-9,y:py+3,'text-anchor':'end',class:'plot-axis'},(value/divisor).toLocaleString(LANG,{maximumFractionDigits:divisor>1?2:1})))}
+ for(let i=0;i<=Math.round((high-low)/step);++i){const value=low+i*step,py=y(value);svg.append(svgNode('line',{x1:left,y1:py,x2:right,y2:py,class:'plot-grid'}),svgNode('text',{x:left-9,y:py+3,'text-anchor':'end',class:'plot-axis'},String(+(value/divisor).toFixed(divisor>1?2:1))))}
  const ticks=width>550?5:3;
  if(values.length){const used=new Set();for(let i=0;i<ticks;++i){const index=Math.round(i*(values.length-1)/(ticks-1));if(used.has(index))continue;used.add(index);svg.appendChild(svgNode('text',{x:x(index),y:height-8,'text-anchor':i===0&&values.length>1?'start':index===values.length-1?'end':'middle',class:'plot-axis'},sampleAge(index,values.length,cachedHistory.interval_s||300)))}}
  const segments=[];let current=[];

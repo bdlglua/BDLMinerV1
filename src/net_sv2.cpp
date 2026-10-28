@@ -132,15 +132,19 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
             if (event == Event::Job || (event == Event::Target && protocol->hasJob())) {
                 minerPoolDifficulty(protocol->job().difficulty);
                 minerPublishJob(protocol->job(), protocol->job().clean);
-                logf("[pool] SV2 job %s height=%u clean=%d diff=%g\n", protocol->job().id.c_str(),
-                     protocol->job().blockHeight(), protocol->job().clean, protocol->job().difficulty);
+                static uint32_t loggedHeight = 0;
+                if (protocol->job().clean && protocol->job().blockHeight() != loggedHeight) {
+                    loggedHeight = protocol->job().blockHeight();
+                    logf("[pool] SV2 new block %u, job %s diff=%g\n", loggedHeight, protocol->job().id.c_str(),
+                         protocol->job().difficulty);
+                }
             }
             if (event == Event::Target && !protocol->hasJob()) minerPoolDifficulty(protocol->difficulty());
             if (event == Event::Accepted || event == Event::Rejected) {
                 lastReply = millis();
                 for (uint32_t i = 0; i < protocol->acknowledged(); ++i) minerShareResult(event == Event::Accepted);
-                logf("[pool] SV2 %u share(s) %s%s\n", protocol->acknowledged(), event == Event::Accepted ? "accepted" : "rejected: ",
-                     event == Event::Accepted ? "" : protocol->error().c_str());
+                if (event == Event::Rejected)
+                    logf("[pool] SV2 %u share(s) rejected: %s\n", protocol->acknowledged(), protocol->error().c_str());
             }
         }
         pending = protocol->pending();

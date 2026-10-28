@@ -90,7 +90,10 @@ struct Settings {
 
 inline void settingsNormalizeAgent(Settings &values) {
     const char *agent = values.userAgent.c_str();
-    if (!*agent || strlen(agent) > 64 || (values.userAgentAuto && !strcmp(agent, "NerdMinerV2")))
+    // A manual "BDLMinerV1/<version>" is the native identity saved by an older
+    // firmware: it follows the running version instead of announcing that one.
+    if (!*agent || strlen(agent) > 64 || (values.userAgentAuto && !strcmp(agent, "NerdMinerV2")) ||
+        !strncmp(agent, "BDLMinerV1/", 11))
         values.userAgent = DEFAULT_USER_AGENT;
 }
 

@@ -11,10 +11,10 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: test/web/package-lock.json
       - run: npm ci --prefix test/web
@@ -24,11 +24,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.platformio
@@ -53,11 +53,11 @@ jobs:
         env: [m5stickc-plus2, m5stack-esp32, m5stack-s3, lilygo-t-display, lilygo-t-display-s3,
               esp32-2432s028r, esp32-headless, esp32s3-headless, esp32s2-headless, esp32c3-headless, bitaxe-gamma-601]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.platformio
@@ -73,7 +73,7 @@ jobs:
 
       - name: Experimental Gamma 601 USB build
         if: matrix.env == 'bitaxe-gamma-601'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bitaxe-gamma-601-experimental-${{ github.sha }}
           retention-days: 14
@@ -86,7 +86,7 @@ jobs:
 
       - name: M5StickC Plus2 dashboard test build
         if: matrix.env == 'm5stickc-plus2'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: m5stickc-plus2-dashboard-test-${{ github.sha }}
           retention-days: 14

@@ -122,8 +122,15 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         if (!proto.authorized() || !proto.hasJob()) break;
                         minerPoolDifficulty(proto.job().difficulty);
                         minerPublishJob(proto.job(), proto.job().clean);
-                        logf("[pool] job %s height=%u clean=%d diff=%g\n", proto.job().id.c_str(),
-                             proto.job().blockHeight(), proto.job().clean, proto.job().difficulty);
+                        // The log keeps a few KB: only a new block is worth a line (job
+                        // updates come every ~30 s; the [stats] line counts the shares).
+                        // (a clean job also follows a difficulty change, at the same height)
+                        static uint32_t loggedHeight = 0;
+                        if (proto.job().clean && proto.job().blockHeight() != loggedHeight) {
+                            loggedHeight = proto.job().blockHeight();
+                            logf("[pool] new block %u, job %s diff=%g\n", loggedHeight, proto.job().id.c_str(),
+                                 proto.job().difficulty);
+                        }
                         break;
                     case stratum::Event::Difficulty:
                         if (!proto.hasJob()) minerPoolDifficulty(proto.difficulty());
@@ -132,7 +139,6 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                     case stratum::Event::ShareAccepted:
                         lastShareReply = millis();
                         minerShareResult(true);
-                        logf("[pool] share accepted\n");
                         break;
                     case stratum::Event::ShareRejected:
                         lastShareReply = millis();
@@ -174,8 +180,9 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                 logf("[pool] stale share dropped (job %s)\n", share.jobId);
                 continue;
             }
-            logf("[pool] submit nonce=%08x diff=%.4g job=%s\n", (unsigned)share.nonce, share.difficulty,
-                 share.jobId);
+            if (share.difficulty >= 1.0)  // 32-bit shares and better; the others are counted in [stats]
+                logf("[pool] submit nonce=%08x diff=%.4g job=%s\n", (unsigned)share.nonce, share.difficulty,
+                     share.jobId);
             if (!proto.pendingShares()) lastShareReply = millis();
             std::string line = proto.submit(share);
             if (line.empty() || !sendLine(client, line)) return;

@@ -41,7 +41,9 @@ def main():
     run(os.environ.get("CC", "gcc"), "-O1", "-ffunction-sections", "-fdata-sections", "-c",
         library / "lgfx/utility/lgfx_qrcode.c", "-o", build / "qrcode.o")
     run(compiler, *flags, "test/host/test_display.cpp", "src/ui_view.cpp", "src/ui_art.cpp", "src/ui_font.cpp", "src/i18n.cpp",
-        library / "lgfx/v1/lgfx_v1.cpp", build / "qrcode.o", "-Wl,--gc-sections", "-pthread",
+        # M5GFX >= 0.2.30 splits the implementation into several hub files
+        # (LGFXBase, fonts, panels, platforms...); older ones had lgfx_v1.cpp only.
+        *sorted((library / "lgfx/v1").glob("*.cpp")), build / "qrcode.o", "-Wl,--gc-sections", "-pthread",
         "-o", build / "test_display")
     if args.check:
         run(build / "test_display")
