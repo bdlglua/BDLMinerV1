@@ -114,7 +114,10 @@ async function tick(){
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];
   renderUpdate(j.github_update);
   if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')));
-  else if(!pv.supported)T.push(tile(t('Seen by the pool'),'-',t('no stats API known for this pool')));
+  // Without a readable pool API, show what the pool credits: accepted share
+  // difficulty x 2^32 over the session, the way pools estimate a worker.
+  else if(!pv.supported){const work=j.shares.work,since=j.uptime_s;
+   T.push(work>0&&since>0?tile(t('Seen by the pool'),si(work*4294967296/since,'H/s'),t('estimated from accepted shares')+' · '+j.shares.accepted+' '+t('shares')+' · '+t('since restart')):tile(t('Seen by the pool'),'-',t('waiting for accepted shares')))}
   const now=Date.now()/1e3,B=j.blocks_recent||[];
   if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+': '+t('your best')+' '+diff(B[0].best):''),true));
   if(j.top&&j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
@@ -245,7 +248,7 @@ function drawPlot(host,key,values,color,small=false){
  for(const segment of segments)if(segment.length===1)svg.appendChild(svgNode('circle',{cx:segment[0][0],cy:segment[0][1],r:3,fill:color}));
  const cursor=svgNode('line',{x1:right,y1:top,x2:right,y2:bottom,class:'plot-cursor',visibility:'hidden'}),dot=svgNode('circle',{cx:right,cy:bottom,r:4,fill:color,class:'plot-dot',visibility:'hidden'});svg.append(cursor,dot);
  host.replaceChildren(svg);
- if(!valid.length){const empty=document.createElement('div');empty.className='plot-empty';const title=document.createElement('span');title.textContent=t('No observations yet.');const note=document.createElement('small');note.textContent=t(key==='temperature_c'?'A usable temperature sensor is required.':'The first history point appears after five minutes of mining.');empty.append(title,note);host.appendChild(empty)}
+ if(!valid.length){const empty=document.createElement('div');empty.className='plot-empty';const title=document.createElement('span');title.textContent=t('No observations yet.');const note=document.createElement('small');const started=(cachedHistory.hashrate||[]).some(Number.isFinite);note.textContent=t(key==='temperature_c'&&(started||latestStats?.temp_c==null)?'A usable temperature sensor is required.':'The first history point appears after five minutes of mining.');empty.append(title,note);host.appendChild(empty)}
  const view={host,values,x,y,left,right,width,cursor,dot};plotViews.push(view);
  const point=event=>{if(!values.length)return;document.getElementById('chart-inspection').setAttribute('aria-live','off');const bounds=host.getBoundingClientRect(),px=(event.clientX-bounds.left)*width/bounds.width,index=Math.max(0,Math.min(values.length-1,Math.round((px-left)/(right-left)*Math.max(1,values.length-1))));if(historyPointerFrame)cancelAnimationFrame(historyPointerFrame);historyPointerFrame=requestAnimationFrame(()=>{historyPointerFrame=0;selectHistory(index)})};
  host.onpointermove=point;host.onpointerdown=point;

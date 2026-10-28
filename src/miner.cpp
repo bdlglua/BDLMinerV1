@@ -493,8 +493,12 @@ void minerPoolDifficulty(double difficulty) {
 
 void minerShareResult(bool accepted) {
     portENTER_CRITICAL(&statsMux);
-    if (accepted) stats.accepted++;
-    else stats.rejected++;
+    if (accepted) {
+        stats.accepted++;
+        // What the pool credits: its difficulty at acceptance (vardiff changes
+        // apply to later shares). Pools estimate a worker's hashrate this way.
+        stats.acceptedWork += stats.poolDiff;
+    } else stats.rejected++;
     portEXIT_CRITICAL(&statsMux);
 }
 

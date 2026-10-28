@@ -116,6 +116,7 @@ void handleStats() {
     }
     j["shares"]["accepted"] = stats.accepted;
     j["shares"]["rejected"] = stats.rejected;
+    j["shares"]["work"] = stats.acceptedWork;
     j["best"]["session"] = stats.sessionBestDiff;
     j["best"]["ever"] = stats.bestDiff;
     j["blocks"] = stats.blocksFound;
