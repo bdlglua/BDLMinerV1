@@ -721,8 +721,18 @@ void webStart() {
     server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
     server.on("/api/github-check", HTTP_POST, []() {
         if (!settings.webPassword.isEmpty() && !authorized()) return;
-        if (ghUpdateCheck()) server.send(202, "text/plain", "Check requested");
-        else server.send(409, "text/plain", "GitHub updates are disabled or busy");
+        if (!settings.githubUpdate) {
+            server.send(409, "text/plain", "GitHub updates are disabled in settings");
+            return;
+        }
+        if (ghUpdateCheck()) {
+            server.send(202, "text/plain", "Check requested");
+            return;
+        }
+        GithubUpdate state = ghUpdateState();
+        // A check already queued or running answers this request as well.
+        if (state.installing || ota::busy()) server.send(409, "text/plain", "An update is being installed");
+        else server.send(202, "text/plain", "Check requested");
     });
     server.on("/api/github-update", HTTP_POST, []() {
         // Only installs the latest release, and only when it carries the
