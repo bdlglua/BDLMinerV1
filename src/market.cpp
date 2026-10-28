@@ -35,6 +35,10 @@ bool endpointValid[6] = {};
 MarketData data;
 PoolStats pool;
 bool poolBackup = false;  // identifies the endpoint that produced `pool`
+// Only public-pool.io and ckpool are known; any other pool is tried as a
+// ckpool. One without HTTPS on 443 makes each try wait for a TLS timeout
+// (18 s seen), so after such a failure it is not asked again until restart.
+String noHttpsHost[2];
 portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 
 // GET `path` on the TLS connection shared by one refresh and parse the JSON
@@ -211,13 +215,15 @@ double parseRate(const char *s, double previous = 0) {
 }
 
 // GET https://host:port/path with its own TLS connection; the body as JSON
-// through `filter`. Returns the HTTP code (or a negative error).
+// through `filter`. Returns the HTTP code, or a negative error: kNoTls when
+// the TLS connection itself failed.
+constexpr int kNoTls = -100;
 int fetchJson(const String &host, uint16_t port, const String &path, JsonDocument &doc, const JsonDocument &filter) {
     WiFiClientSecure tls;
     HTTPClient http;
     http.setTimeout(10000);
     if (!http.begin(tls, "https://" + host + ":" + port + path)) return -2;
-    if (!tlsConnect(tls, host.c_str(), port)) return -1;
+    if (!tlsConnect(tls, host.c_str(), port)) return kNoTls;
     int code = http.GET();
     if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter)))
         code = -3;
@@ -236,6 +242,16 @@ bool refreshPoolStats() {
     portENTER_CRITICAL(&dataMux);
     PoolStats p = poolBackup == backup ? pool : PoolStats{};
     portEXIT_CRITICAL(&dataMux);
+    bool known = host == "public-pool.io" || host.endsWith(".public-pool.io") || host.endsWith("ckpool.org") ||
+                 host == "pool.nerdminers.org";
+    if (!known && host == noHttpsHost[backup]) {
+        p.supported = false;
+        portENTER_CRITICAL(&dataMux);
+        pool = p;
+        poolBackup = backup;
+        portEXIT_CRITICAL(&dataMux);
+        return true;  // nothing to retry
+    }
     JsonDocument filter, doc;
     int code;
     if (host == "public-pool.io" || host.endsWith(".public-pool.io")) {
@@ -261,6 +277,11 @@ bool refreshPoolStats() {
             p.shares = poolNumber(doc["shares"], p.shares);
             p.workers = doc["workers"] | 0;
         }
+    }
+    if (!known && code == kNoTls) {
+        noHttpsHost[backup] = host;
+        logf("[market] %s has no HTTPS stats API, not asked again until restart\n", host.c_str());
+        code = HTTP_CODE_NOT_FOUND;
     }
     p.supported = code == HTTP_CODE_OK || code < 0;  // 404 etc.: no such API (or address unknown there)
     if (code == HTTP_CODE_OK) p.updatedMs = millis();

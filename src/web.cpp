@@ -11,6 +11,8 @@
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 
+#include <algorithm>
+
 #include "board.h"
 #include "core/address.h"
 #include "ghupdate.h"
@@ -493,6 +495,11 @@ void handlePostBackup() {
             if (i == TOP_SHARES) break;
             s.top[i++] = {o["d"] | 0.0, o["t"] | 0u};
         }
+        // backupError() tolerates the order JSON rounding may change, but
+        // the miner inserts new records into a list it expects best first.
+        std::stable_sort(s.top, s.top + i, [](const BestShare &a, const BestShare &b) {
+            return a.difficulty > b.difficulty;
+        });
         if (!minerStatsRestore(s)) {
             server.send(500, "text/plain", "Settings saved, but statistics could not be restored. Retry before restarting.");
             return;
