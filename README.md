@@ -5,17 +5,18 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.5](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.5)**
+**Latest release: [v1.6.6](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.6)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.5.md)
+· [Release notes](docs/releases/v1.6.6.md)
 
-Version **1.6.5** updates ArduinoJson (security fix), M5GFX and M5Unified, keeps
-hours of events in the log instead of about a minute, and makes a saved
-`BDLMinerV1/<version>` user agent follow the firmware version. It includes the
-reliability fixes of 1.6.4.
+Version **1.6.6** redesigns the physical screen (one big number per page) and the web
+dashboard (a compact console), and builds the firmware for size: every board is
+140-340 KB smaller, the T-Display has room again, and M5Stack Core and CYD boards
+get two firmware slots for GitHub and web updates. When a pool has no readable
+statistics API, the dashboard estimates what it sees from the accepted shares.
 Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
 **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.6.5**.
+**BDLMinerV1/1.6.6**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -163,8 +164,9 @@ or a board without an OTA slot does not enter this automatic retry loop.
 The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
 key built into the firmware (`src/update_key.h`), so a modified file is refused. For that
 reason **Install** works without a web password too (with one set, it is asked). Settings
-and statistics are kept. Like web updates, it needs a board with room for two firmwares
-(not M5Stack Core or CYD).
+and statistics are kept. Like web updates, it needs two firmware slots: every board has
+them from 1.6.6 on. M5Stack Core and CYD boards installed before 1.6.6 had a single slot;
+reinstall them once by USB (or the web flasher) with the 1.6.6 factory image to get two.
 If an older firmware cannot reach GitHub to update itself, install the matching
 `<board>-firmware.bin` once through *Settings → Firmware update* (or by USB on a
 board without two app slots). Future checks then use the updated discovery code.
@@ -185,7 +187,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.5 && git push origin v1.6.5
+git tag v1.6.6 && git push origin v1.6.6
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -209,7 +211,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.5.
+corrections shipped in v1.5.3 and retained in v1.6.6.
 
 ## Build and flash
 
@@ -417,39 +419,26 @@ Clock / Global data comes from the public [mempool.space](https://mempool.space)
 
 ### Physical display
 
-The eight physical screens use a NerdMinerV2-inspired illustrated instrument panel:
-black backgrounds, Bitcoin/mining artwork, chamfered panels, smooth numerals and
-yellow/cyan readouts. The pages cover mining, clock,
-Bitcoin market, network, device information, hashrate history, records and blocks.
-Mining puts the live hashrate first, alongside temperature, effective power,
-accepted shares and best difficulty. Records include both 32-bit and 64-bit shares.
-The footer identifies the current mining limit and the eight dots identify the page.
+The eight physical screens show **one big number per page**, readable from across
+the room: live hashrate, local time, Bitcoin price, block height, IP address,
+average hashrate (with its graph), best difficulty ever, and the block being mined.
+Three secondary readings sit under the big value (side by side on landscape panels,
+stacked on portrait ones), for example shares, best difficulty and temperature on the
+mining page. A thin header shows a Bitcoin coin, the page name and the miner state:
+`LIVE`, `OFFLINE`, `+1 SHARE`, or `COOLING`, `PAUSED`, `LIMITED`, `BATTERY` when
+mining is limited. Dots at the bottom identify the page.
 
-The mining, clock, Bitcoin and network pages place a dedicated illustration above
-the colored readouts. Startup has a Bitcoin-and-pickaxes splash, and the device
-page includes a decorative ASIC picture. These are original BDLMiner illustrations,
-not photographs of the connected board or copied NerdMiner logos.
-The layout adapts to the panel dimensions, including square and small M5 screens.
-Short panels prioritize hashrate, temperature and power on the mining page.
-French and English, the five accent themes, buttons, rotation, night mode and
-brightness settings are retained. Missing temperatures display `--`, and pauses
-and thermal limits remain visible.
+The big value uses the largest antialiased face that fits the panel, up to 80
+pixels on 320x240 screens, with its unit beside it or, on narrow portrait panels,
+under it. French and English, the five accent themes, buttons, rotation, night
+mode and brightness settings are retained. Missing temperatures display `--`.
 
-Only changed cards and status fields are redrawn. The renderer reuses one 8 KiB
-strip buffer instead of allocating sprites for every field or a full-screen
-framebuffer. If this allocation fails, clipped direct drawing is used. The graph
-redraws when a new sample arrives, preserves elapsed time and gaps, and uses a zero
-baseline. Four 128x128 RGB565 illustrations use 128 KiB of flash in total. Area
-filtering remains available for other sizes; small commonly used illustrations
-also have native-size sprites prepared directly from the source PNG (about
-21 KiB extra), avoiding a second resize. Small labels use stronger hinted glyphs
-and numerical readouts use a dedicated cap-height family, so they fill the field
-without space reserved for unused descenders. Text retains light antialiasing
-and is compressed in flash, instead of stretching pixel fonts.
-Panel corners, indicators and graph lines are antialiased too. There is no
-decoded image buffer, font-loading heap, filesystem or animation loop. Headless
-builds exclude the artwork. The default yellow primary plate and cyan secondary
-plate follow the NerdMiner visual reference; selected accent themes are retained.
+Only changed fields are redrawn. The renderer reuses one 8 KiB strip buffer
+instead of allocating sprites for every field or a full-screen framebuffer. If this
+allocation fails, clipped direct drawing is used. The graph redraws when a new
+sample arrives, preserves elapsed time and gaps, and uses a zero baseline. Text uses
+light antialiasing compressed in flash (4-bit coverage, run-length encoded); there is
+no image, decoded bitmap, font-loading heap, filesystem or animation loop.
 
 | Resolution | Boards |
 |---|---|
@@ -468,8 +457,6 @@ pip install pillow
 python3 tools/preview_display.py
 ```
 
-Artwork sources are in `assets/display/`. After replacing the original 2x2 PNG
-atlas, encode its small firmware images with `python3 tools/pack_display_art.py`.
 Generate the embedded fonts with `python3 tools/pack_display_fonts.py`; their
 source font and license are also included in that directory. These preparation
 steps require Pillow; ordinary firmware builds do not. Overview sheets use a
@@ -513,8 +500,8 @@ the serial monitor):
   statistics are rejected before anything is restored. Also at `/api/backup`
   (GET / POST). **Firmware update**
   takes the `firmware.bin` of this board (`.pio/build/<env>/firmware.bin`): no cable
-  needed. Boards whose firmware does not fit twice in flash (M5Stack Core,
-  ESP32-2432S028R CYD) can only be updated by USB.
+  needed. M5Stack Core and CYD boards installed before 1.6.6 have a single firmware
+  slot and need one USB reinstall with a 1.6.6 or later factory image first.
   Settings can be searched, passwords revealed locally, and mining power selected
   with **Full performance (100%)**, **Balanced (75%)** or **Quiet (50%)** presets.
   Presets only edit the form; **Save and restart** applies them. Existing user limits
@@ -769,7 +756,6 @@ src/
   ui.*             display data, buttons and history sampling
   ui_view.*        adaptive physical display renderer and change cache
   ui_font.*        compressed native-size glyphs for the physical display
-  ui_art.*         display illustrations and native-size sprites
 lib/
   secp256k1/       pinned Bitcoin Core EllSwift/BIP340 implementation (MIT)
   monocypher/      pinned ChaCha20-Poly1305 implementation (BSD-2-Clause)
