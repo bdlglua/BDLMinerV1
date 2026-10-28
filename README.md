@@ -5,18 +5,19 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.7](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.7)**
+**Latest release: [v1.6.8](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.8)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.7.md)
+· [Release notes](docs/releases/v1.6.8.md)
 
-Version **1.6.7** (and 1.6.6) redesigns the physical screen (one big number per page) and the web
-dashboard (a compact console), and builds the firmware for size: every board is
-140-340 KB smaller, the T-Display has room again, and M5Stack Core and CYD boards
-get two firmware slots for GitHub and web updates. When a pool has no readable
-statistics API, the dashboard estimates what it sees from the accepted shares.
-Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
-**600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.6.7**.
+Version **1.6.8** makes updates safer: a new firmware runs on trial and the previous
+one comes back by itself if it crashes or cannot mine. It adds crash reports on the
+dashboard, hashrate and rejected-share alerts, a webhook for Discord or Telegram,
+Home Assistant controls, touch-screen gestures, a full-screen *BLOCK FOUND!* alert,
+a home-screen web app, redesigned settings and log pages, and finds any pool's
+statistics API by itself. It keeps 1.6.6's one-big-number screen, console dashboard
+and smaller firmware. Experimental Gamma 601 profiles still cover **525–800 MHz**,
+defaulting to **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
+**BDLMinerV1/1.6.8**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -171,6 +172,24 @@ If an older firmware cannot reach GitHub to update itself, install the matching
 `<board>-firmware.bin` once through *Settings → Firmware update* (or by USB on a
 board without two app slots). Future checks then use the updated discovery code.
 
+**Trial and automatic rollback** (from 1.6.8): a newly installed firmware, from GitHub
+or the web page, starts on trial. It is kept once it has run 3 minutes connected to
+the pool and hashing (shares are too rare at difficulty 1 to be the proof). If it
+crashes or hangs before that, or does not get there within 20 minutes (40 without
+WiFi), the previous firmware comes back by itself and a notification is sent. A
+restart during the trial counts too (a power cut, the reset button), so a version
+gets a second try; rolled back twice, it is no longer installed automatically (the
+update tile says why if it is offered). The *Device* tile shows *Firmware on trial* meanwhile.
+
+### Crash reports
+
+After a crash the panic handler keeps a core dump in flash. At the next start the
+log and a *Last crash* tile on the dashboard show its summary (task, address,
+the exception by name, backtrace; an `abort()`, failed assert or watchdog is named as
+such rather than by the "StoreProhibited at 0x00000000" ESP-IDF uses to stop); **Download report** saves the full ELF for
+`esp-coredump` / GDB with the matching `firmware.elf`, and **Erase** clears it
+(both need the web password).
+
 ### Anonymous usage count
 
 To know how many miners run each version, 5 minutes after boot and then once a day the
@@ -187,7 +206,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.7 && git push origin v1.6.7
+git tag v1.6.8 && git push origin v1.6.8
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -211,7 +230,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.7.
+corrections shipped in v1.5.3 and retained in v1.6.8.
 
 ## Build and flash
 
@@ -258,7 +277,7 @@ Boards without a display report everything on the serial monitor and the
      `0.0002` by default; the pool may enforce a higher minimum. V2 uses the target
      assigned to its mining channel;
    * **Main / backup protocol**: Stratum V1 by default, or Stratum V2 with Noise
-     and a pool authority key. The dashboard includes a Public Pool V2 solo preset;
+     and a pool authority key (see [Stratum V1 and Stratum V2](#stratum-v1-and-stratum-v2));
    * **User agent mode**: Automatic selects an identity for the pool; Manual sends
      your custom identity. The stored manual value is kept when switching modes;
    * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
@@ -302,8 +321,8 @@ finding a valid Bitcoin block.
 |---|---|---|---|
 | [Nerdminers.org](https://pool.nerdminers.org/) | `pool.nerdminers.org` | `3333` | V1; designed for NerdMiner and similar ESP32 devices. Leave user agent on Automatic. |
 | [NerdMiner.io](https://nerdminer.io/) | `pool.nerdminer.io` | `3333` | V1; announces adaptive difficulty for small miners. Use your valid Bitcoin address as the worker. |
-| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `3333` | V1; use the dashboard's **Use Public Pool V1 (solo)** preset. |
-| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `23330` | V2; use **Use Public Pool V2 (solo)** to fill the protocol, port and authority key together. |
+| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `3333` | V1. |
+| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `23330` | V2, with the authority key below. |
 
 For Nerdminers.org, use `YOUR_BTC_ADDRESS.worker1`; for NerdMiner.io, follow its
 published worker instructions and use your Bitcoin address. Password `x` is the
@@ -357,13 +376,12 @@ synchronized clock; invalid signatures, expired certificates and unauthenticated
 messages cause a reconnect. It never silently downgrades the selected endpoint
 to V1. A separately configured backup pool can explicitly use V1 or V2.
 
-For [Public Pool](https://web.public-pool.io/), click **Use Public Pool V2 (solo)**
-in settings: it fills `public-pool.io`, port `23330`, Stratum V2 and the published
-authority key `9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6`.
+For [Public Pool](https://web.public-pool.io/) over V2, set `public-pool.io`, port
+`23330`, Stratum V2 and the published authority key
+`9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6` (pasting
+`stratum2+tcp://public-pool.io:23330/<key>` into the pool host fills all three).
 Use your Bitcoin address (optionally `.worker`) as the worker identity and verify
-current connection details on the pool's site if its endpoint/key changes. This
-is a solo preset; it does not select Public Pool's separate PPLNS endpoint.
-**Use Public Pool V1 (solo)** selects port `3333` and V1, retaining the saved V2 key.
+current connection details on the pool's site if its endpoint/key changes.
 The protocol and user agent do not override pool difficulty or increase the
 device's hashing power. V2 channel identity uses the configured address/worker;
 the V1 password setting is not sent as a V2 authentication field.
@@ -393,6 +411,9 @@ and physical-device throughput still require hardware/network validation.
 | Setup portal (hold at boot) | A | right button | BOOT | BOOT |
 | Reset (5 s) | A | right button | BOOT | BOOT |
 
+Touch screens (CYD, M5Stack Core2 / CoreS3): a tap shows the next screen, a press of
+one second changes the brightness.
+
 Screens, in order:
 
 1. **Mining**: live hashrate, temperature, effective power, accepted/rejected shares,
@@ -408,7 +429,9 @@ Screens, in order:
 8. **Blocks**: the block being mined, then the last 4 blocks found on the network, with
    their pool, age and your best share while each one was being mined.
 
-Accepted shares flash `+1 SHARE` in the header; 32‑bit shares also light the red LED of M5
+When the miner finds a block, a full-screen **BLOCK FOUND!** alert with its height
+stays until a button is pressed (that press only closes it); it lights the screen
+even in night mode. Accepted shares flash `+1 SHARE` in the header; 32‑bit shares also light the red LED of M5
 devices for a second (not in night mode).
 Web settings add: 5 colour themes, automatic screen change every N seconds, rotation
 following the accelerometer (M5 devices with an IMU: the two landscape ways), and a night
@@ -474,10 +497,14 @@ Once connected, the board serves a dashboard at **http://<board IP>/** or
 **http://bdlminer-xxxx.local/** (mDNS; `xxxx` = last digits of the MAC address, shown in
 the serial monitor):
 
+The dashboard can be added to a phone's home screen (web app manifest and icon):
+it then opens full screen like an app. Browsers only offer a full *install* over
+HTTPS; *Add to Home screen* works on the local address.
+
 * **Dashboard**: hashrate per engine, shares, best difficulties, 32‑bit and 64‑bit shares and their
   average interval, block chance per day and per year, the 10 best shares ever with
-  their date, what the pool sees (hashrate, best share, workers: public-pool.io and
-  ckpool-style pools such as pool.nerdminers.org and solo.ckpool.org), market data,
+  their date, what the pool sees (hashrate, best share, workers, from the pool's
+  statistics API, found automatically; see below), market data,
   lifetime totals, the last blocks of the network (pool, transactions, your best share
   for each), a 24‑hour chart, an *Update available* tile (see
   [Updates from GitHub](#updates-from-github)), the reason of the last restart, and night / heat /
@@ -585,6 +612,17 @@ These are also shown in the dashboard's Pool card.
 > Settings and firmware updates need the web password, sent with HTTP basic
 > authentication, which is not encrypted on the local network.
 
+### What the pool sees
+
+The miner finds its pool's statistics API by itself, for any pool: it tries
+ckpool's `/users/<address>` and public-pool's `/api/client/<address>` on the pool's
+host, on its parent domain (`eu.pool.example` → `pool.example`) and on the usual
+ports (443, 40557; 3334 and 80 over plain HTTP for a pool on the local network), and
+recognises the answer by its JSON. The address that answered is kept, across restarts,
+and shown under the *Seen by the pool* tile; if it stops answering, the search starts
+again. A pool without such an API is searched again every 6 hours; meanwhile the tile
+estimates the hashrate from the accepted shares.
+
 ## Notifications
 
 Install the [ntfy](https://ntfy.sh) app, subscribe to a topic of your own (a long,
@@ -592,7 +630,22 @@ hard-to-guess name: anyone who knows it can read it) and enter it in the web set
 (*ntfy topic*; another ntfy server can be set). The miner then sends: block found,
 new best difficulty ever (from difficulty 1, at most every 10 minutes), offline for
 10 minutes and back online, too hot / cooled down, restarted after a crash or a
-watchdog, and optionally every 32‑bit share.
+watchdog, a firmware rolled back after a failed trial, and optionally every 32‑bit share.
+
+**Alerts**: when the hashrate stays below the *% of normal* setting (50 % by default,
+0 = off) for the *minutes* setting (15), with the pool connected and mining at full
+power, the miner sends *Hashrate low*, then *Hashrate back to normal*. "Normal" is the
+median of the last 24 hours at full power (at least 30 minutes of it). Over the same
+span, 5 or more rejected shares making at least 10 % of the shares send *Shares rejected*.
+
+**Webhook**: every notification is also posted as JSON to *Webhook URL* (`http://` or
+`https://`; it holds a token, so it is a hidden field). The body carries `content`
+(Discord), `text` (Telegram's `sendMessage`, with `chat_id` in the URL), and
+`title`, `message`, `priority`, `tags`, `miner`, `firmware` for anything else
+(Home Assistant, n8n, Gotify proxies...). ntfy and the webhook work alone or together.
+For Discord, use *Channel settings › Integrations › Webhooks › Copy URL*. After saving,
+**Send a test notification** (under the webhook field) shows the result of each
+destination: OK, an HTTP code, or no connection.
 
 ## Home Assistant
 
@@ -601,6 +654,11 @@ itself through MQTT discovery (device *BDLMiner bdlminer-xxxx*: hashrate, temper
 shares, best difficulties, 32‑bit shares, blocks, uptime, pool status) and publishes
 every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` /
 `offline`. `/metrics` serves Prometheus scrapers.
+
+It can also be driven from Home Assistant: a *Mining* switch (off = power 0 %, on =
+back to the previous power), *Power* (0–100 %) and *Brightness* (0–100 %) numbers and a
+*Restart* button, on `bdlminer/<name>/set/<mining|power|brightness|restart>`. Power is
+saved like the web setting; brightness works like the button.
 
 ## Safety, power and networks
 
@@ -671,7 +729,7 @@ every 30 s on `bdlminer/<name>/state`, with `bdlminer/<name>/status` = `online` 
 | Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
 | Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](#pool-shares-and-local-records). |
 | M5StickC Plus2 slows down with the local dashboard open | v1.6.3 reduces HTTP/page overhead and refreshes statistics every 10 seconds. See the [dashboard-load review](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
-| `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. The Public Pool V2 solo preset fills both; an altered or expired server certificate is refused. |
+| `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. Pasting the pool's `stratum2+tcp://host:port/key` address fills both; an altered or expired server certificate is refused. |
 | `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
 | A manually selected user agent is refused | Enter an identity accepted by that pool or select Automatic. Manual mode preserves your choice rather than replacing it after a refusal. |
 | No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
@@ -745,8 +803,10 @@ src/
   runtime.h        observable task/allocation startup failures
   core/line_buffer.h bounded Stratum framing and recovery after invalid/oversized lines
   watch.*          once-a-second supervision: heat / battery, night mode, notifications, watchdogs
-  notify.*         ntfy push notifications
-  mqtt.*           Home Assistant (MQTT discovery)
+  notify.*         ntfy push notifications and the JSON webhook
+  trial.*          firmware trial after an update, automatic rollback
+  crashlog.*       core dump summary, download and erase
+  mqtt.*           Home Assistant (MQTT discovery, state and commands)
   tls.*            TLS/SHA coordination, handshake profiling and watchdog leases
   log.*            log ring buffer (web page) and reason of the last restart
   settings.*       NVS + WiFiManager portal
