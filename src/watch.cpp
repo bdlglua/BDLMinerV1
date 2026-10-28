@@ -2,6 +2,10 @@
 
 #include <Arduino.h>
 
+#include <algorithm>
+#include <memory>
+#include <new>
+
 #include "board.h"
 #include "core/mining_safety.h"
 #include "log.h"
@@ -18,6 +22,8 @@ namespace {
 constexpr uint32_t kNoPoolRestartMs = 30 * 60 * 1000;  // not connected that long: restart
 constexpr uint32_t kOfflineNotifyMs = 10 * 60 * 1000;
 constexpr uint32_t kBestNotifyMs = 10 * 60 * 1000;   // at most one record notification per 10 min
+constexpr uint32_t kAlertWarmupMs = 5 * 60 * 1000;   // the minute average needs time after boot
+constexpr int kNormalPoints = 6;                     // 30 minutes of full-speed history at least
 
 std::atomic<bool> night{false};
 std::atomic<const char *> limitReason{"supervision"};
@@ -83,6 +89,8 @@ void throttle() {
     ui::setBacklight(b);
 }
 
+void alerts(uint32_t now, const MinerStats &stats);
+
 void events(uint32_t now) {
     const MinerStats stats = minerStats();
     static bool first = true;
@@ -105,6 +113,10 @@ void events(uint32_t now) {
         snprintf(msg, sizeof(msg), "Block %u found by %s! Check the pool and your wallet.", (unsigned)stats.blockHeight,
                  board::modelName());
         notify("BLOCK FOUND", msg, 5, "tada,moneybag");
+        logf("[miner] BLOCK FOUND at height %u\n", (unsigned)stats.blockHeight);
+        watchWake();  // shown even at night
+        ui::blockFound(stats.blockHeight);
+        if (settings.beep) board::beep();
     }
 
     // The red LED lights for a second on each 32-bit share (not at night).
@@ -160,10 +172,79 @@ void events(uint32_t now) {
         notify("Miner offline", msg, 4, "warning");
     }
 
+    alerts(now, stats);
+
     if (now - lastConnected > kNoPoolRestartMs) restart("no pool connection for 30 minutes");
     if (settings.rebootHours && now - acceptedAt > settings.rebootHours * 3600000UL) {
         snprintf(msg, sizeof(msg), "no accepted share for %u hours", settings.rebootHours);
         restart(msg);
+    }
+}
+
+// Median of the full-speed history points: what this board normally does.
+// Recomputed when a point is added (every 5 minutes), 0 while unknown.
+double normalHashrate() {
+    static double normal = 0;
+    static uint32_t seen = UINT32_MAX;
+    uint32_t revision = minerHistoryRevision();
+    if (revision == seen) return normal;
+    std::unique_ptr<HistoryPoint[]> points(new (std::nothrow) HistoryPoint[HISTORY_LEN]);
+    std::unique_ptr<float[]> rates(new (std::nothrow) float[HISTORY_LEN]);
+    if (!points || !rates) return normal;  // try again next second
+    seen = revision;
+    int count = minerHistoryPoints(points.get(), HISTORY_LEN), n = 0;
+    for (int i = 0; i < count; i++) {
+        const HistoryPoint &p = points[i];
+        if (p.powerPercent >= 100 && p.coveragePercent >= 90 && p.hashrate > 0) rates[n++] = p.hashrate;
+    }
+    if (n < kNormalPoints) return normal = 0;
+    std::nth_element(rates.get(), rates.get() + n / 2, rates.get() + n);
+    return normal = rates[n / 2];
+}
+
+// Hashrate well below normal for settings.alertMinutes, and many rejected
+// shares over the same span: both usually mean something to look at.
+void alerts(uint32_t now, const MinerStats &stats) {
+    static uint32_t lowSince = 0, windowAt = 0, accepted0 = 0, rejected0 = 0;
+    static bool lowSent = false, started = false;
+    uint32_t span = settings.alertMinutes * 60000UL;
+    char msg[120];
+
+    double normal = settings.alertPercent ? normalHashrate() : 0;
+    bool comparable = normal > 0 && now >= kAlertWarmupMs && stats.poolConnected && settings.miningPower >= 100 &&
+                      minerPowerPercent() >= 100 && !ota::busy();
+    double rate = minerHashrate();
+    if (!comparable) {
+        lowSince = 0;  // paused, throttled or offline: start over
+    } else if (rate < normal * settings.alertPercent / 100) {
+        if (!lowSince) lowSince = now;
+        if (!lowSent && now - lowSince >= span) {
+            lowSent = true;
+            snprintf(msg, sizeof(msg), "%.0f H/s for %u minutes, normally %.0f H/s", rate, settings.alertMinutes, normal);
+            logf("[watch] hashrate low: %s\n", msg);
+            notify("Hashrate low", msg, 4, "chart_with_downwards_trend");
+        }
+    } else {
+        lowSince = 0;
+        if (lowSent) {
+            lowSent = false;
+            snprintf(msg, sizeof(msg), "%.0f H/s, normally %.0f H/s", rate, normal);
+            notify("Hashrate back to normal", msg, 2, "chart_with_upwards_trend");
+        }
+    }
+
+    if (!started || now - windowAt >= span) {
+        uint32_t rejected = stats.rejected - rejected0, accepted = stats.accepted - accepted0;
+        if (started && rejected >= 5 && rejected * 10 >= rejected + accepted) {
+            snprintf(msg, sizeof(msg), "%u of %u shares rejected in %u minutes", (unsigned)rejected,
+                     (unsigned)(rejected + accepted), settings.alertMinutes);
+            logf("[watch] %s\n", msg);
+            notify("Shares rejected", msg, 4, "x");
+        }
+        started = true;
+        windowAt = now;
+        accepted0 = stats.accepted;
+        rejected0 = stats.rejected;
     }
 }
 

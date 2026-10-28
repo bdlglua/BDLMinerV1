@@ -25,6 +25,7 @@ uint32_t millis() {return clockMs;}
 void logf(const char *,...) {}
 void minerSaveStats() {++saved;}
 void setRestartReason(const char *) {}
+void trialConfirm(const char *) {}
 void delay(int) {
  ++delays;
  delayExcludedUpdater=!ota::acquire(ota::Owner::Github);

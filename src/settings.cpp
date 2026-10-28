@@ -54,6 +54,9 @@ const SettingInfo kSettings[] = {
     S("ntfy", Text, ntfyTopic, "Notifications", "ntfy topic (empty = off)"),
     S("ntfysrv", Text, ntfyServer, "Notifications", "ntfy server"),
     S("notify32", Bool, notify32, "Notifications", "Also notify every 32-bit share"),
+    S("hook", Secret, webhookUrl, "Notifications", "Webhook URL: JSON POST for Discord, Telegram... (empty = off, holds its token)"),
+    N("alertpct", alertPercent, "Notifications", "Alert when hashrate stays below this % of normal (0 = off)"),
+    N("alertmin", alertMinutes, "Notifications", "... for this many minutes"),
     N("maxtemp", maxTemp, "Safety", "Pause mining above this temperature in C (0 = off)"),
 #ifdef BOARD_GAMMA601
     N("asicmhz", asicFrequency, "Safety", "Gamma ASIC frequency (MHz)"),
@@ -141,6 +144,8 @@ void settingsSanitize(Settings &settings) {
     if (!bm1370::validProfile(settings.asicFrequency)) settings.asicFrequency = bm1370::kStockMHz;
 #endif
     if (settings.miningPower > 100) settings.miningPower = 100;
+    if (settings.alertPercent > 100) settings.alertPercent = 100;
+    if (!settings.alertMinutes) settings.alertMinutes = 15;
     if (settings.nightFrom > 23) settings.nightFrom = HOUR_OFF;
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
 }

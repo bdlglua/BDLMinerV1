@@ -407,11 +407,11 @@ check('manual user agent and independent V1/V2 choices are saved with their actu
  await f.page.fill('#k_ua','MyMiner/test');await f.page.selectOption('#k_proto','1');
  assert.equal(await f.page.locator('#k_sv2key').isEnabled(),true);await f.page.click('#save');
  assert.equal(f.state.posts.length,0); // no unauthenticated V2 setting can be submitted without a key
- await f.page.click('#public-pool-proto');
- assert.equal(await f.page.locator('#k_pool').inputValue(),'public-pool.io');assert.equal(await f.page.locator('#k_port').inputValue(),'23330');
+ await f.page.fill('#k_sv2key','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');
  assert.equal(await f.page.locator('#k_proto2').inputValue(),'0');assert.equal(await f.page.locator('#k_sv2key2').isDisabled(),true);
- await f.page.click('#public-pool-v1-proto');assert.equal(await f.page.locator('#k_proto').inputValue(),'0');assert.equal(await f.page.locator('#k_port').inputValue(),'3333');assert.equal(await f.page.locator('#k_sv2key').isDisabled(),true);
- await f.page.click('#public-pool-proto');
+ await f.page.selectOption('#k_proto','0');assert.equal(await f.page.locator('#k_sv2key').isDisabled(),true);
+ await f.page.selectOption('#k_proto','1');assert.equal(await f.page.locator('#k_sv2key').isEnabled(),true);
+ assert.equal(await f.page.locator('[id^="public-pool"]').count(),0);
  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
  const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,false);assert.equal(saved.ua,'MyMiner/test');assert.equal(saved.proto,1);assert.equal(saved.proto2,0);assert.equal(saved.sv2key,'9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');
 }));
@@ -419,7 +419,8 @@ check('manual user agent and independent V1/V2 choices are saved with their actu
 check('automatic mode preserves a manual value and V2 backup does not change the main endpoint',()=>run({},async f=>{
  await loaded(f);await f.page.selectOption('#k_uaauto','false');await f.page.fill('#k_ua','SavedCustomMiner');
  await f.page.selectOption('#k_uaauto','true');assert.equal(await f.page.locator('#k_ua').isDisabled(),true);
- await f.page.click('#public-pool-proto2');assert.equal(await f.page.locator('#k_pool').inputValue(),'pool.example');assert.equal(await f.page.locator('#k_proto').inputValue(),'0');
+ await f.page.fill('#k_pool2','public-pool.io');await f.page.fill('#k_port2','23330');await f.page.selectOption('#k_proto2','1');
+ await f.page.fill('#k_sv2key2','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');assert.equal(await f.page.locator('#k_pool').inputValue(),'pool.example');assert.equal(await f.page.locator('#k_proto').inputValue(),'0');
  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
  const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,true);assert.equal(saved.ua,'SavedCustomMiner');assert.equal(saved.proto2,1);assert.equal(saved.port2,23330);assert.equal(saved.pool2,'public-pool.io');
 }));
@@ -484,6 +485,26 @@ check('log filtering and pause leave the original text available for download',(
   const download=f.page.waitForEvent('download');await f.page.click('#download-log');const file=await download;assert.equal(file.suggestedFilename(),'bdlminer.log');
   await f.page.fill('#log-search','');assert.match(await f.page.locator('#l').textContent(),/available/);
   await f.page.click('#pause-log');await f.page.waitForTimeout(80);assert.ok(f.state.logCalls>calls);
+}));
+
+check('choice controls save numbers and discarding restores the saved values',()=>run({},async f=>{
+  await loaded(f);assert.equal(await f.page.locator('#k_nightfrom').inputValue(),'255');assert.equal(await f.page.locator('#discard').isVisible(),false);
+  await f.page.selectOption('#k_nightfrom','22');assert.equal(await f.page.locator('#discard').isVisible(),true);
+  assert.equal(await f.page.locator('.field.changed').count(),1);
+  await f.page.click('#discard');assert.equal(await f.page.locator('#k_nightfrom').inputValue(),'255');assert.equal(await f.page.locator('.field.changed').count(),0);
+  await f.page.selectOption('#k_nightfrom','22');await f.page.click('#save');
+  await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
+  assert.strictEqual(JSON.parse(f.state.posts[0].body).nightfrom,22);
+}));
+
+check('log categories and warnings filter whole device lines',()=>run({},async f=>{
+  f.state.logText='00:00:01 [pool] Connecting\n00:00:02 [miner] hashing\n00:00:03 [wifi] connection failed';
+  await f.page.goto(f.url+'/log');await f.page.waitForFunction(()=>document.querySelector('#l').textContent.includes('hashing'));
+  assert.equal(await f.page.locator('#sum-lines').textContent(),'3');assert.equal(await f.page.locator('#sum-alerts').textContent(),'1');
+  await f.page.click('[data-category=pool]');assert.equal(await f.page.locator('#l').textContent(),'00:00:01 [pool] Connecting');
+  await f.page.click('[data-category=alerts]');assert.equal(await f.page.locator('#l').textContent(),'00:00:03 [wifi] connection failed');
+  await f.page.click('[data-category=all]');await f.page.fill('#log-search','hash');assert.equal(await f.page.locator('#l mark').textContent(),'hash');
+  assert.equal(await f.page.locator('#l').textContent(),'00:00:02 [miner] hashing');
 }));
 
 check('restart cancellation is harmless and accepted restarts lock actions',()=>run({},async f=>{

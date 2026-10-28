@@ -148,6 +148,8 @@ const Pair kTexts[] = {
     {"Rebooting into setup", "Redemarrage en config"},
     {"Update", "Mise a jour"},
     {"Installing", "Installation"},
+    {"BLOCK FOUND!", "BLOC TROUVE !"},
+    {"Press a button", "Appuyez sur un bouton"},
 };
 
 // Pool statuses, matched on their start.

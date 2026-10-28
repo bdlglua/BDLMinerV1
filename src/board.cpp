@@ -230,6 +230,69 @@ Button btnA, btnB;
 }  // namespace
 #endif
 
+// A tap on the screen shows the next page, a long press changes brightness
+// (touch panels: M5Stack Core2 / CoreS3 through M5Unified, CYD below).
+namespace {
+struct TouchGesture {
+    bool down = false, held = false;
+    uint32_t downAt = 0;
+    // 1 = tap, 2 = long press (once, while still pressed)
+    int update(bool now) {
+        uint32_t t = millis();
+        int ev = 0;
+        if (now && !down) {
+            downAt = t;
+            held = false;
+        } else if (now && down && !held && t - downAt >= 1000) {
+            held = true;
+            ev = 2;
+        } else if (!now && down && !held && t - downAt >= 30) {
+            ev = 1;
+        }
+        down = now;
+        return ev;
+    }
+};
+TouchGesture touchGesture;
+
+#ifdef DISPLAY_LGFX_CYD
+// XPT2046 resistive controller of the ESP32-2432S028R, on its own pins. Only
+// "pressed or not" is needed, from its pressure (Z1) measurement: no
+// calibration, and the display's SPI bus is left alone.
+constexpr int kTouchClk = 25, kTouchMosi = 32, kTouchMiso = 39, kTouchCs = 33;
+bool touchReady = false;
+
+uint16_t xpt2046(uint8_t command) {
+    digitalWrite(kTouchCs, LOW);
+    for (int bit = 7; bit >= 0; --bit) {
+        digitalWrite(kTouchMosi, (command >> bit) & 1);
+        digitalWrite(kTouchClk, HIGH);
+        digitalWrite(kTouchClk, LOW);
+    }
+    uint16_t value = 0;
+    for (int bit = 0; bit < 16; ++bit) {
+        digitalWrite(kTouchClk, HIGH);
+        value = value << 1 | digitalRead(kTouchMiso);
+        digitalWrite(kTouchClk, LOW);
+    }
+    digitalWrite(kTouchCs, HIGH);
+    return (value >> 3) & 0xFFF;
+}
+
+bool touchPressed() {
+    if (!touchReady) {
+        pinMode(kTouchCs, OUTPUT);
+        digitalWrite(kTouchCs, HIGH);
+        pinMode(kTouchClk, OUTPUT);
+        pinMode(kTouchMosi, OUTPUT);
+        pinMode(kTouchMiso, INPUT);
+        touchReady = true;
+    }
+    return xpt2046(0xB0) > 200;  // Z1, 12 bits, pen interrupt left enabled
+}
+#endif
+}  // namespace
+
 #ifdef DISPLAY_M5UNIFIED
 #include <M5Unified.h>
 #endif
@@ -344,12 +407,25 @@ Input poll() {
         if (!wasLong) return Input::Next;
     }
     if (M5.BtnB.wasClicked() || M5.BtnPWR.wasClicked()) return Input::Brightness;
+    if (M5.Touch.isEnabled()) {
+        // Core2's touch buttons under the panel are BtnA/B/C already.
+        auto touch = M5.Touch.getDetail();
+        bool onScreen = touch.isPressed() && touch.y >= 0 && touch.y < M5.Display.height();
+        int gesture = touchGesture.update(onScreen || (touchGesture.down && touch.isPressed()));
+        if (gesture == 1) return Input::Next;
+        if (gesture == 2) return Input::Brightness;
+    }
     return Input::None;
 #else
     int a = btnA.poll();
     if (a == 2) return Input::FactoryReset;
     if (a == 1) return Input::Next;
     if (btnB.poll() == 1) return Input::Brightness;
+#ifdef DISPLAY_LGFX_CYD
+    int gesture = touchGesture.update(touchPressed());
+    if (gesture == 1) return Input::Next;
+    if (gesture == 2) return Input::Brightness;
+#endif
     return Input::None;
 #endif
 }

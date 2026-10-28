@@ -10,5 +10,7 @@ void webStart();
 // Applies scheduled restarts; call from loop(). HTTP runs in its own task so
 // a slow upload cannot block sensor sampling, buttons or the display.
 void webHandle();
+// Schedules the same restart as the dashboard's (saves statistics first).
+void webRequestRestart(const char *why);
 // mDNS host name ("bdlminer-xxxx"), empty before webStart().
 const String &webHostName();

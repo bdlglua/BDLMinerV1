@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <Preferences.h>
 #include <WiFiClientSecure.h>
 #include <cctype>
 #include <cmath>
@@ -27,7 +28,8 @@ constexpr uint32_t kRetryMs = 30 * 1000;
 constexpr uint32_t kMinHeapForTls = 70 * 1024;
 
 constexpr uint32_t kPoolStatsMs = 30 * 60 * 1000;
-constexpr uint32_t kPoolStatsRetryMs = 60 * 60 * 1000;  // unknown API: try again hourly
+constexpr uint32_t kPoolStatsRetryMs = 60 * 60 * 1000;  // unreachable API: try again hourly
+constexpr uint32_t kApiSearchMs = 6 * 60 * 60 * 1000;   // no API found: search again after 6 h
 
 uint32_t endpointAt[6] = {};
 bool endpointValid[6] = {};
@@ -35,10 +37,6 @@ bool endpointValid[6] = {};
 MarketData data;
 PoolStats pool;
 bool poolBackup = false;  // identifies the endpoint that produced `pool`
-// Only public-pool.io and ckpool are known; any other pool is tried as a
-// ckpool. One without HTTPS on 443 makes each try wait for a TLS timeout
-// (18 s seen), so after such a failure it is not asked again until restart.
-String noHttpsHost[2];
 portMUX_TYPE dataMux = portMUX_INITIALIZER_UNLOCKED;
 
 // GET `path` on the TLS connection shared by one refresh and parse the JSON
@@ -214,16 +212,18 @@ double parseRate(const char *s, double previous = 0) {
     return std::isfinite(v) ? v : previous;
 }
 
-// GET https://host:port/path with its own TLS connection; the body as JSON
-// through `filter`. Returns the HTTP code, or a negative error: kNoTls when
-// the TLS connection itself failed.
-constexpr int kNoTls = -100;
-int fetchJson(const String &host, uint16_t port, const String &path, JsonDocument &doc, const JsonDocument &filter) {
+// GET http(s)://host:port/path, the body as JSON through `filter`. Returns the
+// HTTP code or a negative error.
+int fetchJson(bool secure, const String &host, uint16_t port, const String &path, JsonDocument &doc,
+              const JsonDocument &filter) {
     WiFiClientSecure tls;
+    WiFiClient tcp;
     HTTPClient http;
     http.setTimeout(10000);
-    if (!http.begin(tls, "https://" + host + ":" + port + path)) return -2;
-    if (!tlsConnect(tls, host.c_str(), port)) return kNoTls;
+    http.setConnectTimeout(5000);
+    String url = String(secure ? "https://" : "http://") + host + ":" + port + path;
+    if (!(secure ? http.begin(tls, url) : http.begin(tcp, url))) return -2;
+    if (secure && !tlsConnect(tls, host.c_str(), port)) return -4;
     int code = http.GET();
     if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter)))
         code = -3;
@@ -231,7 +231,105 @@ int fetchJson(const String &host, uint16_t port, const String &path, JsonDocumen
     return code;
 }
 
-// Refreshes PoolStats for the pool in use; false when it could not.
+// Pool statistics APIs, found by trying them in turn: ckpool's /users/<address>
+// and public-pool's /api/client/<address>, on the pool's host, on its parent
+// domain (eu.pool.example -> pool.example) and on the ports these servers use
+// by default. Whatever the site, the JSON tells which kind answered.
+struct PoolApi {
+    bool secure, parent;
+    uint16_t port;
+    const char *path;
+};
+const PoolApi kPoolApis[] = {
+    {true, false, 443, "/users/"},          {true, false, 40557, "/api/client/"}, {true, false, 443, "/api/client/"},
+    {true, true, 443, "/users/"},           {true, true, 40557, "/api/client/"},  {true, true, 443, "/api/client/"},
+    {false, false, 3334, "/api/client/"},   {false, false, 80, "/users/"},  // self-hosted, local network
+};
+constexpr int kPoolApiCount = sizeof(kPoolApis) / sizeof(kPoolApis[0]);
+int apiIndex[2] = {-1, -1};  // per main / backup pool: the API that answered, -1 = none yet
+String apiHost[2];
+uint32_t searchAfter[2] = {0, 0};
+
+// "eu.pool.example" -> "pool.example"; empty for two-label names and IP addresses.
+String parentDomain(const String &host) {
+    int dot = host.indexOf('.');
+    if (dot < 0 || host.indexOf('.', dot + 1) < 0) return "";
+    bool ip = true;
+    for (char c : host) ip = ip && (isdigit((unsigned char)c) || c == '.');
+    return ip ? String() : host.substring(dot + 1);
+}
+
+void poolFilter(JsonDocument &filter) {
+    filter["bestDifficulty"] = true;
+    filter["workersCount"] = true;
+    filter["workers"][0]["hashRate"] = true;
+    filter["accounting"]["totalAcceptedShares"] = true;
+    for (const char *k : {"hashrate1hr", "hashrate5m", "bestever", "shares", "workers"}) filter[k] = true;
+}
+
+// Reads either API's answer into `p`; false for JSON neither of them sends.
+bool parseStats(JsonDocument &doc, PoolStats &p) {
+    if (!doc["bestDifficulty"].isNull() || !doc["workersCount"].isNull()) {  // public-pool
+        p.bestEver = poolNumber(doc["bestDifficulty"], p.bestEver);
+        p.workers = doc["workersCount"] | 0;
+        p.shares = poolNumber(doc["accounting"]["totalAcceptedShares"], p.shares);
+        p.hashrate = 0;
+        for (JsonVariant w : doc["workers"].as<JsonArray>()) p.hashrate += poolNumber(w["hashRate"]);
+        return true;
+    }
+    if (!doc["bestever"].isNull() || !doc["hashrate1hr"].isNull() || !doc["hashrate5m"].isNull()) {  // ckpool
+        p.hashrate = parseRate(doc["hashrate1hr"] | doc["hashrate5m"] | "", p.hashrate);
+        p.bestEver = poolNumber(doc["bestever"], p.bestEver);
+        p.shares = poolNumber(doc["shares"], p.shares);
+        p.workers = doc["workers"] | 0;
+        return true;
+    }
+    return false;
+}
+// End of the pool stats parsing.
+
+constexpr int kUnknownJson = -5;
+int queryApi(int i, const String &host, const String &addr, PoolStats &p) {
+    const PoolApi &api = kPoolApis[i];
+    String target = api.parent ? parentDomain(host) : host;
+    if (target.isEmpty()) return -1;
+    JsonDocument filter, doc;
+    poolFilter(filter);
+    int code = fetchJson(api.secure, target, api.port, String(api.path) + addr, doc, filter);
+    if (code == HTTP_CODE_OK && !parseStats(doc, p)) code = kUnknownJson;
+    if (code == HTTP_CODE_OK)
+        snprintf(p.source, sizeof(p.source), "%s%s:%u%s", api.secure ? "" : "http://", target.c_str(), api.port, api.path);
+    return code;
+}
+
+// The API found for a pool is kept across restarts ("host|index").
+const char *apiKey(bool backup) { return backup ? "backup" : "main"; }
+int loadApi(bool backup, const String &host) {
+    Preferences prefs;
+    if (!prefs.begin("poolapi", true)) return -1;
+    String saved = prefs.getString(apiKey(backup), "");
+    prefs.end();
+    int bar = saved.lastIndexOf('|');
+    if (bar < 0 || saved.substring(0, bar) != host) return -1;
+    int i = saved.substring(bar + 1).toInt();
+    return i >= 0 && i < kPoolApiCount ? i : -1;
+}
+void saveApi(bool backup, const String &host, int i) {
+    Preferences prefs;
+    if (!prefs.begin("poolapi", false)) return;
+    if (i < 0) prefs.remove(apiKey(backup));
+    else prefs.putString(apiKey(backup), host + "|" + i);
+    prefs.end();
+}
+
+void storePool(const PoolStats &p, bool backup) {
+    portENTER_CRITICAL(&dataMux);
+    pool = p;
+    poolBackup = backup;
+    portEXIT_CRITICAL(&dataMux);
+}
+
+// Refreshes PoolStats for the pool in use; false when it should be tried again soon.
 bool refreshPoolStats() {
     if (ESP.getFreeHeap() < kMinHeapForTls) return false;
     bool backup = netOnBackup();
@@ -242,57 +340,52 @@ bool refreshPoolStats() {
     portENTER_CRITICAL(&dataMux);
     PoolStats p = poolBackup == backup ? pool : PoolStats{};
     portEXIT_CRITICAL(&dataMux);
-    bool known = host == "public-pool.io" || host.endsWith(".public-pool.io") || host.endsWith("ckpool.org") ||
-                 host == "pool.nerdminers.org";
-    if (!known && host == noHttpsHost[backup]) {
-        p.supported = false;
-        portENTER_CRITICAL(&dataMux);
-        pool = p;
-        poolBackup = backup;
-        portEXIT_CRITICAL(&dataMux);
-        return true;  // nothing to retry
+    if (apiHost[backup] != host) {
+        apiHost[backup] = host;
+        apiIndex[backup] = loadApi(backup, host);
+        searchAfter[backup] = 0;
     }
-    JsonDocument filter, doc;
-    int code;
-    if (host == "public-pool.io" || host.endsWith(".public-pool.io")) {
-        filter["bestDifficulty"] = true;
-        filter["workersCount"] = true;
-        filter["workers"][0]["hashRate"] = true;
-        filter["accounting"]["totalAcceptedShares"] = true;
-        code = fetchJson("public-pool.io", 40557, "/api/client/" + addr, doc, filter);
-        if (code == HTTP_CODE_OK) {
-            p.bestEver = poolNumber(doc["bestDifficulty"], p.bestEver);
-            p.workers = doc["workersCount"] | 0;
-            p.shares = poolNumber(doc["accounting"]["totalAcceptedShares"], p.shares);
-            p.hashrate = 0;
-            for (JsonVariant w : doc["workers"].as<JsonArray>()) p.hashrate += poolNumber(w["hashRate"]);
-        }
-    } else {
-        // ckpool: https://<pool>/users/<address>
-        for (const char *k : {"hashrate1hr", "hashrate5m", "bestever", "shares", "workers"}) filter[k] = true;
-        code = fetchJson(host, 443, "/users/" + addr, doc, filter);
-        if (code == HTTP_CODE_OK) {
-            p.hashrate = parseRate(doc["hashrate1hr"] | doc["hashrate5m"] | "", p.hashrate);
-            p.bestEver = poolNumber(doc["bestever"], p.bestEver);
-            p.shares = poolNumber(doc["shares"], p.shares);
-            p.workers = doc["workers"] | 0;
+
+    int code = -1;
+    if (apiIndex[backup] >= 0) {
+        code = queryApi(apiIndex[backup], host, addr, p);
+        if (code == HTTP_CODE_NOT_FOUND || code == kUnknownJson) {  // the API moved: search again
+            logf("[market] pool stats API of %s stopped answering (%d)\n", host.c_str(), code);
+            apiIndex[backup] = -1;
+            saveApi(backup, host, -1);
         }
     }
-    if (!known && code == kNoTls) {
-        noHttpsHost[backup] = host;
-        logf("[market] %s has no HTTPS stats API, not asked again until restart\n", host.c_str());
-        code = HTTP_CODE_NOT_FOUND;
+    if (apiIndex[backup] < 0) {
+        if (searchAfter[backup] && (int32_t)(millis() - searchAfter[backup]) < 0) {
+            p.supported = false;
+            storePool(p, backup);
+            return true;
+        }
+        for (int i = 0; i < kPoolApiCount && code != HTTP_CODE_OK; i++) {
+            if (ESP.getFreeHeap() < kMinHeapForTls) return false;  // continue at the next attempt
+            code = queryApi(i, host, addr, p);
+            if (code == HTTP_CODE_OK) {
+                apiIndex[backup] = i;
+                saveApi(backup, host, i);
+                logf("[market] pool stats API found: %s\n", p.source);
+            }
+        }
+        if (code != HTTP_CODE_OK) {
+            searchAfter[backup] = millis() + kApiSearchMs;
+            if (!searchAfter[backup]) searchAfter[backup] = 1;
+            p.supported = false;
+            storePool(p, backup);
+            logf("[market] no pool stats API found for %s; next search in 6 h\n", host.c_str());
+            return true;
+        }
     }
-    p.supported = code == HTTP_CODE_OK || code < 0;  // 404 etc.: no such API (or address unknown there)
+    p.supported = true;
     if (code == HTTP_CODE_OK) p.updatedMs = millis();
-    portENTER_CRITICAL(&dataMux);
-    pool = p;
-    poolBackup = backup;
-    portEXIT_CRITICAL(&dataMux);
+    storePool(p, backup);
     if (code == HTTP_CODE_OK)
         logf("[market] pool sees %.3g H/s, best %.4g, %u worker(s)\n", p.hashrate, p.bestEver, (unsigned)p.workers);
     else
-        logf("[market] pool stats from %s: HTTP %d\n", host.c_str(), code);
+        logf("[market] pool stats from %s: error %d\n", p.source[0] ? p.source : host.c_str(), code);
     return code == HTTP_CODE_OK;
 }
 

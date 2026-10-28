@@ -31,3 +31,7 @@ bool ghUpdateCheck();  // queue an immediate check; false when disabled or busy
 // Asks for the available update to be installed (within seconds, by the
 // next ghUpdatePoll()); false when there is none.
 bool ghUpdateInstall();
+
+// A version that must not be installed automatically again (rolled back after
+// a failed trial, see trial.h); `why` is shown while it is the latest release.
+void ghUpdateRefuse(const char *version, const char *why);

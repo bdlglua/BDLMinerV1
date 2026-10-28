@@ -17,7 +17,8 @@ struct SettingLimits { long minimum, maximum; };
 inline SettingLimits settingLimits(const SettingInfo &s) {
     SettingLimits limits{0, s.bits == 8 ? 255 : 65535};
     if (!strcmp(s.key, "port") || !strcmp(s.key, "port2") || !strcmp(s.key, "mqttport")) limits.minimum = 1;
-    if (!strcmp(s.key, "bright") || !strcmp(s.key, "power")) limits.maximum = 100;
+    if (!strcmp(s.key, "bright") || !strcmp(s.key, "power") || !strcmp(s.key, "alertpct")) limits.maximum = 100;
+    if (!strcmp(s.key, "alertmin")) { limits.minimum = 1; limits.maximum = 240; }
     if (!strcmp(s.key, "rot")) limits.maximum = 3;
     if (!strcmp(s.key, "lang")) limits.maximum = 1;
     if (!strcmp(s.key, "theme")) limits.maximum = 4;
@@ -42,6 +43,12 @@ inline const char *settingsError(JsonObjectConst values) {
             case SettingType::Secret:
                 if (!v.is<const char *>()) return "Invalid text setting";
                 if (!strcmp(s.key, "ua") && strlen(v.as<const char *>()) > 64) return "User agent must be at most 64 characters";
+                if (!strcmp(s.key, "hook")) {
+                    const char *url = v.as<const char *>();
+                    while (*url && std::isspace((unsigned char)*url)) ++url;
+                    if (*url && strncmp(url, "http://", 7) && strncmp(url, "https://", 8))
+                        return "The webhook URL must start with http:// or https://";
+                }
                 if (!strcmp(s.key, "pool") || !strcmp(s.key, "addr")) {
                     const char *text = v.as<const char *>();
                     while (*text && std::isspace((unsigned char)*text)) ++text;

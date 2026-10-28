@@ -5,6 +5,7 @@
 #include <WiFi.h>
 
 #include "board.h"
+#include "crashlog.h"
 #include "core/address.h"
 #include "log.h"
 #include "market.h"
@@ -14,6 +15,7 @@
 #include "notify.h"
 #include "ota.h"
 #include "settings.h"
+#include "trial.h"
 #include "ui.h"
 #include "watch.h"
 #include "web.h"
@@ -51,6 +53,7 @@ void setup() {
     Serial.println();
     logf("BDLMiner V1 %s on %s\n", FW_VERSION, BOARD_NAME);
     logBoot();
+    crashBegin();
 
     board::begin();
     settingsLoad();
@@ -87,6 +90,7 @@ void setup() {
     minerLoadStats();
     minerStart();
     notifyStart();
+    trialBegin();  // may notify a rollback
     netStart();
     marketStart();
     webStart();
@@ -104,6 +108,9 @@ void loop() {
 
     board::Input input = board::poll();
     if (input != board::Input::None) watchWake();
+    // The first press after a block only closes its alert.
+    if ((input == board::Input::Next || input == board::Input::Brightness) && ui::dismissAlert())
+        input = board::Input::None;
     switch (input) {
         case board::Input::Next:
             ui::nextScreen();
@@ -115,6 +122,7 @@ void loop() {
         case board::Input::FactoryReset: {
             ota::Guard reboot(ota::Owner::Restart);
             if (!reboot) break;
+            trialConfirm("factory reset");
             ui::showMessage("Reset", "Erasing settings...", "Rebooting into setup");
             logf("[cfg] factory reset\n");
             minerSaveStats();  // statistics survive a factory reset
@@ -130,6 +138,8 @@ void loop() {
         lastTick = now;
         minerTick();
         watchTick();
+        trialPoll();
+        mqttApply();
         ui::render();
         // Headless status LED: steady while connecting, blinking while mining.
         board::setLed(stats.poolConnected ? (now / 1000) % 2 : true);

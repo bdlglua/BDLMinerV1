@@ -449,5 +449,22 @@ void View::update(const char *title, const char *versions, unsigned percent, con
     });
 }
 
+void View::alert(const char *title, const char *value, const char *line) {
+    frame(-5, accent_, language_);
+    if (changed(3, {0, 0, width_, height_}, "border")) {
+        int thick = height_ >= 200 ? 3 : 2;
+        for (int i = 0; i < thick; ++i) display_->drawRect(i, i, width_ - 2 * i, height_ - 2 * i, accent_);
+    }
+    Rect b = body();
+    int titleH = std::max(labelSize() + 6, std::min(28, b.h / 4)), lineH = labelSize() + 6;
+    int size = std::min(24, titleH - 4);  // the whole title, narrow portrait panels included
+    for (labelFont(*display_, size); size > 8 && display_->textWidth(title) > b.w; labelFont(*display_, --size)) {}
+    text(1, {b.x, b.y, b.w, titleH}, title, accent_, size);
+    Metric big;
+    big.value = value;
+    hero(0, {b.x, b.y + titleH, b.w, b.h - titleH - lineH}, big);
+    text(2, {b.x, b.y + b.h - lineH, b.w, lineH}, line, kMuted, labelSize());
+}
+
 }  // namespace ui_view
 #endif

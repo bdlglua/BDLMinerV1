@@ -21,6 +21,10 @@ void setRotation(uint8_t rotation);
 // Shows "+1 share" long enough to cover a one-second refresh, including
 // across millis() wraparound.
 void flashShare();
+// A block was found: a full-screen alert until a button is pressed.
+void blockFound(uint32_t height);
+// Hides that alert; true if it was shown (the press is then used up).
+bool dismissAlert();
 // Milliseconds since the current screen was shown.
 uint32_t screenAge();
 

@@ -151,6 +151,11 @@ int main(int argc, char **argv) {
         if (!out.empty()) ppm(lcd, out + "/update_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.update("Automatic update", FW_VERSION " -> next", 100, "Restarting...");
         view.render(example(0, false)); // failed update restores the mining frame
+        view.alert("BLOCK FOUND!", "915432", "Press a button");
+        if (!out.empty()) ppm(lcd, out + "/block_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
+        auto alerted = image(lcd);
+        view.alert("BLOCK FOUND!", "915432", "Press a button"); assert(image(lcd) == alerted);
+        view.render(example(0, false)); // dismissing restores the mining frame
         view.message("BDLMiner V1", "M5StickC Plus2", "v" FW_VERSION " / hold A: setup");
         if (!out.empty()) ppm(lcd, out + "/splash_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.message("WiFi", "Connecting...", "Hold A at boot: setup");

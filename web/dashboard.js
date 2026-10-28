@@ -12,7 +12,7 @@ function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*42949
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  if(label===t('Hashrate'))e.classList.add('hero');
  if(label===t('Hashrate history'))e.classList.add('history');
- for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power'],records:['32-bit shares','64-bit shares','Block chance','Blocks found','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
+ for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash'],records:['32-bit shares','64-bit shares','Block chance','Blocks found','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
 
 function textAt(id,value){const node=document.getElementById(id);if(node.textContent!==String(value))node.textContent=value}
@@ -65,6 +65,14 @@ function upd(u){
  };
  e.appendChild(c);return e;
 }
+// The panic handler's core dump: summary, download (password) and erase.
+function crashTile(c){
+ const e=tile(t('Last crash'),c.summary.split(',')[0],c.summary+'\n'+si(c.size,'B'),true);
+ const link=document.createElement('a');link.className='button secondary';link.href='/api/coredump';link.textContent=t('Download report');
+ const erase=document.createElement('button');erase.type='button';erase.className='secondary';erase.textContent=t('Erase');
+ erase.onclick=async()=>{erase.disabled=true;try{await request('/api/coredump/erase',{method:'POST'},'text');e.remove()}catch(err){erase.disabled=false;e.querySelector('.s').textContent=errorText(err)}};
+ e.append(link,erase);return e;
+}
 function peerHosts(list,ip){
  const seen=new Set(),hosts=[];
  if(!Array.isArray(list))return hosts;
@@ -113,7 +121,7 @@ async function tick(){
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];
   renderUpdate(j.github_update);
-  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')));
+  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')));
   // Without a readable pool API, show what the pool credits: accepted share
   // difficulty x 2^32 over the session, the way pools estimate a worker.
   else if(!pv.supported){const work=j.shares.work,since=j.uptime_s;
@@ -130,8 +138,9 @@ async function tick(){
    tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+': '+j.max_temp_c+' °C':'')),
    tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+': '+(j.power_limit_percent??'-')+' %'),
    tile(t('Memory'),si(j.heap,'B'),t('largest block')+': '+si(j.heap_max_block,'B')),
-   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+si(j.heap,'B')+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason),
+   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+si(j.heap,'B')+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason+(j.firmware_trial?'\n'+t('Firmware on trial: confirmed after 3 minutes of mining'):'')),
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
+  if(j.crash)T.push(crashTile(j.crash));
   if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):'—';
    const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz · '+number(a.core_v,3)+' V · '+number(a.current_a,1)+' A',t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C',t('Input')+': '+number(a.input_v)+' V',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
    hardware.dataset.group='device';T.push(hardware);

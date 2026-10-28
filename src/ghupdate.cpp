@@ -15,6 +15,7 @@
 #include "ota.h"
 #include "settings.h"
 #include "tls.h"
+#include "trial.h"
 #include "update_key.h"
 
 #ifndef FW_ENV
@@ -304,6 +305,8 @@ GithubInstallResult install() {
     else state.installing = false;
     portEXIT_CRITICAL(&stateMux);
     if (ok) {
+        trialConfirm("a newer firmware is installed");  // the running one worked
+        trialExpect(state.version);
         char why[48];
         snprintf(why, sizeof(why), "updated to %s from GitHub", state.version);
         logf("[update] %s, restarting\n", why);
@@ -394,6 +397,11 @@ void ghUpdatePoll() {
         nextPing = millis() + kPingMs;
         ping();
     }
+}
+
+void ghUpdateRefuse(const char *version, const char *why) {
+    strlcpy(refusedVersion, version, sizeof(refusedVersion));
+    strlcpy(refusedError, why, sizeof(refusedError));
 }
 
 GithubUpdate ghUpdateState() {

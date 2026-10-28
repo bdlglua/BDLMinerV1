@@ -52,6 +52,8 @@ public:
     void message(const char *title, const char *line1, const char *line2 = nullptr);
     void portal(const char *title, const char *ssid, const char *password, const char *qr);
     void update(const char *title, const char *versions, unsigned percent, const char *state);
+    // Full-screen announcement in an accent frame: `value` as large as it fits.
+    void alert(const char *title, const char *value, const char *line);
 
 private:
     struct Cached { std::string key; Rect rect{}; bool valid = false; };

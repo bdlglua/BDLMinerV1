@@ -64,6 +64,9 @@ struct Settings {
     String ntfyTopic;  // empty = off
     String ntfyServer = DEFAULT_NTFY_SERVER;
     bool notify32 = false;  // also every 32-bit share
+    String webhookUrl;       // POST JSON to it too (Discord, Telegram...), empty = off
+    uint8_t alertPercent = 50;  // notify when hashrate stays below this % of normal, 0 = off
+    uint8_t alertMinutes = 15;  // ... for that long
 #ifdef BOARD_GAMMA601
     uint16_t asicFrequency = 600; // requested Gamma profile; automatic stock fallback
 #endif

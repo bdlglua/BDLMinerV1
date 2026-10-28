@@ -32,6 +32,8 @@ Point samples[240], chronological[240];
 int sampleCount = 0, sampleHead = 0;
 uint32_t lastSample = 0, graphRevision = 0;
 bool sampled = false;
+uint32_t foundHeight = 0;
+bool alertShown = false;
 
 uint32_t accent() { return kThemes[settings.theme % (sizeof(kThemes) / sizeof(kThemes[0]))]; }
 
@@ -216,6 +218,7 @@ void showPortal(const String &apName, const char *password) {
 }
 void showMessage(const char *title, const char *line1, const char *line2) { if (view) view->message(tr(title), tr(line1), tr(line2)); }
 void nextScreen() {
+    if (alertShown) return;  // the alert stays until a button is pressed
     screen = (screen + 1) % ui_view::kPages; screenSince = millis();
     if (view) view->invalidate(); render();
 }
@@ -234,6 +237,13 @@ void setRotation(uint8_t rotation) {
     lcd->setRotation(rotation); if (view) view->invalidate(); render();
 }
 void flashShare() { shareFlash = true; flashUntil = millis() + 1600; }
+void blockFound(uint32_t height) { foundHeight = height; alertShown = true; render(); }
+bool dismissAlert() {
+    if (!alertShown) return false;
+    alertShown = false; screenSince = millis();
+    if (view) view->invalidate(); render();
+    return true;
+}
 uint32_t screenAge() { return millis() - screenSince; }
 void render() {
     uint32_t now = millis();
@@ -246,6 +256,11 @@ void render() {
     if (update.installing) {
         String versions = String(FW_VERSION) + " -> " + update.version;
         view->update(tr("Automatic update"), versions.c_str(), update.progress, tr(update.progress >= 100 ? "Restarting..." : "Installing"));
+        return;
+    }
+    if (alertShown) {
+        String height = foundHeight ? String(foundHeight) : String("!");
+        view->alert(tr("BLOCK FOUND!"), height.c_str(), tr("Press a button"));
         return;
     }
     buildModel(minerStats(), now); view->render(model);
@@ -262,6 +277,8 @@ void cycleBrightness() {}
 void setBacklight(uint8_t) {}
 void setRotation(uint8_t) {}
 void flashShare() {}
+void blockFound(uint32_t) {}
+bool dismissAlert() { return false; }
 uint32_t screenAge() { return 0; }
 void render() {}
 }  // namespace ui

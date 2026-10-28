@@ -3,3 +3,7 @@
 #pragma once
 
 void mqttStart();
+// Applies the commands received from Home Assistant (mining on/off, power,
+// brightness, restart); call once a second from loop(), which owns the
+// settings, the screen and restarts.
+void mqttApply();

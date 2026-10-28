@@ -10,6 +10,9 @@
 #include "net.h"
 #include "settings.h"
 #include "web.h"
+#include "ui.h"
+
+#include <atomic>
 #include "runtime.h"
 
 namespace {
@@ -37,8 +40,82 @@ const Sensor kSensors[] = {
     {"status", "Pool status", nullptr, nullptr, nullptr},
 };
 
+// Commands from Home Assistant, applied by mqttApply() in the main loop.
+std::atomic<int> pendingPower{-1}, pendingBrightness{-1};
+std::atomic<bool> pendingRestart{false};
+uint8_t resumePower = 100;  // power restored by the "Mining" switch
+
+void deviceInfo(JsonObject dev, const String &id) {
+    dev["identifiers"].add(id);
+    dev["name"] = "BDLMiner " + id;
+    dev["model"] = board::modelName();
+    dev["manufacturer"] = "BDLMiner";
+    dev["sw_version"] = FW_VERSION;
+    dev["configuration_url"] = "http://" + WiFi.localIP().toString() + "/";
+}
+
+// Home Assistant controls (MQTT discovery), commanded on <base>/set/<key>.
+void announceControls(const String &id) {
+    struct Control { const char *component, *key, *name; int maximum; };
+    const Control kControls[] = {
+        {"switch", "mining", "Mining", 0},
+        {"number", "power", "Mining power", 100},
+        {"number", "brightness", "Screen brightness", 100},
+        {"button", "restart", "Restart", 0},
+    };
+    for (const Control &c : kControls) {
+        JsonDocument d;
+        d["name"] = c.name;
+        d["unique_id"] = id + "_" + c.key;
+        d["command_topic"] = base + "/set/" + c.key;
+        d["availability_topic"] = base + "/status";
+        if (strcmp(c.component, "button")) {
+            d["state_topic"] = base + "/state";
+            d["value_template"] = String("{{ value_json.") + (strcmp(c.key, "power") ? c.key : "power_limit") + " }}";
+        }
+        if (!strcmp(c.component, "number")) {
+            d["min"] = 0;
+            d["max"] = c.maximum;
+            d["step"] = 5;
+            d["unit_of_measurement"] = "%";
+            d["mode"] = "slider";
+        }
+        if (!strcmp(c.component, "button")) d["device_class"] = "restart";
+        deviceInfo(d["device"].to<JsonObject>(), id);
+        String payload;
+        serializeJson(d, payload);
+        mqtt.publish(("homeassistant/" + String(c.component) + "/" + id + "/" + c.key + "/config").c_str(), payload.c_str(), true);
+    }
+}
+
+void onCommand(char *topic, uint8_t *payload, unsigned int length) {
+    String value;
+    value.reserve(length);
+    for (unsigned i = 0; i < length; ++i) value += char(payload[i]);
+    value.trim();
+    String prefix = base + "/set/";
+    if (strncmp(topic, prefix.c_str(), prefix.length())) return;
+    const char *key = topic + prefix.length();
+    long number = value.toInt();
+    bool numeric = value.length() && (isdigit((unsigned char)value[0]) || value[0] == '-');
+    if (!strcmp(key, "mining")) {
+        if (value.equalsIgnoreCase("ON")) pendingPower = resumePower ? resumePower : 100;
+        else if (value.equalsIgnoreCase("OFF")) pendingPower = 0;
+    } else if (!strcmp(key, "power") && numeric && number >= 0 && number <= 100) {
+        pendingPower = int(number);
+    } else if (!strcmp(key, "brightness") && numeric && number >= 0 && number <= 100) {
+        pendingBrightness = int(number);
+    } else if (!strcmp(key, "restart") && value.equalsIgnoreCase("PRESS")) {
+        pendingRestart = true;
+    } else {
+        return;
+    }
+    logf("[mqtt] command %s = %s\n", key, value.c_str());
+}
+
 void announce() {
     const String &id = webHostName();
+    announceControls(id);
     for (const Sensor &s : kSensors) {
         JsonDocument d;
         d["name"] = s.name;
@@ -49,13 +126,7 @@ void announce() {
         if (s.unit) d["unit_of_measurement"] = s.unit;
         if (s.deviceClass) d["device_class"] = s.deviceClass;
         if (s.stateClass) d["state_class"] = s.stateClass;
-        JsonObject dev = d["device"].to<JsonObject>();
-        dev["identifiers"].add(id);
-        dev["name"] = "BDLMiner " + id;
-        dev["model"] = board::modelName();
-        dev["manufacturer"] = "BDLMiner";
-        dev["sw_version"] = FW_VERSION;
-        dev["configuration_url"] = "http://" + WiFi.localIP().toString() + "/";
+        deviceInfo(d["device"].to<JsonObject>(), id);
         String payload;
         serializeJson(d, payload);
         mqtt.publish(("homeassistant/sensor/" + id + "/" + s.key + "/config").c_str(), payload.c_str(), true);
@@ -78,6 +149,9 @@ void publishState() {
     d["blocks"] = stats.blocksFound;
     d["uptime"] = minerUptimeSeconds();
     d["status"] = netStatus();
+    d["power_limit"] = settings.miningPower;
+    d["mining"] = settings.miningPower ? "ON" : "OFF";
+    d["brightness"] = settingsBrightness();
     String payload;
     serializeJson(d, payload);
     mqtt.publish((base + "/state").c_str(), payload.c_str());
@@ -102,6 +176,8 @@ void mqttTask(void *) {
                                          will.c_str(), 0, true, "offline");
             if (ok) {
                 logf("[mqtt] connected to %s:%u\n", settings.mqttHost.c_str(), settings.mqttPort);
+                mqtt.setCallback(onCommand);
+                mqtt.subscribe((base + "/set/#").c_str());
                 mqtt.publish(will.c_str(), "online", true);
                 announce();
                 lastState = 0;
@@ -127,4 +203,21 @@ void mqttStart() {
     if (!settings.mqttHost.isEmpty())
         runtime::started(xTaskCreatePinnedToCore(mqttTask, "mqtt", 6144, nullptr, 1, nullptr, 0) == pdPASS,
                          runtime::Mqtt, "MQTT");
+}
+
+void mqttApply() {
+    int power = pendingPower.exchange(-1), brightness = pendingBrightness.exchange(-1);
+    if (power >= 0 && power != settings.miningPower) {
+        if (settings.miningPower) resumePower = settings.miningPower;
+        settings.miningPower = uint8_t(power);  // read by the thermal policy each second
+        Settings copy = settings;
+        copy.brightness = settingsBrightness();
+        settingsSave(copy);
+        logf("[mqtt] mining power %u%%\n", (unsigned)power);
+    }
+    if (brightness >= 0) {
+        settingsSetBrightness(uint8_t(brightness));
+        ui::setBacklight(settingsBrightness());
+    }
+    if (pendingRestart.exchange(false)) webRequestRestart("restart requested over MQTT");
 }

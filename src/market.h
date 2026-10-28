@@ -28,11 +28,12 @@ struct MarketData {
 // style APIs: public-pool.io, pool.nerdminers.org, solo.ckpool.org...).
 struct PoolStats {
     uint32_t updatedMs = 0;  // millis() of the last successful refresh, 0 = never
-    bool supported = true;   // false: this pool has no known stats API
+    bool supported = true;   // false: no stats API found for this pool
     double hashrate = 0;     // H/s seen by the pool (last hour, or last 10 minutes)
     double bestEver = 0;     // best share difficulty the pool recorded
     double shares = 0;       // accepted shares (ckpool: total difficulty)
     uint32_t workers = 0;
+    char source[64] = "";    // the API that answered: "public-pool.io:40557/api/client/"
 };
 
 // Starts NTP and the background refresh task. Call once WiFi is up.

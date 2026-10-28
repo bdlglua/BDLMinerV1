@@ -26,6 +26,9 @@
 #include "watch.h"
 #include "runtime.h"
 #include "tls.h"
+#include "trial.h"
+#include "notify.h"
+#include "crashlog.h"
 #include "web_validation.h"
 
 #ifndef FW_ENV
@@ -48,11 +51,16 @@ void sendPage(const char *title, const char *body, const char *script) {
     // Send one complete head and three fixed-length body segments instead of
     // framing every small tag as a separate HTTP chunk/TCP write.
     String head;
-    head.reserve(768);
+    head.reserve(1024);
     head = "<!doctype html><html lang=\"";
     head += settings.language == 1 ? "fr" : "en";
     head += "\"><head><title>"; head += title; head += "</title>";
     head += "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"dark\">";
+    // Installable on a phone's home screen (a full PWA install needs HTTPS).
+    head += "<meta name=\"theme-color\" content=\"#0a0d12\"><meta name=\"mobile-web-app-capable\" content=\"yes\">"
+            "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black\">"
+            "<link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" type=\"image/png\" href=\"/assets/icon-192.png\">"
+            "<link rel=\"apple-touch-icon\" href=\"/assets/icon-192.png\">";
     head += "<link rel=\"stylesheet\" href=\"/assets/style.css?v="; head += kWebVersion; head += "\">";
     head += "<script>const LANG='"; head += settings.language == 1 ? "fr" : "en"; head += "';</script>";
     head += "<script defer src=\"/assets/common.js?v="; head += kWebVersion; head += "\"></script>";
@@ -66,8 +74,8 @@ void sendPage(const char *title, const char *body, const char *script) {
     server.sendContent(end);
 }
 
-void sendAsset(const char *mime, const uint8_t *data, size_t size) {
-    server.sendHeader("Content-Encoding", "gzip");
+void sendAsset(const char *mime, const uint8_t *data, size_t size, bool gzip = true) {
+    if (gzip) server.sendHeader("Content-Encoding", "gzip");
     server.sendHeader("Cache-Control", "public, max-age=31536000, immutable");
     server.send_P(200, mime, reinterpret_cast<PGM_P>(data), size);
 }
@@ -147,6 +155,7 @@ void handleStats() {
     j["pool_view"]["best"] = pv.bestEver;
     j["pool_view"]["shares"] = pv.shares;
     j["pool_view"]["workers"] = pv.workers;
+    if (pv.source[0]) j["pool_view"]["source"] = pv.source;
     j["network"]["height"] = stats.blockHeight;
     j["network"]["difficulty"] = stats.networkDiff;
     j["address"] = settings.btcAddress;
@@ -190,6 +199,11 @@ void handleStats() {
     if (minerThrottle() == Throttle::Reduced) j["throttle"] = "reduced";
     j["night"] = watchNight();
     j["boot_reason"] = bootReason();
+    if (crashPresent()) {
+        j["crash"]["summary"] = crashSummary();
+        j["crash"]["size"] = crashSize();
+    }
+    j["firmware_trial"] = trialPending();
     j["accent"] = accentCss();
     j["ip"] = WiFi.localIP().toString();
     j["ssid"] = WiFi.SSID();
@@ -695,6 +709,14 @@ void webStart() {
     server.on("/assets/dashboard.js", HTTP_GET, []() { sendAsset("text/javascript; charset=utf-8", kWebDashboard, sizeof(kWebDashboard)); });
     server.on("/assets/settings.js", HTTP_GET, []() { sendAsset("text/javascript; charset=utf-8", kWebSettings, sizeof(kWebSettings)); });
     server.on("/assets/log.js", HTTP_GET, []() { sendAsset("text/javascript; charset=utf-8", kWebLog, sizeof(kWebLog)); });
+    server.on("/assets/icon-192.png", HTTP_GET, []() { sendAsset("image/png", kWebIcon192, sizeof(kWebIcon192), false); });
+    server.on("/assets/icon-512.png", HTTP_GET, []() { sendAsset("image/png", kWebIcon512, sizeof(kWebIcon512), false); });
+    server.on("/favicon.ico", HTTP_GET, []() { sendAsset("image/png", kWebIcon192, sizeof(kWebIcon192), false); });
+    server.on("/manifest.webmanifest", HTTP_GET, []() {
+        server.sendHeader("Content-Encoding", "gzip");
+        server.sendHeader("Cache-Control", "no-cache");  // fixed URL: revalidate after an update
+        server.send_P(200, "application/manifest+json", reinterpret_cast<PGM_P>(kWebManifest), sizeof(kWebManifest));
+    });
     server.on("/", HTTP_GET, []() { sendPage("BDLMiner V1", kDashboard, "dashboard"); });
     server.on("/settings", HTTP_GET, []() { sendPage("BDLMiner settings", kSettingsPage, "settings"); });
     server.on("/log", HTTP_GET, []() { sendPage("BDLMiner log", kLogPage, "log"); });
@@ -709,6 +731,18 @@ void webStart() {
     server.on("/api/settings", HTTP_POST, handlePostSettings);
     server.on("/api/backup", HTTP_GET, handleGetBackup);
     server.on("/api/backup", HTTP_POST, handlePostBackup);
+    server.on("/api/notify-test", HTTP_POST, []() {
+        if (!authorized()) return;
+        if (!notifyTest()) {
+            server.send(409, "text/plain", "Set an ntfy topic or a webhook URL, save, then try again");
+            return;
+        }
+        server.send(202, "text/plain", "Test notification queued");
+    });
+    server.on("/api/notify-test", HTTP_GET, []() {
+        server.sendHeader("Cache-Control", "no-store");
+        server.send(200, "application/json", notifyResult());
+    });
     server.on("/api/restart", HTTP_POST, []() {
         if (!authorized()) return;
         if (restartAt || ota::busy()) {
@@ -742,6 +776,31 @@ void webStart() {
         if (ghUpdateInstall()) server.send(200, "text/plain", "Installing, the miner restarts by itself");
         else server.send(409, "text/plain", "No update to install");
     });
+    // The crash report is a memory image, which can hold passwords: password only.
+    server.on("/api/coredump", HTTP_GET, []() {
+        if (!authorized()) return;
+        size_t size = crashSize();
+        if (!size) {
+            server.send(404, "text/plain", "No crash report");
+            return;
+        }
+        server.sendHeader("Content-Disposition", "attachment; filename=\"bdlminer-coredump.elf\"");
+        server.sendHeader("Cache-Control", "no-store");
+        server.setContentLength(size);
+        server.send(200, "application/octet-stream", "");
+        static uint8_t chunk[1024];
+        for (size_t offset = 0; offset < size;) {
+            size_t n = min(sizeof(chunk), size - offset);
+            if (!crashRead(offset, chunk, n)) break;
+            server.sendContent((const char *)chunk, n);
+            offset += n;
+        }
+    });
+    server.on("/api/coredump/erase", HTTP_POST, []() {
+        if (!authorized()) return;
+        if (crashErase()) server.send(200, "text/plain", "Crash report erased");
+        else server.send(500, "text/plain", "The crash report could not be erased");
+    });
     server.on("/metrics", HTTP_GET, handleMetrics);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
     server.begin();
@@ -763,6 +822,7 @@ void webHandle() {
         // A validated web upload deliberately retains its OTA ownership.
         // Other reboots must reserve the slot without interrupting GitHub OTA.
         if (!ota::owns(ota::Owner::Web) && !ota::acquire(ota::Owner::Restart)) return;
+        trialConfirm(restartWhy.load());  // the dashboard was usable
         minerSaveStats();  // does nothing after a restored backup
         setRestartReason(restartWhy.load());
         ESP.restart();
@@ -770,3 +830,7 @@ void webHandle() {
 }
 
 const String &webHostName() { return hostName; }
+
+void webRequestRestart(const char *why) {
+    if (!restartAt) restartSoon(why);
+}
