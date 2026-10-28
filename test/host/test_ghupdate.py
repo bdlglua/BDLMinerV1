@@ -81,6 +81,7 @@ const char *valid=R"({"tag_name":"v1.0.11","assets":[
 void reset() {
     state=GithubUpdate(); firmwareUrl=""; signatureUrl="";
     installRequested=false; checkRequested=false; retryInstall=false; installFailures=0; installRetryAt=0; installResult=GithubInstallResult::Done; nextCheck=kFirstCheckMs; nextPing=kFirstPingMs;
+    refusedVersion[0]=refusedError[0]=0;
     nowMs=0; settings.githubUpdate=1; settings.usageCount=false; WiFi.connected=true; ESP.heap=100000;
     installs=pings=0; requests.clear(); manifest={200,valid,false}; api={403,"",false};
     ota::release(ota::Owner::Web); ota::release(ota::Owner::Github);
@@ -140,6 +141,8 @@ int main() {
     nowMs=nextCheck; ghUpdatePoll(); assert(installs==2); // manual install is retried even in offer-only mode
     reset(); settings.githubUpdate=2; installResult=GithubInstallResult::Refused;
     nowMs=kFirstCheckMs; ghUpdatePoll(); assert(installs==1 && !retryInstall && nextCheck==nowMs+kCheckMs);
+    nowMs=nextCheck; ghUpdatePoll(); assert(installs==1); // a refused release is not reinstalled every hour
+    assert(ghUpdateInstall()); ghUpdatePoll(); assert(installs==2); // but can still be installed on request
     reset(); settings.githubUpdate=2; installResult=GithubInstallResult::Retry;
     nowMs=kFirstCheckMs; ghUpdatePoll(); manifest.code=404; api.code=403;
     nowMs=nextCheck; ghUpdatePoll(); assert(installs==1 && retryInstall && ghUpdateState().retrySeconds==300);

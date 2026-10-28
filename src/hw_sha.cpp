@@ -547,7 +547,12 @@ uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
         return 0;
     }
     int loop = current;
-    if (loop >= kLoopCount) return 0;
+    if (loop >= kLoopCount) {
+        // health() gave up on every loop: software mines from now on, so
+        // the engines this task may still hold go back to TLS.
+        idle();
+        return 0;
+    }
     // An open TLS connection can hold the engine for seconds (mbedtls then
     // keeps it for the whole digest); never wait for it.
     if (!minerHolds && !tryLockEngines()) return 0;

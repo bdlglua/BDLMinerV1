@@ -39,6 +39,11 @@ std::atomic<uint32_t> installRetryAt{0};
 bool retryInstall = false;
 uint8_t installFailures = 0;
 uint32_t nextCheck = kFirstCheckMs;  // millis()
+// A release whose installation was refused (bad signature, no room for a
+// second firmware) gives the same answer every time: it is not installed
+// automatically again, only when asked for from the dashboard.
+char refusedVersion[24] = "";
+char refusedError[80] = "";
 uint32_t nextPing = kFirstPingMs;
 
 void setError(const char *fmt, const char *arg = "") {
@@ -171,6 +176,7 @@ bool check() {
     firmwareUrl = fw;
     signatureUrl = sig;
     if (newer && !available) setError("release %s has no signed firmware for " FW_ENV, version);
+    else if (available && !strcmp(version, refusedVersion)) setError("%s", refusedError);
     logf("[update] latest release %s, this firmware %s%s\n", version, FW_VERSION,
          available ? ": update available" : "");
     if (available && !wasAvailable) {
@@ -352,8 +358,15 @@ void ghUpdatePoll() {
             state.checking = false;
             portEXIT_CRITICAL(&stateMux);
         }
-        if (ready && (requestedInstall || retryInstall || settings.githubUpdate == 2) && ghUpdateState().available) {
+        GithubUpdate current = ghUpdateState();
+        bool automatic = settings.githubUpdate == 2 && strcmp(current.version, refusedVersion);
+        if (ready && (requestedInstall || retryInstall || automatic) && current.available) {
             GithubInstallResult result = install();
+            if (result == GithubInstallResult::Refused) {
+                GithubUpdate failed = ghUpdateState();
+                strlcpy(refusedVersion, failed.version, sizeof(refusedVersion));
+                strlcpy(refusedError, failed.error, sizeof(refusedError));
+            }
             retryInstall = result == GithubInstallResult::Retry;
             if (retryInstall) {
                 if (installFailures < 4) ++installFailures;

@@ -133,6 +133,9 @@ void events(uint32_t now) {
         acceptedAt = now;
         ui::flashShare();
     }
+    // A paused miner (power 0 %, too hot, firmware update) finds no share by
+    // design: that time must not count towards the restart below.
+    if (!minerPowerPercent()) acceptedAt = now;
     board::flashLed(led);
 
     if (stats.poolConnected) {
