@@ -5,18 +5,18 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.6](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.6)**
+**Latest release: [v1.6.7](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.7)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.6.md)
+· [Release notes](docs/releases/v1.6.7.md)
 
-Version **1.6.6** redesigns the physical screen (one big number per page) and the web
+Version **1.6.7** (and 1.6.6) redesigns the physical screen (one big number per page) and the web
 dashboard (a compact console), and builds the firmware for size: every board is
 140-340 KB smaller, the T-Display has room again, and M5Stack Core and CYD boards
 get two firmware slots for GitHub and web updates. When a pool has no readable
 statistics API, the dashboard estimates what it sees from the accepted shares.
 Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
 **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.6.6**.
+**BDLMinerV1/1.6.7**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -187,7 +187,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.6 && git push origin v1.6.6
+git tag v1.6.7 && git push origin v1.6.7
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -211,7 +211,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.6.
+corrections shipped in v1.5.3 and retained in v1.6.7.
 
 ## Build and flash
 
