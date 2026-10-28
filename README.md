@@ -5,19 +5,20 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.8](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.8)**
+**Latest release: [v1.6.9](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.9)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.8.md)
+· [Release notes](docs/releases/v1.6.9.md)
 
-Version **1.6.8** makes updates safer: a new firmware runs on trial and the previous
-one comes back by itself if it crashes or cannot mine. It adds crash reports on the
-dashboard, hashrate and rejected-share alerts, a webhook for Discord or Telegram,
-Home Assistant controls, touch-screen gestures, a full-screen *BLOCK FOUND!* alert,
-a home-screen web app, redesigned settings and log pages, and finds any pool's
-statistics API by itself. It keeps 1.6.6's one-big-number screen, console dashboard
-and smaller firmware. Experimental Gamma 601 profiles still cover **525–800 MHz**,
-defaulting to **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.6.8**.
+Version **1.6.9** makes the dashboard live (pushed every 2 seconds), applies numbers
+and switches in the settings without a restart, frees about 13 KB of memory so that
+market data, notifications and GitHub updates no longer wait on a running miner, keeps
+a history of the last crashes, shows integrations and pool reliability, and fixes
+Stratum V2 disconnections ("Unknown SV2 future job"). It builds on 1.6.8: firmware
+trial with automatic rollback, crash reports, alerts and webhook, Home Assistant
+controls, touch gestures, the *BLOCK FOUND!* alert, the home-screen web app and the
+automatic pool statistics API. Experimental Gamma 601 profiles still cover
+**525–800 MHz**, defaulting to **600 MHz / 1150 mV**, with 525 MHz fallback. The
+default identity is **BDLMinerV1/1.6.9**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -188,7 +189,9 @@ log and a *Last crash* tile on the dashboard show its summary (task, address,
 the exception by name, backtrace; an `abort()`, failed assert or watchdog is named as
 such rather than by the "StoreProhibited at 0x00000000" ESP-IDF uses to stop); **Download report** saves the full ELF for
 `esp-coredump` / GDB with the matching `firmware.elf`, and **Erase** clears it
-(both need the web password).
+(both need the web password). The miner also keeps the summaries of its last 5
+crashes, with the version that crashed and the date, so a report replaced by a later
+crash still leaves a trace; **Erase** clears this history too.
 
 ### Anonymous usage count
 
@@ -206,7 +209,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.8 && git push origin v1.6.8
+git tag v1.6.9 && git push origin v1.6.9
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -230,7 +233,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.8.
+corrections shipped in v1.5.3 and retained in v1.6.9.
 
 ## Build and flash
 
@@ -497,6 +500,19 @@ Once connected, the board serves a dashboard at **http://<board IP>/** or
 **http://bdlminer-xxxx.local/** (mDNS; `xxxx` = last digits of the MAC address, shown in
 the serial monitor):
 
+The dashboard is live: the miner pushes its statistics every 2 seconds to up to two
+open dashboards (Server-Sent Events on `/api/events`); any other page, or a browser
+that loses the stream, falls back to asking every 10 seconds. An *Integrations* tile
+shows MQTT (connected or not), the last notification sent and how each destination
+answered, and where the pool statistics come from. The pool tile adds the time
+connected since restart, reconnections and switches to the backup pool.
+
+Settings that are numbers or switches (brightness, rotation, theme, language, screen
+cycle, night mode, beep, alerts, maximum temperature, mining power, restart after no
+share, battery saver, GitHub updates, usage count) apply at once, without a restart;
+the button then reads **Save**. Text settings, the pool, WiFi and MQTT still restart
+the miner (**Save and restart**), since other tasks use them.
+
 The dashboard can be added to a phone's home screen (web app manifest and icon):
 it then opens full screen like an app. Browsers only offer a full *install* over
 HTTPS; *Add to Home screen* works on the local address.
@@ -621,7 +637,9 @@ ports (443, 40557; 3334 and 80 over plain HTTP for a pool on the local network),
 recognises the answer by its JSON. The address that answered is kept, across restarts,
 and shown under the *Seen by the pool* tile; if it stops answering, the search starts
 again. A pool without such an API is searched again every 6 hours; meanwhile the tile
-estimates the hashrate from the accepted shares.
+estimates the hashrate from the accepted shares. When a known API stops answering
+(an outage on the pool's side), the tile says so, shows the estimate, and the miner
+asks again every 10 minutes.
 
 ## Notifications
 
@@ -646,6 +664,11 @@ span, 5 or more rejected shares making at least 10 % of the shares send *Shares 
 For Discord, use *Channel settings › Integrations › Webhooks › Copy URL*. After saving,
 **Send a test notification** (under the webhook field) shows the result of each
 destination: OK, an HTTP code, or no connection.
+
+Notifications are sent from the task that already fetches market data, so they cost
+no memory of their own. Each one is tried up to 3 times, 30 seconds apart; while there
+is not enough free memory for a TLS connection (54 KB, with a 24 KB block) or no WiFi,
+it waits up to 10 minutes without using up those tries.
 
 ## Home Assistant
 
