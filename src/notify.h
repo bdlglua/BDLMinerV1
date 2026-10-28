@@ -6,6 +6,9 @@
 #include <Arduino.h>
 
 void notifyStart();
+// Delivers queued notifications, one step at a time; called every few seconds
+// from the market task, which already makes TLS connections.
+void notifyPoll();
 
 // Queues a notification (dropped when no topic is set or the queue is full).
 // priority: 1 (min) .. 5 (max), tags: ntfy emoji tags ("tada,moneybag").
@@ -16,3 +19,10 @@ bool notifyTest();
 // The last delivery: {"id":N,"title":...,"ntfy":"OK"|"HTTP 404"|"off"...,"webhook":...};
 // id 0 before the first one.
 String notifyResult();
+// For the dashboard: whether notifications are on and the last delivery.
+struct NotifyStatus {
+    bool enabled = false;
+    uint32_t id = 0;  // 0 before the first delivery
+    char title[64] = "", ntfy[24] = "off", webhook[24] = "off";
+};
+NotifyStatus notifyStatus();

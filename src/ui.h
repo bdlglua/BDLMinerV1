@@ -16,6 +16,8 @@ void cycleBrightness();
 
 // Backlight actually used (night mode, battery saver); 0 stops drawing.
 void setBacklight(uint8_t percent);
+// Applies settings.rotation, theme and language after a change from the web.
+void applySettings();
 // Turns the picture (the two landscape ways only), without saving it.
 void setRotation(uint8_t rotation);
 // Shows "+1 share" long enough to cover a one-second refresh, including

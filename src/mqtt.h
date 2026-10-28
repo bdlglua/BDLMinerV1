@@ -7,3 +7,5 @@ void mqttStart();
 // brightness, restart); call once a second from loop(), which owns the
 // settings, the screen and restarts.
 void mqttApply();
+// "off", "connected" or "disconnected", for the dashboard.
+const char *mqttState();

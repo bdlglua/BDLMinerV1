@@ -32,6 +32,7 @@ using std::min;
 using portMUX_TYPE = int;
 constexpr int portMUX_INITIALIZER_UNLOCKED = 0;
 constexpr int HTTP_CODE_OK = 200;
+constexpr uint32_t kTlsMinFree = 54 * 1024;
 struct String : std::string {
     using std::string::string;
     using std::string::operator=;

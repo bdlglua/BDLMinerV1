@@ -55,6 +55,17 @@ int main(int argc, char **) {
     assert(p.handle(ack(2,2))==Event::Accepted && p.acknowledged()==2 && p.pending()==0);
     assert(p.handle(ack(2,2))==Event::None && p.acknowledged()==0);
     assert(p.handle(job(43,false,1800000001))==Event::Job && !p.job().clean);
+    {   // A future job announced early survives many template updates before its block.
+        auto early=p;
+        assert(early.handle(job(500,true))==Event::None);
+        for(uint32_t i=0;i<20;++i)assert(early.handle(job(600+i,false,1800000002+i))==Event::Job);
+        assert(early.handle(previous(500))==Event::Job && early.job().id=="500" && early.job().clean);
+        // Two future jobs and a stream of updates: both kept, either can be chosen.
+        auto two=p;
+        assert(two.handle(job(700,true))==Event::None && two.handle(job(701,true))==Event::None);
+        for(uint32_t i=0;i<20;++i)assert(two.handle(job(800+i,false,1800000002+i))==Event::Job);
+        assert(two.handle(previous(701))==Event::Job && two.job().id=="701");
+    }
     auto bounded=p;
     for(int i=0;i<32;++i)assert(!bounded.submit(s).payload.empty());
     assert(bounded.pending()==32 && bounded.submit(s).payload.empty());

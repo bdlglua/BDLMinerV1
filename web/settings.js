@@ -146,7 +146,16 @@ async function saveSettings(event){
  const v=values();
  if(!$('f').checkValidity()){$('settings-search').value='';filterSettings();$('f').reportValidity();return}
  busy=true;sync();
- try{await request('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},'text');restarting=true;$('msg').textContent=t('Saved, restarting… reload in 15 s')}
+ try{
+  const answer=await request('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},'text');
+  let result=null;try{result=JSON.parse(answer)}catch(e){}
+  if(result&&result.restart===false){
+   // Applied by the miner at once: the page stays usable.
+   const language=v.lang!==undefined&&v.lang!==S.values.lang;S.values=v;dirtyState();
+   $('msg').textContent=t(result.changed?'Saved and applied.':'Nothing to save.');
+   if(language)setTimeout(()=>location.reload(),600);
+  }else{restarting=true;$('msg').textContent=t('Saved, restarting… reload in 15 s')}
+ }
  catch(e){$('msg').textContent=errorText(e)}finally{busy=false;sync()}
 }
 async function imp(input){
@@ -185,9 +194,10 @@ load();
 function fieldValue(k,type){const input=$('k_'+k);return type==='bool'?(input.tagName==='SELECT'?input.value==='true':input.checked):type==='number'||type==='decimal'?Number(input.value):input.value}
 function dirtyState(){
  if(!S)return;
- let count=0;
- for(const[k,type]of S.schema){const changed=fieldValue(k,type)!==S.values[k];$('k_'+k).closest('.field').classList.toggle('changed',changed);if(changed)count++}
- $('dirty').textContent=count?count+' '+t(count>1?'unsaved changes':'unsaved change'):t('Changes take effect after restart.');
+ let count=0,restart=false;const live=S.live||[];
+ for(const[k,type]of S.schema){const changed=fieldValue(k,type)!==S.values[k];$('k_'+k).closest('.field').classList.toggle('changed',changed);if(changed){count++;if(!live.includes(k))restart=true}}
+ $('dirty').textContent=count?count+' '+t(count>1?'unsaved changes':'unsaved change')+' · '+t(restart?'needs a restart':'applied right away'):t(live.length?'Display, alerts and power apply right away; other changes restart the miner.':'Changes take effect after restart.');
+ $('save').textContent=t(count&&!restart?'Save':'Save and restart');
  document.querySelector('.save-bar').dataset.dirty=count>0;$('discard').hidden=!count;
 }
 function filterSettings(){

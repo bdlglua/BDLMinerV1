@@ -29,7 +29,7 @@ constexpr uint32_t kCheckMs = 3600 * 1000UL;
 constexpr uint32_t kRetryMs = 5 * 60 * 1000;
 constexpr uint32_t kFirstPingMs = 5 * 60 * 1000;
 constexpr uint32_t kPingMs = 24 * 3600 * 1000UL;
-constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
+constexpr uint32_t kMinHeap = kTlsMinFree;
 
 GithubUpdate state;
 String firmwareUrl, signatureUrl;

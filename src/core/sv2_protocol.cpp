@@ -67,6 +67,23 @@ void Protocol::activate(Slot &slot, uint32_t time, bool clean) {
     memcpy(current_.prevHash, previous_, 32);
     haveCurrent_ = true; slot.future = false;
 }
+// An empty slot, else the oldest job that is neither the current one nor a
+// future job: a pool may announce the job for the next block long before its
+// SetNewPrevHash, with many template updates in between. Replacing it would
+// leave that SetNewPrevHash pointing at nothing.
+size_t Protocol::freeSlot() const {
+    size_t best = jobs_.size();
+    auto older = [&](size_t i) { return best == jobs_.size() || int32_t(jobs_[i].order - jobs_[best].order) < 0; };
+    for (size_t i = 0; i < jobs_.size(); ++i) {
+        const Slot &s = jobs_[i];
+        if (!s.valid) return i;
+        if (!s.future && !(haveCurrent_ && s.job.id == current_.id) && older(i)) best = i;
+    }
+    if (best < jobs_.size()) return best;
+    for (size_t i = 0; i < jobs_.size(); ++i)  // only future jobs left besides the current one
+        if (jobs_[i].future && older(i)) best = i;
+    return best;
+}
 size_t Protocol::pendingIndex(uint32_t sequence) const {
     for (size_t i = 0; i < pendingCount_; ++i) if (pending_[i] == sequence) return i;
     return pendingCount_;
@@ -129,8 +146,8 @@ Event Protocol::handle(const Frame &f) {
         slot.job.coinb1 = r.vector(r.number(2)); slot.job.coinb2 = r.vector(r.number(2));
         if (!r.end() || (channel != channel_ && channel != group_) || (!slot.future && (!havePrevious_ || time < ntime_)))
             return fail("Invalid SV2 mining job");
-        size_t index = nextSlot_++ % jobs_.size();
-        if (haveCurrent_ && jobs_[index].valid && jobs_[index].job.id == current_.id) index = nextSlot_++ % jobs_.size();
+        size_t index = freeSlot();
+        slot.order = order_++;
         size_t bytes = slot.job.coinb1.size() + slot.job.coinb2.size();
         for (const auto &old : jobs_) if (old.valid) {
             if (old.id == id) return fail("Duplicate SV2 job identifier");

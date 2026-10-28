@@ -56,9 +56,12 @@ void core0WdtResume() {
     if (--wdtPauses == 0) enableCore0WDT();
 }
 
-bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port) {
+bool tlsMemoryOk() { return ESP.getFreeHeap() >= kTlsMinFree && ESP.getMaxAllocHeap() >= kTlsMinBlock; }
+
+bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds) {
     tls.setInsecure();
-    tls.setHandshakeTimeout(12);
+    tls.setHandshakeTimeout(timeoutSeconds);
+    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);  // the TCP connect too
     if (!lock || xSemaphoreTake(lock, portMAX_DELAY) != pdTRUE) {
         logf("[tls] handshake unavailable: TLS lock missing\n");
         return false;

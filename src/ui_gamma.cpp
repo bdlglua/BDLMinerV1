@@ -37,6 +37,7 @@ void setBacklight(uint8_t value) {
     if (oled) { if (value) static_cast<lgfx::LGFX_Device *>(oled)->wakeup(); else static_cast<lgfx::LGFX_Device *>(oled)->sleep(); }
 }
 void setRotation(uint8_t rotation) { if (oled) oled->setRotation(rotation >= 2 ? 2 : 0); }
+void applySettings() { setRotation(settings.rotation); render(); }
 void flashShare() {} // Do not flash the OLED on each difficulty-1 ASIC result.
 void blockFound(uint32_t height) { foundHeight = height; alertShown = true; render(); }
 bool dismissAlert() { if (!alertShown) return false; alertShown = false; since = millis(); render(); return true; }

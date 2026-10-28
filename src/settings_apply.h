@@ -124,3 +124,52 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
         pending.userAgentAuto = !legacyManualAgent(values["ua"].as<const char *>());
     return changed;
 }
+
+// Settings applied while the miner runs: numbers and switches that are read
+// where they are used (supervision, screen, alerts, updates). Text settings,
+// the pool, WiFi and MQTT rebuild connections or tasks: they need a restart,
+// and other tasks read those strings without a lock.
+inline bool settingIsLive(const char *key) {
+    static const char *const kLive[] = {"bright", "rot",      "autorot",  "lang",     "theme",  "cycle",
+                                        "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin",
+                                        "maxtemp", "power",    "rebooth",  "saver",    "update", "count"};
+    for (const char *k : kLive)
+        if (!strcmp(k, key)) return true;
+    return false;
+}
+
+inline bool settingDiffers(const SettingInfo &s, const Settings &a, const Settings &b) {
+    const void *x = settingValue(s, a), *y = settingValue(s, b);
+    switch (s.type) {
+        case SettingType::Text:
+        case SettingType::Secret: return *(const String *)x != *(const String *)y;
+        case SettingType::Number:
+            return s.bits == 8 ? *(const uint8_t *)x != *(const uint8_t *)y : *(const uint16_t *)x != *(const uint16_t *)y;
+        case SettingType::Decimal: return *(const double *)x != *(const double *)y;
+        case SettingType::Bool: return *(const bool *)x != *(const bool *)y;
+    }
+    return false;
+}
+
+// How `pending` differs from `current`: the number of changed settings, and
+// whether all of them can be applied without a restart.
+struct SettingsChange { int count = 0; bool live = true; };
+inline SettingsChange settingsCompare(const Settings &pending, const Settings &current) {
+    SettingsChange change;
+    for (size_t i = 0; i < kSettingCount; i++) {
+        if (!settingDiffers(kSettings[i], pending, current)) continue;
+        change.count++;
+        if (!settingIsLive(kSettings[i].key)) change.live = false;
+    }
+    return change;
+}
+
+// Copies the live settings that changed (numbers and switches only).
+inline void settingsCopyLive(Settings &live, const Settings &pending) {
+    for (size_t i = 0; i < kSettingCount; i++) {
+        const SettingInfo &s = kSettings[i];
+        if (!settingIsLive(s.key) || s.type == SettingType::Text || s.type == SettingType::Secret) continue;
+        size_t size = s.type == SettingType::Number ? s.bits / 8 : s.type == SettingType::Decimal ? sizeof(double) : sizeof(bool);
+        memcpy(settingValue(s, live), settingValue(s, pending), size);
+    }
+}

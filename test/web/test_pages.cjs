@@ -44,6 +44,7 @@ async function fixture(options={}){
   if(options.stats) Object.assign(state.stats,options.stats);
   state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
   if(options.capabilities)state.settings.capabilities=options.capabilities;
+  if(options.live)state.settings.live=['power','maxtemp','nightfrom','saver'];
   if(options.gamma){state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}]);state.settings.values.asicmhz=600;}
   const server=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
@@ -66,6 +67,11 @@ async function fixture(options={}){
       if(options.settingsFailure&&state.settingsCalls===1)return json(res,{error:'unavailable'},503);
       if(options.settingsDenied){res.writeHead(403);return res.end('Set a web password in the setup portal first (hold the main button while the miner starts).')}
       return json(res,state.settings);
+    }
+    if(req.url==='/api/events'&&options.stream){
+      res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});
+      const push=()=>{state.streamed=(state.streamed||0)+1;res.write('data: '+JSON.stringify({...state.stats,hashrate:state.stats.hashrate+state.streamed})+'\n\n')};
+      push();const timer=setInterval(push,100);res.on('close',()=>clearInterval(timer));return;
     }
     if(req.url.split('?')[0]==='/api/stats'){
       state.peak=Math.max(state.peak,++state.inflight);
@@ -485,6 +491,43 @@ check('log filtering and pause leave the original text available for download',(
   const download=f.page.waitForEvent('download');await f.page.click('#download-log');const file=await download;assert.equal(file.suggestedFilename(),'bdlminer.log');
   await f.page.fill('#log-search','');assert.match(await f.page.locator('#l').textContent(),/available/);
   await f.page.click('#pause-log');await f.page.waitForTimeout(80);assert.ok(f.state.logCalls>calls);
+}));
+
+check('the live stream replaces polling and the dashboard follows it',()=>run({stream:true,stats:{hashrate:1000}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#m')?.textContent.includes('kH/s'));
+  await f.page.waitForTimeout(300);const polls=f.state.requests.filter(r=>r.startsWith('GET /api/stats')).length;
+  await f.page.evaluate(()=>{const s=document.getElementById('st');return s&&s.dataset.state});
+  await f.page.waitForTimeout(400);
+  assert.ok(f.state.streamed>3);
+  assert.equal(f.state.requests.filter(r=>r.startsWith('GET /api/stats')).length,polls); // no more polling
+  assert.equal(await f.page.locator('#st').getAttribute('data-state'),'online');
+}));
+
+check('a failing pool statistics API is reported with the share estimate',()=>run({stats:{uptime_s:3600,shares:{accepted:2,rejected:0,work:2},pool_view:{updated_s:-1,supported:true,source:'public-pool.io:40557/api/client/',error:-4},integrations:{mqtt:'off',notify:{enabled:false}}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#pool-grid .t');
+  const pool=await f.page.locator('#pool-grid').textContent();
+  assert.match(pool,/estimated from accepted shares/);assert.match(pool,/statistics API is not answering \(no connection\)/);
+  assert.match(await f.page.locator('#device-grid').textContent(),/Integrations⚠ check/);
+}));
+
+check('integrations, pool reliability and crash history tiles',()=>run({stats:{pool:{host:'pool.example',port:3333,connected:true,status:'Mining',difficulty:1,connected_percent:98.4,sessions:3,failovers:1},integrations:{mqtt:'disconnected',mqtt_host:'ha.local:1883',notify:{enabled:true,title:'Test notification',ntfy:'off',webhook:'OK'}},pool_view:{updated_s:60,supported:true,hashrate:1e6,best:2,workers:1,source:'public-pool.io:40557/api/client/'},crash:{history:[{t:1793000000,version:'1.6.7',summary:'abort() called in task loopTask, backtrace 0x1'},{t:0,version:'1.6.6',summary:'task IDLE, LoadProhibited (cause 28) at 0x00000010'}]}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');
+  const pool=await f.page.locator('#pool-grid').textContent();
+  assert.match(pool,/connected 98\.4 % since restart · 2 reconnections · 1 switch to backup/);assert.match(pool,/via public-pool\.io:40557/);
+  const device=await f.page.locator('#device-grid').textContent();
+  assert.match(device,/Integrations⚠ check/);assert.match(device,/MQTT: disconnected · ha\.local:1883/);assert.match(device,/webhook OK \(Test notification\)/);
+  assert.match(device,/Crash history2/);assert.match(device,/v1\.6\.7 · abort\(\) called in task loopTask/);assert.match(device,/date unknown · v1\.6\.6/);
+  assert.doesNotMatch(device,/backtrace 0x1/);assert.equal(await f.page.locator('#device-grid a[href="/api/coredump"]').count(),0);
+}));
+
+check('live settings save without a restart and keep the page usable',()=>run({live:true,postText:'{"restart":false,"changed":1}'},async f=>{
+  await loaded(f);await f.page.fill('#k_power','60');
+  assert.equal(await f.page.locator('#save').textContent(),'Save');assert.match(await f.page.locator('#dirty').textContent(),/applied right away/);
+  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('applied'));
+  assert.equal(await f.page.locator('#save').isEnabled(),true);assert.equal(await f.page.locator('.field.changed').count(),0);
+  assert.equal(JSON.parse(f.state.posts[0].body).power,60);
+  await f.page.fill('#k_pool','other.pool');assert.equal(await f.page.locator('#save').textContent(),'Save and restart');
+  assert.match(await f.page.locator('#dirty').textContent(),/needs a restart/);
 }));
 
 check('choice controls save numbers and discarding restores the saved values',()=>run({},async f=>{

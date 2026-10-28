@@ -24,7 +24,6 @@ QueueHandle_t queue;
 portMUX_TYPE resultMux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t resultId = 0;
 char resultTitle[64] = "", resultNtfy[24] = "off", resultHook[24] = "off";
-constexpr uint32_t kMinHeap = 70 * 1024;  // a TLS session needs ~45 KB
 
 bool enabled() { return !settings.ntfyTopic.isEmpty() || !settings.webhookUrl.isEmpty(); }
 
@@ -109,31 +108,32 @@ void describe(char *out, size_t size, bool configured, int code) {
     else strlcpy(out, "no connection", size);
 }
 
-void notifyTask(void *) {
+// One message being delivered. Each destination is retried on its own: one
+// failing must not repeat the other.
+struct Delivery {
     Message m;
-    for (;;) {
-        xQueueReceive(queue, &m, portMAX_DELAY);
-        // Each destination is retried on its own: one failing must not repeat the other.
-        bool useNtfy = !settings.ntfyTopic.isEmpty(), useHook = !settings.webhookUrl.isEmpty();
-        int ntfy = 0, hook = 0;  // last HTTP status, -1 no connection, 0 not tried
-        for (int attempt = 0; attempt < 3 && ((useNtfy && !ok(ntfy)) || (useHook && !ok(hook))); attempt++) {
-            if (attempt) vTaskDelay(pdMS_TO_TICKS(30000));
-            if (!WiFi.isConnected() || ESP.getFreeHeap() <= kMinHeap) continue;
-            if (useNtfy && !ok(ntfy)) ntfy = sendNtfy(m);
-            if (useHook && !ok(hook)) hook = sendWebhook(m);
-        }
-        bool sent = (!useNtfy || ok(ntfy)) && (!useHook || ok(hook));
-        logf("[notify] %s: %s\n", sent ? "sent" : "not delivered", m.title);
-        char n[24], h[24];
-        describe(n, sizeof(n), useNtfy, ntfy);
-        describe(h, sizeof(h), useHook, hook);
-        portENTER_CRITICAL(&resultMux);
-        resultId++;
-        strlcpy(resultTitle, m.title, sizeof(resultTitle));
-        strlcpy(resultNtfy, n, sizeof(resultNtfy));
-        strlcpy(resultHook, h, sizeof(resultHook));
-        portEXIT_CRITICAL(&resultMux);
-    }
+    bool active = false, useNtfy = false, useHook = false;
+    uint8_t attempts = 0;
+    int ntfy = 0, hook = 0;  // last HTTP status, -1 no connection, 0 not tried
+    uint32_t nextAt = 0, waitingSince = 0;
+} delivery;
+constexpr uint8_t kAttempts = 3;
+constexpr uint32_t kRetryMs = 30 * 1000;
+constexpr uint32_t kMemoryWaitMs = 10 * 60 * 1000;  // low memory or no WiFi: wait, without using up attempts
+
+void finish(Delivery &d) {
+    bool sent = (!d.useNtfy || ok(d.ntfy)) && (!d.useHook || ok(d.hook));
+    logf("[notify] %s: %s\n", sent ? "sent" : "not delivered", d.m.title);
+    char n[24], h[24];
+    describe(n, sizeof(n), d.useNtfy, d.ntfy);
+    describe(h, sizeof(h), d.useHook, d.hook);
+    portENTER_CRITICAL(&resultMux);
+    resultId++;
+    strlcpy(resultTitle, d.m.title, sizeof(resultTitle));
+    strlcpy(resultNtfy, n, sizeof(resultNtfy));
+    strlcpy(resultHook, h, sizeof(resultHook));
+    portEXIT_CRITICAL(&resultMux);
+    d.active = false;
 }
 
 }  // namespace
@@ -141,11 +141,36 @@ void notifyTask(void *) {
 void notifyStart() {
     if (!enabled()) return;  // changes take effect after reboot
     queue = xQueueCreate(6, sizeof(Message));
-    if (!runtime::started(queue != nullptr, runtime::Notify, "notification queue")) return;
-    if (!runtime::started(xTaskCreatePinnedToCore(notifyTask, "notify", 10240, nullptr, 1, nullptr, 0) == pdPASS,
-                          runtime::Notify, "notifications")) {
-        vQueueDelete(queue);
-        queue = nullptr;
+    runtime::started(queue != nullptr, runtime::Notify, "notification queue");
+}
+
+void notifyPoll() {
+    Delivery &d = delivery;
+    if (!queue) return;
+    uint32_t now = millis();
+    if (!d.active) {
+        if (xQueueReceive(queue, &d.m, 0) != pdTRUE) return;
+        d.active = true;
+        d.useNtfy = !settings.ntfyTopic.isEmpty();
+        d.useHook = !settings.webhookUrl.isEmpty();
+        d.attempts = 0;
+        d.ntfy = d.hook = 0;
+        d.nextAt = d.waitingSince = now;
+    }
+    if ((int32_t)(now - d.nextAt) < 0) return;
+    if (!WiFi.isConnected() || !tlsMemoryOk()) {
+        if (now - d.waitingSince < kMemoryWaitMs) d.nextAt = now + 10000;
+        else finish(d);
+        return;
+    }
+    d.attempts++;
+    if (d.useNtfy && !ok(d.ntfy)) d.ntfy = sendNtfy(d.m);
+    if (d.useHook && !ok(d.hook)) d.hook = sendWebhook(d.m);
+    if (((!d.useNtfy || ok(d.ntfy)) && (!d.useHook || ok(d.hook))) || d.attempts >= kAttempts) {
+        finish(d);
+    } else {
+        d.nextAt = now + kRetryMs;
+        d.waitingSince = d.nextAt;
     }
 }
 
@@ -183,4 +208,16 @@ String notifyResult() {
     String out;
     serializeJson(d, out);
     return out;
+}
+
+NotifyStatus notifyStatus() {
+    NotifyStatus s;
+    s.enabled = queue != nullptr;
+    portENTER_CRITICAL(&resultMux);
+    s.id = resultId;
+    memcpy(s.title, resultTitle, sizeof(s.title));
+    memcpy(s.ntfy, resultNtfy, sizeof(s.ntfy));
+    memcpy(s.webhook, resultHook, sizeof(s.webhook));
+    portEXIT_CRITICAL(&resultMux);
+    return s;
 }

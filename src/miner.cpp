@@ -479,10 +479,30 @@ MinerStats minerStats() {
     return copy;
 }
 
+// Time connected to a pool since boot, and the sessions that make it up.
+uint32_t poolConnectedMs = 0, poolSince = 0, poolSessions = 0;
+
 void minerPoolConnected(bool connected) {
+    uint32_t now = millis();
     portENTER_CRITICAL(&statsMux);
+    if (connected && !stats.poolConnected) {
+        poolSince = now;
+        poolSessions++;
+    } else if (!connected && stats.poolConnected) {
+        poolConnectedMs += now - poolSince;
+    }
     stats.poolConnected = connected;
     portEXIT_CRITICAL(&statsMux);
+}
+
+PoolUptime minerPoolUptime() {
+    uint32_t now = millis();
+    PoolUptime u;
+    portENTER_CRITICAL(&statsMux);
+    u.connectedMs = poolConnectedMs + (stats.poolConnected ? now - poolSince : 0);
+    u.sessions = poolSessions;
+    portEXIT_CRITICAL(&statsMux);
+    return u;
 }
 
 void minerPoolDifficulty(double difficulty) {

@@ -21,6 +21,7 @@ constexpr uint32_t kStateMs = 30000;
 
 WiFiClient tcp;
 PubSubClient mqtt(tcp);
+std::atomic<bool> brokerUp{false};  // for other tasks: the client itself is not shared
 String base;  // bdlminer/<host name>
 
 struct Sensor {
@@ -186,6 +187,7 @@ void mqttTask(void *) {
                      mqtt.state());
             }
         }
+        brokerUp = mqtt.connected();
         if (mqtt.connected()) {
             mqtt.loop();
             if (!lastState || millis() - lastState > kStateMs) {
@@ -220,4 +222,9 @@ void mqttApply() {
         ui::setBacklight(settingsBrightness());
     }
     if (pendingRestart.exchange(false)) webRequestRestart("restart requested over MQTT");
+}
+
+const char *mqttState() {
+    if (settings.mqttHost.isEmpty()) return "off";
+    return brokerUp ? "connected" : "disconnected";
 }

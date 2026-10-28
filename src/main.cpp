@@ -139,7 +139,9 @@ void loop() {
         minerTick();
         watchTick();
         trialPoll();
+        crashPoll();
         mqttApply();
+        if (webTakeSettingsChange()) ui::applySettings();
         ui::render();
         // Headless status LED: steady while connecting, blinking while mining.
         board::setLed(stats.poolConnected ? (now / 1000) % 2 : true);

@@ -12,7 +12,7 @@ function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*42949
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  if(label===t('Hashrate'))e.classList.add('hero');
  if(label===t('Hashrate history'))e.classList.add('history');
- for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash'],records:['32-bit shares','64-bit shares','Block chance','Blocks found','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
+ for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash','Crash history','Integrations'],records:['32-bit shares','64-bit shares','Block chance','Blocks found','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
 
 function textAt(id,value){const node=document.getElementById(id);if(node.textContent!==String(value))node.textContent=value}
@@ -66,12 +66,34 @@ function upd(u){
  e.appendChild(c);return e;
 }
 // The panic handler's core dump: summary, download (password) and erase.
+// Connected time since restart, reconnections and switches to the backup pool.
+function poolUptime(p){
+ if(!Number.isFinite(p.connected_percent))return'';
+ const parts=[t('connected')+' '+p.connected_percent.toFixed(1)+' % '+t('since restart')];
+ if(p.sessions>1)parts.push((p.sessions-1)+' '+t(p.sessions>2?'reconnections':'reconnection'));
+ if(p.failovers)parts.push(p.failovers+' '+t(p.failovers>1?'switches to backup':'switch to backup'));
+ return'\n'+parts.join(' · ');
+}
+// The pool's statistics API failing, usually an outage on its side.
+function apiError(code){return t('the pool\'s statistics API is not answering')+' ('+(code>0?'HTTP '+code:t('no connection'))+')'}
+// MQTT, notifications and the pool statistics API at a glance.
+function integrationsTile(x,pv){
+ const n=x.notify||{},lines=[];
+ lines.push('MQTT: '+(x.mqtt==='off'?t('off'):t(x.mqtt)+(x.mqtt_host?' · '+x.mqtt_host:'')));
+ lines.push(t('Notifications')+': '+(!n.enabled?t('off'):n.title?'ntfy '+t(n.ntfy)+' · webhook '+t(n.webhook)+' ('+t(n.title)+')':t('none sent yet')));
+ lines.push(t('Pool statistics')+': '+(pv.source?pv.source+(pv.error?' · ⚠ '+apiError(pv.error):''):pv.supported===false?t('no stats API found for this pool'):t('searching…')));
+ const bad=pv.error||x.mqtt==='disconnected'||(n.title&&[n.ntfy,n.webhook].some(s=>s!=='OK'&&s!=='off'));
+ const e=tile(t('Integrations'),bad?'⚠ '+t('check'):t('OK'),lines.join('\n'));e.dataset.group='device';return e;
+}
+// The current core dump (downloadable) and the last crashes, newest first.
 function crashTile(c){
- const e=tile(t('Last crash'),c.summary.split(',')[0],c.summary+'\n'+si(c.size,'B'),true);
- const link=document.createElement('a');link.className='button secondary';link.href='/api/coredump';link.textContent=t('Download report');
+ const past=(c.history||[]).map(h=>(h.t?new Date(h.t*1e3).toLocaleString():t('date unknown'))+' · v'+h.version+' · '+h.summary.split(', backtrace')[0]);
+ const detail=(c.summary?c.summary+'\n'+si(c.size,'B'):'')+(past.length?(c.summary?'\n\n':'')+t('Crash history')+' ('+past.length+')\n'+past.join('\n'):'');
+ const e=tile(t(c.summary?'Last crash':'Crash history'),c.summary?c.summary.split(',')[0]:past.length,detail,true);
+ if(c.summary){const link=document.createElement('a');link.className='button secondary';link.href='/api/coredump';link.textContent=t('Download report');e.append(link)}
  const erase=document.createElement('button');erase.type='button';erase.className='secondary';erase.textContent=t('Erase');
  erase.onclick=async()=>{erase.disabled=true;try{await request('/api/coredump/erase',{method:'POST'},'text');e.remove()}catch(err){erase.disabled=false;e.querySelector('.s').textContent=errorText(err)}};
- e.append(link,erase);return e;
+ e.append(erase);return e;
 }
 function peerHosts(list,ip){
  const seen=new Set(),hosts=[];
@@ -93,8 +115,9 @@ async function peer(u){
   return p;
  }catch(e){return null}
 }
-async function tick(){
- try{const j=await request('/api/stats?history=0');const m=j?.market,pv=j?.pool_view;
+// Renders one statistics snapshot, from the live stream or a poll.
+function show(j){
+ {const m=j?.market,pv=j?.pool_view;
   if(!m||!pv||!j.pool||!j.shares||!j.best||!j.network||!j.lifetime||!Array.isArray(j.engines)||
      ![j.hashrate,j.uptime_s,j.total_hashes,j.shares.accepted,j.shares.rejected].every(v=>Number.isFinite(v)&&v>=0))
    throw Error(t('Invalid response from the miner.'));
@@ -121,11 +144,11 @@ async function tick(){
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];
   renderUpdate(j.github_update);
-  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')));
+  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')+(pv.error?'\n⚠ '+apiError(pv.error):'')));
   // Without a readable pool API, show what the pool credits: accepted share
   // difficulty x 2^32 over the session, the way pools estimate a worker.
-  else if(!pv.supported){const work=j.shares.work,since=j.uptime_s;
-   T.push(work>0&&since>0?tile(t('Seen by the pool'),si(work*4294967296/since,'H/s'),t('estimated from accepted shares')+' · '+j.shares.accepted+' '+t('shares')+' · '+t('since restart')):tile(t('Seen by the pool'),'-',t('waiting for accepted shares')))}
+  else if(!pv.supported||pv.error){const work=j.shares.work,since=j.uptime_s,note=pv.error?'\n⚠ '+apiError(pv.error):'';
+   T.push(work>0&&since>0?tile(t('Seen by the pool'),si(work*4294967296/since,'H/s'),t('estimated from accepted shares')+' · '+j.shares.accepted+' '+t('shares')+' · '+t('since restart')+note):tile(t('Seen by the pool'),'-',t('waiting for accepted shares')+note))}
   const now=Date.now()/1e3,B=j.blocks_recent||[];
   if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+': '+t('your best')+' '+diff(B[0].best):''),true));
   if(j.top&&j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
@@ -133,7 +156,7 @@ async function tick(){
    tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),
    tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' '+t('tx in mempool')),
    tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+m.retarget.progress.toFixed(0)+' % '+t('done')+')'))}
-  T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')),
+  T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')+poolUptime(j.pool)),
    tile(t('Payout address'),j.address,j.address_type==='invalid'?'⚠ '+t('not a valid Bitcoin address'):j.address_type),
    tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+': '+j.max_temp_c+' °C':'')),
    tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+': '+(j.power_limit_percent??'-')+' %'),
@@ -141,6 +164,7 @@ async function tick(){
    tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+si(j.heap,'B')+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason+(j.firmware_trial?'\n'+t('Firmware on trial: confirmed after 3 minutes of mining'):'')),
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
   if(j.crash)T.push(crashTile(j.crash));
+  if(j.integrations)T.push(integrationsTile(j.integrations,pv));
   if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):'—';
    const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz · '+number(a.core_v,3)+' V · '+number(a.current_a,1)+' A',t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C',t('Input')+': '+number(a.input_v)+' V',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
    hardware.dataset.group='device';T.push(hardware);
@@ -154,12 +178,21 @@ async function tick(){
 
   // Auxiliary requests have their own non-overlapping schedulers. A slow
   // history response or unreachable peer must not hold up local readings.
-  historyPoll.refresh();peersPoll.refresh();
- }catch(e){statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
+  historyPoll.refresh();
+ }
+}
+async function tick(){
+ if(Date.now()-streamAt<12000)return;  // the live stream is delivering
+ try{show(await request('/api/stats?history=0'));peersPoll.refresh()}
+ catch(e){statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
 }
 // The live rate already averages ten seconds. Poll at that cadence to avoid
 // making an open dashboard compete continuously with the ESP32 miners.
+// Live stream: the miner pushes the same statistics every 2 s. Polling
+// takes over whenever nothing has arrived for 12 s (stream refused, closed...).
+let streamAt=0;
 startPolling(tick,10000);
+if(window.EventSource){const stream=new EventSource('/api/events');stream.onmessage=e=>{try{const j=JSON.parse(e.data);show(j);streamAt=Date.now()}catch(err){}}}
 
 async function refreshPeers(){
  if(!statsOnline||!latestStats)return;

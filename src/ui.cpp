@@ -232,6 +232,13 @@ void setBacklight(uint8_t percent) {
     bool wasOff = backlight == 0; backlight = percent; board::setBrightness(percent);
     if (wasOff && percent && view) { view->invalidate(); render(); }
 }
+void applySettings() {
+    if (!lcd) return;
+    if (lcd->getRotation() != settings.rotation) lcd->setRotation(settings.rotation);
+    screenSince = millis();
+    if (view) view->invalidate();
+    render();
+}
 void setRotation(uint8_t rotation) {
     if (!lcd || rotation == lcd->getRotation() || (rotation & 1) != (lcd->getRotation() & 1)) return;
     lcd->setRotation(rotation); if (view) view->invalidate(); render();
@@ -275,6 +282,7 @@ void showMessage(const char *, const char *, const char *) {}
 void nextScreen() {}
 void cycleBrightness() {}
 void setBacklight(uint8_t) {}
+void applySettings() {}
 void setRotation(uint8_t) {}
 void flashShare() {}
 void blockFound(uint32_t) {}

@@ -13,6 +13,7 @@
 #include "log.h"
 #include "miner.h"
 #include "net.h"
+#include "notify.h"
 #include "settings.h"
 #include "tls.h"
 #include "runtime.h"
@@ -25,10 +26,9 @@ constexpr const char *kApi = "https://mempool.space/api";
 constexpr uint32_t kRefreshMs = 10 * 60 * 1000;
 constexpr uint32_t kRetryMs = 30 * 1000;
 // A TLS session needs ~45 KB; never starve the miner and the pool socket.
-constexpr uint32_t kMinHeapForTls = 70 * 1024;
 
 constexpr uint32_t kPoolStatsMs = 30 * 60 * 1000;
-constexpr uint32_t kPoolStatsRetryMs = 60 * 60 * 1000;  // unreachable API: try again hourly
+constexpr uint32_t kPoolStatsRetryMs = 10 * 60 * 1000;  // unreachable API (often a pool outage): sooner
 constexpr uint32_t kApiSearchMs = 6 * 60 * 60 * 1000;   // no API found: search again after 6 h
 
 uint32_t endpointAt[6] = {};
@@ -82,8 +82,9 @@ bool fetch(int endpoint, WiFiClientSecure &tls, HTTPClient &http, const char *pa
 
 // One refresh of every endpoint. Fields that fail keep their previous value.
 bool refresh() {
-    if (ESP.getFreeHeap() < kMinHeapForTls) {
-        logf("[market] skipped, low memory (%u bytes free)\n", (unsigned)ESP.getFreeHeap());
+    if (!tlsMemoryOk()) {
+        logf("[market] skipped, low memory (%u bytes free, largest block %u)\n", (unsigned)ESP.getFreeHeap(),
+             (unsigned)ESP.getMaxAllocHeap());
         return false;
     }
     uint32_t t0 = millis();
@@ -215,15 +216,15 @@ double parseRate(const char *s, double previous = 0) {
 // GET http(s)://host:port/path, the body as JSON through `filter`. Returns the
 // HTTP code or a negative error.
 int fetchJson(bool secure, const String &host, uint16_t port, const String &path, JsonDocument &doc,
-              const JsonDocument &filter) {
+              const JsonDocument &filter, uint8_t timeoutSeconds = 12) {
     WiFiClientSecure tls;
     WiFiClient tcp;
     HTTPClient http;
-    http.setTimeout(10000);
-    http.setConnectTimeout(5000);
+    http.setTimeout(timeoutSeconds * 1000UL);
+    http.setConnectTimeout(timeoutSeconds < 5 ? timeoutSeconds * 1000 : 5000);
     String url = String(secure ? "https://" : "http://") + host + ":" + port + path;
     if (!(secure ? http.begin(tls, url) : http.begin(tcp, url))) return -2;
-    if (secure && !tlsConnect(tls, host.c_str(), port)) return -4;
+    if (secure && !tlsConnect(tls, host.c_str(), port, timeoutSeconds)) return -4;
     int code = http.GET();
     if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter)))
         code = -3;
@@ -289,13 +290,16 @@ bool parseStats(JsonDocument &doc, PoolStats &p) {
 // End of the pool stats parsing.
 
 constexpr int kUnknownJson = -5;
-int queryApi(int i, const String &host, const String &addr, PoolStats &p) {
+// A probe gives up sooner: a port that does not speak TLS would hold the
+// handshake lock for the whole timeout (18 s seen at 12 s).
+constexpr uint8_t kProbeSeconds = 6;
+int queryApi(int i, const String &host, const String &addr, PoolStats &p, bool probe = false) {
     const PoolApi &api = kPoolApis[i];
     String target = api.parent ? parentDomain(host) : host;
     if (target.isEmpty()) return -1;
     JsonDocument filter, doc;
     poolFilter(filter);
-    int code = fetchJson(api.secure, target, api.port, String(api.path) + addr, doc, filter);
+    int code = fetchJson(api.secure, target, api.port, String(api.path) + addr, doc, filter, probe ? kProbeSeconds : 12);
     if (code == HTTP_CODE_OK && !parseStats(doc, p)) code = kUnknownJson;
     if (code == HTTP_CODE_OK)
         snprintf(p.source, sizeof(p.source), "%s%s:%u%s", api.secure ? "" : "http://", target.c_str(), api.port, api.path);
@@ -331,7 +335,7 @@ void storePool(const PoolStats &p, bool backup) {
 
 // Refreshes PoolStats for the pool in use; false when it should be tried again soon.
 bool refreshPoolStats() {
-    if (ESP.getFreeHeap() < kMinHeapForTls) return false;
+    if (!tlsMemoryOk()) return false;
     bool backup = netOnBackup();
     String host = backup ? settings.backupHost : settings.poolHost;
     host.toLowerCase();
@@ -362,8 +366,8 @@ bool refreshPoolStats() {
             return true;
         }
         for (int i = 0; i < kPoolApiCount && code != HTTP_CODE_OK; i++) {
-            if (ESP.getFreeHeap() < kMinHeapForTls) return false;  // continue at the next attempt
-            code = queryApi(i, host, addr, p);
+            if (!tlsMemoryOk()) return false;  // continue at the next attempt
+            code = queryApi(i, host, addr, p, true);
             if (code == HTTP_CODE_OK) {
                 apiIndex[backup] = i;
                 saveApi(backup, host, i);
@@ -380,6 +384,7 @@ bool refreshPoolStats() {
         }
     }
     p.supported = true;
+    p.error = code == HTTP_CODE_OK ? 0 : code;
     if (code == HTTP_CODE_OK) p.updatedMs = millis();
     storePool(p, backup);
     if (code == HTTP_CODE_OK)
@@ -395,6 +400,7 @@ void marketTask(void *) {
     uint32_t retry = kRetryMs;
     for (;;) {
         ghUpdatePoll();
+        notifyPoll();
         bool backup = netOnBackup();
         if (backup != lastPoolBackup) {
             lastPoolBackup = backup;

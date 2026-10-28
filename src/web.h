@@ -12,5 +12,7 @@ void webStart();
 void webHandle();
 // Schedules the same restart as the dashboard's (saves statistics first).
 void webRequestRestart(const char *why);
+// True once after settings were applied without a restart (screen to update).
+bool webTakeSettingsChange();
 // mDNS host name ("bdlminer-xxxx"), empty before webStart().
 const String &webHostName();

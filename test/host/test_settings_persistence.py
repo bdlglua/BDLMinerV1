@@ -13,6 +13,7 @@ post = web[web.index('void handlePostSettings()'):web.index('// GET /api/backup:
 prefix = r'''
 #include <cassert>
 #include <cstdio>
+#include <atomic>
 #include <map>
 #include "settings_store.h"
 #include "settings_apply.h"
@@ -53,6 +54,9 @@ bool authorized() { return auth; }
 uint32_t restartAt=0;
 int restarts=0;
 void restartSoon(const char *) { ++restarts;restartAt=1; }
+std::atomic<bool> settingsChanged{false};
+int brightnessSets=0;
+void settingsSetBrightness(uint8_t) { ++brightnessSets; }
 struct {
  std::string body=R"({"power":50})",message;
  int status=0;
@@ -62,24 +66,31 @@ struct {
 '''
 tests = r'''
 int main() {
- settings.btcAddress="address.worker";
+ settings.poolHost="pool.example";settings.btcAddress="address.worker";
  Preferences::failOpen=true;handlePostSettings();
- assert(server.status==500 && restarts==0 && settingsSequence==0);
+ assert(server.status==500 && restarts==0 && settingsSequence==0 && settings.miningPower==100);
  Preferences::failOpen=false;Preferences::failWrite=true;handlePostSettings();
  assert(server.status==500 && restarts==0 && settingsSequence==0);
  Preferences::failWrite=false;assert(settingsSave(settings,false));
- assert(settingsSequence==1); // failed staged writes did not block normal saves
+ assert(settingsSequence==1); // failed writes did not block normal saves
  Preferences::corrupt=true;handlePostSettings();
- assert(server.status==500 && restarts==0 && settingsSequence==1);
+ assert(server.status==500 && restarts==0 && settingsSequence==1 && settings.miningPower==100);
  Settings loaded;uint32_t sequence=0;Preferences p;
  assert(settingsstore::load(p,loaded,sequence) && sequence==1 && loaded.miningPower==100);
+ // A number is saved and applied at once, without a restart.
  Preferences::corrupt=false;handlePostSettings();
- assert(server.status==200 && restarts==1 && settingsSequence==2);
- assert(settings.miningPower==100); // live settings immutable until restart
+ assert(server.status==200 && restarts==0 && settingsSequence==2 && settings.miningPower==50 && settingsChanged);
+ assert(server.message.find("\"restart\":false")!=std::string::npos);
  assert(settingsstore::load(p,loaded,sequence) && loaded.miningPower==50);
- assert(!settingsSave(settings,false)); // brightness cannot overwrite successful staged settings
+ // Nothing changed: nothing written.
+ handlePostSettings();assert(server.status==200 && settingsSequence==2 && server.message.find("\"changed\":0")!=std::string::npos);
+ // A pool change is saved and restarts; live strings stay until then.
+ server.body=R"({"pool":"new.pool","power":75})";handlePostSettings();
+ assert(server.status==200 && restarts==1 && settingsSequence==3 && settings.poolHost=="pool.example" && settings.miningPower==50);
+ assert(settingsstore::load(p,loaded,sequence) && loaded.poolHost=="new.pool" && loaded.miningPower==75);
+ assert(!settingsSave(settings,false)); // brightness cannot overwrite staged settings
  handlePostSettings();assert(server.status==409 && restarts==1);
- puts("Production settings HTTP: failed open/write/readback => 500, no restart, old record retained; success => one restart");
+ puts("Production settings HTTP: failed writes => 500 and nothing applied; numbers live without restart; pool change => one restart");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-settings-') as temp:

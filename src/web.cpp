@@ -12,6 +12,9 @@
 #include <esp_system.h>
 
 #include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <lwip/sockets.h>
 
 #include "board.h"
 #include "core/address.h"
@@ -28,6 +31,7 @@
 #include "tls.h"
 #include "trial.h"
 #include "notify.h"
+#include "mqtt.h"
 #include "crashlog.h"
 #include "web_validation.h"
 
@@ -41,6 +45,7 @@ WebServer server(80);
 String hostName;
 std::atomic<uint32_t> restartAt{0};  // restart due at this millis(), 0 = none
 std::atomic<const char *> restartWhy{""};
+std::atomic<bool> settingsChanged{false};
 HistoryPoint historyScratch[HISTORY_LEN]; // one HTTP worker; shared between its history handlers
 uint32_t bootSession = 0;
 
@@ -105,9 +110,9 @@ const char *accentCss() {
     return kAccent[settings.theme % 5];
 }
 
-void handleStats() {
+// What the dashboard shows; `history` adds the 24-hour chart.
+void buildStats(JsonDocument &j, bool history) {
     const MinerStats stats = minerStats();
-    JsonDocument j;
     j["board"] = board::modelName();
     j["firmware"] = FW_VERSION;
     j["boot_id"] = String(bootSession, HEX);
@@ -148,6 +153,11 @@ void handleStats() {
     j["pool"]["user_agent"] = netUserAgent();
     j["pool"]["protocol"] = netProtocol();
     j["pool"]["user_agent_auto"] = settings.userAgentAuto;
+    PoolUptime poolUp = minerPoolUptime();
+    uint32_t uptimeMs = millis();
+    j["pool"]["connected_percent"] = uptimeMs ? std::round(1000.0 * poolUp.connectedMs / uptimeMs) / 10 : 0;
+    j["pool"]["sessions"] = poolUp.sessions;
+    j["pool"]["failovers"] = netFailovers();
     PoolStats pv = poolStatsGet();
     j["pool_view"]["updated_s"] = pv.updatedMs ? (long)((millis() - pv.updatedMs) / 1000) : -1;
     j["pool_view"]["supported"] = pv.supported;
@@ -156,6 +166,7 @@ void handleStats() {
     j["pool_view"]["shares"] = pv.shares;
     j["pool_view"]["workers"] = pv.workers;
     if (pv.source[0]) j["pool_view"]["source"] = pv.source;
+    if (pv.error) j["pool_view"]["error"] = pv.error;
     j["network"]["height"] = stats.blockHeight;
     j["network"]["difficulty"] = stats.networkDiff;
     j["address"] = settings.btcAddress;
@@ -165,7 +176,7 @@ void handleStats() {
     j["lifetime"]["blocks"] = stats.lifetimeBlocks;
     j["lifetime"]["seconds"] = stats.lifetimeSeconds;
     j["history_revision"] = minerHistoryRevision();
-    if (server.arg("history") != "0") {
+    if (history) {
         int n = minerHistoryPoints(historyScratch, HISTORY_LEN);
         j["history"]["interval_s"] = HISTORY_INTERVAL_S;
         JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
@@ -199,11 +210,23 @@ void handleStats() {
     if (minerThrottle() == Throttle::Reduced) j["throttle"] = "reduced";
     j["night"] = watchNight();
     j["boot_reason"] = bootReason();
-    if (crashPresent()) {
-        j["crash"]["summary"] = crashSummary();
-        j["crash"]["size"] = crashSize();
+    if (crashPresent() || crashHasHistory()) {
+        if (crashPresent()) {
+            j["crash"]["summary"] = crashSummary();
+            j["crash"]["size"] = crashSize();
+        }
+        crashHistory(j["crash"]["history"].to<JsonArray>());
     }
     j["firmware_trial"] = trialPending();
+    NotifyStatus ns = notifyStatus();
+    j["integrations"]["mqtt"] = mqttState();
+    if (!settings.mqttHost.isEmpty()) j["integrations"]["mqtt_host"] = settings.mqttHost + ":" + settings.mqttPort;
+    j["integrations"]["notify"]["enabled"] = ns.enabled;
+    if (ns.id) {
+        j["integrations"]["notify"]["title"] = ns.title;
+        j["integrations"]["notify"]["ntfy"] = ns.ntfy;
+        j["integrations"]["notify"]["webhook"] = ns.webhook;
+    }
     j["accent"] = accentCss();
     j["ip"] = WiFi.localIP().toString();
     j["ssid"] = WiFi.SSID();
@@ -271,13 +294,77 @@ void handleStats() {
     up["release_url"] = String("https://github.com/" GITHUB_REPO "/releases/") + (gu.version[0] ? String("tag/v") + gu.version : "latest");
     up["error"] = gu.error;
     up["notes"] = gu.installing ? String(gu.progress) + " %" : String(gu.error);
+}
 
+void handleStats() {
+    JsonDocument j;
+    buildStats(j, server.arg("history") != "0");
     String body;
     body.reserve(measureJson(j));
     serializeJson(j, body);
     server.sendHeader("Cache-Control", "no-store");
     server.sendHeader("Access-Control-Allow-Origin", "*");  // read by the other miners' dashboards
     server.send(200, "application/json", body);
+}
+
+// Live dashboards: /api/events keeps its connection and receives the
+// statistics every 2 s (Server-Sent Events) instead of asking for them. The
+// server only drops its own reference to an answered client, so a copy kept
+// here holds the socket open.
+constexpr int kMaxStreams = 2;
+constexpr uint32_t kStreamMs = 2000;
+WiFiClient streams[kMaxStreams];
+bool streamDue = false;
+
+void handleEvents() {
+    int slot = -1;
+    for (int i = 0; i < kMaxStreams && slot < 0; i++)
+        if (!streams[i].connected()) slot = i;
+    if (slot < 0) {
+        server.send(503, "text/plain", "Too many live dashboards; polling instead");
+        return;
+    }
+    WiFiClient client = server.client();
+    client.print("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\n"
+                 "Connection: keep-alive\r\n\r\nretry: 5000\n\n");
+    streams[slot] = client;
+    streamDue = true;  // a first snapshot right away
+}
+
+// Never blocks: a dashboard that cannot keep up is dropped (its browser
+// reconnects) rather than holding up the web server.
+bool sendNow(WiFiClient &client, const String &data) {
+    int fd = client.fd();
+    const char *p = data.c_str();
+    size_t left = data.length();
+    while (left) {
+        int n = lwip_send(fd, p, left, MSG_DONTWAIT);
+        if (n <= 0) return false;
+        p += n;
+        left -= n;
+    }
+    return true;
+}
+
+void pushStreams() {
+    static uint32_t last = 0;
+    if (!streamDue && millis() - last < kStreamMs) return;
+    streamDue = false;
+    last = millis();
+    bool any = false;
+    for (WiFiClient &c : streams) any = any || c.connected();
+    if (!any) return;
+    JsonDocument j;
+    buildStats(j, false);
+    String json;
+    serializeJson(j, json);  // replaces the string's content: the prefix goes in afterwards
+    String message;
+    message.reserve(json.length() + 8);
+    message = "data: ";
+    message += json;
+    message += "\n\n";
+    for (WiFiClient &c : streams)
+        if (c.connected() && !sendNow(c, message)) c.stop();
 }
 
 void handleHistory() {
@@ -389,14 +476,18 @@ void handleGetSettings() {
         } else if (s.type == SettingType::Decimal) limits["min"] = 0;
     }
     settingValues(j["values"].to<JsonObject>());
+    JsonArray live = j["live"].to<JsonArray>();
+    for (size_t i = 0; i < kSettingCount; i++)
+        if (settingIsLive(kSettings[i].key)) live.add(kSettings[i].key);
     String body;
     serializeJson(j, body);
     server.sendHeader("Cache-Control", "no-store");
     server.send(200, "application/json", body);
 }
 
-// Saves the settings present in the JSON body (the page's form) and restarts,
-// which applies everything the same way as at boot.
+// Saves the settings present in the JSON body (the page's form). Numbers and
+// switches take effect at once; anything else restarts, which applies it the
+// same way as at boot. Answers {"restart": bool, "changed": n}.
 void handlePostSettings() {
     if (!authorized()) return;
     if (restartAt || ota::busy()) {
@@ -412,22 +503,36 @@ void handlePostSettings() {
         server.send(400, "text/plain", error);
         return;
     }
-    int changed = applySettings(j.as<JsonObjectConst>());
-    if (changed == -2) {
-        server.send(500, "text/plain", "Settings could not be saved. Previous configuration kept; try again.");
-        return;
-    }
-    if (changed < 0) {
-        server.send(400, "text/plain", "Pool host and payout address cannot be empty");
-        return;
-    }
-    if (!changed) {
+    Settings current = settings;
+    current.brightness = settingsBrightness();
+    Settings pending = current;
+    if (!settingsApply(pending, j.as<JsonObjectConst>())) {
         server.send(400, "text/plain", "No settings to save");
         return;
     }
-    logf("[web] %d settings saved, restarting\n", changed);
-    server.send(200, "text/plain", "Saved, restarting");
-    restartSoon("settings changed from the web page");
+    settingsSanitize(pending);
+    if (!pending.poolHost.length() || !pending.btcAddress.length()) {
+        server.send(400, "text/plain", "Pool host and payout address cannot be empty");
+        return;
+    }
+    SettingsChange change = settingsCompare(pending, current);
+    bool restart = change.count && !change.live;
+    if (change.count && !settingsSave(pending, restart)) {
+        server.send(500, "text/plain", "Settings could not be saved. Previous configuration kept; try again.");
+        return;
+    }
+    char body[48];
+    snprintf(body, sizeof(body), "{\"restart\":%s,\"changed\":%d}", restart ? "true" : "false", change.count);
+    server.send(200, "application/json", body);
+    if (restart) {
+        logf("[web] %d settings saved, restarting\n", change.count);
+        restartSoon("settings changed from the web page");
+    } else if (change.count) {
+        settingsCopyLive(settings, pending);
+        if (pending.brightness != current.brightness) settingsSetBrightness(pending.brightness);
+        settingsChanged = true;  // the loop applies the screen settings
+        logf("[web] %d settings applied without restarting\n", change.count);
+    }
 }
 
 // GET /api/backup: settings (passwords included) and lifetime statistics.
@@ -691,6 +796,7 @@ void handleMetrics() {
 void webTask(void *) {
     for (;;) {
         server.handleClient();
+        pushStreams();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -721,6 +827,7 @@ void webStart() {
     server.on("/settings", HTTP_GET, []() { sendPage("BDLMiner settings", kSettingsPage, "settings"); });
     server.on("/log", HTTP_GET, []() { sendPage("BDLMiner log", kLogPage, "log"); });
     server.on("/api/stats", HTTP_GET, handleStats);
+    server.on("/api/events", HTTP_GET, handleEvents);
     server.on("/api/history", HTTP_GET, handleHistory);
     server.on("/api/diagnostics", HTTP_GET, handleDiagnostics);
     server.on("/api/log", HTTP_GET, []() {
@@ -834,3 +941,5 @@ const String &webHostName() { return hostName; }
 void webRequestRestart(const char *why) {
     if (!restartAt) restartSoon(why);
 }
+
+bool webTakeSettingsChange() { return settingsChanged.exchange(false); }

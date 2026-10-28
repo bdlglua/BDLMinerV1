@@ -30,6 +30,7 @@ char status[48] = "Starting";
 portMUX_TYPE statusMux = portMUX_INITIALIZER_UNLOCKED;
 std::atomic<bool> onBackup{false};
 std::atomic<uint8_t> pendingShares{0};
+std::atomic<uint32_t> failovers{0};  // switches to the backup pool since boot
 
 void setStatus(const char *s) {
     portENTER_CRITICAL(&statusMux);
@@ -263,6 +264,7 @@ void netTask(void *) {
         failures = authorized ? 0 : failures + 1;
         if (rotate && sessionTimedOut) {
             onBackup = !onBackup;
+            if (onBackup) failovers++;
             failures = 0;
             backoffMs = 2000;
             logf("[pool] rotation: switching to %s\n", netPoolHost().c_str());
@@ -271,6 +273,7 @@ void netTask(void *) {
             failures = 0;
         } else if (failures >= kFailoverAfter && !settings.backupHost.isEmpty()) {
             onBackup = true;
+            failovers++;
             failures = 0;
             backoffMs = 2000;
             logf("[pool] main pool failed %d times, switching to backup %s:%u\n", kFailoverAfter,
@@ -301,6 +304,7 @@ const String &netPoolHost() { return onBackup ? settings.backupHost : settings.p
 uint16_t netPoolPort() { return onBackup ? settings.backupPort : settings.poolPort; }
 
 bool netOnBackup() { return onBackup; }
+uint32_t netFailovers() { return failovers; }
 uint8_t netPendingShares() { return pendingShares.load(); }
 const char *netUserAgent() { return activeAgent.load(); }
 const char *netProtocol() { return (onBackup ? settings.backupProtocol : settings.poolProtocol) == 1 ? "Stratum V2 (Noise)" : "Stratum V1"; }

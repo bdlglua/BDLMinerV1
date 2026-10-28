@@ -13,6 +13,8 @@ String netStatus();
 const String &netPoolHost();
 uint16_t netPoolPort();
 bool netOnBackup();
+// Switches to the backup pool since boot (failures and rotation).
+uint32_t netFailovers();
 uint8_t netPendingShares();
 // Automatically selected identity for the current/latest connection attempt.
 const char *netUserAgent();

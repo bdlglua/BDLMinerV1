@@ -48,6 +48,11 @@ struct MinerStats {
 // Coherent copy for UI/network consumers; shared storage stays in miner.cpp.
 MinerStats minerStats();
 void minerPoolConnected(bool connected);
+struct PoolUptime {
+    uint32_t connectedMs = 0;  // since boot
+    uint32_t sessions = 0;     // connections that reached mining
+};
+PoolUptime minerPoolUptime();
 void minerPoolDifficulty(double difficulty);
 void minerShareResult(bool accepted);
 uint32_t minerUptimeSeconds();

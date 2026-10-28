@@ -38,10 +38,12 @@ void logf(const char *,...) {}
 struct { unsigned getFreeHeap(){return 1;} unsigned getMaxAllocHeap(){return 1;} } ESP;
 struct WiFiClientSecure {
  bool succeeds=true;
- void setInsecure() {} void setHandshakeTimeout(int) {}
+ void setInsecure() {} void setHandshakeTimeout(int) {} void setTimeout(int) {}
  bool connect(const char *,uint16_t) { ++connects;return succeeds; }
  void lastError(char *out,size_t n) { if(n)*out=0; }
 };
+constexpr uint32_t kTlsMinFree=54*1024,kTlsMinBlock=24*1024;
+bool tlsConnect(WiFiClientSecure &tls,const char *host,uint16_t port,uint8_t timeoutSeconds=12);
 '''
 tests=r'''
 int main() {

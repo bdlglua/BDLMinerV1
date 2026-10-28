@@ -34,6 +34,7 @@ struct PoolStats {
     double shares = 0;       // accepted shares (ckpool: total difficulty)
     uint32_t workers = 0;
     char source[64] = "";    // the API that answered: "public-pool.io:40557/api/client/"
+    int error = 0;           // last refresh: 0 OK, an HTTP status, or < 0 no connection
 };
 
 // Starts NTP and the background refresh task. Call once WiFi is up.
