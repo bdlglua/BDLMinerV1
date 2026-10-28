@@ -4,4 +4,6 @@
 namespace ui_font {
 // Select a pre-rendered size, never enlarge a pixel font.
 const lgfx::IFont *atMost(int height, bool numerals = false);
+// True when every character has a glyph in the numeral faces.
+bool numeric(const char *text);
 }

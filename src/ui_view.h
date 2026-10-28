@@ -1,5 +1,10 @@
 // Device-independent display rendering. The same code and LovyanGFX fonts
 // are used by the firmware and the native display previews.
+//
+// "Big number" layout: each page shows one value as large as the panel
+// allows (metrics[0]: value, its unit in `detail`), up to three secondary
+// readings below it (metrics[1..3]), the page name and the miner state in a
+// thin header, and the page position as dots.
 #pragma once
 
 #include <lgfx/v1/LGFX_Sprite.hpp>
@@ -26,6 +31,10 @@ struct Model {
     uint8_t language = 0;
     uint32_t accent = 0xF7931A, statusColor = kGreen;
     std::string title, status, battery, footer;
+    // [0] the big value (detail = its unit), [1..3] secondary readings.
+    // Graph page: [0] average, [1] minimum, [2] maximum. Blocks page: [0] the
+    // block being mined, [1..3] recent blocks (label height, value pool,
+    // detail age / your best).
     std::array<Metric, 6> metrics;
     const Point *points = nullptr;  // chronological; borrowed during render()
     int pointCount = 0;
@@ -58,14 +67,16 @@ private:
 
     int margin() const;
     int headerHeight() const;
-    int footerHeight() const;
+    int dotsHeight() const;
+    int labelSize() const;
     Rect body() const;
     bool changed(int slot, Rect rect, const std::string &key);
     void frame(int page, uint32_t accent, uint8_t language);
+    void header(const std::string &title, const std::string &status, uint32_t statusColor);
     void text(int slot, Rect rect, const std::string &value, uint32_t color, int size, bool right = false);
-    void card(int slot, Rect rect, const Metric &metric, bool hero = false, bool wrap = false, int skin = 0);
-    void illustration(int slot, Rect rect, int icon);
-    void chrome(const Model &model);
+    void hero(int slot, Rect rect, const Metric &metric, bool centered = true);
+    void stat(int slot, Rect rect, const Metric &metric, bool stacked, bool divider);
+    void stats(const Model &model, Rect rect, int first, int count);
     void graph(const Model &model, Rect rect);
     template <typename Paint> void paint(Rect rect, uint32_t background, Paint draw);
 };

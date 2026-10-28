@@ -5,7 +5,6 @@
 #if defined(HAS_DISPLAY) || defined(BDLMINER_DISPLAY_PREVIEW)
 
 #include "ui_view.h"
-#include "ui_art.h"
 #include "ui_font.h"
 #include <algorithm>
 #include <cmath>
@@ -16,6 +15,8 @@
 namespace ui_view {
 namespace {
 constexpr size_t kScratchPixels = 4096;
+constexpr int kLargestNumerals = 80;  // tools/pack_display_fonts.py NUMERAL_SIZES
+constexpr int kLargestText = 24;      // TEXT_SIZES
 
 uint32_t blend(uint32_t foreground, uint32_t background, unsigned alpha) {
     uint32_t result = 0;
@@ -24,10 +25,10 @@ uint32_t blend(uint32_t foreground, uint32_t background, unsigned alpha) {
     return result;
 }
 
-void smoothDot(lgfx::LovyanGFX &d, int x, int y, int radius, uint32_t color) {
+void smoothDot(lgfx::LovyanGFX &d, int x, int y, int radius, uint32_t color, uint32_t background = kBackground) {
     for (int dy = -radius; dy <= radius; ++dy) for (int dx = -radius; dx <= radius; ++dx) {
         float coverage = std::max(0.0f, std::min(1.0f, radius + 0.5f - std::sqrt(float(dx * dx + dy * dy))));
-        if (coverage > 0) d.drawPixel(x + dx, y + dy, blend(color, kBackground, unsigned(coverage * 255)));
+        if (coverage > 0) d.drawPixel(x + dx, y + dy, blend(color, background, unsigned(coverage * 255)));
     }
 }
 
@@ -63,14 +64,13 @@ std::string compactLabel(const std::string &label) {
         {"NEXT RETARGET", "ADJ."}, {"AJUSTEMENT", "AJ."},
         {"NETWORK DIFF", "DIFF"}, {"DIFF RESEAU", "DIFF"},
         {"TOTAL HASHES", "HASHES"}, {"HASHES TOTAUX", "HASHES"},
-        {"LIVE HASHRATE", "HASHRATE"}, {"HASHRATE DIRECT", "HASHRATE"},
         {"BITCOIN PRICE", "BTC"}, {"PRIX DU BITCOIN", "BTC"}, {"BTC PRICE", "BTC"}, {"PRIX BTC", "BTC"},
         {"BEST EVER", "BEST"}, {"LIFE HASHES", "HASH"}, {"RUN TIME", "TIME"}, {"DUREE TOTALE", "DUREE"},
         {"SESSION", "SESS"}, {"BEST DIFF", "BEST"}, {"MEILL. DIFF", "DIFF"},
         {"POWER", "PWR"}, {"PUISSANCE", "PUIS."}, {"LOCAL IP", "IP"}, {"IP LOCALE", "IP"},
         {"NET HASHRATE", "NET"}, {"HASHRATE RESEAU", "RESEAU"}, {"MEMPOOL TX", "TX"}, {"TX MEMPOOL", "TX"},
-        {"MINING BLOCK", "BLOCK"}, {"BLOC EN COURS", "BLOC"}, {"SHARES", "SHR"},
-        {"32-BIT", "32b"}, {"32 BITS", "32b"}, {"64-BIT", "64b"}, {"64 BITS", "64b"},
+        {"FEES sat/vB", "FEES"}, {"FRAIS sat/vB", "FRAIS"}, {"HALVING", "HALV."},
+        {"SHARES", "SHR"}, {"32-BIT", "32b"}, {"32 BITS", "32b"}, {"64-BIT", "64b"}, {"64 BITS", "64b"},
     };
     for (const auto &p : pairs) if (label == p[0]) return p[1];
     return label;
@@ -82,31 +82,21 @@ void labelFont(lgfx::LovyanGFX &d, int size) {
     d.setTextPadding(0);
 }
 
-void fitted(lgfx::LovyanGFX &d, const std::string &value, int x, int y, int w, int h,
-            uint32_t color, bool right = false) {
-    if (w <= 0 || h <= 0) return;
+// The largest face, numeral when possible, that fits `value` in w x h.
+void fitFont(lgfx::LovyanGFX &d, const std::string &value, int w, int h, int largest) {
+    bool numerals = ui_font::numeric(value.c_str());
+    int top = std::min(h, numerals ? largest : std::min(largest, kLargestText));
     d.setTextSize(1);
-    bool numerals = value.find_first_of("0123456789") != std::string::npos &&
-                    value.find_first_not_of("0123456789 .:-+%C") == std::string::npos;
-    // Fit native antialiased glyphs instead of stretching a coarse bitmap.
-    // Long strings fall back to the smallest face and a visible ellipsis.
-    for (int size = std::max(8, std::min(40, h)); size >= 8; --size) {
+    for (int size = std::max(8, top); size >= 8; --size) {
         d.setFont(ui_font::atMost(size, numerals));
-        if (d.textWidth(value.c_str()) <= w) break;
+        if (d.textWidth(value.c_str()) <= w) return;
     }
-    std::string shown = value;
-    if (numerals && d.textWidth(shown.c_str()) > w && !shown.empty() && shown.back() == 'C') {
-        shown.erase(std::remove(shown.begin(), shown.end(), ' '), shown.end());
-        if (d.textWidth(shown.c_str()) > w) {
-            char compact[24];
-            std::snprintf(compact, sizeof(compact), "%.0fC", std::strtod(value.c_str(), nullptr));
-            shown = compact;
-        }
-    }
-    shown = ellipsis(d, shown, w);
-    d.setTextColor(color);
-    d.setTextDatum(right ? lgfx::middle_right : lgfx::middle_left);
-    d.drawString(shown.c_str(), right ? x + w : x, y + h / 2);
+}
+
+int baseline(const lgfx::IFont *font) {
+    lgfx::FontMetrics metrics;
+    font->getDefaultMetric(&metrics);
+    return metrics.baseline;
 }
 
 std::string rateLabel(float value) {
@@ -131,12 +121,13 @@ void View::invalidate() {
     graphValid_ = false;
 }
 
-int View::margin() const { return width_ >= 240 ? 6 : 3; }
-int View::headerHeight() const { return height_ >= 200 ? 28 : height_ >= 120 ? 19 : 14; }
-int View::footerHeight() const { return height_ >= 200 ? 20 : height_ >= 120 ? 13 : 10; }
+int View::margin() const { return width_ >= 240 ? 8 : width_ >= 120 ? 5 : 3; }
+int View::headerHeight() const { return height_ >= 200 ? 24 : height_ >= 120 ? 18 : 13; }
+int View::dotsHeight() const { return height_ >= 200 ? 10 : 7; }
+int View::labelSize() const { return height_ >= 200 && width_ >= 200 ? 11 : 8; }
 Rect View::body() const {
-    int m = margin(), y = headerHeight() + m;
-    return {m, y, width_ - 2 * m, height_ - footerHeight() - m - y};
+    int m = margin(), y = headerHeight() + (height_ >= 120 ? 4 : 2);
+    return {m, y, width_ - 2 * m, height_ - dotsHeight() - y};
 }
 
 template <typename Paint>
@@ -171,6 +162,8 @@ bool View::changed(int slot, Rect rect, const std::string &key) {
     return true;
 }
 
+// Static parts of a page: background, the coin and the page dots. Called on
+// every render; it repaints only when the page, panel or accent changes.
 void View::frame(int page, uint32_t accent, uint8_t language) {
     if (page_ == page && width_ == display_->width() && height_ == display_->height() &&
         accent_ == accent && language_ == language) return;
@@ -182,16 +175,38 @@ void View::frame(int page, uint32_t accent, uint8_t language) {
     height_ = display_->height();
     display_->clearClipRect();
     display_->fillScreen(kBackground);
-    int hh = headerHeight(), m = margin();
-    ui_art::draw(*display_, ui_art::Mining, m, 1, hh - 2, hh - 2);
-    display_->drawFastHLine(m, hh, width_ - 2 * m, kBorder);
+    int hh = headerHeight(), m = margin(), r = std::max(4, hh / 2 - 2);
+    smoothDot(*display_, m + r, hh / 2, r, accent_);
+    labelFont(*display_, std::min(16, std::max(8, r * 2 - 2)));
+    display_->setBaseColor(accent_);  // antialiasing blends into the coin
+    display_->setTextColor(kBackground);
+    display_->setTextDatum(lgfx::middle_center);
+    display_->drawString("B", m + r + 1, hh / 2 + 1);
     if (page >= 0) {
-        int fy = height_ - footerHeight() / 2, gap = width_ >= 200 ? 6 : 4;
-        for (int i = 0; i < kPages; ++i) {
-            int x = width_ - m - 2 - (kPages - 1 - i) * gap;
-            smoothDot(*display_, x, fy, i == page ? 2 : 1, i == page ? accent_ : kBorder);
-        }
+        int gap = width_ >= 200 ? 9 : 6, y = height_ - dotsHeight() / 2 - 1;
+        int x0 = width_ / 2 - (kPages - 1) * gap / 2;
+        for (int i = 0; i < kPages; ++i)
+            smoothDot(*display_, x0 + i * gap, y, i == page ? 2 : 1, i == page ? accent_ : kBorder);
     }
+}
+
+void View::header(const std::string &title, const std::string &status, uint32_t statusColor) {
+    int hh = headerHeight(), m = margin(), coin = 2 * std::max(4, hh / 2 - 2) + 5;
+    int size = labelSize(), statusW = width_ >= 280 ? 110 : width_ >= 200 ? 80 : width_ >= 120 ? 46 : 10;
+    text(16, {m + coin, 0, width_ - 2 * m - coin - statusW, hh}, title, kMuted, size);
+    Rect r{width_ - m - statusW, 0, statusW, hh};
+    if (!changed(17, r, status + "\n" + std::to_string(statusColor))) return;
+    paint(r, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
+        if (status.empty()) return;
+        int dot = hh >= 18 ? 3 : 2;
+        if (statusW < 20) { smoothDot(d, x + r.w - dot - 1, y + hh / 2, dot, statusColor); return; }
+        labelFont(d, size);
+        d.setTextColor(statusColor);
+        d.setTextDatum(lgfx::middle_right);
+        std::string shown = ellipsis(d, status, r.w - 2 * dot - 5);
+        d.drawString(shown.c_str(), x + r.w, y + hh / 2);
+        smoothDot(d, x + r.w - d.textWidth(shown.c_str()) - dot - 4, y + hh / 2, dot, statusColor);
+    });
 }
 
 void View::text(int slot, Rect r, const std::string &value, uint32_t color, int size, bool right) {
@@ -205,109 +220,98 @@ void View::text(int slot, Rect r, const std::string &value, uint32_t color, int 
     });
 }
 
-void View::card(int slot, Rect r, const Metric &metric, bool hero, bool wrap, int skin) {
-    std::string key = metric.label + '\n' + metric.value + '\n' + metric.detail + '\n' + std::to_string(metric.color) + ":" + std::to_string(skin);
-    if (!changed(slot, r, key)) return;
+// The page's one big value, with its unit beside it on the same baseline.
+void View::hero(int slot, Rect r, const Metric &metric, bool centered) {
+    if (!changed(slot, r, metric.value + '\n' + metric.detail + '\n' + std::to_string(metric.color))) return;
     paint(r, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
-        int p = wrap && r.h < 40 ? 1 : r.h < 36 ? 3 : std::min(6, std::max(3, r.w / 28));
-        uint32_t face = skin == 1 ? (accent_ == 0xF7931A ? 0xF6DB00 : accent_) : skin == 2 ? 0x06DCEB : kPanel;
-        uint32_t ink = skin ? 0x081017 : metric.color;
-        uint32_t labelColor = skin ? 0x263039 : kMuted;
-        d.fillRect(x, y, r.w, r.h, face);
-        d.setBaseColor(face);
-        d.drawRect(x, y, r.w, r.h, skin ? face : kBorder);
-        // Chamfered instrument-panel edge, rather than web-style cards.
-        int cut = std::min(7, r.h / 4);
-        for (int u = 0; u < cut; ++u) for (int v = 0; v <= u + 1; ++v) {
-            uint32_t c = v < u ? kBackground : v == u ? blend(skin ? face : kBorder, kBackground, 128)
-                                                                             : skin ? face : blend(kBorder, face, 128);
-            d.drawPixel(x + r.w - cut + u, y + v, c);
+        int unitSize = std::max(8, std::min(height_ >= 200 ? 18 : 12, r.h / 4));
+        labelFont(d, unitSize);
+        const lgfx::IFont *unitFont = d.getFont();
+        int unitTextW = metric.detail.empty() ? 0 : int(d.textWidth(metric.detail.c_str()));
+        int unitH = d.fontHeight(), maxH = r.h - r.h / 8;  // a little air above and below
+        // The unit beside the value, or under it when that leaves a bigger
+        // value (narrow portrait panels).
+        int besideW = unitTextW ? std::min(r.w / 3, unitTextW) + 4 : 0;
+        fitFont(d, metric.value, r.w - besideW, maxH, kLargestNumerals);
+        const lgfx::IFont *besideFont = d.getFont();
+        int besideH = d.fontHeight();
+        bool below = false;
+        if (unitTextW && maxH > 2 * unitH) {
+            fitFont(d, metric.value, r.w, maxH - unitH - 2, kLargestNumerals);
+            below = d.fontHeight() > besideH;
         }
-        if (!skin) {
-            d.drawFastHLine(x + 2, y, std::min(14, r.w - 4), hero ? accent_ : uint32_t(0x56616C));
-        }
-        if (r.h < 21 && !wrap) {
-            int labelW = r.w * 45 / 100;
-            labelFont(d, 8);
-            d.setTextDatum(lgfx::middle_left);
-            d.setTextColor(labelColor);
-            d.drawString(ellipsis(d, compactLabel(metric.label), labelW - p).c_str(), x + p, y + r.h / 2);
-            fitted(d, metric.value, x + labelW, y + 2, r.w - labelW - p, r.h - 4, ink, true);
+        if (!below) d.setFont(besideFont);
+        int unitW = below ? 0 : besideW;
+        std::string shown = ellipsis(d, metric.value, r.w - unitW);
+        int valueW = d.textWidth(shown.c_str()), valueH = d.fontHeight();
+        int blockH = valueH + (below ? unitH + 2 : 0);
+        int left = x + (centered ? std::max(0, (r.w - valueW - unitW) / 2) : 0);
+        int top = y + (r.h - blockH) / 2;
+        int base = top + baseline(d.getFont());
+        d.setTextColor(metric.color);
+        d.setTextDatum(lgfx::top_left);
+        d.drawString(shown.c_str(), left, top);
+        if (!unitTextW) return;
+        d.setFont(unitFont);
+        d.setTextColor(kMuted);
+        if (below) {
+            d.setTextDatum(lgfx::top_center);
+            d.drawString(ellipsis(d, metric.detail, r.w).c_str(), centered ? x + r.w / 2 : left + valueW / 2, top + valueH + 2);
             return;
         }
-        int labelH = height_ >= 200 ? 12 : 8;
-        labelFont(d, labelH);
-        d.setTextColor(labelColor);
         d.setTextDatum(lgfx::top_left);
-        std::string label = metric.label;
-        if (d.textWidth(label.c_str()) > r.w - 2 * p) label = compactLabel(label);
-        bool hideLabel = wrap && r.h < 40;
-        if (!hideLabel) d.drawString(ellipsis(d, label, r.w - 2 * p).c_str(), x + p, y + p);
-        int vy = hideLabel ? p : p + labelH + 2, vh = r.h - vy - p;
-        bool inlineUnit = hero && r.w >= (skin ? 68 : 120) && !metric.detail.empty() && metric.detail.size() <= 5;
-        bool detail = !inlineUnit && !metric.detail.empty() && vh >= (hero ? 22 : 26);
-        if (detail) vh -= labelH + 3;
-        if (wrap) {
-            labelFont(d, labelH);
-            d.setTextColor(ink);
-            size_t start = 0;
-            for (int line = 0; start < metric.value.size() && (line + 1) * labelH <= vh; ++line) {
-                size_t end = start + 1;
-                while (end <= metric.value.size() && d.textWidth(metric.value.substr(start, end - start).c_str()) <= r.w - 2 * p) ++end;
-                end = std::max(start + 1, end - 1);
-                std::string shown = metric.value.substr(start, end - start);
-                if ((line + 2) * labelH > vh && end < metric.value.size()) shown = ellipsis(d, metric.value.substr(start), r.w - 2 * p);
-                d.drawString(shown.c_str(), x + p, y + vy + line * labelH);
-                start = end;
-            }
-        } else {
-            int unitW = inlineUnit ? int(metric.detail.size()) * 6 + 4 : 0;
-            int iconW = hero && page_ == 4 && r.w >= 120 ? std::min(36, vh) : 0;
-            if (iconW) ui_art::draw(d, ui_art::Device, x + r.w - p - iconW, y + vy, iconW, iconW);
-            fitted(d, metric.value, x + p, y + vy, r.w - 2 * p - unitW - (iconW ? iconW + 4 : 0), vh, ink);
-            if (inlineUnit) {
-                labelFont(d, 8);
-                d.setTextDatum(lgfx::bottom_right);
-                d.setTextColor(labelColor);
-                d.drawString(metric.detail.c_str(), x + r.w - p, y + r.h - p);
-            }
-        }
-        if (detail) {
-            labelFont(d, labelH);
-            d.setTextDatum(lgfx::bottom_left);
-            d.setTextColor(labelColor);
-            d.drawString(ellipsis(d, metric.detail, r.w - 2 * p).c_str(), x + p, y + r.h - p);
-        }
+        std::string unit = ellipsis(d, metric.detail, unitW - 4);
+        d.drawString(unit.c_str(), left + valueW + 4, base - baseline(unitFont));
     });
 }
 
-void View::illustration(int slot, Rect r, int icon) {
-    if (!changed(slot, r, std::to_string(icon))) return;
+// A secondary reading: label above value (stacked) or "LABEL  value" on one line.
+void View::stat(int slot, Rect r, const Metric &metric, bool stacked, bool divider) {
+    std::string key = metric.label + '\n' + metric.value + '\n' + std::to_string(metric.color) + (stacked ? "s" : "i");
+    if (!changed(slot, r, key)) return;
     paint(r, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
-        int size = std::min(r.w - 4, r.h - 12);
-        ui_art::draw(d, static_cast<ui_art::Icon>(icon), x + (r.w - size) / 2, y, size, size);
-        labelFont(d, 8);
-        d.setTextDatum(lgfx::bottom_center);
-        d.setTextColor(accent_ == 0xF7931A ? 0xF6DB00 : accent_);
-        d.drawString(r.w >= 54 ? "BDL MINER" : "BDL", x + r.w / 2, y + r.h);
+        int size = labelSize(), pad = divider ? (width_ >= 200 ? 7 : 4) : 0;
+        if (divider) d.drawFastVLine(x, y + 2, r.h - 4, kBorder);
+        labelFont(d, size);
+        d.setTextColor(kMuted);
+        std::string label = metric.label;
+        if (stacked) {
+            if (d.textWidth(label.c_str()) > r.w - pad) label = compactLabel(label);
+            d.setTextDatum(lgfx::top_left);
+            d.drawString(ellipsis(d, label, r.w - pad).c_str(), x + pad, y);
+            int vy = d.fontHeight() + 2, vh = r.h - vy;
+            fitFont(d, metric.value, r.w - pad, std::min(vh, height_ >= 200 ? 24 : 16), 24);
+            d.setTextColor(metric.color);
+            d.setTextDatum(lgfx::middle_left);
+            d.drawString(ellipsis(d, metric.value, r.w - pad).c_str(), x + pad, y + vy + vh / 2);
+            return;
+        }
+        label = compactLabel(label);
+        d.setTextDatum(lgfx::middle_left);
+        int labelW = std::min(int(d.textWidth(label.c_str())), r.w * 45 / 100);
+        d.drawString(ellipsis(d, label, labelW).c_str(), x + pad, y + r.h / 2);
+        int valueW = r.w - pad - labelW - 4;
+        fitFont(d, metric.value, valueW, r.h, 16);
+        d.setTextColor(metric.color);
+        d.setTextDatum(lgfx::middle_right);
+        d.drawString(ellipsis(d, metric.value, valueW).c_str(), x + r.w, y + r.h / 2);
     });
 }
 
-void View::chrome(const Model &m) {
-    int hh = headerHeight(), pad = margin(), statusW = width_ >= 280 ? 104 : width_ >= 200 ? 68 : width_ >= 120 ? 38 : 8;
-    int labelH = height_ >= 200 ? 12 : 8;
-    text(16, {pad + hh, 2, width_ - 2 * pad - hh - statusW, hh - 3}, m.title, kText, labelH);
-    std::string status = m.status;
-    if (width_ >= 200 && !m.battery.empty() && status.size() <= 7) status = m.battery + " " + status;
-    if (width_ >= 120) text(17, {width_ - pad - statusW, 2, statusW, hh - 3}, status, m.statusColor, labelH, true);
-    else {
-        Rect dot{width_ - pad - 6, hh / 2 - 3, 6, 6};
-        if (changed(17, dot, status + std::to_string(m.statusColor))) paint(dot, kBackground, [&](lgfx::LovyanGFX &d, int x, int y) {
-            if (!status.empty()) smoothDot(d, x + 3, y + 3, 2, m.statusColor);
-        });
+// Up to three readings: side by side on landscape panels, stacked otherwise.
+void View::stats(const Model &m, Rect r, int first, int count) {
+    bool row = width_ >= height_ && width_ >= 160;
+    if (row && width_ < 200) count = std::min(count, 2);
+    if (row) {
+        int w = r.w / count;
+        bool stacked = r.h >= 22;
+        for (int i = 0; i < count; ++i)
+            stat(first + i, {r.x + i * w, r.y, i == count - 1 ? r.w - i * w : w, r.h}, m.metrics[first + i], stacked, i > 0);
+        return;
     }
-    int dotsW = (width_ >= 200 ? 6 : 4) * kPages + 2;
-    text(18, {pad, height_ - footerHeight(), width_ - 2 * pad - dotsW, footerHeight()}, m.footer, kMuted, labelH);
+    int h = r.h / count;
+    for (int i = 0; i < count; ++i)
+        stat(first + i, {r.x, r.y + i * h, r.w, i == count - 1 ? r.h - i * h : h}, m.metrics[first + i], false, false);
 }
 
 void View::graph(const Model &m, Rect r) {
@@ -360,130 +364,88 @@ void View::graph(const Model &m, Rect r) {
 
 void View::render(const Model &m) {
     frame(m.page, m.accent, m.language);
-    chrome(m);
+    header(m.title, m.status, m.statusColor);
     Rect b = body();
-    int gap = margin() >= 6 ? 5 : 3;
-    if (m.page <= 3 && width_ >= 120 && width_ >= height_ && height_ >= 120) {
-        // Classic NerdMiner-style composition: illustrated brand at the
-        // upper left, live instruments above yellow/cyan LCD readouts.
-        int bottom = height_ >= 200 ? 56 : 34;
-        int top = b.h - bottom - gap;
-        int artW = b.w * 29 / 100;
-        int sideX = b.x + artW + gap, sideW = b.w - artW - gap;
-        int midW = (sideW - gap) / 2, rowH = (top - gap) / 2;
-        int art = m.page == 0 ? ui_art::Mining : m.page == 1 ? ui_art::Clock : ui_art::Network;
-        illustration(6, {b.x, b.y, artW, top}, art);
-        card(1, {sideX, b.y, midW, rowH}, m.metrics[1]);
-        card(2, {sideX, b.y + rowH + gap, midW, top - rowH - gap}, m.metrics[2]);
-        int upperMetric = m.page == 1 ? 4 : m.page == 2 ? 4 : 3;
-        card(upperMetric, {sideX + midW + gap, b.y, sideW - midW - gap, top}, m.metrics[upperMetric]);
-        int lowerRight = m.page == 1 ? 3 : m.page == 2 ? 3 : 4;
-        int primary = (b.w - gap) * 64 / 100;
-        card(0, {b.x, b.y + top + gap, primary, bottom}, m.metrics[0], true, false, 1);
-        card(lowerRight, {b.x + primary + gap, b.y + top + gap, b.w - primary - gap, bottom}, m.metrics[lowerRight], true, false, 2);
-    } else if (m.page == 5) {
-        int summaryH = height_ >= 200 ? 40 : height_ >= 110 ? 24 : 17;
-        if (width_ < 180 || height_ < 110) card(1, {b.x, b.y, b.w, summaryH}, m.metrics[1]);
-        else {
-            int cw = (b.w - 2 * gap) / 3;
-            for (int i = 0; i < 3; ++i)
-                card(i, {b.x + i * (cw + gap), b.y, i == 2 ? b.w - 2 * (cw + gap) : cw, summaryH}, m.metrics[i]);
+    bool landscape = width_ >= height_ && width_ >= 160;
+    int gap = height_ >= 120 ? 4 : 2;
+    if (m.page == 5) {
+        // Graph: the average as a big value, minimum / maximum beside it.
+        int top = height_ >= 200 ? 46 : height_ >= 120 ? 30 : 22;
+        int statsW = landscape ? b.w * 45 / 100 : 0;
+        hero(0, {b.x, b.y, b.w - statsW, top}, m.metrics[0], false);
+        if (statsW) {
+            int h = top / 2;
+            stat(1, {b.x + b.w - statsW, b.y, statsW, h}, m.metrics[1], false, false);
+            stat(2, {b.x + b.w - statsW, b.y + h, statsW, top - h}, m.metrics[2], false, false);
         }
-        graph(m, {b.x, b.y + summaryH + gap, b.w, b.h - summaryH - gap});
-    } else if (m.page == 6) {
-        int cw = (b.w - gap) / 2, rh = (b.h - 2 * gap) / 3;
-        for (int i = 0; i < 6; ++i)
-            card(i, {b.x + (i % 2) * (cw + gap), b.y + (i / 2) * (rh + gap),
-                     i % 2 ? b.w - cw - gap : cw, i / 2 == 2 ? b.h - 2 * (rh + gap) : rh}, m.metrics[i], false);
-    } else if (m.page == 7) {
-        int top = std::max(24, b.h / 3);
-        card(0, {b.x, b.y, b.w, top}, m.metrics[0], true);
-        int available = b.h - top - gap, count = std::min(4, std::max(1, available / 17));
-        int rh = available / count;
-        for (int i = 0; i < count; ++i) {
-            int y = b.y + top + gap + i * rh;
-            const Metric &v = m.metrics[i + 1];
-            text(i + 1, {b.x, y, b.w, rh}, v.label + "  " + v.value + (v.detail.empty() ? "" : "  " + v.detail), v.color, 8);
-        }
-    } else if (m.page == 4 && (height_ < 110 || width_ < 180)) {
-        int rh = height_ < 110 ? 10 : 12;
-        text(0, {b.x, b.y, b.w, rh}, m.metrics[0].value, kText, 8);
-        text(1, {b.x, b.y + rh, b.w, rh}, m.metrics[1].value + " / " + m.metrics[2].value, accent_, 8);
-        card(3, {b.x, b.y + 2 * rh + gap, b.w, b.h - 2 * rh - gap}, m.metrics[3], false, true);
-    } else if (width_ < 120) {
-        int upper = (b.h - 2 * gap) / 2, side = (b.h - upper - 2 * gap) / 2;
-        card(0, {b.x, b.y, b.w, upper}, m.metrics[0], true, false, 1);
-        card(1, {b.x, b.y + upper + gap, b.w, side}, m.metrics[1]);
-        card(2, {b.x, b.y + upper + side + 2 * gap, b.w, b.h - upper - side - 2 * gap}, m.metrics[2]);
-    } else if (height_ < 110) {
-        int upper = b.h - 21 - gap;
-        card(0, {b.x, b.y, b.w, upper}, m.metrics[0], true, false, m.page <= 3 ? 1 : 0);
-        int half = (b.w - gap) / 2;
-        card(1, {b.x, b.y + upper + gap, half, 21}, m.metrics[1]);
-        card(2, {b.x + half + gap, b.y + upper + gap, b.w - half - gap, 21}, m.metrics[2]);
-    } else {
-        int upper = (b.h - gap) * (m.page == 4 ? (width_ < 180 ? 40 : 50) : 62) / 100;
-        int lower = b.h - upper - gap;
-        int left = (b.w - gap) * 65 / 100, right = b.w - left - gap;
-        int side = (upper - gap) / 2;
-        card(0, {b.x, b.y, left, upper}, m.metrics[0], true, false, m.page <= 3 ? 1 : 0);
-        card(1, {b.x + left + gap, b.y, right, side}, m.metrics[1]);
-        card(2, {b.x + left + gap, b.y + side + gap, right, upper - side - gap}, m.metrics[2]);
-        if (m.page == 4) card(3, {b.x, b.y + upper + gap, b.w, lower}, m.metrics[3], false, true);
-        else {
-            int half = (b.w - gap) / 2;
-            card(3, {b.x, b.y + upper + gap, half, lower}, m.metrics[3]);
-            card(4, {b.x + half + gap, b.y + upper + gap, b.w - half - gap, lower}, m.metrics[4]);
-        }
+        graph(m, {b.x, b.y + top + gap, b.w, b.h - top - gap});
+        return;
     }
+    if (m.page == 7) {
+        // Blocks: the block being mined, then the latest blocks found.
+        int rowH = height_ >= 200 ? 20 : height_ >= 120 ? 15 : 12;
+        int rows = std::max(1, std::min(3, (b.h * 45 / 100) / rowH));
+        int top = b.h - rows * rowH - gap;
+        hero(0, {b.x, b.y, b.w, top}, m.metrics[0]);
+        for (int i = 0; i < rows; ++i) {
+            const Metric &v = m.metrics[i + 1];
+            std::string line = v.label + "  " + v.value + (v.detail.empty() ? "" : "  " + v.detail);
+            text(i + 1, {b.x, b.y + top + gap + i * rowH, b.w, rowH}, v.label.empty() ? "" : line, v.color, labelSize());
+        }
+        return;
+    }
+    int count = 3;
+    int statsH = landscape ? (height_ >= 200 ? 44 : height_ >= 120 ? 30 : 13)
+                           : count * (height_ >= 200 ? 20 : height_ >= 140 ? 16 : 13);
+    if (landscape && width_ < 200) count = 2;
+    hero(0, {b.x, b.y, b.w, b.h - statsH - gap}, m.metrics[0]);
+    stats(m, {b.x, b.y + b.h - statsH, b.w, statsH}, 1, count);
 }
 
 void View::message(const char *title, const char *line1, const char *line2) {
     bool splash = title && std::string(title) == "BDLMiner V1";
     frame(splash ? -4 : -1, accent_, language_);
-    Model m;
-    m.title = title ? title : "";
-    chrome(m);
+    header(title ? title : "", "", kMuted);
     Rect b = body();
-    Metric info;
-    info.label = title ? title : "";
-    info.value = line1 ? line1 : "";
-    info.detail = line2 ? line2 : "";
-    if (splash && width_ >= 120) {
-        int artW = std::min(b.h, b.w / 3);
-        illustration(6, {b.x, b.y, artW, b.h}, ui_art::Mining);
-        card(0, {b.x + artW + 5, b.y, b.w - artW - 5, b.h}, info, true);
-    } else card(0, b, info, true);
+    int lineH = labelSize() + 6;
+    Metric big;
+    big.value = line1 ? line1 : "";
+    big.color = splash ? accent_ : kText;
+    hero(0, {b.x, b.y, b.w, b.h - lineH}, big);
+    text(1, {b.x, b.y + b.h - lineH, b.w, lineH}, line2 ? line2 : "", kMuted, labelSize());
 }
 
 void View::portal(const char *title, const char *ssid, const char *password, const char *qr) {
     frame(-2, accent_, language_);
-    Model m; m.title = title; m.footer = "192.168.4.1";
-    chrome(m);
+    header(title, "192.168.4.1", kMuted);
     Rect b = body();
     int size = std::min(b.h, b.w / 2 - 3);
     if (changed(0, {b.x, b.y, size, size}, qr)) {
         display_->fillRect(b.x, b.y, size, size, uint32_t(0xFFFFFF));
         display_->qrcode(qr, b.x, b.y, size);
     }
-    int x = b.x + size + 5, w = b.w - size - 5;
-    int rh = b.h / 2;
+    int x = b.x + size + 6, w = b.w - size - 6, h = b.h / 2;
     Metric ap; ap.label = "WiFi"; ap.value = ssid;
-    Metric pass; pass.label = language_ ? "MOT DE PASSE" : "PASSWORD"; pass.value = password;
-    card(1, {x, b.y, w, rh - 2}, ap);
-    card(2, {x, b.y + rh + 2, w, b.h - rh - 2}, pass);
+    Metric pass; pass.label = language_ ? "MOT DE PASSE" : "PASSWORD"; pass.value = password; pass.color = accent_;
+    stat(1, {x, b.y, w, h}, ap, true, false);
+    stat(2, {x, b.y + h, w, b.h - h}, pass, true, false);
 }
 
 void View::update(const char *title, const char *versions, unsigned percent, const char *state) {
     frame(-3, accent_, language_);
-    Model m; m.title = title; m.footer = versions;
-    chrome(m);
+    header(title, state, accent_);
     Rect b = body();
-    Metric info; info.label = title; info.value = state; info.detail = std::to_string(std::min(percent, 100u)) + "%";
-    card(0, {b.x, b.y, b.w, b.h - 12}, info, true);
-    Rect bar{b.x, b.y + b.h - 7, b.w, 6};
-    if (changed(1, bar, std::to_string(percent))) paint(bar, kBorder, [&](lgfx::LovyanGFX &d, int x, int y) {
-        d.fillRect(x, y, bar.w * std::min(percent, 100u) / 100, bar.h, accent_);
+    unsigned shown = std::min(percent, 100u);
+    int barH = height_ >= 200 ? 8 : 5, lineH = labelSize() + 6;
+    Metric big;
+    big.value = std::to_string(shown);
+    big.detail = "%";
+    big.color = accent_;
+    hero(0, {b.x, b.y, b.w, b.h - lineH - barH - 4}, big);
+    text(1, {b.x, b.y + b.h - lineH - barH - 2, b.w, lineH}, versions, kMuted, labelSize());
+    Rect bar{b.x, b.y + b.h - barH, b.w, barH};
+    if (changed(2, bar, std::to_string(shown))) paint(bar, kBorder, [&](lgfx::LovyanGFX &d, int x, int y) {
+        d.fillRect(x, y, bar.w * int(shown) / 100, bar.h, accent_);
     });
 }
 

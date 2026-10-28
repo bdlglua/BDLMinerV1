@@ -33,57 +33,51 @@ Model example(int page, bool french) {
     settings.language = french;
     Model m;
     m.page = page; m.language = french;
-    m.title = french ? "MINAGE" : "MINING";
-    m.status = "LIVE"; m.battery = "85%"; m.footer = french ? "Minage / 1j 2h" : "Mining / 1d 2h";
+    m.status = "LIVE"; m.battery = "85%";
     auto metric = [&](int i, const char *label, const char *value, const char *detail = "", uint32_t color = kText) {
         m.metrics[i] = {tr(label), value, detail, color};
     };
     switch (page) {
         case 0:
-            metric(0, french ? "HASHRATE DIRECT" : "LIVE HASHRATE", "1.005", "MH/s", m.accent);
-            metric(1, "TEMP", "52.1 C"); metric(2, french ? "PUISSANCE" : "POWER", "100%", "", kGreen);
-            metric(3, "SHARES", "10827", "3 rejected", kGreen); metric(4, "BEST DIFF", "7.82", "Pool 0.00020");
+            m.title = french ? "MINAGE" : "MINING";
+            metric(0, "LIVE HASHRATE", "1.005", "MH/s", m.accent);
+            metric(1, "SHARES", "10827", "", kGreen); metric(2, "BEST DIFF", "7.82"); metric(3, "TEMP", "52.1 C");
             break;
         case 1:
             m.title = french ? "HORLOGE" : "CLOCK";
-            metric(0, "LOCAL TIME", "21:14", "Mon 26 Oct 2026"); metric(1, "BTC PRICE", "104250", "USD", m.accent);
-            metric(2, "BLOCK", "950128"); metric(3, "HASHRATE", "1.005 MH/s"); metric(4, "SHARES", "10827");
-            m.footer = french ? "lun 26 oct 2026" : "Mon 26 Oct 2026";
+            metric(0, "LOCAL TIME", "21:14");
+            metric(1, "DATE", french ? "lun 26 oct" : "Mon 26 Oct"); metric(2, "BTC PRICE", "104250", "", m.accent);
+            metric(3, "BLOCK", "950128");
             break;
         case 2:
             m.title = "BITCOIN";
-            metric(0, "BITCOIN PRICE", "104250", "USD", m.accent); metric(1, "NEXT RETARGET", "+2.34%", "", kGreen);
-            metric(2, "MEMPOOL TX", "8.2k"); metric(3, "NET HASHRATE", "1.03ZH/s"); metric(4, "FEES sat/vB", "3/2/1", "FAST / 30M / 1H");
+            metric(0, "BITCOIN PRICE", "104250", "USD", m.accent); metric(1, "FEES sat/vB", "3/2/1");
+            metric(2, "NEXT RETARGET", "+2.34%", "", kGreen); metric(3, "NET HASHRATE", "1.03ZH/s");
             break;
         case 3:
             m.title = french ? "RESEAU" : "NETWORK";
-            metric(0, "BLOCK HEIGHT", "950128", "halving in 99872 blocks", m.accent);
-            metric(1, "NETWORK DIFF", "152.4T"); metric(2, "TOTAL HASHES", "94.6G");
-            metric(3, "POOL", "public-pool.io", "21496"); metric(4, "LOCAL IP", "192.168.1.42", "-47 dBm");
-            m.footer = "192.168.1.42";
+            metric(0, "BLOCK HEIGHT", "950128", "", m.accent);
+            metric(1, "NETWORK DIFF", "152.4T"); metric(2, "POOL", "public-pool.io"); metric(3, "HALVING", "99872");
             break;
         case 4:
             m.title = french ? "APPAREIL" : "DEVICE";
-            metric(0, "BOARD", "M5StickC Plus2"); metric(1, "FIRMWARE", "v" FW_VERSION); metric(2, "FREE RAM", "124 KB");
-            metric(3, "PAYOUT ADDRESS", "bc1q0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijkl");
-            m.footer = "hw+sw+fill / A: next";
+            metric(0, "LOCAL IP", "192.168.1.42"); metric(1, "BOARD", "M5StickC Plus2");
+            metric(2, "FIRMWARE", "v" FW_VERSION); metric(3, "FREE RAM", "124 KB");
             break;
         case 5:
             m.title = "HASHRATE";
-            metric(0, "MIN", "982k"); metric(1, "AVG H/s", "998k", "", m.accent); metric(2, "MAX", "1.02M");
-            m.footer = "10s samples / H/s";
+            metric(0, "AVG H/s", "998k", "H/s", m.accent); metric(1, "MIN", "982k"); metric(2, "MAX", "1.02M");
             break;
         case 6:
             m.title = "RECORDS";
-            metric(0, "BEST EVER", "12.7", "", m.accent); metric(1, "SESSION", "7.82"); metric(2, "32-BIT", "21");
-            metric(3, "64-BIT", "0"); metric(4, "LIFE HASHES", "1.24T"); metric(5, "RUN TIME", "14d 2h");
-            m.footer = "Blocks 0 / Block/year 1 in 4.3B";
+            metric(0, "BEST EVER", "12.7", "", m.accent); metric(1, "32-BIT", "21");
+            metric(2, "SESSION", "7.82"); metric(3, "RUN TIME", french ? "14j 2h" : "14d 2h");
             break;
         case 7:
             m.title = french ? "BLOCS" : "BLOCKS";
             metric(0, "MINING BLOCK", "950128", "", m.accent);
             metric(1, "950127", "Foundry USA", "2min / 7.82"); metric(2, "950126", "AntPool", "11min / 1.42");
-            metric(3, "950125", "ViaBTC", "19min"); metric(4, "950124", "F2Pool", "25min");
+            metric(3, "950125", "ViaBTC", "19min");
             break;
     }
     return m;
@@ -143,10 +137,9 @@ int main(int argc, char **argv) {
             view.invalidate(); view.render(m);
             assert(image(lcd) == first);
             if (!out.empty()) ppm(lcd, out + "/page" + std::to_string(page) + "_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + (lang ? "_fr" : "_en") + ".ppm");
-            int firstMetric = page == 5 && (size[0] < 180 || size[1] < 110) ? 1 : 0;
-            m.metrics[firstMetric].value = "0"; view.render(m);
+            m.metrics[0].value = "0"; view.render(m);
             assert(image(lcd) != first); // changed metric renders without changing pages
-            m.metrics[firstMetric].value = "999999999999999999999999999999999999";
+            m.metrics[0].value = "999999999999999999999999999999999999";
             view.render(m);  // bounded text on every supported shape
             m.accent = 0x3B9CF6; view.render(m);
         }

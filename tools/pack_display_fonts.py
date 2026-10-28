@@ -9,9 +9,13 @@ import math
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-SIZES = (8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40)
+# Text labels and messages stay small; the "big number" screens draw one
+# value per page with the numeral faces, up to 80 px on 320x240 panels.
+TEXT_SIZES = (8, 9, 10, 11, 12, 14, 16, 18, 20, 24)
+NUMERAL_SIZES = (8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 56, 64, 72, 80)
 CHARS = ''.join(chr(i) for i in range(32, 127))
-NUMERALS = ''.join(sorted(set('0123456789 .:-+%C?')))
+# Digits, separators and SI prefixes ("1.24T", "152.4T", "12.7k").
+NUMERALS = ''.join(sorted(set('0123456789 .:-+%C?kMGTPEZ')))
 
 
 def main():
@@ -20,7 +24,7 @@ def main():
     parser.add_argument('--bold-font', type=Path, default=ROOT / 'assets/display/DejaVuSans-Bold.ttf')
     args = parser.parse_args()
     glyphs, pixels, faces = [], [], []
-    for numeric, height in ((numeric, height) for numeric in (False, True) for height in SIZES):
+    for numeric, height in [(False, h) for h in TEXT_SIZES] + [(True, h) for h in NUMERAL_SIZES]:
         charset = NUMERALS if numeric else CHARS
         # Small labels need solid stems on the LCD. Numerical faces use their
         # own cap-height bounds, so unused descenders no longer shrink digits.
@@ -54,7 +58,7 @@ def main():
     out += 'struct Glyph { uint32_t offset; uint16_t length; uint8_t width, advance; int8_t left; };\n'
     out += 'constexpr Glyph kGlyphs[] = {\n' + ''.join('    {' + ','.join(map(str, g)) + '},\n' for g in glyphs) + '};\n'
     out += 'constexpr uint8_t kCoverage[] = {\n' + '\n'.join('    ' + ','.join(f'0x{v:02x}' for v in pixels[i:i+24]) + ',' for i in range(0, len(pixels), 24)) + '\n};\n'
-    out += f'constexpr unsigned kFacesPerFamily = {len(SIZES)};\n'
+    out += f'constexpr unsigned kTextFaces = {len(TEXT_SIZES)}, kNumeralFaces = {len(NUMERAL_SIZES)};\n'
     out += 'constexpr char kNumeralCharacters[] = "' + NUMERALS + '";\n'
     out += '#define BDL_FONT_FACES ' + ','.join('{' + str(first) + ',' + str(height) + ',' + str(baseline) + ',' + str(numeric).lower() + '}' for height, baseline, first, numeric in faces) + '\n'
     out += '}  // namespace ui_font\n'

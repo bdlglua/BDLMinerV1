@@ -79,10 +79,17 @@ const SmoothFont kFonts[] = {BDL_FONT_FACES};
 }
 
 const lgfx::IFont *atMost(int height, bool numerals) {
-    unsigned base = numerals ? kFacesPerFamily : 0;
-    for (int i = int(kFacesPerFamily) - 1; i >= 0; --i)
+    unsigned base = numerals ? kTextFaces : 0, count = numerals ? kNumeralFaces : kTextFaces;
+    for (int i = int(count) - 1; i >= 0; --i)
         if (kFonts[base + i].height() <= height) return &kFonts[base + i];
     return &kFonts[base];
+}
+
+bool numeric(const char *text) {
+    if (!text || !*text) return false;
+    for (; *text; ++text)
+        if (*text == '?' || !std::strchr(kNumeralCharacters, *text)) return false;
+    return true;
 }
 }
 #endif
