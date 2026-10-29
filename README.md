@@ -5,20 +5,20 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.6.9](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.9)**
+**Latest release: [v1.7.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.7.0)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.6.9.md)
+· [Release notes](docs/releases/v1.7.0.md)
 
-Version **1.6.9** makes the dashboard live (pushed every 2 seconds), applies numbers
-and switches in the settings without a restart, frees about 13 KB of memory so that
-market data, notifications and GitHub updates no longer wait on a running miner, keeps
-a history of the last crashes, shows integrations and pool reliability, and fixes
-Stratum V2 disconnections ("Unknown SV2 future job"). It builds on 1.6.8: firmware
-trial with automatic rollback, crash reports, alerts and webhook, Home Assistant
-controls, touch gestures, the *BLOCK FOUND!* alert, the home-screen web app and the
-automatic pool statistics API. Experimental Gamma 601 profiles still cover
-**525–800 MHz**, defaulting to **600 MHz / 1150 mV**, with 525 MHz fallback. The
-default identity is **BDLMinerV1/1.6.9**.
+Version **1.7.0** keeps the 24-hour hashrate history across restarts, sends a daily
+summary, lists the last shares with the pool's answers, explains when a pool lists no
+worker, and no longer treats a power cut during an update trial as a failed firmware.
+It builds on 1.6.9 (live dashboard, settings without restart, more free memory, crash
+history, Stratum V2 fix) and 1.6.8 (firmware trial with automatic rollback, crash
+reports, alerts and webhook, Home Assistant controls, touch gestures, the *BLOCK
+FOUND!* alert, the home-screen web app and the automatic pool statistics API).
+Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
+**600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
+**BDLMinerV1/1.7.0**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -177,10 +177,12 @@ board without two app slots). Future checks then use the updated discovery code.
 or the web page, starts on trial. It is kept once it has run 3 minutes connected to
 the pool and hashing (shares are too rare at difficulty 1 to be the proof). If it
 crashes or hangs before that, or does not get there within 20 minutes (40 without
-WiFi), the previous firmware comes back by itself and a notification is sent. A
-restart during the trial counts too (a power cut, the reset button), so a version
-gets a second try; rolled back twice, it is no longer installed automatically (the
-update tile says why if it is offered). The *Device* tile shows *Firmware on trial* meanwhile.
+WiFi), the previous firmware comes back by itself and a notification is sent; rolled
+back twice, a version is no longer installed automatically (the update tile says why
+if it is offered). Any restart during the trial brings the previous firmware back,
+but one caused by a power cut, the reset button or a USB serial connection is not
+held against the new version: it is installed again, without a notification (after
+three such interruptions, they count as failures). The *Device* tile shows *Firmware on trial* meanwhile.
 
 ### Crash reports
 
@@ -209,7 +211,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.6.9 && git push origin v1.6.9
+git tag v1.7.0 && git push origin v1.7.0
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -233,7 +235,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.6.9.
+corrections shipped in v1.5.3 and retained in v1.7.0.
 
 ## Build and flash
 
@@ -522,7 +524,9 @@ HTTPS; *Add to Home screen* works on the local address.
   their date, what the pool sees (hashrate, best share, workers, from the pool's
   statistics API, found automatically; see below), market data,
   lifetime totals, the last blocks of the network (pool, transactions, your best share
-  for each), a 24‑hour chart, an *Update available* tile (see
+  for each), a 24‑hour chart (kept across restarts: saved every 30 minutes and before
+  each restart, the time the miner was off shown as a gap), the last 20 shares sent
+  with the pool's answer (*Recent shares*), an *Update available* tile (see
   [Updates from GitHub](#updates-from-github)), the reason of the last restart, and night / heat /
   battery state. With **Other miners** set, a *Miners* section shows each of them and the
   total hashrate (each miner's `/api/stats` allows other pages to read it).
@@ -641,6 +645,14 @@ estimates the hashrate from the accepted shares. When a known API stops answerin
 (an outage on the pool's side), the tile says so, shows the estimate, and the miner
 asks again every 10 minutes.
 
+A pool may list no worker at all for this miner: public-pool, for one, now imposes a
+minimum difficulty of 1 (it ignores the suggested difficulty) and lists a worker only
+if it sent a share in the last 10 minutes. At about 1 MH/s that is one share every 70
+minutes, so the worker appears only briefly after each one, while the pool still
+counts its shares and hourly hashrate. The tile explains it when it happens. Pools
+that honour a low difficulty, such as pool.nerdminers.org, keep the worker listed. To
+give it a name, enter the address as `address.name`.
+
 ## Notifications
 
 Install the [ntfy](https://ntfy.sh) app, subscribe to a topic of your own (a long,
@@ -649,6 +661,11 @@ hard-to-guess name: anyone who knows it can read it) and enter it in the web set
 new best difficulty ever (from difficulty 1, at most every 10 minutes), offline for
 10 minutes and back online, too hot / cooled down, restarted after a crash or a
 watchdog, a firmware rolled back after a failed trial, and optionally every 32‑bit share.
+
+**Daily summary**: at the hour set in *Daily summary at* (20:00 by default, *Off* to
+stop it), a notification gives the day's average hashrate, best share and record,
+accepted and rejected shares and the time connected to the pool (or since the start,
+when the miner started during the day).
 
 **Alerts**: when the hashrate stays below the *% of normal* setting (50 % by default,
 0 = off) for the *minutes* setting (15), with the pool connected and mining at full
