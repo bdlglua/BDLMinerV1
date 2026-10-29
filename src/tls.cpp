@@ -92,8 +92,10 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t 
         why[0] = ' ';
         tls.lastError(why + 1, sizeof(why) - 1);
     }
-    logf("[tls] %s: handshake %s in %u ms%s (heap %u, largest block %u)\n", host, ok ? "done" : "failed",
-         (unsigned)(millis() - t0), why, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+    // A probe (short timeout) failing is an expected answer: its caller reports the outcome.
+    if (ok || timeoutSeconds >= 12)
+        logf("[tls] %s: handshake %s in %u ms%s (heap %u, largest block %u)\n", host, ok ? "done" : "failed",
+             (unsigned)(millis() - t0), why, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
     core0WdtResume();
     hwsha::release();
     xSemaphoreGive(lock);

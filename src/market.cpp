@@ -233,7 +233,8 @@ int fetchJson(bool secure, const String &host, uint16_t port, const String &path
 }
 
 // Pool statistics APIs, found by trying them in turn: ckpool's /users/<address>
-// and public-pool's /api/client/<address>, on the pool's host, on its parent
+// (also served as /api/miner?address=<address>, e.g. nerdminer.io) and
+// public-pool's /api/client/<address>, on the pool's host, on its parent
 // domain (eu.pool.example -> pool.example) and on the ports these servers use
 // by default. Whatever the site, the JSON tells which kind answered.
 struct PoolApi {
@@ -245,11 +246,16 @@ const PoolApi kPoolApis[] = {
     {true, false, 443, "/users/"},          {true, false, 40557, "/api/client/"}, {true, false, 443, "/api/client/"},
     {true, true, 443, "/users/"},           {true, true, 40557, "/api/client/"},  {true, true, 443, "/api/client/"},
     {false, false, 3334, "/api/client/"},   {false, false, 80, "/users/"},  // self-hosted, local network
+    // Appended, never inserted: the index found is saved on each miner.
+    {true, false, 443, "/api/miner?address="}, {true, true, 443, "/api/miner?address="},
 };
 constexpr int kPoolApiCount = sizeof(kPoolApis) / sizeof(kPoolApis[0]);
 int apiIndex[2] = {-1, -1};  // per main / backup pool: the API that answered, -1 = none yet
 String apiHost[2];
 uint32_t searchAfter[2] = {0, 0};
+// A pool usually creates an address's page with its first accepted share: a
+// share after a fruitless search is worth a new one, without waiting 6 hours.
+uint32_t sharesAtSearch[2] = {0, 0};
 
 // "eu.pool.example" -> "pool.example"; empty for two-label names and IP addresses.
 String parentDomain(const String &host) {
@@ -360,7 +366,8 @@ bool refreshPoolStats() {
         }
     }
     if (apiIndex[backup] < 0) {
-        if (searchAfter[backup] && (int32_t)(millis() - searchAfter[backup]) < 0) {
+        bool newShare = minerStats().accepted != sharesAtSearch[backup];
+        if (searchAfter[backup] && (int32_t)(millis() - searchAfter[backup]) < 0 && !newShare) {
             p.supported = false;
             storePool(p, backup);
             return true;
@@ -375,11 +382,13 @@ bool refreshPoolStats() {
             }
         }
         if (code != HTTP_CODE_OK) {
+            sharesAtSearch[backup] = minerStats().accepted;
             searchAfter[backup] = millis() + kApiSearchMs;
             if (!searchAfter[backup]) searchAfter[backup] = 1;
             p.supported = false;
             storePool(p, backup);
-            logf("[market] no pool stats API found for %s; next search in 6 h\n", host.c_str());
+            logf("[market] no pool stats API found for %s; searched again after its next accepted share, or in 6 h\n",
+                 host.c_str());
             return true;
         }
     }
