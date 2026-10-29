@@ -5,11 +5,12 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.7.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.7.0)**
+**Latest release: [v1.7.1](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.7.1)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.7.0.md)
+· [Release notes](docs/releases/v1.7.1.md)
 
-Version **1.7.0** keeps the 24-hour hashrate history across restarts, sends a daily
+Version **1.7.1** finds the statistics of more pools (such as nerdminer.io) and
+searches again as soon as the pool has recorded a share. Version 1.7.0 keeps the 24-hour hashrate history across restarts, sends a daily
 summary, lists the last shares with the pool's answers, explains when a pool lists no
 worker, and no longer treats a power cut during an update trial as a failed firmware.
 It builds on 1.6.9 (live dashboard, settings without restart, more free memory, crash
@@ -18,7 +19,7 @@ reports, alerts and webhook, Home Assistant controls, touch gestures, the *BLOCK
 FOUND!* alert, the home-screen web app and the automatic pool statistics API).
 Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
 **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.7.0**.
+**BDLMinerV1/1.7.1**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -211,7 +212,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.7.0 && git push origin v1.7.0
+git tag v1.7.1 && git push origin v1.7.1
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -235,7 +236,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.7.0.
+corrections shipped in v1.5.3 and retained in v1.7.1.
 
 ## Build and flash
 
@@ -635,12 +636,14 @@ These are also shown in the dashboard's Pool card.
 ### What the pool sees
 
 The miner finds its pool's statistics API by itself, for any pool: it tries
-ckpool's `/users/<address>` and public-pool's `/api/client/<address>` on the pool's
+ckpool's `/users/<address>` (also served as `/api/miner?address=<address>`, as on
+nerdminer.io) and public-pool's `/api/client/<address>` on the pool's
 host, on its parent domain (`eu.pool.example` → `pool.example`) and on the usual
 ports (443, 40557; 3334 and 80 over plain HTTP for a pool on the local network), and
 recognises the answer by its JSON. The address that answered is kept, across restarts,
 and shown under the *Seen by the pool* tile; if it stops answering, the search starts
-again. A pool without such an API is searched again every 6 hours; meanwhile the tile
+again. Most pools only publish an address once it has an accepted share, so a fruitless
+search runs again after the miner's next accepted share (otherwise every 6 hours); meanwhile the tile
 estimates the hashrate from the accepted shares. When a known API stops answering
 (an outage on the pool's side), the tile says so, shows the estimate, and the miner
 asks again every 10 minutes.
