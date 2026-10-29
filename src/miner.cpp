@@ -4,7 +4,9 @@
 #endif
 
 #include <Preferences.h>
+#include <esp_partition.h>
 #include <esp_rom_crc.h>
+#include <ctime>
 #include <stddef.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
@@ -145,6 +147,7 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
 
     portENTER_CRITICAL(&statsMux);
     if (d > stats.sessionBestDiff) stats.sessionBestDiff = d;
+    if (d > stats.periodBestDiff) stats.periodBestDiff = d;
     if (d > stats.bestDiff) {
         stats.bestDiff = d;
         bestDirty = true;
@@ -482,6 +485,38 @@ MinerStats minerStats() {
 // Time connected to a pool since boot, and the sessions that make it up.
 uint32_t poolConnectedMs = 0, poolSince = 0, poolSessions = 0;
 
+constexpr int kShareLog = 20;
+ShareEntry shareLog[kShareLog];
+int shareLogHead = 0, shareLogCount = 0;
+
+void minerShareSent(double difficulty, bool backup) {
+    time_t now = time(nullptr);
+    portENTER_CRITICAL(&statsMux);
+    shareLog[shareLogHead] = ShareEntry{now > 1700000000 ? uint32_t(now) : 0, float(difficulty), SharePending, backup};
+    shareLogHead = (shareLogHead + 1) % kShareLog;
+    if (shareLogCount < kShareLog) shareLogCount++;
+    portEXIT_CRITICAL(&statsMux);
+}
+
+// Called with statsMux held.
+void settleOldestShare(uint8_t state) {
+    for (int i = shareLogCount; i > 0; --i) {
+        ShareEntry &e = shareLog[(shareLogHead - i + kShareLog) % kShareLog];
+        if (e.state == SharePending) {
+            e.state = state;
+            return;
+        }
+    }
+}
+
+int minerShareLog(ShareEntry *out, int capacity) {
+    portENTER_CRITICAL(&statsMux);
+    int n = min(capacity, shareLogCount);
+    for (int i = 0; i < n; ++i) out[i] = shareLog[(shareLogHead - 1 - i + kShareLog) % kShareLog];
+    portEXIT_CRITICAL(&statsMux);
+    return n;
+}
+
 void minerPoolConnected(bool connected) {
     uint32_t now = millis();
     portENTER_CRITICAL(&statsMux);
@@ -491,6 +526,9 @@ void minerPoolConnected(bool connected) {
     } else if (!connected && stats.poolConnected) {
         poolConnectedMs += now - poolSince;
     }
+    if (!connected)  // a lost connection takes its pending answers with it
+        for (int i = 0; i < shareLogCount; ++i)
+            if (shareLog[i].state == SharePending) shareLog[i].state = ShareUnanswered;
     stats.poolConnected = connected;
     portEXIT_CRITICAL(&statsMux);
 }
@@ -513,6 +551,7 @@ void minerPoolDifficulty(double difficulty) {
 
 void minerShareResult(bool accepted) {
     portENTER_CRITICAL(&statsMux);
+    settleOldestShare(accepted ? ShareAccepted : ShareRejected);
     if (accepted) {
         stats.accepted++;
         // What the pool credits: its difficulty at acceptance (vardiff changes
@@ -630,7 +669,7 @@ void minerTick() {
                 (stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000);
     portEXIT_CRITICAL(&statsMux);
     if (save) {
-        if (minerSaveStats()) { lastSave = now; retrySaveAt = now; }
+        if (minerSaveStats(true)) { lastSave = now; retrySaveAt = now; }
         else retrySaveAt = now + 30000;
     }
 }
@@ -684,6 +723,14 @@ int minerHistoryPoints(HistoryPoint *out, int capacity, uint32_t *revision) {
     return n;
 }
 
+double minerTakePeriodBest() {
+    portENTER_CRITICAL(&statsMux);
+    double best = stats.periodBestDiff;
+    stats.periodBestDiff = 0;
+    portEXIT_CRITICAL(&statsMux);
+    return best;
+}
+
 uint32_t minerHistoryRevision() {
     portENTER_CRITICAL(&statsMux);
     uint32_t revision = historyRevision;
@@ -719,6 +766,8 @@ struct StatsRecord {
     StatsSnapshot s;
     uint32_t crc;  // over every byte before it
 };
+
+void findHistory();  // below, with the history store
 
 uint32_t statsSeq = 0;
 bool statsLoaded = false;  // never save before the saved stats were read back
@@ -789,6 +838,7 @@ void minerLoadStats() {
     stats.lifetimeBlocks = baseBlocks;
     stats.lifetimeSeconds = baseSeconds;
     statsLoaded = true;
+    findHistory();
 }
 
 void minerStatsSnapshot(StatsSnapshot &out) {
@@ -803,13 +853,152 @@ void minerStatsSnapshot(StatsSnapshot &out) {
     portEXIT_CRITICAL(&statsMux);
 }
 
-bool minerSaveStats() {
+namespace {
+
+// The 24-hour hashrate history, kept in the "spiffs" data partition (unused
+// otherwise) so that a restart does not empty the chart. Each save goes to the
+// next of up to 64 sectors: the header is written last, so a save cut short
+// leaves the previous record the newest valid one.
+constexpr uint32_t kHistoryMagic = 0x48444C42;  // "BLDH"
+constexpr uint32_t kSector = 4096, kPointsAt = 32, kMaxSectors = 64;
+constexpr uint32_t kHistorySaveMs = 30 * 60 * 1000;
+struct HistoryHeader {
+    uint32_t magic, seq;
+    uint32_t lastPointAt;  // Unix time of the newest point
+    uint32_t count;
+    uint32_t crc;          // over the points, then the fields above
+};
+static_assert(kPointsAt + HISTORY_LEN * sizeof(HistoryPoint) <= kSector, "one record per sector");
+const esp_partition_t *historyPart = nullptr;
+uint32_t historySectors = 0, historySeq = 0, historyNext = 0, historySavedAt = 0, historySavedRevision = 0;
+// The record found at boot, merged once the clock is set.
+bool restorePending = false;
+uint32_t restoreSector = 0, restoreCount = 0, restoreLastAt = 0;
+
+uint32_t headerCrc(const HistoryHeader &h, uint32_t crc) {
+    return esp_rom_crc32_le(crc, (const uint8_t *)&h, offsetof(HistoryHeader, crc));
+}
+
+// Reads `count` points of a record from `first` on, in small pieces.
+bool readPoints(uint32_t sector, uint32_t first, uint32_t count, HistoryPoint *out, uint32_t *crc) {
+    HistoryPoint chunk[32];
+    for (uint32_t done = 0; done < count;) {
+        uint32_t n = std::min<uint32_t>(32, count - done);
+        if (esp_partition_read(historyPart, sector * kSector + kPointsAt + (first + done) * sizeof(HistoryPoint), chunk,
+                               n * sizeof(HistoryPoint)) != ESP_OK)
+            return false;
+        if (crc) *crc = esp_rom_crc32_le(*crc, (const uint8_t *)chunk, n * sizeof(HistoryPoint));
+        if (out) memcpy(out + done, chunk, n * sizeof(HistoryPoint));
+        done += n;
+    }
+    return true;
+}
+
+void findHistory() {
+    historyPart = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+    if (!historyPart) return;
+    historySectors = std::min<uint32_t>(kMaxSectors, historyPart->size / kSector);
+    bool found = false;
+    for (uint32_t i = 0; i < historySectors; ++i) {
+        HistoryHeader h;
+        if (esp_partition_read(historyPart, i * kSector, &h, sizeof(h)) != ESP_OK || h.magic != kHistoryMagic ||
+            h.count == 0 || h.count > HISTORY_LEN || (found && int32_t(h.seq - historySeq) <= 0))
+            continue;
+        uint32_t crc = 0;
+        if (!readPoints(i, 0, h.count, nullptr, &crc) || headerCrc(h, crc) != h.crc) continue;
+        found = true;
+        historySeq = h.seq;
+        historyNext = (i + 1) % historySectors;
+        restoreSector = i;
+        restoreCount = h.count;
+        restoreLastAt = h.lastPointAt;
+    }
+    restorePending = found;
+}
+
+// Writes the history as it is now; false if it changed meanwhile or could not be written.
+bool saveHistory() {
+    time_t now = time(nullptr);
+    if (!historyPart || !historySectors || now < 1700000000) return false;  // points need a date
+    portENTER_CRITICAL(&statsMux);
+    uint32_t count = historyLen, head = historyHead, revision = historyRevision;
+    uint32_t lastAt = uint32_t(now) - (millis() - historyMs) / 1000;
+    portEXIT_CRITICAL(&statsMux);
+    if (!count) return false;
+    uint32_t sector = historyNext;
+    if (esp_partition_erase_range(historyPart, sector * kSector, kSector) != ESP_OK) return false;
+    uint32_t crc = 0;
+    HistoryPoint chunk[32];
+    for (uint32_t done = 0; done < count;) {
+        uint32_t n = std::min<uint32_t>(32, count - done);
+        bool same = true;
+        portENTER_CRITICAL(&statsMux);
+        same = historyRevision == revision;
+        for (uint32_t i = 0; same && i < n; ++i)
+            chunk[i] = history[(head - count + done + i + HISTORY_LEN) % HISTORY_LEN];
+        portEXIT_CRITICAL(&statsMux);
+        if (!same) return false;  // a new point arrived: next time
+        crc = esp_rom_crc32_le(crc, (const uint8_t *)chunk, n * sizeof(HistoryPoint));
+        if (esp_partition_write(historyPart, sector * kSector + kPointsAt + done * sizeof(HistoryPoint), chunk,
+                                n * sizeof(HistoryPoint)) != ESP_OK)
+            return false;
+        done += n;
+    }
+    HistoryHeader h{kHistoryMagic, historySeq + 1, lastAt, count, 0};
+    h.crc = headerCrc(h, crc);
+    if (esp_partition_write(historyPart, sector * kSector, &h, sizeof(h)) != ESP_OK) return false;
+    historySeq = h.seq;
+    historyNext = (sector + 1) % historySectors;
+    historySavedAt = millis();
+    historySavedRevision = revision;
+    logf("[stats] hashrate history saved: %u points\n", (unsigned)count);
+    return true;
+}
+
+}  // namespace
+
+void minerHistoryPoll() {
+    if (!restorePending) return;
+    uint32_t up = millis();
+    time_t now = time(nullptr);
+    // The first new point comes after five minutes: merging stops being simple then.
+    if (up > (HISTORY_INTERVAL_S - 20) * 1000UL) {
+        restorePending = false;
+        logf("[stats] hashrate history not restored: clock not set in time\n");
+        return;
+    }
+    if (now < 1700000000) return;
+    restorePending = false;
+    portENTER_CRITICAL(&statsMux);
+    bool empty = historyLen == 0;
+    portEXIT_CRITICAL(&statsMux);
+    if (!empty) return;
+    int64_t off = int64_t(now) - up / 1000 - restoreLastAt;  // seconds between the last point and this boot
+    uint32_t missing = off > 0 ? uint32_t(off / HISTORY_INTERVAL_S) : 0;
+    if (missing >= HISTORY_LEN) return;  // all older than 24 hours
+    uint32_t keep = std::min<uint32_t>(restoreCount, HISTORY_LEN - missing);
+    // Only this task adds points, and none exists yet: readers see historyLen 0 until the end.
+    if (!readPoints(restoreSector, restoreCount - keep, keep, history, nullptr)) return;
+    for (uint32_t i = 0; i < missing; ++i) history[keep + i] = HistoryPoint{0, INT16_MIN, 0, 0};  // off: no observation
+    portENTER_CRITICAL(&statsMux);
+    historyLen = keep + missing;
+    historyHead = historyLen % HISTORY_LEN;
+    ++historyRevision;
+    portEXIT_CRITICAL(&statsMux);
+    logf("[stats] hashrate history restored: %u points, %u while off\n", (unsigned)keep, (unsigned)missing);
+}
+
+bool minerSaveStats(bool periodic) {
     if (!saveMutex) return false;
     xSemaphoreTake(saveMutex, portMAX_DELAY);
     if (!statsLoaded || statsFrozen) {
         xSemaphoreGive(saveMutex);
         return true;
     }
+    // Restarts save the history too; the periodic save, every 30 minutes.
+    if ((!periodic || millis() - historySavedAt >= kHistorySaveMs) && historyRevision != historySavedRevision &&
+        !restorePending && !saveHistory())
+        historySavedAt = millis() - kHistorySaveMs + 60000;  // try again in a minute
     StatsSnapshot s;
     minerStatsSnapshot(s);
     bool ok = writeRecord(s);

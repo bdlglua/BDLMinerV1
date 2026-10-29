@@ -140,6 +140,7 @@ void loop() {
         watchTick();
         trialPoll();
         crashPoll();
+        minerHistoryPoll();
         mqttApply();
         if (webTakeSettingsChange()) ui::applySettings();
         ui::render();

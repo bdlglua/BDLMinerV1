@@ -32,5 +32,16 @@ int main(){
     // Stop must decay to zero without unsigned overflow or imaginary work.
     for(int i=0;i<60;++i){testMillis+=1000;minerTick();}
     assert(minerHashrate()==0&&minerTotalHashes()==72000000000000ULL);
+    // Share log: answers settle the oldest pending share; a lost connection leaves the rest unanswered.
+    minerPoolConnected(true);
+    minerShareSent(1.5,false);minerShareSent(2.5,true);minerShareSent(3.5,false);
+    minerShareResult(true);minerShareResult(false);
+    ShareEntry log[20];int n=minerShareLog(log,20);
+    assert(n==3&&log[0].difficulty==3.5f&&log[0].state==SharePending&&log[1].state==ShareRejected&&log[1].backup&&log[2].state==ShareAccepted);
+    minerPoolConnected(false);n=minerShareLog(log,20);assert(log[0].state==ShareUnanswered&&log[2].state==ShareAccepted);
+    for(int i=0;i<25;++i)minerShareSent(i,false);
+    assert(minerShareLog(log,20)==20&&log[0].difficulty==24.0f&&log[19].difficulty==5.0f);
+    double period=minerTakePeriodBest();assert(minerTakePeriodBest()==0&&period>=0);
+    puts("Share log: in-order answers, unanswered after disconnect, 20 newest kept; period best resets");
     puts("Native ASIC mining: unique work/version masks, independent SHA-256d, corrupted/stale results, no software fallback and accurate 1.2 TH/s counters/stop decay passed");
 }

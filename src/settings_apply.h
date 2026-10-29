@@ -67,6 +67,7 @@ inline const char *settingsError(JsonObjectConst values) {
                 if (!strcmp(s.key, "maxtemp") && n && n < 30) return "Temperature must be 0 or at least 30 C";
                 if ((!strcmp(s.key, "nightfrom") || !strcmp(s.key, "nightto")) && n > 23 && n != 255)
                     return "Night hours must be 0-23 or 255";
+                if (!strcmp(s.key, "summary") && n > 23 && n != 255) return "The summary hour must be 0-23 or 255";
                 break;
             }
             case SettingType::Decimal:
@@ -131,7 +132,7 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
 // and other tasks read those strings without a lock.
 inline bool settingIsLive(const char *key) {
     static const char *const kLive[] = {"bright", "rot",      "autorot",  "lang",     "theme",  "cycle",
-                                        "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin",
+                                        "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin", "summary",
                                         "maxtemp", "power",    "rebooth",  "saver",    "update", "count"};
     for (const char *k : kLive)
         if (!strcmp(k, key)) return true;

@@ -66,6 +66,13 @@ function upd(u){
  e.appendChild(c);return e;
 }
 // The panic handler's core dump: summary, download (password) and erase.
+// The last shares sent and the pool's answers, newest first.
+function sharesTile(log){
+ const mark={accepted:'✓',rejected:'✗',pending:'…',unanswered:'?'},label={accepted:'Accepted',rejected:'Rejected',pending:'Waiting',unanswered:'No answer'};
+ const lines=log.slice(0,10).map(e=>(e.t?new Date(e.t*1e3).toLocaleTimeString():'--:--:--')+'  '+mark[e.s]+' '+t(label[e.s]||e.s)+' · '+t('diff')+' '+diff(e.d)+(e.b?' · '+t('backup pool'):''));
+ const accepted=log.filter(e=>e.s==='accepted').length;
+ const e=tile(t('Recent shares'),accepted+' / '+log.length+' '+t('accepted'),lines.join('\n'),true);e.dataset.group='records';return e;
+}
 // Connected time since restart, reconnections and switches to the backup pool.
 function poolUptime(p){
  if(!Number.isFinite(p.connected_percent))return'';
@@ -73,6 +80,13 @@ function poolUptime(p){
  if(p.sessions>1)parts.push((p.sessions-1)+' '+t(p.sessions>2?'reconnections':'reconnection'));
  if(p.failovers)parts.push(p.failovers+' '+t(p.failovers>1?'switches to backup':'switch to backup'));
  return'\n'+parts.join(' · ');
+}
+// A pool that lists only recently active workers (public-pool: a share in the
+// last 10 minutes) shows none between the rare shares of a high difficulty.
+function workerNote(j,pv){
+ const every=j.hashrate>0&&j.pool.difficulty>0?j.pool.difficulty*4294967296/j.hashrate:0;
+ if(pv.workers!==0||every<600)return'';
+ return'\n'+t('No worker listed: the pool shows a worker only for a few minutes after each share, and at difficulty')+' '+diff(j.pool.difficulty).trim()+' '+t('this miner sends one every')+' '+dur(every)+'.';
 }
 // The pool's statistics API failing, usually an outage on its side.
 function apiError(code){return t('the pool\'s statistics API is not answering')+' ('+(code>0?'HTTP '+code:t('no connection'))+')'}
@@ -144,13 +158,14 @@ function show(j){
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];
   renderUpdate(j.github_update);
-  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')+(pv.error?'\n⚠ '+apiError(pv.error):'')));
+  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')+(pv.error?'\n⚠ '+apiError(pv.error):'')+workerNote(j,pv)));
   // Without a readable pool API, show what the pool credits: accepted share
   // difficulty x 2^32 over the session, the way pools estimate a worker.
   else if(!pv.supported||pv.error){const work=j.shares.work,since=j.uptime_s,note=pv.error?'\n⚠ '+apiError(pv.error):'';
    T.push(work>0&&since>0?tile(t('Seen by the pool'),si(work*4294967296/since,'H/s'),t('estimated from accepted shares')+' · '+j.shares.accepted+' '+t('shares')+' · '+t('since restart')+note):tile(t('Seen by the pool'),'-',t('waiting for accepted shares')+note))}
   const now=Date.now()/1e3,B=j.blocks_recent||[];
   if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+': '+t('your best')+' '+diff(B[0].best):''),true));
+  if(Array.isArray(j.shares_log)&&j.shares_log.length)T.push(sharesTile(j.shares_log));
   if(j.top&&j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
   if(m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString()+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString()+' '+t('sats')+' / '+m.currency:'',true),
    tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),

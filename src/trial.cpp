@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_ota_ops.h>
+#include <esp_system.h>
 
 #include <atomic>
 
@@ -23,7 +24,8 @@ namespace {
 constexpr uint32_t kConfirmMs = 3 * 60 * 1000;
 constexpr uint32_t kTrialMs = 20 * 60 * 1000;
 constexpr uint32_t kOfflineTrialMs = 40 * 60 * 1000;  // a firmware may also break WiFi
-constexpr uint8_t kTries = 2;  // a power cut during the trial also rolls back
+constexpr uint8_t kTries = 2;    // failed trials before a version is refused
+constexpr uint8_t kMaxCuts = 3;  // trials ended by a reset or power cut that are not held against it
 
 std::atomic<bool> pending{false};
 
@@ -33,6 +35,8 @@ void forget() {
         p.remove("ver");
         p.remove("failver");
         p.remove("fails");
+        p.remove("cuts");
+        p.remove("cut");
         p.end();
     }
 }
@@ -53,27 +57,45 @@ void trialBegin() {
     p.begin("trial", true);
     String expected = p.getString("ver", "");
     String counted = p.getString("told", "");  // this rollback was already counted
-    String failed = p.getString("failver", "");
-    uint8_t fails = failed == expected ? p.getUChar("fails", 0) : 0;
+    bool same = p.getString("failver", "") == expected;
+    uint8_t fails = same ? p.getUChar("fails", 0) : 0;
+    uint8_t cuts = same ? p.getUChar("cuts", 0) : 0;
+    bool lastWasCut = same && p.getBool("cut", false);
     p.end();
     if (!esp_ota_get_last_invalid_partition() || expected.isEmpty() || expected == FW_VERSION) return;
     bool fresh = counted != expected;
-    if (fresh) fails++;
-    char why[80];
-    snprintf(why, sizeof(why), "firmware %s failed its trial and was rolled back", expected.c_str());
-    if (fails >= kTries) {
-        ghUpdateRefuse(expected.c_str(), why);
-        logf("[update] %s %u times; it is not installed automatically again\n", why, (unsigned)fails);
+    // The reset that ended the trial: a power cut, the reset button or a USB
+    // serial reset says nothing about the firmware, unless it keeps happening
+    // (a firmware that hangs and gets switched off).
+    bool cut = lastWasCut;
+    if (fresh) {
+        esp_reset_reason_t reason = esp_reset_reason();
+        cut = (reason == ESP_RST_POWERON || reason == ESP_RST_EXT || reason == ESP_RST_BROWNOUT) && cuts < kMaxCuts;
+        if (cut) cuts++;
+        else fails++;
+    }
+    char why[96];
+    if (cut) {
+        snprintf(why, sizeof(why), "firmware %s was interrupted by a reset or power cut during its trial", expected.c_str());
+        logf("[update] %s; it is installed again\n", why);
     } else {
-        logf("[update] %s; it gets one more try\n", why);
+        snprintf(why, sizeof(why), "firmware %s failed its trial and was rolled back", expected.c_str());
+        if (fails >= kTries) {
+            ghUpdateRefuse(expected.c_str(), why);
+            logf("[update] %s %u times; it is not installed automatically again\n", why, (unsigned)fails);
+        } else {
+            logf("[update] %s; it gets one more try\n", why);
+        }
     }
     if (!fresh) return;
-    notify("Update rolled back", why, 4, "warning");
+    if (!cut) notify("Update rolled back", why, 4, "warning");
     Preferences w;
     if (w.begin("trial", false)) {
         w.putString("told", expected);
         w.putString("failver", expected);
         w.putUChar("fails", fails);
+        w.putUChar("cuts", cuts);
+        w.putBool("cut", cut);
         w.end();
     }
 }

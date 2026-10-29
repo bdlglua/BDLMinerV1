@@ -1,6 +1,7 @@
 #include "watch.h"
 
 #include <Arduino.h>
+#include <Preferences.h>
 
 #include <algorithm>
 #include <memory>
@@ -90,6 +91,7 @@ void throttle() {
 }
 
 void alerts(uint32_t now, const MinerStats &stats);
+void summary(uint32_t now, const MinerStats &stats);
 
 void events(uint32_t now) {
     const MinerStats stats = minerStats();
@@ -173,6 +175,7 @@ void events(uint32_t now) {
     }
 
     alerts(now, stats);
+    summary(now, stats);
 
     if (now - lastConnected > kNoPoolRestartMs) restart("no pool connection for 30 minutes");
     if (settings.rebootHours && now - acceptedAt > settings.rebootHours * 3600000UL) {
@@ -246,6 +249,67 @@ void alerts(uint32_t now, const MinerStats &stats) {
         accepted0 = stats.accepted;
         rejected0 = stats.rejected;
     }
+}
+
+String rateText(double rate) {
+    char out[24];
+    if (rate >= 1e9) snprintf(out, sizeof(out), "%.2f GH/s", rate / 1e9);
+    else if (rate >= 1e6) snprintf(out, sizeof(out), "%.2f MH/s", rate / 1e6);
+    else snprintf(out, sizeof(out), "%.1f kH/s", rate / 1e3);
+    return out;
+}
+
+// Once a day at settings.summaryHour (within its first 10 minutes): what the
+// miner did since the previous summary, or since it started.
+void summary(uint32_t now, const MinerStats &stats) {
+    static bool started = false;
+    static uint32_t fromMs, accepted0, rejected0, blocks0, connected0, sentDay;
+    static uint64_t hashes0;
+    if (!started) {
+        started = true;
+        fromMs = now;
+        hashes0 = minerTotalHashes();
+        accepted0 = stats.accepted;
+        rejected0 = stats.rejected;
+        blocks0 = stats.blocksFound;
+        connected0 = minerPoolUptime().connectedMs;
+        Preferences p;  // survives restarts: one summary a day
+        p.begin("summary", true);
+        sentDay = p.getUInt("day", 0);
+        p.end();
+    }
+    struct tm t;
+    if (settings.summaryHour > 23 || !clockNow(t) || t.tm_hour != settings.summaryHour || t.tm_min >= 10) return;
+    uint32_t day = uint32_t(t.tm_year) * 1000 + t.tm_yday + 1;
+    if (day == sentDay) return;
+    sentDay = day;
+    Preferences p;
+    if (p.begin("summary", false)) {
+        p.putUInt("day", day);
+        p.end();
+    }
+    uint32_t ms = now - fromMs;
+    if (ms >= 30 * 60 * 1000) {  // nothing worth a message just after a start
+        PoolUptime pool = minerPoolUptime();
+        double rate = (minerTotalHashes() - hashes0) * 1000.0 / ms;
+        double best = minerTakePeriodBest();
+        uint32_t blocks = stats.blocksFound - blocks0;
+        char msg[192], since[32];
+        if (ms >= 23 * 3600000UL) snprintf(since, sizeof(since), "24 h");
+        else snprintf(since, sizeof(since), "Since start %u h ago", (unsigned)((ms + 1800000) / 3600000));
+        snprintf(msg, sizeof(msg), "%s%s: %s average, best %.4g (record %.4g), %u accepted / %u rejected, pool connected %.1f %%",
+                 blocks ? "BLOCK FOUND! " : "", since, rateText(rate).c_str(), best, stats.bestDiff,
+                 (unsigned)(stats.accepted - accepted0), (unsigned)(stats.rejected - rejected0),
+                 100.0 * (pool.connectedMs - connected0) / ms);
+        logf("[watch] daily summary: %s\n", msg);
+        notify("Daily summary", msg, 2, "bar_chart");
+    }
+    fromMs = now;
+    hashes0 = minerTotalHashes();
+    accepted0 = stats.accepted;
+    rejected0 = stats.rejected;
+    blocks0 = stats.blocksFound;
+    connected0 = minerPoolUptime().connectedMs;
 }
 
 void screens() {

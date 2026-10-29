@@ -158,6 +158,19 @@ void buildStats(JsonDocument &j, bool history) {
     j["pool"]["connected_percent"] = uptimeMs ? std::round(1000.0 * poolUp.connectedMs / uptimeMs) / 10 : 0;
     j["pool"]["sessions"] = poolUp.sessions;
     j["pool"]["failovers"] = netFailovers();
+    ShareEntry sent[20];
+    int sentCount = minerShareLog(sent, 20);
+    if (sentCount) {
+        static const char *const kStates[] = {"pending", "accepted", "rejected", "unanswered"};
+        JsonArray log = j["shares_log"].to<JsonArray>();
+        for (int i = 0; i < sentCount; ++i) {
+            JsonObject e = log.add<JsonObject>();
+            e["t"] = sent[i].time;
+            e["d"] = sent[i].difficulty;
+            e["s"] = kStates[sent[i].state & 3];
+            if (sent[i].backup) e["b"] = true;
+        }
+    }
     PoolStats pv = poolStatsGet();
     j["pool_view"]["updated_s"] = pv.updatedMs ? (long)((millis() - pv.updatedMs) / 1000) : -1;
     j["pool_view"]["supported"] = pv.supported;
@@ -180,7 +193,11 @@ void buildStats(JsonDocument &j, bool history) {
         int n = minerHistoryPoints(historyScratch, HISTORY_LEN);
         j["history"]["interval_s"] = HISTORY_INTERVAL_S;
         JsonArray hr = j["history"]["hashrate"].to<JsonArray>();
-        for (int i = 0; i < n; i++) hr.add(double(historyScratch[i].hashrate));
+        for (int i = 0; i < n; i++) {
+            const HistoryPoint &p = historyScratch[i];
+            if (p.coveragePercent || p.hashrate) hr.add(double(p.hashrate));
+            else hr.add(nullptr);
+        }
     }
     j["heap"] = ESP.getFreeHeap();
     j["task_failures"] = runtime::failures().load();
@@ -379,7 +396,8 @@ void handleHistory() {
         for (int i = 0; i < n; ++i) {
             if (i) body += ',';
             const auto &p = historyScratch[i];
-            if (field == 0) body += String(p.hashrate, 0);
+            // No observation at all (the miner was off): a gap, not 0 H/s.
+            if (field == 0) body += p.coveragePercent || p.hashrate ? String(p.hashrate, 0) : String("null");
             else if (field == 1) body += p.temperatureDeciC == INT16_MIN ? String("null") : String(p.temperatureDeciC / 10.0f, 1);
             else if (field == 2) body += p.coveragePercent ? String(p.powerPercent) : String("null");
             else body += String(p.coveragePercent);

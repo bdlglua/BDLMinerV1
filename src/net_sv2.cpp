@@ -158,6 +158,7 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
             if (submit.payload.empty()) { logf("[pool] SV2 obsolete share dropped (job %s)\n", share.jobId); continue; }
             if (first) lastReply = millis();
             if (!transport->send(client, submit)) return result;
+            minerShareSent(share.difficulty, netOnBackup());
             pending = protocol->pending();
         } else vTaskDelay(pdMS_TO_TICKS(10));
     }

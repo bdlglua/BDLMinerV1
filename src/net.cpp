@@ -187,6 +187,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
             if (!proto.pendingShares()) lastShareReply = millis();
             std::string line = proto.submit(share);
             if (line.empty() || !sendLine(client, line)) return;
+            minerShareSent(share.difficulty, onBackup);
             pendingShares = proto.pendingShares();
         }
     }

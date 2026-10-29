@@ -67,6 +67,7 @@ struct Settings {
     String webhookUrl;       // POST JSON to it too (Discord, Telegram...), empty = off
     uint8_t alertPercent = 50;  // notify when hashrate stays below this % of normal, 0 = off
     uint8_t alertMinutes = 15;  // ... for that long
+    uint8_t summaryHour = 20;   // daily summary notification at this local hour, HOUR_OFF = none
 #ifdef BOARD_GAMMA601
     uint16_t asicFrequency = 600; // requested Gamma profile; automatic stock fallback
 #endif

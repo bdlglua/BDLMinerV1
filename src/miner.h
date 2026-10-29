@@ -30,6 +30,7 @@ struct MinerStats {
     volatile uint32_t over64bits;    // hashes with >= 64 leading zero bits, this boot
     double bestDiff;                 // best share difficulty ever (persisted)
     double sessionBestDiff;
+    double periodBestDiff;           // since minerTakePeriodBest(): the daily summary
 
     // Totals since the first boot (persisted), this session included.
     uint64_t lifetimeHashes;
@@ -48,6 +49,17 @@ struct MinerStats {
 // Coherent copy for UI/network consumers; shared storage stays in miner.cpp.
 MinerStats minerStats();
 void minerPoolConnected(bool connected);
+// The last shares sent to the pool and its answers, for the dashboard. The
+// pool answers in order, so each result goes to the oldest pending share.
+struct ShareEntry {
+    uint32_t time;      // Unix time, 0 when the clock was not set
+    float difficulty;   // of the hash
+    uint8_t state;      // SharePending, ShareAccepted, ShareRejected or ShareUnanswered
+    bool backup;        // sent to the backup pool
+};
+enum : uint8_t { SharePending, ShareAccepted, ShareRejected, ShareUnanswered };
+void minerShareSent(double difficulty, bool backup);
+int minerShareLog(ShareEntry *out, int capacity);  // newest first
 struct PoolUptime {
     uint32_t connectedMs = 0;  // since boot
     uint32_t sessions = 0;     // connections that reached mining
@@ -89,6 +101,8 @@ struct HistoryPoint {
 };
 int minerHistoryPoints(HistoryPoint *out, int capacity, uint32_t *revision = nullptr);
 uint32_t minerHistoryRevision();
+// The best share difficulty since the previous call (then starts a new period).
+double minerTakePeriodBest();
 void minerObserve(float temperature, uint8_t effectivePower);
 struct MinerProfile {
     uint64_t hashingUs = 0, restMs = 0, waitingMs = 0, pausedMs = 0;
@@ -100,7 +114,12 @@ void minerProfiles(MinerProfile *out, int capacity);
 // power cut during a save loses at most the previous save). Saving does
 // nothing before minerLoadStats() has read the saved stats back.
 void minerLoadStats();
-bool minerSaveStats();
+// `periodic`: the 10-minute save, which writes the hashrate history only every
+// 30 minutes; any other call (before a restart) writes it too.
+bool minerSaveStats(bool periodic = false);
+// Merges the history saved before the last restart once the clock is set; call
+// once a second from the main loop.
+void minerHistoryPoll();
 
 // The best shares ever found (any difficulty, not only those sent to the
 // pool), best first. `time` is a Unix time, 0 when the clock was not set yet.

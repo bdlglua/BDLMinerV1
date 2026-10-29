@@ -42,6 +42,7 @@ const FIELDS={
  nightto:['Night mode until'],beep:['Beep on a 32-bit share'],tz:['Time zone','POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0'],fiat:['Price currency'],
  ntfy:['ntfy topic','A long, hard-to-guess name. Empty = off.'],ntfysrv:['ntfy server'],notify32:['Also every 32-bit share'],
  hook:['Webhook URL','JSON POST for Discord, Telegram… It holds a token: keep it private. Empty = off.'],
+ summary:['Daily summary at','Average hashrate, best share, shares and pool connection of the past day. Off = none.'],
  alertpct:['Hashrate alert below','Share of the usual full-power hashrate. 0 = off.','%'],alertmin:['… for at least','','min'],
  maxtemp:['Pause mining above','0 = no thermal limit.','°C'],power:['Mining power','On USB and battery. 0 = paused.','%'],
  rebooth:['Restart after no accepted share for','0 = off.','h'],saver:['Battery saver','On battery: dim the screen and mine at half speed.'],
@@ -55,7 +56,7 @@ const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Str
  asicmhz:Array.from({length:12},(_,n)=>{const mhz=525+n*25;return[mhz,n?mhz+' MHz':'525 MHz (stock)']}),
  lang:[[0,'English'],[1,'Français']],rot:[[0,'Portrait'],[1,'Landscape'],[2,'Portrait, upside down'],[3,'Landscape, upside down']],
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
- update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
+ summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
 const THEMES=['#f7931a','#38d07a','#3b9cf6','#a66bf5','#ec5aa0'];
 function help(text){const p=document.createElement('p');p.className='field-help';p.textContent=text;return p}
 function render(data){

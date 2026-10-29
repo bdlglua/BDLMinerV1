@@ -510,6 +510,19 @@ check('a failing pool statistics API is reported with the share estimate',()=>ru
   assert.match(await f.page.locator('#device-grid').textContent(),/Integrations⚠ check/);
 }));
 
+check('a pool listing no worker is explained by the share interval',()=>run({stats:{hashrate:1e6,pool:{host:'public-pool.io',port:3333,connected:true,status:'Mining',difficulty:1},pool_view:{updated_s:60,supported:true,hashrate:0,best:116,workers:0,source:'public-pool.io:40557/api/client/'}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#pool-grid .t');
+  assert.match(await f.page.locator('#pool-grid').textContent(),/No worker listed: .* at difficulty 1(\.0+)? this miner sends one every 1h 1[12]m\./);
+}));
+
+check('recent shares list the pool answers, newest first',()=>run({stats:{shares_log:[{t:0,d:1.5,s:'pending'},{t:1793214889,d:0.25,s:'accepted',b:true},{t:1793214800,d:3,s:'rejected'},{t:1793214700,d:2,s:'unanswered'}]}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
+  const text=await f.page.locator('#records-grid').textContent();
+  assert.match(text,/Recent shares1 \/ 4 accepted/);assert.match(text,/--:--:--  … Waiting · diff 1\.5/);
+  assert.match(text,/✓ Accepted · diff 0\.25\d* · backup pool/);assert.match(text,/✗ Rejected · diff 3/);assert.match(text,/\? No answer · diff 2/);
+  assert.ok(text.indexOf('Waiting')<text.indexOf('Accepted'));
+}));
+
 check('integrations, pool reliability and crash history tiles',()=>run({stats:{pool:{host:'pool.example',port:3333,connected:true,status:'Mining',difficulty:1,connected_percent:98.4,sessions:3,failovers:1},integrations:{mqtt:'disconnected',mqtt_host:'ha.local:1883',notify:{enabled:true,title:'Test notification',ntfy:'off',webhook:'OK'}},pool_view:{updated_s:60,supported:true,hashrate:1e6,best:2,workers:1,source:'public-pool.io:40557/api/client/'},crash:{history:[{t:1793000000,version:'1.6.7',summary:'abort() called in task loopTask, backtrace 0x1'},{t:0,version:'1.6.6',summary:'task IDLE, LoadProhibited (cause 28) at 0x00000010'}]}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');
   const pool=await f.page.locator('#pool-grid').textContent();

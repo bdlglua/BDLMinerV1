@@ -64,6 +64,7 @@ void minerPublishJob(const work::Job &, bool) { ++published; if (!poolConnected)
 double poolDifficulty = 0;
 void minerPoolDifficulty(double value) { poolDifficulty = value; }
 void minerShareResult(bool) {}
+void minerShareSent(double, bool) {}
 bool minerNextShare(stratum::Share &, uint32_t) { ++polled; if (!poolConnected) ++premature; return false; }
 '''
 tests = r'''
