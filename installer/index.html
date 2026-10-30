@@ -150,11 +150,12 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat-note{margin:0;padding:6px 14px;font-size:13px;color:#ffb36b}
 .chat-note:empty{display:none}
 .chat-settings{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:14px}
-.chat-settings[hidden],.chat .chat-log[hidden],.chat form[hidden]{display:none}
+.chat-settings[hidden],.chat .chat-log[hidden],.chat form[hidden],.chat-rules[hidden]{display:none}
 .chat-settings h3{margin:0;font-size:15px}
 .chat-settings .field{display:flex;flex-direction:column;gap:6px}
 .chat-settings label{color:var(--label);font-size:13px;margin:0}
-.chat-settings .row{display:flex;gap:8px}
+.chat-settings .row{display:flex;gap:8px;min-width:0}
+.chat-settings .row input{flex:1;min-width:0}
 .chat-settings .hint{color:var(--label);font-size:12px;margin:0}
 .chat-qr{display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px}
 .chat-qr[hidden]{display:none}
@@ -355,20 +356,19 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
  <div class="chat-settings" id="chat-settings" hidden>
   <h3 data-t="chatSettings">Settings</h3>
   <div class="field">
-   <label for="chat-name" data-t="chatName">Your name</label>
+   <label for="chat-name" data-t="chatName">Name</label>
    <div class="row"><input id="chat-name" maxlength="24" autocomplete="nickname" data-ph="chatNamePh" placeholder="Your name">
     <button type="button" class="btn-s" id="chat-save" data-t="chatSave">Save</button></div>
-   <p class="hint" id="chat-when" data-t="chatNameHint">Chosen once, then kept: you can change it every 30 days.</p>
+   <p class="hint" id="chat-when" data-t="chatNameHint">Changeable every 30 days</p>
   </div>
   <div class="field">
-   <label data-t="chatCodeTitle">Use your name on another device</label>
-   <p class="hint" data-t="chatQrHint">Scan your QR code with the other device's camera: the chat opens there with your name.</p>
-   <div class="row"><button type="button" class="btn-s ghost" id="chat-qr-show" aria-expanded="false" aria-controls="chat-qr" data-t="chatQrShow">Show my QR code</button></div>
+   <label data-t="chatCodeTitle">Other device</label>
+   <div class="row"><button type="button" class="btn-s ghost" id="chat-qr-show" aria-expanded="false" aria-controls="chat-qr" data-t="chatQrShow">📱 My QR code</button></div>
    <div class="chat-qr" id="chat-qr" hidden>
     <div id="chat-qr-img" role="img" data-al="chatQrAlt" aria-label="QR code to open the chat with your name"></div>
+    <p class="hint" data-t="chatCodeHint">🔒 Scan it with your phone. Show it to no one.</p>
     <button type="button" class="btn-s ghost" id="chat-link" data-t="chatLink">Copy the link</button>
    </div>
-   <p class="hint" data-t="chatCodeHint">This QR code is the key to your name: show it to no one.</p>
   </div>
   <button type="button" class="btn-s" id="chat-back" data-t="chatBack">Back to the chat</button>
  </div>
@@ -416,9 +416,9 @@ statsTitle:'BDLMiner en ce moment',statsLead:'Le total en direct des miners qui 
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
-chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Ton pseudo',chatNamePh:'Ton pseudo',
-chatSave:'Enregistrer',chatNameHint:'Choisi une fois puis gardé : tu pourras le changer tous les 30 jours.',chatWhen:'Pseudo enregistré · modifiable le {d}',chatNow:'Pseudo enregistré · modifiable dès maintenant',
-chatCodeTitle:'Utiliser ton pseudo sur un autre appareil',chatQrHint:'Scanne ton QR code avec l\'appareil photo de l\'autre appareil : la discussion s\'y ouvre avec ton pseudo.',chatQrShow:'Afficher mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'Ce QR code est la clé de ton pseudo : ne le montre à personne.',
+chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
+chatSave:'Enregistrer',chatNameHint:'Modifiable tous les 30 jours',chatWhen:'Modifiable le {d}',chatNow:'Modifiable maintenant',
+chatCodeTitle:'Autre appareil',chatQrShow:'📱 Mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'🔒 Scanne-le avec ton téléphone. Ne le montre à personne.',
 chatBack:'Retour à la discussion',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
 chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatAttach:'Photo ou vidéo',chatRecord:'Message vocal',chatRemove:'Retirer',
 chatRules:'Messages, photos et vidéos publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
@@ -445,7 +445,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={chatWhen:'Name registered · changeable on {d}',chatNow:'Name registered · changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -588,7 +588,7 @@ const $c=id=>document.getElementById(id);
 function chatCode(){let c=store.get('chatCode');
  if(!c||!/^[A-Za-z0-9_-]{16,128}$/.test(c)){const b=new Uint8Array(24);crypto.getRandomValues(b);
   c=btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');store.set('chatCode',c)}return c}
-function chatDate(t){return new Date(t).toLocaleDateString(lang=='fr'?'fr-FR':'en-US',{day:'numeric',month:'long',year:'numeric'})}
+function chatDate(t){return new Date(t).toLocaleDateString(lang=='fr'?'fr-FR':'en-US',{day:'numeric',month:'short',year:'numeric'})}
 function chatTime(t){return new Date(t).toLocaleTimeString(lang=='fr'?'fr-FR':'en-US',{hour:'2-digit',minute:'2-digit'})}
 function chatNote(text){$c('chat-note').textContent=text||''}
 function chatError(key,until){chatNote((T('chatErrors')[key]||key).replace('{d}',until?chatDate(until):''))}
@@ -677,6 +677,7 @@ function chatMe(){const input=$c('chat-name'),me=chat.me;if(!input)return;
  input.readOnly=!free;$c('chat-save').hidden=!free;
  $c('chat-when').textContent=!named?T('chatNameHint'):free?T('chatNow'):T('chatWhen').replace('{d}',chatDate(me.changeAt))}
 function chatShowSettings(on){if(!on&&window.chatQr)chatQr(false);chat.settings=on;$c('chat-settings').hidden=!on;$c('chat-log').hidden=on;$c('chat-form').hidden=on;
+ $c('chat').querySelector('.chat-rules').hidden=on;
  $c('chat-gear').setAttribute('aria-pressed',on);chatMe();if(on)$c('chat-name').focus();else $c('chat-text').focus()}
 function chatAttachClear(){if(chat.attach?.url)URL.revokeObjectURL(chat.attach.url);chat.attach=null;$c('chat-attach').hidden=true}
 function chatAttachShow(a){chatAttachClear();chat.attach=a;const box=$c('chat-attach');box.querySelectorAll('img,video,audio').forEach(e=>e.remove());
