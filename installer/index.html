@@ -3,65 +3,313 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BDLMiner V1 flasher</title>
+<title>BDLMiner V1: solo Bitcoin mining on ESP32</title>
+<meta name="description" content="Free, open-source solo &quot;lottery&quot; Bitcoin miner for the M5StickC Plus2 and other ESP32 boards. Install it from your browser in two minutes.">
+<meta property="og:title" content="BDLMiner V1">
+<meta property="og:description" content="Free, open-source solo Bitcoin lottery miner for ESP32 boards. Install it from your browser.">
+<meta property="og:image" content="assets/screen-mining.png">
+<meta name="theme-color" content="#0b0d12">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <style>
-:root{--bg:#0b0d12;--panel:#161b26;--border:#2b3344;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a}
+:root{--bg:#0b0d12;--panel:#141922;--panel2:#10141c;--border:#262e3d;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a;--good:#3ddc84}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;padding:16px}
-main{max-width:640px;margin:0 auto}
-header{display:flex;align-items:center;gap:10px;margin:8px 0 20px}
-.coin{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:900;display:grid;place-items:center;transform:rotate(14deg)}
-h1{font-size:22px;margin:0}h1 b{color:var(--accent)}
-#lang{margin-left:auto;background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer}
-.box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--accent)}
+.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:#000;padding:8px 12px;border-radius:6px;z-index:10}
+.skip:focus{left:8px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+/* Navigation */
+nav{position:sticky;top:0;z-index:5;background:rgba(11,13,18,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+nav .wrap{display:flex;align-items:center;gap:18px;height:58px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;font-weight:800;font-size:18px}
+.brand b{color:var(--accent)}
+.links{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap}
+.links a{color:var(--label);text-decoration:none;font-size:14px}
+.links a:hover{color:var(--fg)}
+#lang{background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit;font-size:14px}
+@media (max-width:760px){.links{display:none}#lang{margin-left:auto}}
+/* Hero */
+.hero{padding-block:56px 40px;display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
+@media (max-width:860px){.hero{grid-template-columns:1fr;padding-block-start:36px}}
+.hero h1{font-size:clamp(32px,5vw,50px);line-height:1.1;margin:0 0 16px}
+.hero h1 b{color:var(--accent)}
+.hero p{color:#c4cad6;font-size:18px;margin:0 0 24px}
+.buttons{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;background:var(--accent);color:#000;border:0;border-radius:8px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+.btn.ghost{background:none;color:var(--fg);border:1px solid var(--border)}
+.btn.ghost:hover{border-color:var(--label)}
+.device{background:#1b1f27;border:1px solid #2f3747;border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.device img{display:block;width:100%;height:auto;border-radius:6px;image-rendering:pixelated;background:#000}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.thumbs img{width:100%;border-radius:4px;border:1px solid #2f3747;image-rendering:pixelated;cursor:pointer;opacity:.7;background:#000;padding:0}
+.thumbs button{padding:0;border:0;background:none;cursor:pointer}
+.thumbs button[aria-pressed=true] img{opacity:1;border-color:var(--accent)}
+/* Sections */
+section{padding:48px 0;border-top:1px solid var(--border)}
+h2{font-size:28px;margin:0 0 8px}
+.lead{color:var(--label);margin:0 0 28px;max-width:720px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+.card h3{margin:0 0 6px;font-size:17px}
+.card p{margin:0;color:#b9c0cc;font-size:15px}
+.card .icon{font-size:22px;margin-bottom:8px}
+.boards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;list-style:none;padding:0;margin:0}
+.boards li{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.boards li.exp{border-style:dashed}
+/* Installer */
+.install{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.install{grid-template-columns:1fr}}
 label{display:block;color:var(--label);font-size:13px;margin-bottom:6px}
 select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font:inherit}
 esp-web-install-button{display:block;margin-top:14px}
-esp-web-install-button button,.btn{background:var(--accent);color:#000;border:0;border-radius:8px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}
-ol{padding-left:20px;margin:0}li{margin:6px 0}a{color:var(--accent)}.s{color:var(--label);font-size:13px}
+ol{padding-left:20px;margin:0}li{margin:6px 0}
+.s{color:var(--label);font-size:13px}
+/* Statistics */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+.tile .label{color:var(--label);font-size:13px}
+.tile .value{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+.tile .value.accent{color:var(--accent)}
+.chart{width:100%;height:200px;display:block}
+.chart text{fill:var(--label);font-size:11px}
+.note{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;color:#c4cad6}
+/* Footer */
+footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label);font-size:14px}
+footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
 </style>
 </head>
 <body>
-<main>
-<header><div class="coin">B</div><h1>BDLMiner <b>V1</b></h1><button id="lang">Français</button></header>
+<a class="skip" href="#main" data-t="skip">Skip to content</a>
+<nav aria-label="Main">
+ <div class="wrap">
+  <a class="brand" href="#top" aria-label="BDLMiner V1">
+   <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><g fill="#f7931a"><rect x="24" y="24" width="52" height="52" rx="10"/><g id="pins"><rect x="31" y="8" width="6" height="12" rx="2"/><rect x="47" y="8" width="6" height="12" rx="2"/><rect x="63" y="8" width="6" height="12" rx="2"/></g><use href="#pins" transform="translate(0 72)"/><use href="#pins" transform="rotate(90 50 50)"/><use href="#pins" transform="rotate(90 50 50) translate(0 72)"/></g><text x="50" y="64" text-anchor="middle" font-size="42" font-weight="900" font-family="system-ui,sans-serif" fill="#15100a">B</text></svg>
+   <span>BDLMiner <b>V1</b></span>
+  </a>
+  <div class="links">
+   <a href="#features" data-t="navFeatures">Features</a>
+   <a href="#boards" data-t="navBoards">Boards</a>
+   <a href="#install" data-t="navInstall">Install</a>
+   <a href="#stats" data-t="navStats">Statistics</a>
+   <a href="#community" data-t="navCommunity">Community</a>
+  </div>
+  <button id="lang" type="button">Français</button>
+ </div>
+</nav>
 
-<div class="box">
-<label for="board" data-t="board">Your board</label>
-<select id="board"></select>
-<esp-web-install-button id="install">
-  <button slot="activate" class="btn" data-t="install">Install</button>
-  <span slot="unsupported" data-t="unsupported">Your browser cannot install: use Chrome or Edge on a computer.</span>
-  <span slot="not-allowed" data-t="notallowed">The page must be opened over HTTPS.</span>
-</esp-web-install-button>
-<p class="s" data-t="version">Version __VERSION__. The first install erases the board (settings and statistics).</p>
+<main id="main">
+<div class="wrap hero" id="top">
+ <div>
+  <h1 data-h="title">Solo Bitcoin mining on a <b>pocket-sized</b> ESP32</h1>
+  <p data-t="tagline">BDLMiner V1 is free, open-source firmware that turns an M5StickC Plus2 or another ESP32 board into a solo "lottery" Bitcoin miner, with a live screen, a web dashboard and automatic signed updates.</p>
+  <div class="buttons">
+   <a class="btn" href="#install" data-t="ctaInstall">Install in 2 minutes</a>
+   <a class="btn ghost" href="https://github.com/bdlglua/BDLMinerV1">GitHub</a>
+   <a class="btn ghost" href="https://discord.gg/S8kSgD6Xe9">Discord</a>
+  </div>
+  <p class="s" data-t="version">Latest version: __VERSION__.</p>
+ </div>
+ <div class="device">
+  <img id="screen" src="assets/screen-mining.png" width="320" height="170" alt="The miner's screen: 1.005 MH/s, 10827 shares, best difficulty 7.82, 52.1 °C" data-alt="altMining">
+  <div class="thumbs" role="group" aria-label="Screens" data-al="screens">
+   <button type="button" data-screen="graph" aria-pressed="false"><img src="assets/screen-graph.png" width="320" height="170" alt="Hashrate chart screen" data-alt="altGraph"></button>
+   <button type="button" data-screen="global" aria-pressed="false"><img src="assets/screen-global.png" width="320" height="170" alt="Bitcoin price and network screen" data-alt="altGlobal"></button>
+   <button type="button" data-screen="clock" aria-pressed="false"><img src="assets/screen-clock.png" width="320" height="170" alt="Clock screen" data-alt="altClock"></button>
+  </div>
+ </div>
 </div>
 
-<div class="box">
-<ol>
-<li data-t="s1">Plug the board into this computer with a USB cable that carries data.</li>
-<li data-t="s2">Pick the board above, click Install and choose its serial port.</li>
-<li data-t="s3">When it restarts, join the WiFi network BDLMinerV1-XXXX (password MineYourCoins) and enter your WiFi, pool and BTC address.</li>
-</ol>
-<p class="s"><a href="https://github.com/bdlglua/BDLMinerV1" data-t="source">Source code and documentation</a> · <a href="https://discord.gg/S8kSgD6Xe9" data-t="discord">Help and community on Discord</a></p>
-</div>
+<section id="features">
+ <div class="wrap">
+  <h2 data-t="featTitle">What it does</h2>
+  <p class="lead" data-t="featLead">Everything runs on the board: it connects to a pool over WiFi, hashes block headers and shows what happens.</p>
+  <div class="grid">
+   <div class="card"><div class="icon" aria-hidden="true">⚡</div><h3 data-t="f1t">Hardware SHA-256</h3><p data-t="f1">Uses the ESP32's SHA engine: about 1 MH/s on an M5StickC Plus2, with software mining as a fallback.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">🔗</div><h3 data-t="f2t">Stratum V1 and V2</h3><p data-t="f2">Any solo pool, native Stratum V2 with Noise encryption, a backup pool and automatic failover.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">📊</div><h3 data-t="f3t">Live web dashboard</h3><p data-t="f3">Hashrate, shares, what the pool sees, history, settings and logs from any browser on your network.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">🔒</div><h3 data-t="f4t">Signed automatic updates</h3><p data-t="f4">New releases install by themselves, only with a valid signature, and roll back if they fail.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">🔔</div><h3 data-t="f5t">Alerts</h3><p data-t="f5">ntfy, Discord or Telegram webhooks: best shares, low hashrate, a daily summary and, who knows, a block.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">🏠</div><h3 data-t="f6t">Home Assistant</h3><p data-t="f6">MQTT discovery with controls, and Prometheus metrics for your own graphs.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">🖥️</div><h3 data-t="f7t">Made for small screens</h3><p data-t="f7">Readable pages on every display from 0.9 to 2.8 inches, in English or French, or no screen at all.</p></div>
+   <div class="card"><div class="icon" aria-hidden="true">🧪</div><h3 data-t="f8t">ASIC boards too</h3><p data-t="f8">Experimental support for the Bitaxe Gamma 601 and the NerdNOS, from hundreds of GH/s up to about 1 TH/s.</p></div>
+  </div>
+ </div>
+</section>
+
+<section id="boards">
+ <div class="wrap">
+  <h2 data-t="boardsTitle">Supported boards</h2>
+  <p class="lead" data-t="boardsLead">One firmware per family. Dashed boards are experimental: reports from real hardware are welcome.</p>
+  <ul class="boards" id="board-list"></ul>
+ </div>
+</section>
+
+<section id="install">
+ <div class="wrap">
+  <h2 data-t="installTitle">Install from your browser</h2>
+  <p class="lead" data-t="installLead">No software to install: Chrome or Edge on a computer flashes the board over USB.</p>
+  <div class="install">
+   <div class="card">
+    <label for="board" data-t="board">Your board</label>
+    <select id="board"></select>
+    <esp-web-install-button id="installer">
+     <button slot="activate" class="btn" data-t="install">Install</button>
+     <span slot="unsupported" data-t="unsupported">Your browser cannot install: use Chrome or Edge on a computer.</span>
+     <span slot="not-allowed" data-t="notallowed">The page must be opened over HTTPS.</span>
+    </esp-web-install-button>
+    <p class="s" data-t="erase">Version __VERSION__. The first install erases the board (settings and statistics).</p>
+   </div>
+   <div class="card">
+    <ol>
+     <li data-t="s1">Plug the board into this computer with a USB cable that carries data.</li>
+     <li data-t="s2">Pick the board, click Install and choose its serial port.</li>
+     <li data-t="s3">When it restarts, join the WiFi network BDLMinerV1-XXXX (password MineYourCoins) and enter your WiFi, pool and BTC address.</li>
+    </ol>
+    <p class="s" data-h="after">Then open the dashboard at <b>http://bdlminer-xxxx.local</b>. Updates arrive by themselves.</p>
+   </div>
+  </div>
+ </div>
+</section>
+
+<section id="stats">
+ <div class="wrap">
+  <h2 data-t="statsTitle">BDLMiner right now</h2>
+  <p class="lead" data-t="statsLead">The total of the miners that share their hashrate anonymously: once an hour, the version, the board and the hashrate, nothing else.</p>
+  <div class="tiles" aria-live="polite">
+   <div class="tile"><div class="label" data-t="tHashrate">Total hashrate</div><div class="value accent" id="st-hashrate">–</div></div>
+   <div class="tile"><div class="label" data-t="tMiners">Miners</div><div class="value" id="st-miners">–</div></div>
+   <div class="tile"><div class="label" data-t="tAverage">Average per miner</div><div class="value" id="st-average">–</div></div>
+   <div class="tile"><div class="label" data-t="tRecord">Best hour</div><div class="value" id="st-record">–</div></div>
+  </div>
+  <div class="card">
+   <svg class="chart" id="st-chart" viewBox="0 0 960 200" preserveAspectRatio="none" role="img" aria-label="Total hashrate per hour, last 7 days"></svg>
+  </div>
+  <p class="s" id="st-status" data-h="statsMore">Details by board and version on the <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">statistics page</a>.</p>
+ </div>
+</section>
+
+<section id="lottery">
+ <div class="wrap">
+  <h2 data-t="lotteryTitle">A lottery ticket, not an income</h2>
+  <div class="note" data-t="lottery">A block pays 3.125 BTC plus fees to your own address, but at 1 MH/s finding one takes billions of years on average. Every hash has the same tiny chance, with no progress between them: the fun is in the build, the statistics and chasing your best difficulty. Spend on it only what you would on a gadget.</div>
+ </div>
+</section>
+
+<section id="community">
+ <div class="wrap">
+  <h2 data-t="communityTitle">Community</h2>
+  <p class="lead" data-t="communityLead">Questions, setups, best shares and ideas: come and say hello.</p>
+  <div class="grid">
+   <a class="card" href="https://discord.gg/S8kSgD6Xe9" style="text-decoration:none;color:inherit"><div class="icon" aria-hidden="true">💬</div><h3>Discord</h3><p data-t="cDiscord">Live help, announcements and the support tickets.</p></a>
+   <a class="card" href="https://www.reddit.com/r/bdlminer/" style="text-decoration:none;color:inherit"><div class="icon" aria-hidden="true">🟠</div><h3>Reddit</h3><p data-t="cReddit">r/bdlminer: show your setup and share your records.</p></a>
+   <a class="card" href="https://github.com/bdlglua/BDLMinerV1" style="text-decoration:none;color:inherit"><div class="icon" aria-hidden="true">🐙</div><h3>GitHub</h3><p data-t="cGithub">Source code, documentation, releases, bug reports and ideas.</p></a>
+  </div>
+ </div>
+</section>
 </main>
+
+<footer>
+ <div class="wrap">
+  <span data-t="license">BDLMiner V1 is free software under the GNU GPL v3.0.</span>
+  <span><a href="https://github.com/bdlglua/BDLMinerV1/blob/main/SECURITY.md" data-t="security">Security</a> · <a href="https://github.com/bdlglua/BDLMinerV1/blob/main/ACCESSIBILITY.md" data-t="accessibility">Accessibility</a> · <a href="https://github.com/bdlglua/BDLMinerV1/releases" data-t="releases">Releases</a></span>
+ </div>
+</footer>
+
 <script>
 const BOARDS=__BOARDS__;
-const FR={board:'Ta carte',install:'Installer',unsupported:'Ce navigateur ne peut pas installer : utilise Chrome ou Edge sur un ordinateur.',
-notallowed:'La page doit être ouverte en HTTPS.',version:'Version __VERSION__. La première installation efface la carte (réglages et statistiques).',
+const STATS='https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary';
+const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Installer',navStats:'Statistiques',navCommunity:'Communauté',
+title:'Le minage Bitcoin solo sur un ESP32 <b>de poche</b>',
+tagline:'BDLMiner V1 est un firmware libre et gratuit qui transforme un M5StickC Plus2 ou une autre carte ESP32 en mineur Bitcoin solo « loterie », avec un écran en direct, un tableau de bord web et des mises à jour signées automatiques.',
+ctaInstall:'Installer en 2 minutes',version:'Dernière version : __VERSION__.',
+featTitle:'Ce qu\'il fait',featLead:'Tout tourne sur la carte : elle se connecte à une pool par WiFi, calcule des en-têtes de bloc et montre ce qui se passe.',
+f1t:'SHA-256 matériel',f1:'Utilise le moteur SHA de l\'ESP32 : environ 1 MH/s sur un M5StickC Plus2, avec le minage logiciel en secours.',
+f2t:'Stratum V1 et V2',f2:'N\'importe quelle pool solo, Stratum V2 natif chiffré avec Noise, une pool de secours et la bascule automatique.',
+f3t:'Tableau de bord web en direct',f3:'Hashrate, shares, ce que voit la pool, historique, réglages et journal depuis n\'importe quel navigateur de ton réseau.',
+f4t:'Mises à jour signées automatiques',f4:'Les nouvelles versions s\'installent seules, seulement avec une signature valide, et reviennent en arrière si elles échouent.',
+f5t:'Alertes',f5:'ntfy, webhooks Discord ou Telegram : meilleures shares, hashrate en baisse, résumé quotidien et, qui sait, un bloc.',
+f6t:'Home Assistant',f6:'Découverte MQTT avec commandes, et métriques Prometheus pour tes propres graphiques.',
+f7t:'Pensé pour les petits écrans',f7:'Des pages lisibles sur tous les écrans de 0,9 à 2,8 pouces, en français ou en anglais, ou sans écran du tout.',
+f8t:'Les cartes ASIC aussi',f8:'Prise en charge expérimentale du Bitaxe Gamma 601 et du NerdNOS, de quelques centaines de GH/s à environ 1 TH/s.',
+boardsTitle:'Cartes compatibles',boardsLead:'Un firmware par famille. Les cartes en pointillés sont expérimentales : les retours sur du vrai matériel sont les bienvenus.',
+installTitle:'Installer depuis ton navigateur',installLead:'Aucun logiciel à installer : Chrome ou Edge sur un ordinateur flashe la carte par USB.',
+board:'Ta carte',install:'Installer',unsupported:'Ce navigateur ne peut pas installer : utilise Chrome ou Edge sur un ordinateur.',
+notallowed:'La page doit être ouverte en HTTPS.',erase:'Version __VERSION__. La première installation efface la carte (réglages et statistiques).',
 s1:'Branche la carte à cet ordinateur avec un câble USB qui transmet les données.',
-s2:'Choisis la carte ci-dessus, clique sur Installer et sélectionne son port série.',
+s2:'Choisis la carte, clique sur Installer et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV1-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
-source:'Code source et documentation',discord:'Aide et communauté sur Discord'};
-const EN={};document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
+after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
+statsTitle:'BDLMiner en ce moment',statsLead:'Le total des miners qui partagent leur hashrate anonymement : une fois par heure, la version, la carte et le hashrate, rien d\'autre.',
+tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
+statsMore:'Le détail par carte et par version est sur la <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">page des statistiques</a>.',
+lotteryTitle:'Un billet de loterie, pas un revenu',
+lottery:'Un bloc rapporte 3,125 BTC plus les frais sur ta propre adresse, mais à 1 MH/s il faut en moyenne des milliards d\'années pour en trouver un. Chaque hash a la même minuscule chance, sans progression entre eux : le plaisir est dans le montage, les statistiques et la course à la meilleure difficulté. N\'y dépense que ce que tu mettrais dans un gadget.',
+communityTitle:'Communauté',communityLead:'Questions, installations, meilleures shares et idées : viens dire bonjour.',
+cDiscord:'Aide en direct, annonces et tickets de support.',cReddit:'r/bdlminer : montre ton installation et partage tes records.',
+cGithub:'Code source, documentation, versions, signalement de bugs et idées.',
+license:'BDLMiner V1 est un logiciel libre sous licence GNU GPL v3.0.',security:'Sécurité',accessibility:'Accessibilité',releases:'Versions',
+altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 7,82, 52,1 °C',altGraph:'Écran du graphique du hashrate',
+altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
+noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
+experimental:'expérimental',chartLabel:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe apparaîtra après quelques heures de rapports.'};
+const EN={noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
+experimental:'experimental',chartLabel:'Total hashrate per hour, last 7 days',noChart:'The chart appears after a few hours of reports.'};
+document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
+document.querySelectorAll('[data-h]').forEach(e=>EN[e.dataset.h]=e.innerHTML);
+document.querySelectorAll('[data-alt]').forEach(e=>EN[e.dataset.alt]=e.alt);
+document.querySelectorAll('[data-al]').forEach(e=>EN[e.dataset.al]=e.getAttribute('aria-label'));
 let lang=(navigator.language||'').startsWith('fr')?'fr':'en';
-function apply(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=(lang=='fr'?FR:EN)[e.dataset.t]);
- document.getElementById('lang').textContent=lang=='fr'?'English':'Français'}
-document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';apply()};
-const sel=document.getElementById('board'),btn=document.getElementById('install');
+try{lang=localStorage.getItem('lang')||lang}catch(e){}
+const T=k=>(lang=='fr'?FR:EN)[k];
+let screen='mining',summary=null;
+
+function rate(h){const u=['H/s','kH/s','MH/s','GH/s','TH/s','PH/s','EH/s'];if(!(h>0))return'0 H/s';let i=0;while(h>=1000&&i<u.length-1){h/=1000;i++}
+ return h.toLocaleString(lang=='fr'?'fr-FR':'en-US',{maximumFractionDigits:h>=100?0:h>=10?1:2})+' '+u[i]}
+
+function showScreen(name){screen=name;const suffix=lang=='fr'?'-fr':'';
+ document.getElementById('screen').src='assets/screen-'+name+suffix+'.png';
+ const big=document.getElementById('screen');big.alt=T({mining:'altMining',graph:'altGraph',global:'altGlobal',clock:'altClock'}[name]);
+ document.querySelectorAll('[data-screen]').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.screen==name);b.querySelector('img').src='assets/screen-'+b.dataset.screen+suffix+'.png'})}
+let rotate=matchMedia('(prefers-reduced-motion: reduce)').matches?null:setInterval(()=>{const order=['mining','graph','global','clock'];showScreen(order[(order.indexOf(screen)+1)%order.length])},4000);
+document.querySelectorAll('[data-screen]').forEach(b=>b.onclick=()=>{clearInterval(rotate);rotate=null;showScreen(screen==b.dataset.screen?'mining':b.dataset.screen)});
+
+function boards(){const ul=document.getElementById('board-list');ul.innerHTML='';
+ for(const b of BOARDS){const li=document.createElement('li');const exp=/experimental/i.test(b.name);li.className=exp?'exp':'';
+  li.textContent=exp?b.name.replace(/\s*\(experimental[^)]*\)/i,'')+' ('+T('experimental')+')':b.name;ul.appendChild(li)}}
+
+function chart(points){const svg=document.getElementById('st-chart');svg.setAttribute('aria-label',T('chartLabel'));
+ if(!points||points.length<2){svg.innerHTML='<text x="12" y="100">'+T('noChart')+'</text>';return}
+ const W=960,H=200,top=10,bottom=22,max=Math.max(...points.map(p=>p.hashrate))*1.1||1,t0=points[0].at,t1=points[points.length-1].at;
+ const x=t=>W*(t-t0)/(t1-t0||1),y=v=>top+(H-top-bottom)*(1-v/max);
+ const line=points.map((p,i)=>(i?'L':'M')+x(p.at).toFixed(1)+' '+y(p.hashrate).toFixed(1)).join(' ');
+ let grid='';for(let i=1;i<=3;i++){const v=max*i/4;grid+='<line x1="0" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#262e3d"/><text x="4" y="'+(y(v)-4)+'">'+rate(v)+'</text>'}
+ svg.innerHTML=grid+'<path d="'+line+' L'+x(t1)+' '+(H-bottom)+' L0 '+(H-bottom)+' Z" fill="#f7931a" fill-opacity=".15"/><path d="'+line+'" fill="none" stroke="#f7931a" stroke-width="2" vector-effect="non-scaling-stroke"/>'}
+
+function stats(){const set=(id,v)=>document.getElementById(id).textContent=v;
+ if(!summary){chart(null);return}
+ set('st-hashrate',rate(summary.hashrate));set('st-miners',summary.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'));
+ set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
+ chart(summary.history);
+ if(!summary.miners&&!summary.history.length)document.getElementById('st-status').textContent=T('noStats')}
+async function refresh(){try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();stats()}
+ catch(e){if(!summary){chart(null);document.getElementById('st-status').textContent=T('statsDown')}}}
+
+function apply(){document.documentElement.lang=lang;
+ document.querySelectorAll('[data-t]').forEach(e=>e.textContent=T(e.dataset.t));
+ document.querySelectorAll('[data-h]').forEach(e=>e.innerHTML=T(e.dataset.h));
+ document.querySelectorAll('[data-al]').forEach(e=>e.setAttribute('aria-label',T(e.dataset.al)));
+ document.querySelectorAll('[data-alt]').forEach(e=>e.alt=T(e.dataset.alt));
+ document.getElementById('lang').textContent=lang=='fr'?'English':'Français';
+ showScreen(screen);boards();stats()}
+document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
+
+const sel=document.getElementById('board'),btn=document.getElementById('installer');
 for(const b of BOARDS){const o=document.createElement('option');o.value=b.env;o.textContent=b.name;sel.appendChild(o)}
-sel.onchange=()=>btn.manifest='manifest-'+sel.value+'.json';sel.onchange();apply();
+sel.onchange=()=>btn.manifest='manifest-'+sel.value+'.json';sel.onchange();
+apply();refresh();setInterval(refresh,60000);
 </script>
 </body>
 </html>

@@ -1,0 +1,48 @@
+# Publishes the site (installer/) on GitHub Pages when it changes on main,
+# with the latest release's factory images: no new release is needed to fix
+# a page. Releases publish it too (release.yml).
+name: Site
+
+on:
+  push:
+    branches: [main]
+    paths: ["installer/**", "tools/make_installer.py", ".github/workflows/site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          VERSION="${TAG#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "release/$VERSION" \
+            --pattern '*-factory.bin' --pattern boards.json
+      - run: python3 tools/make_installer.py "release/$VERSION" site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deploy

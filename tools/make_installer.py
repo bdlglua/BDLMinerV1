@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Builds the web installer site (ESP Web Tools) from a release directory:
+"""Builds the BDLMiner site with its web installer (ESP Web Tools) from a
+release directory:
 
-  <out>/index.html            board list + "Install" button (installer/index.html)
+  <out>/index.html            the site: presentation, boards, "Install" button,
+                              live statistics (installer/index.html)
+  <out>/assets/               its images (installer/assets/)
   <out>/manifest-<env>.json   one ESP Web Tools manifest per board
   <out>/<env>-factory.bin     the images it flashes at 0x0
 
@@ -64,6 +67,9 @@ def build_installer(release, out):
     page = (Path(ROOT) / "installer/index.html").read_text(encoding="utf-8")
     page = page.replace("__BOARDS__", json.dumps(listed)).replace("__VERSION__", version)
     (Path(out) / "index.html").write_text(page, encoding="utf-8")
+    assets = Path(ROOT) / "installer/assets"
+    if assets.is_dir():
+        shutil.copytree(assets, Path(out) / "assets", dirs_exist_ok=True)
     return version, len(listed)
 
 
