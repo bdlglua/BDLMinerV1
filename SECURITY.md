@@ -72,7 +72,8 @@ that reports can focus on what goes beyond them:
   authentication, which an attacker on the same network can still read (the dashboard
   is plain HTTP). Checking for an update never asks for it (one request every 30
   seconds at most); installing the latest **signed** GitHub release asks for it when
-  one is set.
+  one is set. Updating to 1.9.3 removes, once, a password set with an earlier version;
+  one set afterwards is kept.
 - **Read-only pages need no password**: the dashboard, `/api/stats`, `/api/log`,
   `/api/history` and the live stream show the payout address, pool and network
   details to anyone on the local network. `/api/stats` allows cross-origin reads so

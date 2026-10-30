@@ -71,7 +71,8 @@ Boards without a display report everything on the serial monitor and the
    * **Language**: `0` English (default), `1` French, for the screen and the web dashboard;
    * **Web password** (optional): asked (user `admin`) before the
      [web dashboard](#web-dashboard) changes a setting or the firmware. Empty, the
-     default: no password, anyone on your network can.
+     default: no password, anyone on your network can. Updating to 1.9.3 removes, once,
+     a password set with an earlier version; one set afterwards is kept.
 3. The board restarts and connects automatically. Open its local dashboard using
    the IP on the Network screen or serial monitor. If the chosen pool provides a
    public dashboard, search there for your Bitcoin address or worker as well.

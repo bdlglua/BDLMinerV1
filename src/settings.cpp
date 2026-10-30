@@ -154,6 +154,29 @@ void settingsSanitize(Settings &settings) {
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
 }
 
+// From 1.9.3 the dashboard asks for no password unless its owner sets one: a
+// password saved by an earlier version is removed once ("pwopen" marks it
+// done, after a successful save), so that no sign-in is ever asked after the
+// update. One set afterwards is kept.
+static void openDashboardOnce() {
+    Preferences p;
+    if (!p.begin(kNamespace, true)) return;
+    bool done = p.isKey("pwopen");
+    p.end();
+    if (done) return;
+    if (!settings.webPassword.isEmpty()) {
+        Settings copy = settings;
+        copy.webPassword = "";
+        if (!settingsSave(copy)) return;  // tried again at the next start
+        settings.webPassword = "";
+        logf("[cfg] web password removed: the dashboard no longer asks for one\n");
+    }
+    if (p.begin(kNamespace, false)) {
+        p.putBool("pwopen", true);
+        p.end();
+    }
+}
+
 void settingsLoad() {
     Preferences p;
     p.begin(kNamespace, true);
@@ -161,6 +184,7 @@ void settingsLoad() {
         p.end();
         settingsSanitize();
         liveBrightness = settings.brightness;
+        openDashboardOnce();
         return;
     }
     for (size_t i = 0; i < kSettingCount; i++) {
@@ -188,6 +212,7 @@ void settingsLoad() {
     p.end();
     settingsSanitize();
     liveBrightness = settings.brightness;
+    openDashboardOnce();
 }
 
 uint8_t settingsBrightness() { return liveBrightness.load(); }
@@ -324,8 +349,8 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     WiFiManagerParameter pLang("lang", "Language: 0 English, 1 French (Francais)", lang, 1,
                                "type='number' min='0' max='1'");
     WiFiManagerParameter pWeb("webpass",
-                              "Web password, optional: asked before changing settings or the firmware from "
-                              "the dashboard (empty = no password)",
+                              "Web password, optional, leave empty: only to protect the dashboard's settings "
+                              "and firmware update on a shared network",
                               settings.webPassword.c_str(), 40, "type='password'");
     wm.addParameter(&pHost);
     wm.addParameter(&pPort);
