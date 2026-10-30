@@ -2,6 +2,9 @@
 #ifdef BOARD_GAMMA601
 #include "gamma601.h"
 #endif
+#ifdef BOARD_NERDNOS
+#include "nerdnos.h"
+#endif
 
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
@@ -214,6 +217,14 @@ void buildStats(JsonDocument &j, bool history) {
     a["regulator_status"] = asic.regulatorStatus;
     a["profile_mhz"] = asic.requestedMHz; a["stock_fallback"] = asic.stockFallback;
     a["fallback_reason"] = asic.fallbackReason;
+    if (asic.hardwareErrorPercent < 0) a["hardware_error_percent"] = nullptr;
+    else a["hardware_error_percent"] = asic.hardwareErrorPercent;
+#endif
+#ifdef BOARD_NERDNOS
+    auto asic = nerdnos::status();
+    JsonObject a = j["asic"].to<JsonObject>();
+    a["model"] = "BM1397"; a["experimental"] = true; a["running"] = asic.running; a["state"] = asic.state;
+    a["frequency_mhz"] = asic.frequency; a["results"] = asic.results;
     if (asic.hardwareErrorPercent < 0) a["hardware_error_percent"] = nullptr;
     else a["hardware_error_percent"] = asic.hardwareErrorPercent;
 #endif

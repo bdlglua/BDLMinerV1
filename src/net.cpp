@@ -68,7 +68,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
     const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
     activeAgent = identity;
     logf("[pool] Stratum V1 user agent \"%s\" (%s)\n", identity, settings.userAgentAuto ? "automatic" : "manual");
-    #ifdef BOARD_GAMMA601
+    #ifdef BOARD_ASIC
     if (!sendLine(client, proto.configureVersionRolling())) return;
 #endif
     if (!sendLine(client, proto.subscribe(identity))) return;

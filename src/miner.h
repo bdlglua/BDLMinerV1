@@ -13,7 +13,7 @@
 #define HISTORY_LEN 288
 
 struct MinerStats {
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
     volatile uint64_t hashes[MAX_MINERS];
 #else
     volatile uint32_t hashes[MAX_MINERS];
@@ -158,7 +158,7 @@ void minerSetPower(uint8_t percent, bool batterySaver = false);
 uint8_t minerPowerPercent();
 Throttle minerThrottle();
 
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
 struct AsicWork : work::Work { uint32_t generation = 0, height = 0; };
 bool minerAsicWork(AsicWork &out);
 bool minerAsicCurrent(uint32_t generation);

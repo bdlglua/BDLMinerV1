@@ -51,7 +51,7 @@ jobs:
       fail-fast: false
       matrix:
         env: [m5stickc-plus2, m5stack-esp32, m5stack-s3, lilygo-t-display, lilygo-t-display-s3,
-              esp32-2432s028r, esp32-headless, esp32s3-headless, esp32s2-headless, esp32c3-headless, bitaxe-gamma-601]
+              esp32-2432s028r, esp32-headless, esp32s3-headless, esp32s2-headless, esp32c3-headless, bitaxe-gamma-601, nerdnos]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

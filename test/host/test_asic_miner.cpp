@@ -1,5 +1,6 @@
 // Execute production ASIC work/verification/statistics adapters on the host.
 #define BOARD_GAMMA601 1
+#define BOARD_ASIC 1
 #define CONFIG_IDF_TARGET_ESP32S3 1
 #include "../../src/miner.cpp"
 #include <cassert>

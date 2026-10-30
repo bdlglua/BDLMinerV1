@@ -1,4 +1,5 @@
 #define BOARD_GAMMA601 1
+#define BOARD_ASIC 1
 #include "../../src/gamma601.cpp"
 #include <cassert>
 void logf(const char *, ...) {}

@@ -48,7 +48,9 @@ String diffText(double value) {
 String rateText(double rate, const char **unit) {
     if (!std::isfinite(rate) || rate < 0) rate = 0;
     *unit = "H/s";
-    if (rate >= 1e6) { rate /= 1e6; *unit = "MH/s"; }
+    if (rate >= 1e12) { rate /= 1e12; *unit = "TH/s"; }  // ASIC boards
+    else if (rate >= 1e9) { rate /= 1e9; *unit = "GH/s"; }
+    else if (rate >= 1e6) { rate /= 1e6; *unit = "MH/s"; }
     else if (rate >= 1e3) { rate /= 1e3; *unit = "kH/s"; }
     char out[24];
     snprintf(out, sizeof(out), rate >= 100 ? "%.1f" : rate >= 10 ? "%.2f" : "%.3f", rate);

@@ -10,7 +10,7 @@ inline bool legacyManualAgent(const char *agent) {
 }
 
 #define DEFAULT_POOL_HOST "public-pool.io"
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
 #define DEFAULT_POOL_PORT 3333
 #define DEFAULT_DIFFICULTY 1024.0
 #else
@@ -72,7 +72,11 @@ struct Settings {
     uint16_t asicFrequency = 600; // requested Gamma profile; automatic stock fallback
 #endif
     // Safety
+#ifdef BOARD_NERDNOS
+    uint8_t maxTemp = 75;    // NTC next to the BM1397; the stock firmware cuts power at 80 C
+#else
     uint8_t maxTemp = 65;    // 0 disables thermal limiting; existing choices are kept
+#endif
     uint8_t miningPower = 100; // full available speed; saved user limits are preserved
     uint8_t rebootHours = 0; // > 0: restart after N hours without an accepted share
     bool batterySaver = false;  // on battery: dim the screen, mine at half speed
@@ -84,7 +88,7 @@ struct Settings {
     String peers;  // other miners for the dashboard: "192.168.1.41, miner2.local"
     String webPassword;  // empty = settings and firmware cannot be changed from the web
     uint8_t githubUpdate =
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
         1; // experimental hardware: offer updates for review
 #else
         2;

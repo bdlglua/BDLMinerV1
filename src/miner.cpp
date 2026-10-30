@@ -2,6 +2,9 @@
 #ifdef BOARD_GAMMA601
 #include "gamma601.h"
 #endif
+#ifdef BOARD_NERDNOS
+#include "nerdnos.h"
+#endif
 
 #include <Preferences.h>
 #include <esp_partition.h>
@@ -68,7 +71,7 @@ int blockHead = 0;
 mining::SafetyLease safety;
 std::atomic<bool> batteryLimited{false};
 
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
 using HashCount = uint64_t;
 #else
 using HashCount = uint32_t;
@@ -106,7 +109,7 @@ float temperatureSum = 0;
 uint32_t temperatureSamples = 0, powerSum = 0, observationSamples = 0;
 MinerProfile profiles[MAX_MINERS];
 
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
 using MiningWork = AsicWork;
 #else
 struct MiningWork : work::Work {
@@ -430,6 +433,11 @@ void minerStart() {
 #ifdef BOARD_GAMMA601
     stats.engine[0] = "BM1370";
     stats.minerCount = gamma601::start() ? 1 : 0;
+    return;
+#endif
+#ifdef BOARD_NERDNOS
+    stats.engine[0] = "BM1397";
+    stats.minerCount = nerdnos::start() ? 1 : 0;
     return;
 #endif
     bool hw = hwsha::selfTest();
@@ -1021,7 +1029,7 @@ bool minerStatsRestore(const StatsSnapshot &s) {
     return ok;
 }
 
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
 bool minerAsicWork(AsicWork &out) {
     if (!jobMutex || xSemaphoreTake(jobMutex, pdMS_TO_TICKS(20)) != pdTRUE) return false;
     bool valid = boardValid;

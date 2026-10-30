@@ -17,6 +17,10 @@ g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_core.cpp $CORE -o .pio/h
 .pio/host/test_core
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_bm1370.cpp src/core/bm1370.cpp $CORE -o .pio/host/test_bm1370
 .pio/host/test_bm1370
+g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_bm1397.cpp src/core/bm1397.cpp src/core/bm1370.cpp $CORE -o .pio/host/test_bm1397
+.pio/host/test_bm1397
+g++ -std=c++17 -O2 -Wall -Itest/host/stubs/nerdnos -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_nerdnos.cpp src/core/bm1397.cpp src/core/bm1370.cpp $CORE -o .pio/host/test_nerdnos
+.pio/host/test_nerdnos
 g++ -std=c++17 -O2 -Wall -Itest/host/stubs/gamma -Itest/host/stubs/miner -Isrc test/host/test_gamma601.cpp src/core/bm1370.cpp -o .pio/host/test_gamma601
 .pio/host/test_gamma601
 g++ -std=c++17 -O2 -Wall -Wno-unused-variable -ffunction-sections -fdata-sections -Itest/host/stubs/miner -Isrc test/host/test_asic_miner.cpp src/core/sha256.cpp src/core/work.cpp -Wl,--gc-sections -o .pio/host/test_asic_miner
@@ -50,7 +54,7 @@ python3 test/host/test_web_delivery.py
 python3 test/host/test_ghupdate.py
 
 # Gamma-only schema: frequency bounds, staged values and old-record migration.
-g++ -std=c++17 -O2 -Wall -DBOARD_GAMMA601 -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_apply.cpp src/core/sv2_key.cpp src/core/work.cpp src/core/sha256.cpp -o .pio/host/test_gamma_settings_apply
+g++ -std=c++17 -O2 -Wall -DBOARD_GAMMA601 -DBOARD_ASIC -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_apply.cpp src/core/sv2_key.cpp src/core/work.cpp src/core/sha256.cpp -o .pio/host/test_gamma_settings_apply
 .pio/host/test_gamma_settings_apply
-g++ -std=c++17 -O2 -Wall -DBOARD_GAMMA601 -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_store.cpp -o .pio/host/test_gamma_settings_store
+g++ -std=c++17 -O2 -Wall -DBOARD_GAMMA601 -DBOARD_ASIC -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_store.cpp -o .pio/host/test_gamma_settings_store
 .pio/host/test_gamma_settings_store

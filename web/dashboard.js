@@ -181,7 +181,9 @@ function show(j){
   if(j.crash)T.push(crashTile(j.crash));
   if(j.integrations)T.push(integrationsTile(j.integrations,pv));
   if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):'—';
-   const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz · '+number(a.core_v,3)+' V · '+number(a.current_a,1)+' A',t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C',t('Input')+': '+number(a.input_v)+' V',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
+   // Only the readings this board has: NerdNOS has no fan, regulator or input sensors.
+   const has=k=>a[k]!==undefined;
+   const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz'+(has('core_v')?' · '+number(a.core_v,3)+' V':'')+(has('current_a')?' · '+number(a.current_a,1)+' A':''),has('fan_rpm')?t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C':'',has('input_v')?t('Input')+': '+number(a.input_v)+' V':'',has('results')?t('Verified ASIC results')+': '+a.results:'',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
    hardware.dataset.group='device';T.push(hardware);
   }
   for(const [group,id]of Object.entries({pool:'pool-grid',market:'market-grid',device:'device-grid',records:'records-grid',main:'m'}))syncTiles(id,T.filter(e=>(e.dataset.group||'main')===group));

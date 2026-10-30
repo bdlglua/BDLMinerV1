@@ -510,6 +510,14 @@ check('a failing pool statistics API is reported with the share estimate',()=>ru
   assert.match(await f.page.locator('#device-grid').textContent(),/Integrations⚠ check/);
 }));
 
+check('NerdNOS ASIC tile shows only the readings the board has',()=>run({stats:{board:'NerdNOS',hashrate:2.1e11,engines:[{name:'BM1397',rate:2.1e11}],temperature_source:'asic',asic:{model:'BM1397',experimental:true,running:true,state:'Mining (experimental)',frequency_mhz:300,results:1234,hardware_error_percent:0.4}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');
+  const text=await f.page.locator('#device-grid').textContent();
+  assert.match(text,/ASIC · BM1397/);assert.match(text,/300 MHz/);assert.match(text,/Verified ASIC results: 1234/);assert.match(text,/ASIC hardware errors: 0\.40 %/);
+  assert.doesNotMatch(text,/undefined|Fan|Regulator|Input/);
+  assert.match(await f.page.locator('#m').textContent(),/210 GH\/s/);
+}));
+
 check('a pool listing no worker is explained by the share interval',()=>run({stats:{hashrate:1e6,pool:{host:'public-pool.io',port:3333,connected:true,status:'Mining',difficulty:1},pool_view:{updated_s:60,supported:true,hashrate:0,best:116,workers:0,source:'public-pool.io:40557/api/client/'}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#pool-grid .t');
   assert.match(await f.page.locator('#pool-grid').textContent(),/No worker listed: .* at difficulty 1(\.0+)? this miner sends one every 1h 1[12]m\./);

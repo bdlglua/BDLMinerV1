@@ -2,6 +2,9 @@
 #ifdef BOARD_GAMMA601
 #include "gamma601.h"
 #endif
+#ifdef BOARD_NERDNOS
+#include "nerdnos.h"
+#endif
 #include <atomic>
 #include "core/mining_safety.h"
 
@@ -339,6 +342,9 @@ void begin() {
 #ifdef BOARD_GAMMA601
     gamma601::begin();
 #endif
+#ifdef BOARD_NERDNOS
+    nerdnos::begin();
+#endif
 #endif
 }
 
@@ -509,6 +515,10 @@ void sampleTemperature() {
     lastTemperature = gamma601::temperature();
     return;
 #endif
+#ifdef BOARD_NERDNOS
+    lastTemperature = nerdnos::temperature();
+    return;
+#endif
     float imu = NAN, chip = NAN;
 #ifdef DISPLAY_M5UNIFIED
     if (thermometer.source != mining::TemperatureSource::Chip && M5.Imu.isEnabled()) {
@@ -530,7 +540,7 @@ void sampleTemperature() {
 float temperature() { return lastTemperature; }
 
 const char *temperatureSource() {
-#ifdef BOARD_GAMMA601
+#ifdef BOARD_ASIC
     return "asic";
 #endif
     switch (temperatureSensor.load()) {

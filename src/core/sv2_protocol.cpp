@@ -42,8 +42,10 @@ Frame Protocol::setup(const char *host, uint16_t port, const char *agent, const 
     if (!text(b, host)) return {};
     put(b, port, 2);
     const char *hardware =
-#ifdef BOARD_GAMMA601
+#if defined(BOARD_GAMMA601)
         "Bitaxe Gamma 601 / BM1370";
+#elif defined(BOARD_NERDNOS)
+        "NerdNOS / BM1397";
 #else
         "ESP32";
 #endif
