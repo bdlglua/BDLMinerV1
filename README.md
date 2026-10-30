@@ -5,11 +5,12 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.7.1](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.7.1)**
+**Latest release: [v1.7.2](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.7.2)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.7.1.md)
+· [Release notes](docs/releases/v1.7.2.md)
 
-Version **1.7.1** finds the statistics of more pools (such as nerdminer.io) and
+Version **1.7.2** always sends the temperature in its MQTT state, so Home Assistant no
+longer logs template warnings without a sensor reading. Version 1.7.1 finds the statistics of more pools (such as nerdminer.io) and
 searches again as soon as the pool has recorded a share. Version 1.7.0 keeps the 24-hour hashrate history across restarts, sends a daily
 summary, lists the last shares with the pool's answers, explains when a pool lists no
 worker, and no longer treats a power cut during an update trial as a failed firmware.
@@ -19,7 +20,7 @@ reports, alerts and webhook, Home Assistant controls, touch gestures, the *BLOCK
 FOUND!* alert, the home-screen web app and the automatic pool statistics API).
 Experimental Gamma 601 profiles still cover **525–800 MHz**, defaulting to
 **600 MHz / 1150 mV**, with 525 MHz fallback. The default identity is
-**BDLMinerV1/1.7.1**.
+**BDLMinerV1/1.7.2**.
 
 **Gamma 601 support has not been validated on a physical board.** Use the dedicated
 `bitaxe-gamma-601` image, a 5 V >=4 A barrel supply and active cooling. See the
@@ -212,7 +213,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.7.1 && git push origin v1.7.1
+git tag v1.7.2 && git push origin v1.7.2
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -236,7 +237,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](docs/audits/2026-10-27-scripts.md) and
 [local dashboard review](docs/audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.7.1.
+corrections shipped in v1.5.3 and retained in v1.7.2.
 
 ## Build and flash
 
