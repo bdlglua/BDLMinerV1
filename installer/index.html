@@ -75,6 +75,22 @@ ol{padding-left:20px;margin:0}li{margin:6px 0}
 .tile .value.accent{color:var(--accent)}
 .chart{width:100%;height:200px;display:block}
 .chart text{fill:var(--label);font-size:11px}
+.fleet-head{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:22px 0 10px}
+.fleet-head h3{margin:0;font-size:18px;margin-right:auto}
+.fleet{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;list-style:none;padding:0;margin:0 0 14px}
+.fleet li{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.fleet .name{flex:1;min-width:0}
+.fleet .count{color:var(--label);font-size:13px;white-space:nowrap;text-align:right}
+.fleet .count b{color:var(--fg);font-variant-numeric:tabular-nums}
+.dot{flex:none;width:12px;height:12px;border-radius:50%;display:inline-block}
+.dot.on{background:#3ddc84;box-shadow:0 0 6px 2px rgba(61,220,132,.75),0 0 14px 4px rgba(61,220,132,.35);animation:glow 2.4s ease-in-out infinite}
+.dot.off{background:#ff4d4f;box-shadow:0 0 6px 2px rgba(255,77,79,.65),0 0 14px 4px rgba(255,77,79,.25)}
+.dot.none{background:#3a4252}
+.fleet li.none .name{color:var(--label)}
+.legend{display:flex;align-items:center;gap:8px;color:var(--label);font-size:14px}
+.legend b{color:var(--fg)}
+@keyframes glow{50%{box-shadow:0 0 9px 3px rgba(61,220,132,.9),0 0 22px 7px rgba(61,220,132,.45)}}
+@media (prefers-reduced-motion:reduce){.dot.on{animation:none}}
 .note{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;color:#c4cad6}
 /* Footer */
 footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label);font-size:14px}
@@ -184,6 +200,12 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
    <div class="tile"><div class="label" data-t="tAverage">Average per miner</div><div class="value" id="st-average">–</div></div>
    <div class="tile"><div class="label" data-t="tRecord">Best hour</div><div class="value" id="st-record">–</div></div>
   </div>
+  <div class="fleet-head">
+   <h3 data-t="devicesTitle">Devices</h3>
+   <span class="legend"><span class="dot on" aria-hidden="true"></span><span><b id="st-on">–</b> <span data-t="online">online</span></span></span>
+   <span class="legend"><span class="dot off" aria-hidden="true"></span><span><b id="st-off">–</b> <span data-t="offline">offline</span></span></span>
+  </div>
+  <ul class="fleet" id="st-fleet"></ul>
   <div class="card">
    <svg class="chart" id="st-chart" viewBox="0 0 960 200" preserveAspectRatio="none" role="img" aria-label="Total hashrate per hour, last 7 days"></svg>
   </div>
@@ -243,6 +265,8 @@ s2:'Choisis la carte, clique sur Installer et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV1-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
 after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
 statsTitle:'BDLMiner en ce moment',statsLead:'Le total des miners qui partagent leur hashrate anonymement : une fois par heure, la version, la carte et le hashrate, rien d\'autre.',
+devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
+devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
 statsMore:'Le détail par carte et par version est sur la <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">page des statistiques</a>.',
 lotteryTitle:'Un billet de loterie, pas un revenu',
@@ -255,7 +279,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartLabel:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe apparaîtra après quelques heures de rapports.'};
-const EN={noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
+const EN={devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
 experimental:'experimental',chartLabel:'Total hashrate per hour, last 7 days',noChart:'The chart appears after a few hours of reports.'};
 document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
 document.querySelectorAll('[data-h]').forEach(e=>EN[e.dataset.h]=e.innerHTML);
@@ -288,7 +312,33 @@ function chart(points){const svg=document.getElementById('st-chart');svg.setAttr
  let grid='';for(let i=1;i<=3;i++){const v=max*i/4;grid+='<line x1="0" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="#262e3d"/><text x="4" y="'+(y(v)-4)+'">'+rate(v)+'</text>'}
  svg.innerHTML=grid+'<path d="'+line+' L'+x(t1)+' '+(H-bottom)+' L0 '+(H-bottom)+' Z" fill="#f7931a" fill-opacity=".15"/><path d="'+line+'" fill="none" stroke="#f7931a" stroke-width="2" vector-effect="non-scaling-stroke"/>'}
 
-function stats(){const set=(id,v)=>document.getElementById(id).textContent=v;
+// Every supported board: green when some are online now, red when the only
+// ones seen went offline (the service estimates them: reports carry no
+// identifier), grey when none was seen yet.
+const SHORT={'m5stickc-plus2':['M5StickC Plus2'],'m5stack-esp32':['M5Stack (ESP32)'],'m5stack-s3':['M5Stack (ESP32-S3)'],
+ 'lilygo-t-display':['LilyGO T-Display'],'lilygo-t-display-s3':['LilyGO T-Display-S3'],'esp32-2432s028r':['Cheap Yellow Display'],
+ 'esp32-headless':['ESP32 without a screen','ESP32 sans écran'],'esp32s3-headless':['ESP32-S3 without a screen','ESP32-S3 sans écran'],
+ 'esp32s2-headless':['ESP32-S2 without a screen','ESP32-S2 sans écran'],'esp32c3-headless':['ESP32-C3 without a screen','ESP32-C3 sans écran'],
+ 'bitaxe-gamma-601':['Bitaxe Gamma 601'],'nerdnos':['NerdNOS']};
+function fleet(){const ul=document.getElementById('st-fleet');ul.innerHTML='';
+ const seen=new Map((summary?.fleet||[]).map(f=>[f.board,f]));
+ const known=new Set(BOARDS.map(b=>b.env));
+ const label=env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env};
+ const rows=[...BOARDS.map(b=>b.env),...[...seen.keys()].filter(k=>!known.has(k))]
+  .map(env=>({env,name:label(env),online:seen.get(env)?.online||0,offline:seen.get(env)?.offline||0}))
+  .sort((a,b)=>b.online-a.online||b.offline-a.offline);
+ let on=0,off=0;
+ for(const r of rows){on+=r.online;off+=r.offline;
+  const li=document.createElement('li'),dot=document.createElement('span'),name=document.createElement('span'),count=document.createElement('span');
+  const state=r.online?'on':r.offline?'off':'none';li.className=state;
+  dot.className='dot '+state;dot.setAttribute('role','img');dot.setAttribute('aria-label',T({on:'devOnline',off:'devOffline',none:'devNone'}[state]));
+  name.className='name';name.textContent=r.name;count.className='count';
+  const parts=[];if(r.online)parts.push('<b>'+r.online+'</b> '+T('devOnline'));if(r.offline)parts.push('<b>'+r.offline+'</b> '+T('devOffline'));
+  count.innerHTML=parts.length?parts.join(' · '):T('devNone');
+  li.append(dot,name,count);ul.appendChild(li)}
+ document.getElementById('st-on').textContent=summary?on:'–';document.getElementById('st-off').textContent=summary?off:'–'}
+
+function stats(){const set=(id,v)=>document.getElementById(id).textContent=v;fleet();
  if(!summary){chart(null);return}
  set('st-hashrate',rate(summary.hashrate));set('st-miners',summary.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'));
  set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
