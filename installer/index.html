@@ -127,6 +127,9 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat-bubble svg{width:28px;height:28px}
 @media (max-width:520px){.chat-bubble{width:52px;height:52px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px))}.chat-bubble svg{width:24px;height:24px}}
 .chat-bubble .badge{position:absolute;top:-2px;right:-2px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#ff4d4f;color:#fff;font:700 12px/22px system-ui,sans-serif;box-shadow:0 0 0 2px var(--bg)}
+.chat-bubble .badge:not([hidden]){animation:unread 2s ease-in-out infinite}
+@keyframes unread{50%{box-shadow:0 0 0 2px var(--bg),0 0 0 7px rgba(255,77,79,.35)}}
+@media (prefers-reduced-motion:reduce){.chat-bubble .badge:not([hidden]){animation:none}}
 .chat{position:fixed;right:20px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:min(380px,calc(100vw - 40px));height:min(580px,calc(100vh - 130px));
  display:flex;flex-direction:column;padding:0;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
 .chat[hidden]{display:none}
@@ -456,7 +459,7 @@ statsTitle:'BDLMiner en ce moment',statsLead:'Le total en direct des miners qui 
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
-chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
+chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatUnread:'non lus',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
 chatSave:'Enregistrer',chatNameHint:'Modifiable tous les 30 jours',chatWhen:'Modifiable le {d}',chatNow:'Modifiable maintenant',
 chatCodeTitle:'Autre appareil',chatQrShow:'📱 Mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'🔒 Scanne-le avec ton téléphone. Ne le montre à personne.',
 chatBack:'Retour à la discussion',chatMembers:'Membres en ligne',chatYou:'(toi)',chatGuests:'+ {n} visiteur(s) sans pseudo',chatNobody:'Personne avec un pseudo pour l\'instant.',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
@@ -485,7 +488,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -733,7 +736,13 @@ function chatRender(){const log=$c('chat-log');if(!log)return;const near=log.scr
  if(!chat.messages.length){const li=document.createElement('li');li.className='empty';li.textContent=chat.connected?T('chatEmpty'):T('chatOffline');log.appendChild(li)}
  for(const m of chat.messages)log.appendChild(chatItem(m));
  if(near)log.scrollTop=log.scrollHeight;$c('chat-online').textContent=chat.connected?chat.online:'–';chatBadge()}
-function chatBadge(){const b=$c('chat-unread');b.hidden=!chat.unread||chat.open;b.textContent=chat.unread>9?'9+':chat.unread}
+function chatBadge(){const b=$c('chat-unread');b.hidden=!chat.unread||chat.open;b.textContent=chat.unread>9?'9+':chat.unread;
+ $c('chat-bubble').setAttribute('aria-label',T('chatOpen')+(chat.unread&&!chat.open?' ('+chat.unread+' '+T('chatUnread')+')':''))}
+// Messages read: the newest id seen with the chat open, kept by the browser.
+// Unread are the newer ones from others; a first visit counts the last 24 hours.
+function chatSeen(){const ids=chat.messages.map(m=>m.id);if(ids.length)store.set('chatSeen',String(Math.max(...ids,+store.get('chatSeen')||0)))}
+function chatUnread(){const seen=+store.get('chatSeen')||0,day=Date.now()-864e5;
+ chat.unread=chat.open?0:chat.messages.filter(m=>!m.own&&(seen?m.id>seen:m.t>day)).length;chatBadge()}
 function chatSend(value){if(chat.ws&&chat.ws.readyState===1){chat.ws.send(JSON.stringify(value));return true}chatNote(T('chatOffline'));return false}
 // Settings: the name, locked once registered until it may change again.
 function chatMe(){const input=$c('chat-name'),me=chat.me;if(!input)return;
@@ -788,12 +797,12 @@ function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws
  ws.onopen=()=>{chat.connected=true;chat.retry=1000;chatNote('');const key=store.get('chatKey');if(key)ws.send(JSON.stringify({type:'auth',key}));
   ws.send(JSON.stringify({type:'identify',code:chatCode()}))};
  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}
-  if(m.type==='hello'){chat.messages=m.messages;chat.online=m.online;chatRender()}
-  else if(m.type==='mine'){for(const x of chat.messages)if(m.ids.includes(x.id))x.own=true;chatRender()}
+  if(m.type==='hello'){chat.messages=m.messages;chat.online=m.online;chatRender();if(chat.open)chatSeen();chatUnread()}
+  else if(m.type==='mine'){for(const x of chat.messages)if(m.ids.includes(x.id))x.own=true;chatRender();chatUnread()}
   else if(m.type==='online'){chat.online=m.count;$c('chat-online').textContent=m.count}
   else if(m.type==='presence'){chat.presence=m;chatMembers()}
   else if(m.type==='message'){if(chat.messages.some(x=>x.id===m.message.id))return;chat.messages.push(m.message);if(chat.messages.length>100)chat.messages.shift();
-   if(!chat.open)chat.unread++;const log=$c('chat-log');const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
+   if(!chat.open&&!m.message.own)chat.unread++;else if(chat.open)chatSeen();const log=$c('chat-log');const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
    if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));if(near||m.message.own)log.scrollTop=log.scrollHeight}chatBadge()}
   else if(m.type==='edited'){const i=chat.messages.findIndex(x=>x.id===m.message.id);if(i>=0){chat.messages[i]=m.message;chatRender()}}
   else if(m.type==='removed'){chat.messages=chat.messages.filter(x=>!m.ids.includes(x.id));chatRender()}
@@ -815,7 +824,7 @@ function chatFit(){const el=$c('chat'),vv=window.visualViewport;
 if(window.visualViewport){visualViewport.addEventListener('resize',chatFit);visualViewport.addEventListener('scroll',chatFit)}
 addEventListener('resize',chatFit);
 function chatToggle(open){chat.open=open;$c('chat').hidden=!open;$c('chat-bubble').setAttribute('aria-expanded',open);chatFit();
- if(open){chat.unread=0;chatBadge();const log=$c('chat-log');log.scrollTop=log.scrollHeight;
+ if(open){chat.unread=0;chatSeen();chatBadge();const log=$c('chat-log');log.scrollTop=log.scrollHeight;
   if(!(chat.me&&chat.me.name))chatShowSettings(true);else if(!chatTouch)$c('chat-text').focus();else $c('chat-close').focus({preventScroll:true})}
  else $c('chat-bubble').focus()}
 $c('chat-bubble').onclick=()=>chatToggle(!chat.open);
