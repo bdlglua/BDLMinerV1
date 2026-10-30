@@ -15,6 +15,7 @@
 #include "net.h"
 #include "notify.h"
 #include "settings.h"
+#include "share.h"
 #include "tls.h"
 #include "runtime.h"
 
@@ -410,6 +411,7 @@ void marketTask(void *) {
     for (;;) {
         ghUpdatePoll();
         notifyPoll();
+        sharePoll();
         bool backup = netOnBackup();
         if (backup != lastPoolBackup) {
             lastPoolBackup = backup;

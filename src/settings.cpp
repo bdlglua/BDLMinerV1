@@ -78,6 +78,8 @@ const SettingInfo kSettings[] = {
     N("update", githubUpdate, "Network", "Updates from GitHub: 0 off, 1 check and offer, 2 install automatically"),
     S("count", Bool, usageCount, "Network",
       "Anonymous usage count: once a day, download a 2-byte file of this version's release (nothing is sent)"),
+    S("sharehr", Bool, shareHashrate, "Network",
+      "Share my hashrate anonymously: once an hour, send the version, the board and the hashrate (nothing else)"),
 };
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 

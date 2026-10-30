@@ -27,7 +27,7 @@ function sync(){
 // Presentation only: titles, hints, units and choices for the settings the
 // miner describes in /api/settings. Unknown keys keep the miner's own label.
 const GROUPS={Pool:['◎','Where your miner sends its work and how it introduces itself.'],Display:['▣','The miner\'s screen: brightness, colours, night mode and clock.'],Notifications:['◉','Phone notifications, webhook and alerts.'],Safety:['◇','Temperature, power and automatic restarts.'],Network:['⌁','Fallback WiFi, Home Assistant, other miners, password and updates.']};
-const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates'};
+const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 const FIELDS={
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
  addr:['Bitcoin address','Your payout address. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
@@ -50,7 +50,7 @@ const FIELDS={
  mqtt:['MQTT broker','Your Home Assistant broker. Empty = off.'],mqttport:['MQTT port'],mqttuser:['MQTT user'],mqttpass:['MQTT password'],
  peers:['Other miners','Shown on the dashboard: IP addresses or names, comma separated.'],
  webpass:['Web password','Needed to change settings and install firmware from these pages.'],
- update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.']};
+ update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Once an hour, sends the firmware version, the board and the hashrate, to count the total of all BDLMiner miners. No address, name or identifier.']};
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],uaauto:[['true','Automatic'],['false','Manual']],
  asicmhz:Array.from({length:12},(_,n)=>{const mhz=525+n*25;return[mhz,n?mhz+' MHz':'525 MHz (stock)']}),

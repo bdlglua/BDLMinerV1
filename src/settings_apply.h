@@ -133,7 +133,7 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
 inline bool settingIsLive(const char *key) {
     static const char *const kLive[] = {"bright", "rot",      "autorot",  "lang",     "theme",  "cycle",
                                         "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin", "summary",
-                                        "maxtemp", "power",    "rebooth",  "saver",    "update", "count"};
+                                        "maxtemp", "power",    "rebooth",  "saver",    "update", "count", "sharehr"};
     for (const char *k : kLive)
         if (!strcmp(k, key)) return true;
     return false;

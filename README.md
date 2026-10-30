@@ -209,6 +209,23 @@ counts into active miners per version and board. Nothing about the miner is sent
 address, network or identifier: only GitHub sees the download, like any other). It is on
 by default; turn it off with the *Anonymous usage count* setting (`count`).
 
+### Anonymous hashrate sharing
+
+To know the total hashrate of the BDLMiner miners, once an hour (the first time 15
+minutes after boot) the miner posts its firmware version, its board and its hashrate
+(the average of the last minute, rounded to 3 digits) to the
+[BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
+
+```json
+{"v": "1.9.0", "board": "m5stickc-plus2", "hashrate": 1.02e6}
+```
+
+Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
+adds up the reports of the last hour and keeps them 35 days; the sender's network
+address only limits the number of reports and is never stored. A paused miner sends
+nothing. It is on by default; turn it off with the *Share my hashrate anonymously*
+setting (`sharehr`), which applies at once.
+
 ### Making a release
 
 Pushing a tag **`vX.Y.Z`** runs the *Release* workflow (`.github/workflows/release.yml`):
@@ -516,7 +533,8 @@ connected since restart, reconnections and switches to the backup pool.
 
 Settings that are numbers or switches (brightness, rotation, theme, language, screen
 cycle, night mode, beep, alerts, maximum temperature, mining power, restart after no
-share, battery saver, GitHub updates, usage count) apply at once, without a restart;
+share, battery saver, GitHub updates, usage count, hashrate sharing) apply at once,
+without a restart;
 the button then reads **Save**. Text settings, the pool, WiFi and MQTT still restart
 the miner (**Save and restart**), since other tasks use them.
 

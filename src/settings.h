@@ -94,6 +94,7 @@ struct Settings {
         2;
 #endif  // 0 off, 1 check and offer, 2 install by itself
     bool usageCount = true;    // daily download of this version's ping-<board>.txt (ghupdate.h)
+    bool shareHashrate = true;  // hourly anonymous hashrate report (share.h)
 };
 
 inline void settingsNormalizeAgent(Settings &values) {
