@@ -27,10 +27,16 @@ nav .wrap{display:flex;align-items:center;gap:18px;height:58px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;font-weight:800;font-size:18px}
 .brand b{color:var(--accent)}
 .links{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap}
-.links a{color:var(--label);text-decoration:none;font-size:14px}
+.links a{color:var(--label);text-decoration:none;font-size:14px;padding:8px 2px}
 .links a:hover{color:var(--fg)}
-#lang{background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit;font-size:14px}
-@media (max-width:760px){.links{display:none}#lang{margin-left:auto}}
+#lang{background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit;font-size:14px}
+#menu{display:none;background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;width:40px;height:36px;cursor:pointer;font-size:18px;line-height:1}
+/* Phones: the links fold into a menu under the bar. */
+@media (max-width:760px){#lang{margin-left:auto}#menu{display:block}
+ .links{display:none;position:absolute;top:58px;left:0;right:0;flex-direction:column;gap:0;margin:0;background:var(--bg);border-bottom:1px solid var(--border);padding:6px 20px 12px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+ .links.open{display:flex}
+ .links a{padding:12px 4px;font-size:16px;border-bottom:1px solid var(--border)}
+ .links a:last-child{border-bottom:0}}
 /* Hero */
 .hero{padding-block:56px 40px;display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
 @media (max-width:860px){.hero{grid-template-columns:1fr;padding-block-start:36px}}
@@ -38,6 +44,8 @@ nav .wrap{display:flex;align-items:center;gap:18px;height:58px}
 .hero h1 b{color:var(--accent)}
 .hero p{color:#c4cad6;font-size:18px;margin:0 0 24px}
 .buttons{display:flex;gap:12px;flex-wrap:wrap}
+.hero .s{margin:14px 0 0}
+@media (max-width:520px){.buttons .btn{flex:1 1 0;text-align:center;padding-inline:12px}.buttons .btn:first-child{flex-basis:100%}}
 .btn{display:inline-block;background:var(--accent);color:#000;border:0;border-radius:8px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
 .btn.ghost{background:none;color:var(--fg);border:1px solid var(--border)}
 .btn.ghost:hover{border-color:var(--label)}
@@ -48,7 +56,7 @@ nav .wrap{display:flex;align-items:center;gap:18px;height:58px}
 .thumbs button{padding:0;border:0;background:none;cursor:pointer}
 .thumbs button[aria-pressed=true] img{opacity:1;border-color:var(--accent)}
 /* Sections */
-section{padding:48px 0;border-top:1px solid var(--border)}
+section{padding:48px 0;border-top:1px solid var(--border);scroll-margin-top:58px}
 h2{font-size:28px;margin:0 0 8px}
 .lead{color:var(--label);margin:0 0 28px;max-width:720px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
@@ -64,7 +72,7 @@ h2{font-size:28px;margin:0 0 8px}
 @media (max-width:760px){.install{grid-template-columns:1fr}}
 label{display:block;color:var(--label);font-size:13px;margin-bottom:6px}
 select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font:inherit}
-esp-web-install-button{display:block;margin-top:14px}
+esp-web-install-button{display:block;margin:14px 0 12px}
 ol{padding-left:20px;margin:0}li{margin:6px 0}
 .s{color:var(--label);font-size:13px}
 /* Statistics */
@@ -73,6 +81,8 @@ ol{padding-left:20px;margin:0}li{margin:6px 0}
 .tile .label{color:var(--label);font-size:13px}
 .tile .value{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
 .tile .value.accent{color:var(--accent)}
+/* Phones: two by two, each value on one line. */
+@media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tile{padding:12px;min-width:0}.tile .label{font-size:12px}.tile .value{font-size:clamp(17px,5.6vw,22px);white-space:nowrap}}
 .chart{width:100%;height:200px;display:block}
 .chart-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .chart-head .live{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:#3ddc84}
@@ -85,7 +95,7 @@ table.by th{color:var(--label);font-weight:500;font-size:13px}
 table.by .num{text-align:right}
 table.by .empty{color:var(--label)}
 .range{margin-left:auto;display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.range button{background:none;border:0;color:var(--label);font:inherit;font-size:13px;padding:5px 12px;cursor:pointer}
+.range button{background:none;border:0;color:var(--label);font:inherit;font-size:13px;padding:8px 14px;cursor:pointer}
 .range button[aria-pressed=true]{background:var(--accent);color:#000;font-weight:700}
 .chart text{fill:var(--label);font-size:11px}
 .fleet-head{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:22px 0 10px}
@@ -93,6 +103,8 @@ table.by .empty{color:var(--label)}
 .fleet{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;list-style:none;padding:0;margin:0 0 14px}
 .fleet li{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
 .fleet .name{flex:1;min-width:0}
+.fleet-more{background:none;border:1px dashed var(--border);color:var(--label);border-radius:10px;padding:10px 14px;font:inherit;font-size:14px;cursor:pointer;width:100%;margin:0 0 14px}
+.fleet-more:hover{color:var(--fg);border-color:var(--label)}
 .fleet .models{display:block;color:var(--label);font-size:12px;margin-top:2px}
 .fleet .count{color:var(--label);font-size:13px;white-space:nowrap;text-align:right}
 .fleet .count b{color:var(--fg);font-variant-numeric:tabular-nums}
@@ -113,6 +125,7 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
  background:var(--accent);color:#000;cursor:pointer;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 4px rgba(247,147,26,.18);transition:transform .15s}
 .chat-bubble:hover{transform:scale(1.06)}
 .chat-bubble svg{width:28px;height:28px}
+@media (max-width:520px){.chat-bubble{width:52px;height:52px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px))}.chat-bubble svg{width:24px;height:24px}}
 .chat-bubble .badge{position:absolute;top:-2px;right:-2px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#ff4d4f;color:#fff;font:700 12px/22px system-ui,sans-serif;box-shadow:0 0 0 2px var(--bg)}
 .chat{position:fixed;right:20px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:min(380px,calc(100vw - 40px));height:min(580px,calc(100vh - 130px));
  display:flex;flex-direction:column;padding:0;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
@@ -200,6 +213,7 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
  .chat-icon{width:40px;height:40px}}
 @media (prefers-reduced-motion:reduce){.chat-bubble{transition:none}.chat .rec[aria-pressed=true]{animation:none}}
 footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
+footer a{display:inline-block;padding:6px 2px}
 </style>
 </head>
 <body>
@@ -210,7 +224,7 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
    <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><g fill="#f7931a"><rect x="24" y="24" width="52" height="52" rx="10"/><g id="pins"><rect x="31" y="8" width="6" height="12" rx="2"/><rect x="47" y="8" width="6" height="12" rx="2"/><rect x="63" y="8" width="6" height="12" rx="2"/></g><use href="#pins" transform="translate(0 72)"/><use href="#pins" transform="rotate(90 50 50)"/><use href="#pins" transform="rotate(90 50 50) translate(0 72)"/></g><text x="50" y="64" text-anchor="middle" font-size="42" font-weight="900" font-family="system-ui,sans-serif" fill="#15100a">B</text></svg>
    <span>BDLMiner <b>V1</b></span>
   </a>
-  <div class="links">
+  <div class="links" id="site-links">
    <a href="#features" data-t="navFeatures">Features</a>
    <a href="#boards" data-t="navBoards">Boards</a>
    <a href="#install" data-t="navInstall">Install</a>
@@ -218,6 +232,7 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
    <a href="#community" data-t="navCommunity">Community</a>
   </div>
   <button id="lang" type="button">Français</button>
+  <button id="menu" type="button" aria-expanded="false" aria-controls="site-links" data-al="menu" aria-label="Menu">☰</button>
  </div>
 </nav>
 
@@ -311,6 +326,7 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
    <span class="legend"><span class="dot off" aria-hidden="true"></span><span><b id="st-off">–</b> <span data-t="offline">offline</span></span></span>
   </div>
   <ul class="fleet" id="st-fleet"></ul>
+  <button type="button" class="fleet-more" id="st-more" aria-expanded="false" aria-controls="st-fleet" hidden></button>
   <div class="card">
    <div class="chart-head">
     <span class="live"><span class="dot on" aria-hidden="true"></span><span data-t="live">Live</span></span>
@@ -438,7 +454,7 @@ s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV1-XXXX (mot de passe MineYour
 after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
 statsTitle:'BDLMiner en ce moment',statsLead:'Le total en direct des miners qui partagent leur hashrate anonymement : toutes les 5 minutes, la version, la carte et le hashrate, rien d\'autre.',
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
-devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',
+devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
 chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
 chatSave:'Enregistrer',chatNameHint:'Modifiable tous les 30 jours',chatWhen:'Modifiable le {d}',chatNow:'Modifiable maintenant',
@@ -469,7 +485,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -549,6 +565,7 @@ const SHORT={'m5stickc-plus2':['M5StickC Plus2'],'m5stack-esp32':['M5Stack (ESP3
  'esp32-headless':['ESP32 without a screen','ESP32 sans écran'],'esp32s3-headless':['ESP32-S3 without a screen','ESP32-S3 sans écran'],
  'esp32s2-headless':['ESP32-S2 without a screen','ESP32-S2 sans écran'],'esp32c3-headless':['ESP32-C3 without a screen','ESP32-C3 sans écran'],
  'bitaxe-gamma-601':['Bitaxe Gamma 601'],'nerdnos':['NerdNOS']};
+let fleetAll=false;
 function fleet(){const ul=document.getElementById('st-fleet');ul.innerHTML='';
  const seen=new Map((summary?.fleet||[]).map(f=>[f.board,f]));
  const known=new Set(BOARDS.map(b=>b.env));
@@ -556,8 +573,12 @@ function fleet(){const ul=document.getElementById('st-fleet');ul.innerHTML='';
  const rows=[...BOARDS.map(b=>b.env),...[...seen.keys()].filter(k=>!known.has(k))]
   .map(env=>({env,name:label(env),online:seen.get(env)?.online||0,offline:seen.get(env)?.offline||0}))
   .sort((a,b)=>b.online-a.online||b.offline-a.offline);
+ // Boards never seen yet stay folded behind a button, unless none was seen at all.
+ const seenRows=rows.filter(r=>r.online||r.offline),hidden=rows.length-seenRows.length;
+ const more=document.getElementById('st-more');more.hidden=!seenRows.length||!hidden;
+ more.textContent=T(fleetAll?'devFewer':'devMore').replace('{n}',hidden);more.setAttribute('aria-expanded',fleetAll);
  let on=0,off=0;
- for(const r of rows){on+=r.online;off+=r.offline;
+ for(const r of rows){on+=r.online;off+=r.offline;if(seenRows.length&&!fleetAll&&!r.online&&!r.offline)continue;
   const li=document.createElement('li'),dot=document.createElement('span'),name=document.createElement('span'),count=document.createElement('span');
   const state=r.online?'on':r.offline?'off':'none';li.className=state;
   dot.className='dot '+state;dot.setAttribute('role','img');dot.setAttribute('aria-label',T({on:'devOnline',off:'devOffline',none:'devNone'}[state]));
@@ -609,6 +630,14 @@ function apply(){document.documentElement.lang=lang;
  chatRender();chatMe();chatMembers();
  document.getElementById('lang').textContent=lang=='fr'?'English':'Français';
  showScreen(screen);boards();stats()}
+// The phone menu: opens under the bar, closes on a link, Escape or a tap elsewhere.
+{const menu=document.getElementById('menu'),links=document.getElementById('site-links');
+ const set=open=>{links.classList.toggle('open',open);menu.setAttribute('aria-expanded',open);menu.textContent=open?'✕':'☰'};
+ menu.onclick=e=>{e.stopPropagation();set(!links.classList.contains('open'))};
+ links.addEventListener('click',e=>{if(e.target.closest('a'))set(false)});
+ document.addEventListener('click',e=>{if(!e.target.closest('nav'))set(false)});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&links.classList.contains('open')){set(false);menu.focus()}})}
+document.getElementById('st-more').onclick=()=>{fleetAll=!fleetAll;fleet()};
 document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
 
 const sel=document.getElementById('board'),btn=document.getElementById('installer');
