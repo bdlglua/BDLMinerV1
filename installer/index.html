@@ -350,7 +350,9 @@ function chart(){const svg=document.getElementById('st-chart');
  const step=range=='day'?6*36e5:864e5,locale=lang=='fr'?'fr-FR':'en-US';
  for(let t=Math.ceil(t0/step)*step;t<t1-step/3;t+=step){const d=new Date(t);
   const label=range=='day'?d.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString(locale,{weekday:'short',day:'numeric'});
-  grid+='<line x1="'+x(t).toFixed(1)+'" x2="'+x(t).toFixed(1)+'" y1="'+top+'" y2="'+(H-bottom)+'" stroke="#1b212c"/><text x="'+(x(t)+4).toFixed(1)+'" y="'+(H-6)+'">'+label+'</text>'}
+  // Centred under its line; none too close to the edge or to "now".
+  const px=x(t);if(px<30||px>W-right-90)continue;
+  grid+='<line x1="'+px.toFixed(1)+'" x2="'+px.toFixed(1)+'" y1="'+top+'" y2="'+(H-bottom)+'" stroke="#1b212c"/><text x="'+px.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+label+'</text>'}
  grid+='<text x="'+(W-right)+'" y="'+(H-6)+'" text-anchor="end">'+T('now')+'</text>';
  const last=points.at(-1),lx=x(last.at).toFixed(1),ly=y(last.hashrate).toFixed(1);
  svg.innerHTML=grid+'<path d="'+line+' L'+lx+' '+(H-bottom)+' L'+x(Math.max(points[0].at,t0)).toFixed(1)+' '+(H-bottom)+' Z" fill="#f7931a" fill-opacity=".15"/>'+
