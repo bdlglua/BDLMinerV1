@@ -222,7 +222,9 @@ minutes after boot) the miner posts its firmware version, its board and its hash
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
 adds up the reports of the last hour and keeps them 35 days; the sender's network
-address only limits the number of reports and is never stored. A paused miner sends
+address only limits the number of reports and is never stored. The totals are public:
+**<https://bdlminer-stats.bdlminer-bot.workers.dev/>** (total hashrate, miners, 7-day
+chart, by board and version). A paused miner sends
 nothing. It is on by default; turn it off with the *Share my hashrate anonymously*
 setting (`sharehr`), which applies at once.
 
