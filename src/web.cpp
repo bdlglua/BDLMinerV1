@@ -889,13 +889,23 @@ void webStart() {
         restartSoon("restart requested from the web page");
     });
     server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
+    // Only looks for a newer release, so no password: the installation asks for
+    // it. One requested check per 30 s at most, so that nobody on the network
+    // can keep the miner busy with TLS handshakes.
     server.on("/api/github-check", HTTP_POST, []() {
-        if (!settings.webPassword.isEmpty() && !authorized()) return;
+        static uint32_t lastRequest = 0;
+        static bool requested = false;
         if (!settings.githubUpdate) {
             server.send(409, "text/plain", "GitHub updates are disabled in settings");
             return;
         }
+        if (requested && millis() - lastRequest < 30000) {
+            server.send(202, "text/plain", "Check requested");
+            return;
+        }
         if (ghUpdateCheck()) {
+            requested = true;
+            lastRequest = millis();
             server.send(202, "text/plain", "Check requested");
             return;
         }

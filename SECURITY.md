@@ -69,7 +69,8 @@ that reports can focus on what goes beyond them:
   Basic authentication, which an attacker on the same network can read. Without a
   web password, settings, backups, firmware upload, restarts and crash reports
   cannot be used at all from the web; only checking for and installing the latest
-  **signed** GitHub release stays available (with a password set, it asks for it).
+  **signed** GitHub release stays available (with a password set, installing asks for
+  it; checking never does, and is limited to one request every 30 seconds).
 - **Read-only pages need no password**: the dashboard, `/api/stats`, `/api/log`,
   `/api/history` and the live stream show the payout address, pool and network
   details to anyone on the local network. `/api/stats` allows cross-origin reads so

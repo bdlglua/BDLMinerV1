@@ -465,7 +465,8 @@ it only offers it: an *Update available* tile with an **Install** button on the 
 (and a notification); `0` turns the check off.
 The dashboard always shows the GitHub update status, including connection errors,
 disabled updates and checks waiting for WiFi or enough free memory. **Check now**
-requests a fresh check without restarting the miner. New releases include a small
+requests a fresh check without restarting the miner; it needs no password (installing
+does, when one is set). New releases include a small
 `update.json` discovery file, avoiding GitHub's shared unauthenticated API quota;
 the releases API remains a fallback for older releases.
 Failed installation downloads retry after 5 minutes, then 10, 20 and at most 30
