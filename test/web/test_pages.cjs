@@ -65,7 +65,7 @@ async function fixture(options={}){
       state.settingsCalls++;
       if(options.settingsDelay)await new Promise(r=>setTimeout(r,options.settingsDelay));
       if(options.settingsFailure&&state.settingsCalls===1)return json(res,{error:'unavailable'},503);
-      if(options.settingsDenied){res.writeHead(403);return res.end('Set a web password in the setup portal first (hold the main button while the miner starts).')}
+      if(options.settingsDenied){res.writeHead(401);return res.end('Wrong password')}
       return json(res,state.settings);
     }
     if(req.url==='/api/events'&&options.stream){
@@ -455,8 +455,8 @@ check('settings navigation restores filtered groups and marks the active page',(
   assert.equal(await f.page.locator('[data-nav="/settings"]').getAttribute('aria-current'),'page');
 }));
 
-check('read-only setup errors stay inside the translated interface',()=>run({language:'fr',settingsDenied:true},async f=>{
-  await f.page.goto(f.url+'/settings');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('mot de passe'));
+check('a refused password stays inside the translated interface',()=>run({language:'fr',settingsDenied:true},async f=>{
+  await f.page.goto(f.url+'/settings');await f.page.waitForFunction(()=>/authentification|identif|connecte/i.test(document.querySelector('#msg').textContent));
   assert.equal(await f.page.locator('#save').isDisabled(),true);assert.equal(await f.page.locator('h1').textContent(),'Réglages et maintenance');
 }));
 

@@ -49,7 +49,7 @@ const FIELDS={
  wifi2:['Fallback WiFi 1','Network name.'],wpass2:['Fallback WiFi 1 password'],wifi3:['Fallback WiFi 2','Network name.'],wpass3:['Fallback WiFi 2 password'],
  mqtt:['MQTT broker','Your Home Assistant broker. Empty = off.'],mqttport:['MQTT port'],mqttuser:['MQTT user'],mqttpass:['MQTT password'],
  peers:['Other miners','Shown on the dashboard: IP addresses or names, comma separated.'],
- webpass:['Web password','Needed to change settings and install firmware from these pages.'],
+ webpass:['Web password','Optional. Asked before changing settings or installing firmware from these pages. Empty = no password: anyone on your network can.'],
  update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.']};
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],uaauto:[['true','Automatic'],['false','Manual']],

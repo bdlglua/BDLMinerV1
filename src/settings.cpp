@@ -74,7 +74,7 @@ const SettingInfo kSettings[] = {
     S("mqttuser", Text, mqttUser, "Network", "MQTT user"),
     S("mqttpass", Secret, mqttPass, "Network", "MQTT password"),
     S("peers", Text, peers, "Network", "Other miners on the dashboard (comma separated IPs or names)"),
-    S("webpass", Secret, webPassword, "Network", "Web password (settings and firmware update from the dashboard)"),
+    S("webpass", Secret, webPassword, "Network", "Web password (optional: protects settings and firmware update; empty = open)"),
     N("update", githubUpdate, "Network", "Updates from GitHub: 0 off, 1 check and offer, 2 install automatically"),
     S("count", Bool, usageCount, "Network",
       "Anonymous usage count: once a day, download a 2-byte file of this version's release (nothing is sent)"),
@@ -324,8 +324,8 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     WiFiManagerParameter pLang("lang", "Language: 0 English, 1 French (Francais)", lang, 1,
                                "type='number' min='0' max='1'");
     WiFiManagerParameter pWeb("webpass",
-                              "Web password: lets the dashboard change settings and update the firmware "
-                              "(empty = read-only dashboard)",
+                              "Web password, optional: asked before changing settings or the firmware from "
+                              "the dashboard (empty = no password)",
                               settings.webPassword.c_str(), 40, "type='password'");
     wm.addParameter(&pHost);
     wm.addParameter(&pPort);

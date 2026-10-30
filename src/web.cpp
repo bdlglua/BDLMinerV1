@@ -88,13 +88,10 @@ void sendAsset(const char *mime, const uint8_t *data, size_t size, bool gzip = t
     server.send_P(200, mime, reinterpret_cast<PGM_P>(data), size);
 }
 
-// Settings and firmware need the web password (set in the setup portal).
+// Settings, backups, firmware and crash reports need the web password when
+// one is set; without one (the default) they are open to the local network.
 bool authorized() {
-    if (settings.webPassword.isEmpty()) {
-        server.send(403, "text/plain",
-                    "Set a web password in the setup portal first (hold the main button while the miner starts).");
-        return false;
-    }
+    if (settings.webPassword.isEmpty()) return true;
     if (!server.authenticate("admin", settings.webPassword.c_str())) {
         server.requestAuthentication(BASIC_AUTH, "BDLMiner", "Wrong password");
         return false;
@@ -705,7 +702,7 @@ void handleUpload() {
         }
         resetUpload();
         uploadStarted = true;
-        updateAllowed = !settings.webPassword.isEmpty() && server.authenticate("admin", settings.webPassword.c_str());
+        updateAllowed = settings.webPassword.isEmpty() || server.authenticate("admin", settings.webPassword.c_str());
         if (!updateAllowed) return;
         if (restartAt) { updateBusy = true; return; }
         String name = up.filename;
@@ -916,9 +913,8 @@ void webStart() {
     });
     server.on("/api/github-update", HTTP_POST, []() {
         // Only installs the latest release, and only when it carries the
-        // release key's signature: without a web password (read-only
-        // dashboard) it is still allowed.
-        if (!settings.webPassword.isEmpty() && !authorized()) return;
+        // release key's signature.
+        if (!authorized()) return;
         if (ghUpdateInstall()) server.send(200, "text/plain", "Installing, the miner restarts by itself");
         else server.send(409, "text/plain", "No update to install");
     });

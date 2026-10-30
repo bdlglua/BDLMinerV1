@@ -65,12 +65,14 @@ Out of scope:
 These are deliberate design choices for a device on a home network, documented so
 that reports can focus on what goes beyond them:
 
-- **The dashboard is plain HTTP on the local network.** The web password uses HTTP
-  Basic authentication, which an attacker on the same network can read. Without a
-  web password, settings, backups, firmware upload, restarts and crash reports
-  cannot be used at all from the web; only checking for and installing the latest
-  **signed** GitHub release stays available (with a password set, installing asks for
-  it; checking never does, and is limited to one request every 30 seconds).
+- **The web password is optional, and off by default.** Without one, anyone on the
+  local network can change the settings (the payout address included), download
+  backups (they hold the WiFi and other passwords) and crash reports, restart the
+  miner and upload a firmware. Setting one protects all of that, through HTTP Basic
+  authentication, which an attacker on the same network can still read (the dashboard
+  is plain HTTP). Checking for an update never asks for it (one request every 30
+  seconds at most); installing the latest **signed** GitHub release asks for it when
+  one is set.
 - **Read-only pages need no password**: the dashboard, `/api/stats`, `/api/log`,
   `/api/history` and the live stream show the payout address, pool and network
   details to anyone on the local network. `/api/stats` allows cross-origin reads so
@@ -85,17 +87,18 @@ that reports can focus on what goes beyond them:
   An active attacker on the path could read or alter that data, including a webhook
   URL or ntfy topic, which act as secrets. Firmware stays protected by its signature.
 - **A firmware uploaded through the web page is not signature-checked**, so that
-  people can install their own builds: the web password is what protects it.
+  people can install their own builds: only the web password, when set, protects it.
 - **MQTT is plain TCP**; its user and password travel unencrypted to the broker.
 - **Hashrate sharing is on by default**: every 5 minutes the version, the board and the
   hashrate go to the BDLMiner statistics service (nothing else; see the README). Turn it
   off with the *Share my hashrate anonymously* setting.
 - **Crash reports are memory images** and may contain secrets: downloading or erasing
-  them requires the web password.
+  them requires the web password when one is set.
 
 ## Keeping your miner safe
 
-- Set a **web password** in the setup portal, and keep it different from your WiFi password.
+- On a network you share, set a **web password** (setup portal or *Settings* → *Network*),
+  different from your WiFi password.
 - Keep the miner on your home or IoT network; **never forward its port 80** to the internet.
 - Leave **GitHub updates** on, so security fixes reach the miner by themselves.
 - Treat your **webhook URL**, **ntfy topic** and **backup files** as secrets: a backup

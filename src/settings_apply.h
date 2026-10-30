@@ -103,7 +103,6 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
         const SettingInfo &s = kSettings[i];
         JsonVariantConst v = values[s.key];
         if (v.isNull()) continue;
-        if (s.value == &settings.webPassword && v.as<String>().length() == 0) continue;
         void *value = settingValue(s, pending);
         switch (s.type) {
             case SettingType::Text:

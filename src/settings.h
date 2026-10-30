@@ -86,7 +86,7 @@ struct Settings {
     uint16_t mqttPort = 1883;
     String mqttUser, mqttPass;
     String peers;  // other miners for the dashboard: "192.168.1.41, miner2.local"
-    String webPassword;  // empty = settings and firmware cannot be changed from the web
+    String webPassword;  // empty = settings and firmware can be changed from the web without a password
     uint8_t githubUpdate =
 #ifdef BOARD_ASIC
         1; // experimental hardware: offer updates for review

@@ -127,6 +127,10 @@ int main() {
 
     reset(); complete(); server.auth=false; handleUpdateDone();
     assert(server.status==401 && Update.ends==0 && Update.aborts==1 && !ota::busy());
+
+    // Without a web password (the default) no sign-in is asked.
+    reset(); settings.webPassword=""; server.auth=false; complete(); handleUpdateDone();
+    assert(server.status==200 && Update.ends==1 && restarts==1);
     puts("Production HTTP upload callbacks: authorization, ownership, aborts, multipart and activation passed");
 }
 '''

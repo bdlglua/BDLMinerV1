@@ -69,8 +69,9 @@ Boards without a display report everything on the serial monitor and the
    * **Price currency**: currency for the BTC price, `USD` by default
      (`USD`, `EUR`, `GBP`, `CAD`, `CHF`, `AUD`, `JPY`);
    * **Language**: `0` English (default), `1` French, for the screen and the web dashboard;
-   * **Web password**: lets the [web dashboard](#web-dashboard) change every setting and
-     update the firmware (user `admin`). Empty = read-only dashboard.
+   * **Web password** (optional): asked (user `admin`) before the
+     [web dashboard](#web-dashboard) changes a setting or the firmware. Empty, the
+     default: no password, anyone on your network can.
 3. The board restarts and connects automatically. Open its local dashboard using
    the IP on the Network screen or serial monitor. If the chosen pool provides a
    public dashboard, search there for your Bitcoin address or worker as well.
@@ -290,7 +291,7 @@ HTTPS; *Add to Home screen* works on the local address.
   zero bits, since restart. At 1 MH/s their expected interval is about 585,000 years;
   this is a statistical average. Also exposed as `/api/stats.over64bits`, the
   `bdlminer_shares_64bit_total` Prometheus metric and MQTT/Home Assistant `shares64`.
-* **Settings** (needs the web password set in the portal; user `admin`): every setting,
+* **Settings** (asks for the web password, user `admin`, when one is set): every setting,
   grouped (pool, display, notifications, safety, network); *Save and restart*.
   **Backup**: *Download a backup* gives a JSON file with every setting (passwords
   included: keep it private) and the lifetime statistics (best difficulty, the 10 best
@@ -382,8 +383,8 @@ These are also shown in the dashboard's Pool card.
 
 > **Security:** the dashboard, `/api/stats` and the log have no authentication: anyone on
 > your local network can read them (your BTC address is public on the pool anyway).
-> Settings and firmware updates need the web password, sent with HTTP basic
-> authentication, which is not encrypted on the local network.
+> Settings, backups and firmware updates are open too unless you set a web password; it
+> is then sent with HTTP basic authentication, which is not encrypted on the local network.
 
 ## What the pool sees
 
@@ -474,7 +475,7 @@ minutes. The dashboard shows the countdown and **Retry now**. A refused signatur
 or a board without an OTA slot does not enter this automatic retry loop.
 The downloaded firmware is only installed if its ECDSA P‑256 signature matches the release
 key built into the firmware (`src/update_key.h`), so a modified file is refused. For that
-reason **Install** works without a web password too (with one set, it is asked). Settings
+reason **Install** only asks for the web password when one is set. Settings
 and statistics are kept. Like web updates, it needs two firmware slots: every board has
 them from 1.6.6 on. M5Stack Core and CYD boards installed before 1.6.6 had a single slot;
 reinstall them once by USB (or the web flasher) with the 1.6.6 factory image to get two.
@@ -500,7 +501,7 @@ log and a *Last crash* tile on the dashboard show its summary (task, address,
 the exception by name, backtrace; an `abort()`, failed assert or watchdog is named as
 such rather than by the "StoreProhibited at 0x00000000" ESP-IDF uses to stop); **Download report** saves the full ELF for
 `esp-coredump` / GDB with the matching `firmware.elf`, and **Erase** clears it
-(both need the web password). The miner also keeps the summaries of its last 5
+(both ask for the web password when one is set). The miner also keeps the summaries of its last 5
 crashes, with the version that crashed and the date, so a report replaced by a later
 crash still leaves a trace; **Erase** clears this history too.
 

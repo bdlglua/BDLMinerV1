@@ -56,10 +56,11 @@ int main() {
     assert(settings.miningPower == 100 && settings.webPassword == "original-password");
     assert(settings.suggestedDifficulty == DEFAULT_DIFFICULTY && !settings.batterySaver);
 
-    // Empty passwords keep access; partial backups leave other fields intact.
+    // An empty password removes it (the dashboard is then open); partial
+    // backups leave other fields intact.
     assert(!deserializeJson(changes, R"({"webpass":"","power":-5,"port":100000})"));
-    assert(settingsApply(pending, changes.as<JsonObjectConst>()) == 2);
-    assert(pending.webPassword == "next-password" && pending.poolHost == "next.pool");
+    assert(settingsApply(pending, changes.as<JsonObjectConst>()) == 3);
+    assert(pending.webPassword == "" && pending.poolHost == "next.pool");
     assert(pending.miningPower == 0 && pending.poolPort == 65535);
     assert(settings.webPassword == "original-password");
 
