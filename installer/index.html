@@ -140,6 +140,10 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat .send button{flex:none;width:42px;height:38px;border:0;border-radius:8px;background:var(--accent);color:#000;font-size:18px;cursor:pointer}
 .chat .send button:disabled{opacity:.5;cursor:default}
 .chat-rules{margin:0;padding:0 12px 10px;color:var(--label);font-size:11px}
+.chat-me{display:flex;gap:8px;align-items:center}
+.chat input[readonly]{background:var(--panel2);color:var(--accent);font-weight:700;border-color:transparent}
+.chat-link{background:none;border:0;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline;white-space:nowrap}
+.chat-id{font-size:11px;color:var(--label);margin-top:-2px}
 @media (max-width:520px){.chat{right:0;left:0;bottom:0;width:100%;height:82vh;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}
 @media (prefers-reduced-motion:reduce){.chat-bubble{transition:none}}
 footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
@@ -314,7 +318,11 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
  <p class="chat-note" id="chat-note" role="status"></p>
  <form id="chat-form" autocomplete="off">
   <label class="skip" for="chat-name" data-t="chatName">Your name</label>
-  <input id="chat-name" maxlength="24" autocomplete="nickname" data-ph="chatNamePh" placeholder="Your name">
+  <div class="chat-me">
+   <input id="chat-name" maxlength="24" autocomplete="nickname" data-ph="chatNamePh" placeholder="Your name">
+   <button type="button" class="chat-link" id="chat-rename" data-t="chatRename" hidden>Change</button>
+  </div>
+  <div class="chat-id" id="chat-id" hidden><span id="chat-when"></span> · <button type="button" class="chat-link" id="chat-code" data-t="chatCode">My code</button></div>
   <div class="send">
    <label class="skip" for="chat-text" data-t="chatMessage">Message</label>
    <textarea id="chat-text" rows="1" maxlength="500" data-ph="chatTextPh" placeholder="Message…"></textarea>
@@ -355,7 +363,9 @@ tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord
 chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatName:'Ton pseudo',chatNamePh:'Ton pseudo',
 chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatRules:'Messages publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
 chatEmpty:'Aucun message pour l\'instant : dis bonjour !',chatTeam:'équipe',chatDelete:'Suppr.',chatBan:'Bannir',chatOffline:'Connexion au chat…',
-chatErrors:{name:'Choisis un pseudo.',reserved:'Ce pseudo est réservé à l\'équipe.',empty:'Le message est vide.',too_long:'Message trop long (500 caractères au plus).',
+chatRename:'Changer',chatCode:'Mon code',chatWhen:'Pseudo enregistré · modifiable le {d}',chatNow:'Pseudo enregistré · modifiable dès maintenant',
+chatCodeCopied:'Code copié. Sur ton autre appareil, écris /code puis colle-le pour retrouver ton pseudo. Garde-le secret.',chatCodeSet:'Code importé : ton pseudo te suit.',
+chatErrors:{taken:'Ce pseudo est déjà pris.',wait:'Tu pourras changer de pseudo le {d}.',too_many:'Trop de nouveaux pseudos depuis ta connexion aujourd\'hui : réessaie demain.',name:'Choisis un pseudo.',reserved:'Ce pseudo est réservé à l\'équipe.',empty:'Le message est vide.',too_long:'Message trop long (500 caractères au plus).',
  blocked:'Message bloqué : il ressemble à une arnaque.',link:'Les liens ne sont permis que vers GitHub, Discord, Reddit et le site.',slow:'Doucement : un message toutes les 3 secondes.',
  banned:'Tu ne peux plus écrire dans ce chat.',forbidden:'Réservé à l\'équipe.',invalid:'Message invalide.'},
 chatAdminOn:'Mode équipe activé.',chatAdminOff:'Clé refusée.',
@@ -372,7 +382,9 @@ altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horlo
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
 const EN={chatEmpty:'No message yet: say hello!',chatTeam:'team',chatDelete:'Delete',chatBan:'Ban',chatOffline:'Connecting to the chat…',
-chatErrors:{name:'Choose a name.',reserved:'This name is kept for the team.',empty:'The message is empty.',too_long:'Message too long (500 characters at most).',
+chatWhen:'Name registered · changeable on {d}',chatNow:'Name registered · changeable now',
+chatCodeCopied:'Code copied. On your other device, type /code and paste it to get your name back. Keep it secret.',chatCodeSet:'Code imported: your name follows you.',
+chatErrors:{taken:'This name is already taken.',wait:'You can change your name on {d}.',too_many:'Too many new names from your connection today: try again tomorrow.',name:'Choose a name.',reserved:'This name is kept for the team.',empty:'The message is empty.',too_long:'Message too long (500 characters at most).',
  blocked:'Message blocked: it looks like a scam.',link:'Links are only allowed to GitHub, Discord, Reddit and the site.',slow:'Easy: one message every 3 seconds.',
  banned:'You can no longer write in this chat.',forbidden:'For the team only.',invalid:'Invalid message.'},
 chatAdminOn:'Team mode on.',chatAdminOff:'Key refused.',colBoard:'Board',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'No miner right now.',devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
@@ -490,7 +502,7 @@ function apply(){document.documentElement.lang=lang;
  document.querySelectorAll('[data-al]').forEach(e=>e.setAttribute('aria-label',T(e.dataset.al)));
  document.querySelectorAll('[data-alt]').forEach(e=>e.alt=T(e.dataset.alt));
  document.querySelectorAll('[data-ph]').forEach(e=>e.placeholder=T(e.dataset.ph));
- chatRender();
+ chatRender();chatMe();
  document.getElementById('lang').textContent=lang=='fr'?'English':'Français';
  showScreen(screen);boards();stats()}
 document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
@@ -501,7 +513,19 @@ sel.onchange=()=>btn.manifest='manifest-'+sel.value+'.json';sel.onchange();
 // --- Live chat (BDLMiner-chat Worker) ---
 const CHAT='wss://bdlminer-chat.bdlminer-bot.workers.dev/ws';
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
-const chat={ws:null,messages:[],online:0,unread:0,open:false,admin:false,retry:1000,connected:false};
+const chat={ws:null,messages:[],online:0,unread:0,open:false,admin:false,retry:1000,connected:false,me:null,renaming:false,pending:null};
+// The browser's secret code: the server keeps the name registered with it (its hash).
+function chatCode(){let c=store.get('chatCode');
+ if(!c||!/^[A-Za-z0-9_-]{16,128}$/.test(c)){const b=new Uint8Array(24);crypto.getRandomValues(b);
+  c=btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');store.set('chatCode',c)}return c}
+function chatDate(t){return new Date(t).toLocaleDateString(lang=='fr'?'fr-FR':'en-US',{day:'numeric',month:'long',year:'numeric'})}
+// The name field: locked on the registered name, with when it may change.
+function chatMe(){const input=$c('chat-name'),me=chat.me;
+ if(!me||!me.name||chat.renaming){input.readOnly=false;$c('chat-rename').hidden=true;$c('chat-id').hidden=!me||!me.name;if(!me||!me.name)return}
+ else{input.value=me.name;input.readOnly=true}
+ const free=chat.admin||Date.now()>=me.changeAt;
+ $c('chat-when').textContent=free?T('chatNow'):T('chatWhen').replace('{d}',chatDate(me.changeAt));
+ $c('chat-id').hidden=false;$c('chat-rename').hidden=!free||chat.renaming}
 const $c=id=>document.getElementById(id);
 function chatNote(text){$c('chat-note').textContent=text||''}
 function chatTime(t){return new Date(t).toLocaleTimeString(lang=='fr'?'fr-FR':'en-US',{hour:'2-digit',minute:'2-digit'})}
@@ -527,7 +551,8 @@ function chatRender(){const log=$c('chat-log');if(!log)return;log.innerHTML='';
 function chatBadge(){const b=$c('chat-unread');b.hidden=!chat.unread||chat.open;b.textContent=chat.unread>9?'9+':chat.unread}
 function chatSend(value){if(chat.ws&&chat.ws.readyState===1){chat.ws.send(JSON.stringify(value));return true}chatNote(T('chatOffline'));return false}
 function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws=ws;
- ws.onopen=()=>{chat.connected=true;chat.retry=1000;chatNote('');const key=store.get('chatKey');if(key)ws.send(JSON.stringify({type:'auth',key}))};
+ ws.onopen=()=>{chat.connected=true;chat.retry=1000;chatNote('');const key=store.get('chatKey');if(key)ws.send(JSON.stringify({type:'auth',key}));
+  ws.send(JSON.stringify({type:'identify',code:chatCode()}))};
  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}
   if(m.type==='hello'){chat.messages=m.messages;chat.online=m.online;chatRender()}
   else if(m.type==='online'){chat.online=m.count;$c('chat-online').textContent=m.count}
@@ -535,8 +560,10 @@ function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws
    if(!chat.open)chat.unread++;const log=$c('chat-log');const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
    if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));if(near)log.scrollTop=log.scrollHeight}chatBadge()}
   else if(m.type==='removed'){chat.messages=chat.messages.filter(x=>!m.ids.includes(x.id));chatRender()}
-  else if(m.type==='error'){chatNote(T('chatErrors')[m.error]||m.error)}
-  else if(m.type==='auth'){chat.admin=m.ok;if(!m.ok)store.set('chatKey',null);chatNote(T(m.ok?'chatAdminOn':'chatAdminOff'));chatRender()}};
+  else if(m.type==='you'){chat.me=m;if(m.name){chat.renaming=false;store.set('chatName',m.name)}chatMe();
+   if(chat.pending&&m.name){const text=chat.pending;chat.pending=null;if(chatSend({type:'say',text})){$c('chat-text').value='';$c('chat-text').style.height='auto'}}}
+  else if(m.type==='error'){chat.pending=null;chatNote((T('chatErrors')[m.error]||m.error).replace('{d}',m.until?chatDate(m.until):''))}
+  else if(m.type==='auth'){chat.admin=m.ok;if(!m.ok)store.set('chatKey',null);chatNote(T(m.ok?'chatAdminOn':'chatAdminOff'));chatRender();chatMe()}};
  ws.onclose=()=>{chat.connected=false;chat.ws=null;chatRender();setTimeout(chatConnect,chat.retry);chat.retry=Math.min(chat.retry*2,30000)}}
 function chatToggle(open){chat.open=open;$c('chat').hidden=!open;$c('chat-bubble').setAttribute('aria-expanded',open);
  if(open){chat.unread=0;chatBadge();const log=$c('chat-log');log.scrollTop=log.scrollHeight;($c('chat-name').value?$c('chat-text'):$c('chat-name')).focus()}
@@ -545,16 +572,25 @@ $c('chat-bubble').onclick=()=>chatToggle(!chat.open);
 $c('chat-close').onclick=()=>chatToggle(false);
 $c('chat').addEventListener('keydown',e=>{if(e.key==='Escape')chatToggle(false)});
 $c('chat-name').value=store.get('chatName')||'';
-$c('chat-name').onchange=()=>store.set('chatName',$c('chat-name').value.trim());
+$c('chat-rename').onclick=()=>{chat.renaming=true;chatMe();const i=$c('chat-name');i.focus();i.select()};
+$c('chat-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const n=e.target.value.trim();
+ if(n&&(!chat.me||n!==chat.me.name))chatSend({type:'register',name:n});else{chat.renaming=false;chatMe()}}});
+$c('chat-code').onclick=async()=>{const c=chatCode();try{await navigator.clipboard.writeText(c);chatNote(T('chatCodeCopied'))}catch(e){chatNote('/code '+c)}};
 $c('chat-text').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$c('chat-form').requestSubmit()}});
 $c('chat-text').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});
 // "/login <key>" turns team mode on for this browser, "/logout" off; never sent as a message.
 $c('chat-form').onsubmit=e=>{e.preventDefault();const t=$c('chat-text'),text=t.value.trim();if(!text)return;
  const login=text.match(/^\/login\s+(\S+)$/);
  if(login){store.set('chatKey',login[1]);chatSend({type:'auth',key:login[1]});t.value='';return}
- if(text==='/logout'){store.set('chatKey',null);chat.admin=false;chatRender();t.value='';return}
+ if(text==='/logout'){store.set('chatKey',null);chat.admin=false;chatRender();chatMe();t.value='';return}
+ // "/code <code>" brings the name registered on another device.
+ const code=text.match(/^\/code\s+([A-Za-z0-9_-]{16,128})$/);
+ if(code){store.set('chatCode',code[1]);chatSend({type:'identify',code:code[1]});chatNote(T('chatCodeSet'));t.value='';return}
  const name=$c('chat-name').value.trim();if(!name){chatNote(T('chatErrors').name);$c('chat-name').focus();return}
- store.set('chatName',name);if(chatSend({type:'say',name,text})){t.value='';t.style.height='auto';chatNote('')}};
+ chatNote('');
+ // A new or changed name is registered first; the message follows once it is accepted.
+ if(!chat.me||!chat.me.name||name!==chat.me.name){chat.pending=text;chatSend({type:'register',name});return}
+ if(chatSend({type:'say',text})){t.value='';t.style.height='auto'}};
 chatConnect();
 
 apply();refresh();setInterval(()=>{if(!document.hidden)refresh()},20000);
