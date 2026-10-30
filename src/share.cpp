@@ -32,6 +32,16 @@ uint32_t next = kFirstMs;
 
 }  // namespace
 
+// Names equal but for case, spaces and punctuation.
+bool sameName(const char *a, const char *b) {
+    for (;;) {
+        while (*a && !isalnum((unsigned char)*a)) a++;
+        while (*b && !isalnum((unsigned char)*b)) b++;
+        if (!*a || !*b) return !*a && !*b;
+        if (tolower((unsigned char)*a++) != tolower((unsigned char)*b++)) return false;
+    }
+}
+
 size_t shareBody(char *out, size_t size, double hashrate, const char *model) {
     double rounded = hashrate > 0 && isfinite(hashrate) ? hashrate : 0;
     if (rounded > 0) {
@@ -62,9 +72,10 @@ void sharePoll() {
     }
     next = millis() + kEveryMs;
     char body[192];
-    // The exact model only when it says more than the firmware's own name.
+    // The exact model only when it says more than the firmware's own name
+    // ("M5StickC Plus2" is the same as "M5StickC-Plus2").
     const char *model = board::modelName();
-    if (!shareBody(body, sizeof(body), rate, strcmp(model, BOARD_NAME) ? model : nullptr)) return;
+    if (!shareBody(body, sizeof(body), rate, sameName(model, BOARD_NAME) ? nullptr : model)) return;
     String url = STATS_URL;
     int start = url.indexOf("://") + 3, slash = url.indexOf('/', start);
     String host = url.substring(start, slash < 0 ? url.length() : slash);

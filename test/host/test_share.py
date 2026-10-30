@@ -53,6 +53,7 @@ struct HTTPClient {
     void end() {}
 };
 size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr);
+bool sameName(const char *a, const char *b);
 void sharePoll();
 '''
 tests = r'''
@@ -64,6 +65,7 @@ int main() {
     shareBody(out, sizeof(out), 0); assert(strstr(out, "\"hashrate\":0,"));
     shareBody(out, sizeof(out), NAN); assert(strstr(out, "\"hashrate\":0,"));
     assert(shareBody(out, 20, 1e6) == 0);
+    assert(sameName("M5StickC Plus2", "M5StickC-Plus2") && sameName("abc", "A.B-C") && !sameName("M5Stack Core2", "M5Stack-ESP32") && !sameName("ab", "abc"));
     // The exact model, cleaned, only when given.
     shareBody(out, sizeof(out), 1e6, "M5Stack Core2");
     assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"model":"M5Stack Core2"})"));
@@ -82,8 +84,10 @@ int main() {
     nowMs += kWaitMs; memoryOk = true; settings.shareHashrate = false; sharePoll(); assert(posted.size() == 2);
     settings.shareHashrate = true; sharePoll(); assert(posted.size() == 3);
     assert(posted[2].find("model") == std::string::npos);   // the firmware's own name: not sent
+    board::model = "M5StickC Plus2"; nowMs += kEveryMs; sharePoll();   // the same as BOARD_NAME: not sent
+    assert(posted.size() == 4 && posted[3].find("model") == std::string::npos);
     board::model = "M5Stack Core2"; nowMs += kEveryMs; sharePoll();
-    assert(posted.size() == 4 && posted[3].find(R"("model":"M5Stack Core2")") != std::string::npos);
+    assert(posted.size() == 5 && posted[4].find(R"("model":"M5Stack Core2")") != std::string::npos);
     puts("share: OK");
 }
 '''

@@ -20,3 +20,6 @@ void sharePoll();
 // tells more than its firmware (the M5Stack firmware serves several models).
 // Length written, 0 if `size` is too small.
 size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr);
+
+// True for names equal but for case, spaces and punctuation.
+bool sameName(const char *a, const char *b);
