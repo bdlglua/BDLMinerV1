@@ -1,6 +1,7 @@
 # Publishes the site (installer/) on GitHub Pages when it changes on main,
 # with the latest release's factory images: no new release is needed to fix
-# a page. Releases publish it too (release.yml).
+# a page. A release publishes the site of its tag (release.yml); this one runs
+# again after it, so that changes made on main since the tag stay online.
 name: Site
 
 on:
@@ -8,6 +9,9 @@ on:
     branches: [main]
     paths: ["installer/**", "tools/make_installer.py", ".github/workflows/site.yml"]
   workflow_dispatch:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: read
@@ -20,9 +24,12 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: main
       - name: Latest release
         env:
           GH_TOKEN: ${{ github.token }}
