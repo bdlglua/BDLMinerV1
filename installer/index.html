@@ -118,7 +118,19 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat[hidden]{display:none}
 .chat header{display:flex;align-items:center;gap:8px;padding:12px 12px 12px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
 .chat header h2{font-size:16px;margin:0}
-.chat-online{display:flex;align-items:center;gap:6px;color:var(--label);font-size:13px;margin-right:auto}
+.chat-online{display:flex;align-items:center;gap:6px;color:var(--label);font:inherit;font-size:13px;margin-right:auto;background:none;border:0;border-radius:8px;padding:4px 8px;cursor:pointer}
+.chat-online:hover,.chat-online[aria-pressed=true]{background:var(--border);color:var(--fg)}
+.chat-online .caret{font-size:10px;opacity:.7}
+.chat-members{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px}
+.chat-members[hidden]{display:none}
+.chat-members h3{margin:0;font-size:15px}
+.chat-members ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.chat-members li{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:8px;font-size:14px}
+.chat-members li:hover{background:var(--panel2)}
+.chat-members li .dot{width:9px;height:9px}
+.chat-members li .me{color:var(--label);font-size:12px}
+.chat-members .team{background:var(--accent);color:#000;border-radius:4px;padding:0 5px;font-size:10px;font-weight:800;text-transform:uppercase}
+.chat-members .hint{color:var(--label);font-size:13px;margin:0}
 .chat-online .dot{width:8px;height:8px}
 .chat-online b{color:var(--fg)}
 .chat-icon{background:none;border:0;color:var(--label);cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:18px;line-height:1}
@@ -351,7 +363,7 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
 <section class="chat" id="chat" role="dialog" aria-labelledby="chat-title" hidden>
  <header>
   <h2 id="chat-title" data-t="chatTitle">Chat</h2>
-  <span class="chat-online"><span class="dot on" aria-hidden="true"></span><b id="chat-online">–</b> <span data-t="online">online</span></span>
+  <button type="button" class="chat-online" id="chat-people" aria-pressed="false" aria-controls="chat-members" data-al="chatMembers" aria-label="Members online"><span class="dot on" aria-hidden="true"></span><b id="chat-online">–</b> <span data-t="online">online</span> <span class="caret" aria-hidden="true">▾</span></button>
   <button type="button" class="chat-icon" id="chat-gear" aria-pressed="false" aria-controls="chat-settings" data-al="chatSettings" aria-label="Settings">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
   </button>
@@ -376,6 +388,12 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
    </div>
   </div>
   <button type="button" class="btn-s" id="chat-back" data-t="chatBack">Back to the chat</button>
+ </div>
+ <div class="chat-members" id="chat-members" hidden>
+  <h3 data-t="chatMembers">Members online</h3>
+  <ul id="chat-member-list"></ul>
+  <p class="hint" id="chat-guests"></p>
+  <button type="button" class="btn-s" id="chat-members-back" data-t="chatBack">Back to the chat</button>
  </div>
  <p class="chat-note" id="chat-note" role="status"></p>
  <form id="chat-form" autocomplete="off">
@@ -424,7 +442,7 @@ tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord
 chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
 chatSave:'Enregistrer',chatNameHint:'Modifiable tous les 30 jours',chatWhen:'Modifiable le {d}',chatNow:'Modifiable maintenant',
 chatCodeTitle:'Autre appareil',chatQrShow:'📱 Mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'🔒 Scanne-le avec ton téléphone. Ne le montre à personne.',
-chatBack:'Retour à la discussion',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
+chatBack:'Retour à la discussion',chatMembers:'Membres en ligne',chatYou:'(toi)',chatGuests:'+ {n} visiteur(s) sans pseudo',chatNobody:'Personne avec un pseudo pour l\'instant.',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
 chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatAttach:'Photo ou vidéo',chatRecord:'Message vocal',chatRemove:'Retirer',
 chatRules:'Messages, photos et vidéos publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
 chatEmpty:'Aucun message pour l\'instant : dis bonjour !',chatTeam:'équipe',chatEdited:'modifié',chatEdit:'Modifier',chatDelete:'Supprimer',chatSure:'Sûr ?',chatBan:'Bannir',
@@ -450,7 +468,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -575,7 +593,7 @@ function apply(){document.documentElement.lang=lang;
  document.querySelectorAll('[data-al]').forEach(e=>e.setAttribute('aria-label',T(e.dataset.al)));
  document.querySelectorAll('[data-alt]').forEach(e=>e.alt=T(e.dataset.alt));
  document.querySelectorAll('[data-ph]').forEach(e=>e.placeholder=T(e.dataset.ph));
- chatRender();chatMe();
+ chatRender();chatMe();chatMembers();
  document.getElementById('lang').textContent=lang=='fr'?'English':'Français';
  showScreen(screen);boards();stats()}
 document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
@@ -681,9 +699,21 @@ function chatMe(){const input=$c('chat-name'),me=chat.me;if(!input)return;
  if(named&&document.activeElement!==input)input.value=me.name;else if(!named&&!input.value)input.value=store.get('chatName')||'';
  input.readOnly=!free;$c('chat-save').hidden=!free;
  $c('chat-when').textContent=!named?T('chatNameHint'):free?T('chatNow'):T('chatWhen').replace('{d}',chatDate(me.changeAt))}
-function chatShowSettings(on){if(!on&&window.chatQr)chatQr(false);chat.settings=on;$c('chat-settings').hidden=!on;$c('chat-log').hidden=on;$c('chat-form').hidden=on;
- $c('chat').querySelector('.chat-rules').hidden=on;
- $c('chat-gear').setAttribute('aria-pressed',on);chatMe();if(chatTouch)return;if(on)$c('chat-name').focus();else $c('chat-text').focus()}
+// The panel shows one view: the messages ('log'), the settings or the members.
+function chatView(v){if(v!=='settings'&&window.chatQr)chatQr(false);chat.view=v;chat.settings=v==='settings';
+ $c('chat-settings').hidden=v!=='settings';$c('chat-members').hidden=v!=='members';
+ for(const el of [$c('chat-log'),$c('chat-form'),$c('chat').querySelector('.chat-rules')])el.hidden=v!=='log';
+ $c('chat-gear').setAttribute('aria-pressed',v==='settings');$c('chat-people').setAttribute('aria-pressed',v==='members')}
+function chatShowSettings(on){chatView(on?'settings':'log');chatMe();if(chatTouch)return;if(on)$c('chat-name').focus();else $c('chat-text').focus()}
+function chatShowMembers(on){chatView(on?'members':'log');chatMembers();if(!chatTouch)(on?$c('chat-members-back'):$c('chat-text')).focus()}
+// Members online: a green dot each, the team's badge, "(you)", and the visitors without a name.
+function chatMembers(){const ul=$c('chat-member-list');if(!ul)return;ul.innerHTML='';const p=chat.presence||{members:[],guests:0};
+ for(const m of p.members){const li=document.createElement('li');const dot=document.createElement('span');dot.className='dot on';dot.setAttribute('aria-hidden','true');
+  const name=document.createElement('span');name.textContent=m.name;li.append(dot,name);
+  if(m.team){const b=document.createElement('span');b.className='team';b.textContent=T('chatTeam');li.appendChild(b)}
+  if(chat.me&&chat.me.name===m.name){const me=document.createElement('span');me.className='me';me.textContent=T('chatYou');li.appendChild(me)}
+  ul.appendChild(li)}
+ $c('chat-guests').textContent=(!p.members.length?T('chatNobody')+' ':'')+(p.guests?T('chatGuests').replace('{n}',p.guests):'')}
 function chatAttachClear(){if(chat.attach?.url)URL.revokeObjectURL(chat.attach.url);chat.attach=null;$c('chat-attach').hidden=true}
 function chatAttachShow(a){chatAttachClear();chat.attach=a;const box=$c('chat-attach');box.querySelectorAll('img,video,audio').forEach(e=>e.remove());
  box.querySelectorAll('.voice').forEach(e=>e.remove());a.url=URL.createObjectURL(a.blob);
@@ -719,6 +749,7 @@ function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws
   if(m.type==='hello'){chat.messages=m.messages;chat.online=m.online;chatRender()}
   else if(m.type==='mine'){for(const x of chat.messages)if(m.ids.includes(x.id))x.own=true;chatRender()}
   else if(m.type==='online'){chat.online=m.count;$c('chat-online').textContent=m.count}
+  else if(m.type==='presence'){chat.presence=m;chatMembers()}
   else if(m.type==='message'){if(chat.messages.some(x=>x.id===m.message.id))return;chat.messages.push(m.message);if(chat.messages.length>100)chat.messages.shift();
    if(!chat.open)chat.unread++;const log=$c('chat-log');const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
    if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));if(near||m.message.own)log.scrollTop=log.scrollHeight}chatBadge()}
@@ -749,8 +780,12 @@ $c('chat-bubble').onclick=()=>chatToggle(!chat.open);
 $c('chat-close').onclick=()=>chatToggle(false);
 $c('chat-gear').onclick=()=>chatShowSettings(!chat.settings);
 $c('chat-back').onclick=()=>chatShowSettings(false);
-$c('chat').addEventListener('keydown',e=>{if(e.key==='Escape'){if(chat.settings)chatShowSettings(false);else chatToggle(false)}});
+$c('chat-people').onclick=()=>chatShowMembers(chat.view!=='members');
+$c('chat-members-back').onclick=()=>chatShowMembers(false);
+$c('chat').addEventListener('keydown',e=>{if(e.key==='Escape'){if(chat.view&&chat.view!=='log')chatShowSettings(false);else chatToggle(false)}});
 const chatSaveName=()=>{const n=$c('chat-name').value.trim();if(!n){chatError('name');return}
+ // The team can sign in from here too, before taking a reserved name.
+ const login=n.match(/^\/login\s+(\S+)$/);if(login){store.set('chatKey',login[1]);chatSend({type:'auth',key:login[1]});$c('chat-name').value='';return}
  if(chat.me&&n===chat.me.name){chatShowSettings(false);return}chatSend({type:'register',name:n})};
 $c('chat-save').onclick=chatSaveName;
 $c('chat-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(!e.target.readOnly)chatSaveName()}});
