@@ -12,11 +12,7 @@ whose reward is paid to **your** address.
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.5** gives the local dashboard the look of the BDLMiner site. Version 1.9.4
-tells the statistics the exact model of M5Stack boards. Version 1.9.3 no
-longer asks for a sign-in on the local dashboard (the web password is optional). Version 1.9.2 shares the hashrate every 5 minutes, for live statistics, and 1.9.1
-lets *Check now* look for an update without the web password. Version 1.9.0 shares the miner's hashrate anonymously (version, board and hashrate,
-every 5 minutes since 1.9.2; a setting turns it off) to count the live
+Version **1.9.5** gives the local dashboard the look of the BDLMiner site.
 [total hashrate of BDLMiner](https://bdlminer-stats.bdlminer-bot.workers.dev/). Earlier
 versions are described in [docs/releases](docs/releases/).
 
@@ -129,7 +125,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.4", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "1.9.5", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
