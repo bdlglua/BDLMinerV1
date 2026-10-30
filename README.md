@@ -8,6 +8,7 @@ whose reward is paid to **your** address.
 **Latest release: [v1.8.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.8.0)**
 · [Web flasher](https://bdlglua.github.io/BDLMinerV1/)
 · [Release notes](docs/releases/v1.8.0.md)
+· [Discord](https://discord.gg/S8kSgD6Xe9)
 
 Version **1.8.0** adds experimental support for the [NerdNOS](docs/hardware/nerdnos.md)
 (one BM1397 ASIC on a board carrying a T-Display-S3). Version 1.7.2 always sends the temperature in its MQTT state, so Home Assistant no

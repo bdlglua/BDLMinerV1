@@ -43,7 +43,7 @@ ol{padding-left:20px;margin:0}li{margin:6px 0}a{color:var(--accent)}.s{color:var
 <li data-t="s2">Pick the board above, click Install and choose its serial port.</li>
 <li data-t="s3">When it restarts, join the WiFi network BDLMinerV1-XXXX (password MineYourCoins) and enter your WiFi, pool and BTC address.</li>
 </ol>
-<p class="s"><a href="https://github.com/bdlglua/BDLMinerV1" data-t="source">Source code and documentation</a></p>
+<p class="s"><a href="https://github.com/bdlglua/BDLMinerV1" data-t="source">Source code and documentation</a> · <a href="https://discord.gg/S8kSgD6Xe9" data-t="discord">Help and community on Discord</a></p>
 </div>
 </main>
 <script>
@@ -53,7 +53,7 @@ notallowed:'La page doit être ouverte en HTTPS.',version:'Version __VERSION__. 
 s1:'Branche la carte à cet ordinateur avec un câble USB qui transmet les données.',
 s2:'Choisis la carte ci-dessus, clique sur Installer et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV1-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
-source:'Code source et documentation'};
+source:'Code source et documentation',discord:'Aide et communauté sur Discord'};
 const EN={};document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
 let lang=(navigator.language||'').startsWith('fr')?'fr':'en';
 function apply(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=(lang=='fr'?FR:EN)[e.dataset.t]);

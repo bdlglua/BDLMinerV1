@@ -36,7 +36,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at the project maintainers, privately, through GitHub's [private reporting form](https://github.com/bdlglua/BDLMinerV1/security/advisories/new) (only the maintainers can read it; please title it "Code of conduct report"), or a moderator of the BDLMiner Discord server. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at the project maintainers, privately, through GitHub's [private reporting form](https://github.com/bdlglua/BDLMinerV1/security/advisories/new) (only the maintainers can read it; please title it "Code of conduct report"), or a moderator of the [BDLMiner Discord server](https://discord.gg/S8kSgD6Xe9). All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

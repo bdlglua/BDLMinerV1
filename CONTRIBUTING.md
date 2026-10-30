@@ -4,6 +4,7 @@ Thanks for helping! Bug reports, tests on real boards, translations, documentati
 and code are all welcome. By taking part you agree to the
 [code of conduct](CODE_OF_CONDUCT.md).
 
+- **A question, or help to install?** Ask on the [BDLMiner Discord](https://discord.gg/S8kSgD6Xe9).
 - **A bug or an idea?** Open an [issue](https://github.com/bdlglua/BDLMinerV1/issues/new/choose):
   the forms ask for the board, the firmware version and the log, which is most of
   what is needed to help.

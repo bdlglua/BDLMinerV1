@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Questions and help (Discord)
+    url: https://discord.gg/S8kSgD6Xe9
+    about: "Installation, pools, settings: ask the community on the BDLMiner Discord."
   - name: Security vulnerability
     url: https://github.com/bdlglua/BDLMinerV1/security/advisories/new
     about: Report it privately, please do not open a public issue.
