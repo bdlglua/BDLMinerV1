@@ -13,6 +13,7 @@
 #include "ui.h"
 
 #include <atomic>
+#include <cmath>
 #include "runtime.h"
 
 namespace {
@@ -122,7 +123,8 @@ void announce() {
         d["name"] = s.name;
         d["unique_id"] = id + "_" + s.key;
         d["state_topic"] = base + "/state";
-        d["value_template"] = String("{{ value_json.") + s.key + " }}";
+        // A missing or null value gives an unknown state instead of a template warning.
+        d["value_template"] = String("{{ value_json.") + s.key + " | default(none) }}";
         d["availability_topic"] = base + "/status";
         if (s.unit) d["unit_of_measurement"] = s.unit;
         if (s.deviceClass) d["device_class"] = s.deviceClass;
@@ -139,8 +141,10 @@ void publishState() {
     JsonDocument d;
     d["hashrate"] = round(minerHashrate() / 10.0) / 100.0;  // kH/s, 2 decimals
     d["power_percent"] = minerPowerPercent();
+    // Always present (Home Assistant templates read it): null without a valid reading.
     float t = board::temperature();
-    if (!isnan(t)) d["temperature"] = round(t * 10) / 10.0;
+    if (std::isfinite(t)) d["temperature"] = round(t * 10) / 10.0;
+    else d["temperature"] = nullptr;
     d["accepted"] = stats.accepted;
     d["rejected"] = stats.rejected;
     d["best_session"] = stats.sessionBestDiff;
