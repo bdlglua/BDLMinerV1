@@ -123,11 +123,12 @@ by default; turn it off with the *Anonymous usage count* setting (`count`).
 
 To know the total hashrate of the BDLMiner miners, every 5 minutes (the first time 3
 minutes after boot) the miner posts its firmware version, its board, its hashrate (the
-average of the last minute, rounded to 3 digits) and the interval until its next report to the
+average of the last minute, rounded to 3 digits), the interval until its next report and,
+on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.2", "board": "m5stickc-plus2", "hashrate": 1.02e6, "every": 300}
+{"v": "1.9.4", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service

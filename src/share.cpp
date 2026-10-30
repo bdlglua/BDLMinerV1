@@ -2,9 +2,12 @@
 
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "board.h"
 #include "log.h"
 #include "miner.h"
 #include "settings.h"
@@ -29,14 +32,23 @@ uint32_t next = kFirstMs;
 
 }  // namespace
 
-size_t shareBody(char *out, size_t size, double hashrate) {
+size_t shareBody(char *out, size_t size, double hashrate, const char *model) {
     double rounded = hashrate > 0 && isfinite(hashrate) ? hashrate : 0;
     if (rounded > 0) {
         double scale = pow(10, floor(log10(rounded)) - 2);
         rounded = round(rounded / scale) * scale;
     }
-    int n = snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g,\"every\":%u}", FW_VERSION, FW_ENV,
-                     rounded, (unsigned)kEverySeconds);
+    // Model names are fixed strings of the firmware; anything outside letters,
+    // digits, spaces and . - + ( ) is left out all the same.
+    char safe[40] = "";
+    size_t k = 0;
+    for (const char *c = model; c && *c && k + 1 < sizeof(safe); c++)
+        if (isalnum((unsigned char)*c) || strchr(" .-+()", *c)) safe[k++] = *c;
+    safe[k] = 0;
+    int n = safe[0] ? snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g,\"every\":%u,\"model\":\"%s\"}",
+                               FW_VERSION, FW_ENV, rounded, (unsigned)kEverySeconds, safe)
+                    : snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g,\"every\":%u}", FW_VERSION, FW_ENV,
+                               rounded, (unsigned)kEverySeconds);
     return n > 0 && (size_t)n < size ? (size_t)n : 0;
 }
 
@@ -49,8 +61,10 @@ void sharePoll() {
         return;
     }
     next = millis() + kEveryMs;
-    char body[128];
-    if (!shareBody(body, sizeof(body), rate)) return;
+    char body[192];
+    // The exact model only when it says more than the firmware's own name.
+    const char *model = board::modelName();
+    if (!shareBody(body, sizeof(body), rate, strcmp(model, BOARD_NAME) ? model : nullptr)) return;
     String url = STATS_URL;
     int start = url.indexOf("://") + 3, slash = url.indexOf('/', start);
     String host = url.substring(start, slash < 0 ? url.length() : slash);

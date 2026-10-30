@@ -16,6 +16,8 @@ prefix = r'''
 #include <string>
 #include <vector>
 #define FW_VERSION "1.9.0"
+#define BOARD_NAME "M5StickC-Plus2"
+namespace board { const char *model = "M5StickC-Plus2"; const char *modelName() { return model; } }
 #define FW_ENV "m5stickc-plus2"
 #define STATS_URL "https://stats.example/report"
 using std::isfinite;
@@ -50,7 +52,7 @@ struct HTTPClient {
     int POST(uint8_t *data, size_t n) { posted.emplace_back((char *)data, n); return answer; }
     void end() {}
 };
-size_t shareBody(char *out, size_t size, double hashrate);
+size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr);
 void sharePoll();
 '''
 tests = r'''
@@ -62,6 +64,10 @@ int main() {
     shareBody(out, sizeof(out), 0); assert(strstr(out, "\"hashrate\":0,"));
     shareBody(out, sizeof(out), NAN); assert(strstr(out, "\"hashrate\":0,"));
     assert(shareBody(out, 20, 1e6) == 0);
+    // The exact model, cleaned, only when given.
+    shareBody(out, sizeof(out), 1e6, "M5Stack Core2");
+    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"model":"M5Stack Core2"})"));
+    shareBody(out, sizeof(out), 1e6, "Bad\"name\\x"); assert(strstr(out, "\"model\":\"Badnamex\"}"));
 
     sharePoll(); assert(posted.empty());                       // not before 3 minutes
     nowMs = kFirstMs; sharePoll(); assert(posted.size() == 1);
@@ -75,6 +81,9 @@ int main() {
     nowMs += kWaitMs; rate = 1e6; memoryOk = false; sharePoll(); assert(posted.size() == 2);
     nowMs += kWaitMs; memoryOk = true; settings.shareHashrate = false; sharePoll(); assert(posted.size() == 2);
     settings.shareHashrate = true; sharePoll(); assert(posted.size() == 3);
+    assert(posted[2].find("model") == std::string::npos);   // the firmware's own name: not sent
+    board::model = "M5Stack Core2"; nowMs += kEveryMs; sharePoll();
+    assert(posted.size() == 4 && posted[3].find(R"("model":"M5Stack Core2")") != std::string::npos);
     puts("share: OK");
 }
 '''
