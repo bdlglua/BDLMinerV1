@@ -113,39 +113,62 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat-bubble:hover{transform:scale(1.06)}
 .chat-bubble svg{width:28px;height:28px}
 .chat-bubble .badge{position:absolute;top:-2px;right:-2px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#ff4d4f;color:#fff;font:700 12px/22px system-ui,sans-serif;box-shadow:0 0 0 2px var(--bg)}
-.chat{position:fixed;right:20px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:min(370px,calc(100vw - 40px));height:min(540px,calc(100vh - 130px));
+.chat{position:fixed;right:20px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:min(380px,calc(100vw - 40px));height:min(580px,calc(100vh - 130px));
  display:flex;flex-direction:column;padding:0;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
 .chat[hidden]{display:none}
-.chat header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.chat header{display:flex;align-items:center;gap:8px;padding:12px 12px 12px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
 .chat header h2{font-size:16px;margin:0}
 .chat-online{display:flex;align-items:center;gap:6px;color:var(--label);font-size:13px;margin-right:auto}
 .chat-online .dot{width:8px;height:8px}
 .chat-online b{color:var(--fg)}
-.chat-close{background:none;border:0;color:var(--label);font-size:24px;line-height:1;cursor:pointer;padding:0 4px}
-.chat-log{flex:1;overflow-y:auto;list-style:none;margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
-.chat-log li{max-width:100%}
-.chat-log .meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--label)}
+.chat-icon{background:none;border:0;color:var(--label);cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:18px;line-height:1}
+.chat-icon:hover,.chat-icon[aria-pressed=true]{background:var(--border);color:var(--fg)}
+.chat-icon svg{width:18px;height:18px}
+.chat-log{flex:1;overflow-y:auto;list-style:none;margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.chat-log .meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--label);flex-wrap:wrap}
 .chat-log .who{font-weight:700;font-size:13px}
 .chat-log .team{background:var(--accent);color:#000;border-radius:4px;padding:0 5px;font-size:10px;font-weight:800;text-transform:uppercase}
+.chat-log .edited{font-style:italic}
 .chat-log .text{margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.45}
-.chat-log .mod{margin-left:auto;display:flex;gap:4px}
-.chat-log .mod button{background:none;border:1px solid var(--border);color:var(--label);border-radius:4px;font-size:11px;cursor:pointer;padding:0 5px}
+.chat-log .acts{margin-left:auto;display:flex;gap:4px}
+.chat-log .acts button{background:none;border:1px solid var(--border);color:var(--label);border-radius:4px;font-size:11px;cursor:pointer;padding:1px 6px}
+.chat-log .acts button.danger{color:#ff7a6b;border-color:#5a2a2a}
 .chat-log .empty{color:var(--label);text-align:center;margin:auto 0;font-size:14px}
-.chat-note{margin:0;padding:6px 14px;font-size:13px;color:#ffb36b;min-height:0}
+.chat-log .media{margin-top:6px}
+.chat-log .media img,.chat-log .media video{display:block;max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--border);background:#000}
+.chat-log .media audio{width:100%;height:40px}
+.chat-log .editing textarea{width:100%;margin-top:4px}
+.chat-log .editing .row{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}
+.chat-note{margin:0;padding:6px 14px;font-size:13px;color:#ffb36b}
 .chat-note:empty{display:none}
-.chat form{border-top:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:8px}
+.chat-settings{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:14px}
+.chat-settings[hidden]{display:none}
+.chat-settings h3{margin:0;font-size:15px}
+.chat-settings .field{display:flex;flex-direction:column;gap:6px}
+.chat-settings label{color:var(--label);font-size:13px;margin:0}
+.chat-settings .row{display:flex;gap:8px}
+.chat-settings .hint{color:var(--label);font-size:12px;margin:0}
 .chat input,.chat textarea{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
-.chat textarea{resize:none;max-height:120px}
-.chat .send{display:flex;gap:8px;align-items:flex-end}
-.chat .send button{flex:none;width:42px;height:38px;border:0;border-radius:8px;background:var(--accent);color:#000;font-size:18px;cursor:pointer}
-.chat .send button:disabled{opacity:.5;cursor:default}
-.chat-rules{margin:0;padding:0 12px 10px;color:var(--label);font-size:11px}
-.chat-me{display:flex;gap:8px;align-items:center}
 .chat input[readonly]{background:var(--panel2);color:var(--accent);font-weight:700;border-color:transparent}
-.chat-link{background:none;border:0;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline;white-space:nowrap}
-.chat-id{font-size:11px;color:var(--label);margin-top:-2px}
-@media (max-width:520px){.chat{right:0;left:0;bottom:0;width:100%;height:82vh;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}
-@media (prefers-reduced-motion:reduce){.chat-bubble{transition:none}}
+.chat .btn-s{flex:none;background:var(--accent);color:#000;border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.chat .btn-s.ghost{background:none;color:var(--fg);border:1px solid var(--border);font-weight:500}
+.chat .btn-s:disabled{opacity:.5;cursor:default}
+.chat form{border-top:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:8px}
+.chat textarea{resize:none;max-height:120px}
+.chat .compose{display:flex;gap:6px;align-items:flex-end}
+.chat .compose .chat-icon{flex:none;height:38px;width:36px;border:1px solid var(--border)}
+.chat .compose .send{flex:none;width:42px;height:38px;border:0;border-radius:8px;background:var(--accent);color:#000;font-size:18px;cursor:pointer}
+.chat .compose .send:disabled{opacity:.5;cursor:default}
+.chat .rec[aria-pressed=true]{background:#ff4d4f;color:#fff;border-color:#ff4d4f;animation:rec 1.2s ease-in-out infinite}
+@keyframes rec{50%{opacity:.6}}
+.chat-attach{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px}
+.chat-attach[hidden]{display:none}
+.chat-attach img,.chat-attach video{width:44px;height:44px;object-fit:cover;border-radius:6px}
+.chat-attach audio{height:32px;max-width:200px}
+.chat-attach span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label)}
+.chat-rules{margin:0;padding:0 12px 10px;color:var(--label);font-size:11px}
+@media (max-width:520px){.chat{right:0;left:0;bottom:0;width:100%;height:85vh;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}
+@media (prefers-reduced-motion:reduce){.chat-bubble{transition:none}.chat .rec[aria-pressed=true]{animation:none}}
 footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
 </style>
 </head>
@@ -312,24 +335,43 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
  <header>
   <h2 id="chat-title" data-t="chatTitle">Chat</h2>
   <span class="chat-online"><span class="dot on" aria-hidden="true"></span><b id="chat-online">–</b> <span data-t="online">online</span></span>
-  <button type="button" class="chat-close" id="chat-close" data-al="chatClose" aria-label="Close the chat">×</button>
+  <button type="button" class="chat-icon" id="chat-gear" aria-pressed="false" aria-controls="chat-settings" data-al="chatSettings" aria-label="Settings">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+  <button type="button" class="chat-icon" id="chat-close" data-al="chatClose" aria-label="Close the chat">✕</button>
  </header>
  <ol class="chat-log" id="chat-log" aria-live="polite" aria-relevant="additions"></ol>
+ <div class="chat-settings" id="chat-settings" hidden>
+  <h3 data-t="chatSettings">Settings</h3>
+  <div class="field">
+   <label for="chat-name" data-t="chatName">Your name</label>
+   <div class="row"><input id="chat-name" maxlength="24" autocomplete="nickname" data-ph="chatNamePh" placeholder="Your name">
+    <button type="button" class="btn-s" id="chat-save" data-t="chatSave">Save</button></div>
+   <p class="hint" id="chat-when" data-t="chatNameHint">Chosen once, then kept: you can change it every 30 days.</p>
+  </div>
+  <div class="field">
+   <label data-t="chatCodeTitle">Use your name on another device</label>
+   <div class="row"><button type="button" class="btn-s ghost" id="chat-code" data-t="chatCode">Copy my code</button></div>
+   <div class="row"><input id="chat-import" data-ph="chatImportPh" placeholder="Paste a code" autocomplete="off">
+    <button type="button" class="btn-s ghost" id="chat-import-go" data-t="chatImport">Import</button></div>
+   <p class="hint" data-t="chatCodeHint">Your code is your key to your name: keep it secret.</p>
+  </div>
+  <button type="button" class="btn-s" id="chat-back" data-t="chatBack">Back to the chat</button>
+ </div>
  <p class="chat-note" id="chat-note" role="status"></p>
  <form id="chat-form" autocomplete="off">
-  <label class="skip" for="chat-name" data-t="chatName">Your name</label>
-  <div class="chat-me">
-   <input id="chat-name" maxlength="24" autocomplete="nickname" data-ph="chatNamePh" placeholder="Your name">
-   <button type="button" class="chat-link" id="chat-rename" data-t="chatRename" hidden>Change</button>
-  </div>
-  <div class="chat-id" id="chat-id" hidden><span id="chat-when"></span> · <button type="button" class="chat-link" id="chat-code" data-t="chatCode">My code</button></div>
-  <div class="send">
+  <div class="chat-attach" id="chat-attach" hidden><span id="chat-attach-name"></span>
+   <button type="button" class="chat-icon" id="chat-attach-drop" data-al="chatRemove" aria-label="Remove">✕</button></div>
+  <div class="compose">
+   <button type="button" class="chat-icon" id="chat-file" data-al="chatAttach" aria-label="Photo or video">📎</button>
+   <input type="file" id="chat-file-input" accept="image/*,video/*" hidden>
+   <button type="button" class="chat-icon rec" id="chat-rec" aria-pressed="false" data-al="chatRecord" aria-label="Voice message">🎤</button>
    <label class="skip" for="chat-text" data-t="chatMessage">Message</label>
    <textarea id="chat-text" rows="1" maxlength="500" data-ph="chatTextPh" placeholder="Message…"></textarea>
-   <button type="submit" id="chat-send" data-al="chatSend" aria-label="Send">➤</button>
+   <button type="submit" class="send" id="chat-send" data-al="chatSend" aria-label="Send">➤</button>
   </div>
  </form>
- <p class="chat-rules" data-t="chatRules">Public messages, kept 7 days. Never share a seed phrase, a private key or a password.</p>
+ <p class="chat-rules" data-t="chatRules">Public messages, photos and videos, kept 7 days. Never share a seed phrase, a private key or a password.</p>
 </section>
 
 <script>
@@ -360,14 +402,22 @@ statsTitle:'BDLMiner en ce moment',statsLead:'Le total en direct des miners qui 
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
-chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatName:'Ton pseudo',chatNamePh:'Ton pseudo',
-chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatRules:'Messages publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
-chatEmpty:'Aucun message pour l\'instant : dis bonjour !',chatTeam:'équipe',chatDelete:'Suppr.',chatBan:'Bannir',chatOffline:'Connexion au chat…',
-chatRename:'Changer',chatCode:'Mon code',chatWhen:'Pseudo enregistré · modifiable le {d}',chatNow:'Pseudo enregistré · modifiable dès maintenant',
-chatCodeCopied:'Code copié. Sur ton autre appareil, écris /code puis colle-le pour retrouver ton pseudo. Garde-le secret.',chatCodeSet:'Code importé : ton pseudo te suit.',
-chatErrors:{taken:'Ce pseudo est déjà pris.',wait:'Tu pourras changer de pseudo le {d}.',too_many:'Trop de nouveaux pseudos depuis ta connexion aujourd\'hui : réessaie demain.',name:'Choisis un pseudo.',reserved:'Ce pseudo est réservé à l\'équipe.',empty:'Le message est vide.',too_long:'Message trop long (500 caractères au plus).',
+chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Ton pseudo',chatNamePh:'Ton pseudo',
+chatSave:'Enregistrer',chatNameHint:'Choisi une fois puis gardé : tu pourras le changer tous les 30 jours.',chatWhen:'Pseudo enregistré · modifiable le {d}',chatNow:'Pseudo enregistré · modifiable dès maintenant',
+chatCodeTitle:'Utiliser ton pseudo sur un autre appareil',chatCode:'Copier mon code',chatImportPh:'Coller un code',chatImport:'Importer',chatCodeHint:'Ton code est la clé de ton pseudo : garde-le secret.',
+chatBack:'Retour à la discussion',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
+chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatAttach:'Photo ou vidéo',chatRecord:'Message vocal',chatRemove:'Retirer',
+chatRules:'Messages, photos et vidéos publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
+chatEmpty:'Aucun message pour l\'instant : dis bonjour !',chatTeam:'équipe',chatEdited:'modifié',chatEdit:'Modifier',chatDelete:'Supprimer',chatSure:'Sûr ?',chatBan:'Bannir',
+chatSaveEdit:'Enregistrer',chatCancel:'Annuler',chatOffline:'Connexion au chat…',chatUploading:'Envoi du fichier…',chatRecording:'Enregistrement… {s} s (clique sur 🎤 pour arrêter)',
+chatVoice:'Message vocal ({s} s)',chatPhoto:'Photo',chatVideo:'Vidéo',chatNoMic:'Micro indisponible ou refusé.',
+chatCodeCopied:'Code copié. Sur ton autre appareil : ⚙ Réglages → coller le code → Importer.',chatCodeSet:'Code importé : ton pseudo te suit.',
+chatErrors:{taken:'Ce pseudo est déjà pris.',wait:'Tu pourras changer de pseudo le {d}.',too_many:'Trop de nouveaux pseudos depuis ta connexion aujourd\'hui : réessaie demain.',
+ name:'Choisis d\'abord ton pseudo.',reserved:'Ce pseudo est réservé à l\'équipe.',empty:'Le message est vide.',too_long:'Message trop long (500 caractères au plus).',
  blocked:'Message bloqué : il ressemble à une arnaque.',link:'Les liens ne sont permis que vers GitHub, Discord, Reddit et le site.',slow:'Doucement : un message toutes les 3 secondes.',
- banned:'Tu ne peux plus écrire dans ce chat.',forbidden:'Réservé à l\'équipe.',invalid:'Message invalide.'},
+ banned:'Tu ne peux plus écrire dans ce chat.',forbidden:'Tu ne peux modifier ou supprimer que tes propres messages.',invalid:'Message invalide.',gone:'Ce message n\'existe plus.',
+ media:'Fichier introuvable : renvoie-le.',media_type:'Format non accepté : photos, vidéos et sons seulement.',media_size:'Fichier trop lourd (photo 3 Mo, vocal 2 Mo, vidéo 8 Mo).',
+ media_slow:'Pas plus de 10 fichiers par heure.',media_full:'Le chat est plein pour l\'instant : réessaie plus tard.',upload:'L\'envoi du fichier a échoué.'},
 chatAdminOn:'Mode équipe activé.',chatAdminOff:'Clé refusée.',
 live:'En direct',week:'7 jours',byBoard:'Par carte',byVersion:'Par version',colBoard:'Carte',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'Aucun miner en ce moment.',period:'Période',updated:'mis à jour il y a {s} s',now:'maintenant',
 statsMore:'Données brutes : <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary">JSON</a> · <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">page des statistiques</a>.',
@@ -381,12 +431,16 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={chatEmpty:'No message yet: say hello!',chatTeam:'team',chatDelete:'Delete',chatBan:'Ban',chatOffline:'Connecting to the chat…',
-chatWhen:'Name registered · changeable on {d}',chatNow:'Name registered · changeable now',
-chatCodeCopied:'Code copied. On your other device, type /code and paste it to get your name back. Keep it secret.',chatCodeSet:'Code imported: your name follows you.',
-chatErrors:{taken:'This name is already taken.',wait:'You can change your name on {d}.',too_many:'Too many new names from your connection today: try again tomorrow.',name:'Choose a name.',reserved:'This name is kept for the team.',empty:'The message is empty.',too_long:'Message too long (500 characters at most).',
+const EN={chatWhen:'Name registered · changeable on {d}',chatNow:'Name registered · changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
+chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPhoto:'Photo',chatVideo:'Video',
+chatNoMic:'Microphone unavailable or refused.',chatCodeCopied:'Code copied. On your other device: ⚙ Settings → paste the code → Import.',chatCodeSet:'Code imported: your name follows you.',
+chatErrors:{taken:'This name is already taken.',wait:'You can change your name on {d}.',too_many:'Too many new names from your connection today: try again tomorrow.',
+ name:'Choose your name first.',reserved:'This name is kept for the team.',empty:'The message is empty.',too_long:'Message too long (500 characters at most).',
  blocked:'Message blocked: it looks like a scam.',link:'Links are only allowed to GitHub, Discord, Reddit and the site.',slow:'Easy: one message every 3 seconds.',
- banned:'You can no longer write in this chat.',forbidden:'For the team only.',invalid:'Invalid message.'},
+ banned:'You can no longer write in this chat.',forbidden:'You can only edit or delete your own messages.',invalid:'Invalid message.',gone:'This message no longer exists.',
+ media:'File not found: send it again.',media_type:'Format not accepted: photos, videos and sounds only.',media_size:'File too large (photo 3 MB, voice 2 MB, video 8 MB).',
+ media_slow:'No more than 10 files an hour.',media_full:'The chat is full for now: try again later.',upload:'Sending the file failed.'},
 chatAdminOn:'Team mode on.',chatAdminOff:'Key refused.',colBoard:'Board',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'No miner right now.',devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
 experimental:'experimental',chartDay:'Total hashrate every 5 minutes, last 24 hours',chartWeek:'Total hashrate per hour, last 7 days',noChart:'The chart fills up as the reports come.',
 updated:'updated {s} s ago',now:'now'};
@@ -511,86 +565,150 @@ const sel=document.getElementById('board'),btn=document.getElementById('installe
 for(const b of BOARDS){const o=document.createElement('option');o.value=b.env;o.textContent=b.name;sel.appendChild(o)}
 sel.onchange=()=>btn.manifest='manifest-'+sel.value+'.json';sel.onchange();
 // --- Live chat (BDLMiner-chat Worker) ---
-const CHAT='wss://bdlminer-chat.bdlminer-bot.workers.dev/ws';
+const CHAT_HOST='bdlminer-chat.bdlminer-bot.workers.dev';
+const CHAT='wss://'+CHAT_HOST+'/ws';
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
-const chat={ws:null,messages:[],online:0,unread:0,open:false,admin:false,retry:1000,connected:false,me:null,renaming:false,pending:null};
+const chat={ws:null,messages:[],online:0,unread:0,open:false,admin:false,retry:1000,connected:false,me:null,pending:null,attach:null,rec:null,settings:false,busy:false};
+const $c=id=>document.getElementById(id);
 // The browser's secret code: the server keeps the name registered with it (its hash).
 function chatCode(){let c=store.get('chatCode');
  if(!c||!/^[A-Za-z0-9_-]{16,128}$/.test(c)){const b=new Uint8Array(24);crypto.getRandomValues(b);
   c=btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');store.set('chatCode',c)}return c}
 function chatDate(t){return new Date(t).toLocaleDateString(lang=='fr'?'fr-FR':'en-US',{day:'numeric',month:'long',year:'numeric'})}
-// The name field: locked on the registered name, with when it may change.
-function chatMe(){const input=$c('chat-name'),me=chat.me;
- if(!me||!me.name||chat.renaming){input.readOnly=false;$c('chat-rename').hidden=true;$c('chat-id').hidden=!me||!me.name;if(!me||!me.name)return}
- else{input.value=me.name;input.readOnly=true}
- const free=chat.admin||Date.now()>=me.changeAt;
- $c('chat-when').textContent=free?T('chatNow'):T('chatWhen').replace('{d}',chatDate(me.changeAt));
- $c('chat-id').hidden=false;$c('chat-rename').hidden=!free||chat.renaming}
-const $c=id=>document.getElementById(id);
-function chatNote(text){$c('chat-note').textContent=text||''}
 function chatTime(t){return new Date(t).toLocaleTimeString(lang=='fr'?'fr-FR':'en-US',{hour:'2-digit',minute:'2-digit'})}
-// Links to the allowed places become clickable; everything else stays text.
+function chatNote(text){$c('chat-note').textContent=text||''}
+function chatError(key,until){chatNote((T('chatErrors')[key]||key).replace('{d}',until?chatDate(until):''))}
+// Links become clickable (the server only lets the project's own through); the rest stays text.
 function chatText(el,text){for(const part of text.split(/(https?:\/\/[^\s]+)/g)){
  if(/^https?:\/\//.test(part)){const a=document.createElement('a');a.href=part;a.textContent=part;a.target='_blank';a.rel='noopener noreferrer nofollow ugc';el.appendChild(a)}
  else el.appendChild(document.createTextNode(part))}}
+function chatMedia(m){const box=document.createElement('div');box.className='media';const src='https://'+CHAT_HOST+'/media/'+m.id;
+ if(m.kind==='image'){const a=document.createElement('a');a.href=src;a.target='_blank';a.rel='noopener';
+  const img=document.createElement('img');img.src=src;img.loading='lazy';img.alt=T('chatPhoto');a.appendChild(img);box.appendChild(a)}
+ else{const v=document.createElement(m.kind==='video'?'video':'audio');v.src=src;v.controls=true;v.preload='metadata';
+  if(m.kind==='video')v.playsInline=true;else v.setAttribute('aria-label',T('chatRecord'));box.appendChild(v)}
+ return box}
+// A button that asks once more before acting.
+function chatConfirm(label,action){const b=document.createElement('button');b.type='button';b.className='danger';b.textContent=T(label);let armed=0;
+ b.onclick=()=>{if(armed){clearTimeout(armed);action();return}b.textContent=T('chatSure');armed=setTimeout(()=>{armed=0;b.textContent=T(label)},3000)};return b}
 function chatItem(m){const li=document.createElement('li');li.dataset.id=m.id;
  const meta=document.createElement('div');meta.className='meta';
  const who=document.createElement('span');who.className='who';who.textContent=m.name;
  who.style.color=m.team?'var(--accent)':'hsl('+[...m.name].reduce((h,c)=>h*31+c.charCodeAt(0)>>>0,7)%360+' 70% 70%)';meta.appendChild(who);
  if(m.team){const b=document.createElement('span');b.className='team';b.textContent=T('chatTeam');meta.appendChild(b)}
  const time=document.createElement('time');time.dateTime=new Date(m.t).toISOString();time.textContent=chatTime(m.t);meta.appendChild(time);
- if(chat.admin){const mod=document.createElement('span');mod.className='mod';
-  for(const [k,type] of [['chatDelete','delete'],['chatBan','ban']]){const b=document.createElement('button');b.type='button';b.textContent=T(k);
-   b.onclick=()=>chatSend({type,id:m.id});mod.appendChild(b)}meta.appendChild(mod)}
- const text=document.createElement('div');text.className='text';chatText(text,m.text);
- li.append(meta,text);return li}
-function chatRender(){const log=$c('chat-log');if(!log)return;log.innerHTML='';
+ if(m.edited){const e=document.createElement('span');e.className='edited';e.textContent='('+T('chatEdited')+')';meta.appendChild(e)}
+ if(m.own||chat.admin){const acts=document.createElement('span');acts.className='acts';
+  if(m.own){const e=document.createElement('button');e.type='button';e.textContent=T('chatEdit');e.onclick=()=>chatEditing(li,m);acts.appendChild(e)}
+  acts.appendChild(chatConfirm('chatDelete',()=>chatSend({type:'delete',id:m.id})));
+  if(chat.admin&&!m.own)acts.appendChild(chatConfirm('chatBan',()=>chatSend({type:'ban',id:m.id})));
+  meta.appendChild(acts)}
+ li.appendChild(meta);
+ if(m.text){const text=document.createElement('div');text.className='text';chatText(text,m.text);li.appendChild(text)}
+ if(m.media)li.appendChild(chatMedia(m.media));
+ return li}
+function chatEditing(li,m){const old=li.querySelector('.text');const box=document.createElement('div');box.className='editing';
+ const ta=document.createElement('textarea');ta.maxLength=500;ta.value=m.text;ta.rows=2;
+ const row=document.createElement('div');row.className='row';
+ const save=document.createElement('button');save.type='button';save.className='btn-s';save.textContent=T('chatSaveEdit');
+ const cancel=document.createElement('button');cancel.type='button';cancel.className='btn-s ghost';cancel.textContent=T('chatCancel');
+ save.onclick=()=>chatSend({type:'edit',id:m.id,text:ta.value});cancel.onclick=()=>chatRender();
+ ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save.click()}if(e.key==='Escape'){e.stopPropagation();cancel.click()}});
+ row.append(cancel,save);box.append(ta,row);if(old)old.replaceWith(box);else li.insertBefore(box,li.querySelector('.media'));ta.focus()}
+function chatRender(){const log=$c('chat-log');if(!log)return;const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;log.innerHTML='';
  if(!chat.messages.length){const li=document.createElement('li');li.className='empty';li.textContent=chat.connected?T('chatEmpty'):T('chatOffline');log.appendChild(li)}
  for(const m of chat.messages)log.appendChild(chatItem(m));
- log.scrollTop=log.scrollHeight;$c('chat-online').textContent=chat.connected?chat.online:'–';chatBadge()}
+ if(near)log.scrollTop=log.scrollHeight;$c('chat-online').textContent=chat.connected?chat.online:'–';chatBadge()}
 function chatBadge(){const b=$c('chat-unread');b.hidden=!chat.unread||chat.open;b.textContent=chat.unread>9?'9+':chat.unread}
 function chatSend(value){if(chat.ws&&chat.ws.readyState===1){chat.ws.send(JSON.stringify(value));return true}chatNote(T('chatOffline'));return false}
+// Settings: the name, locked once registered until it may change again.
+function chatMe(){const input=$c('chat-name'),me=chat.me;if(!input)return;
+ const named=!!(me&&me.name),free=!named||chat.admin||Date.now()>=me.changeAt;
+ if(named&&document.activeElement!==input)input.value=me.name;else if(!named&&!input.value)input.value=store.get('chatName')||'';
+ input.readOnly=!free;$c('chat-save').hidden=!free;
+ $c('chat-when').textContent=!named?T('chatNameHint'):free?T('chatNow'):T('chatWhen').replace('{d}',chatDate(me.changeAt))}
+function chatShowSettings(on){chat.settings=on;$c('chat-settings').hidden=!on;$c('chat-log').hidden=on;$c('chat-form').hidden=on;
+ $c('chat-gear').setAttribute('aria-pressed',on);chatMe();if(on)$c('chat-name').focus();else $c('chat-text').focus()}
+function chatAttachClear(){if(chat.attach?.url)URL.revokeObjectURL(chat.attach.url);chat.attach=null;$c('chat-attach').hidden=true}
+function chatAttachShow(a){chatAttachClear();chat.attach=a;const box=$c('chat-attach');box.querySelectorAll('img,video,audio').forEach(e=>e.remove());
+ a.url=URL.createObjectURL(a.blob);const el=document.createElement(a.kind==='image'?'img':a.kind);el.src=a.url;
+ if(a.kind==='audio')el.controls=true;else if(a.kind==='video'){el.muted=true;el.playsInline=true}else el.alt='';
+ box.insertBefore(el,box.firstChild);$c('chat-attach-name').textContent=a.label;box.hidden=false;$c('chat-text').focus()}
+// Photos are made smaller in the browser (1600 px, about 0.85 quality); a GIF stays as it is, to keep moving.
+async function chatShrink(file){if(file.type==='image/gif'||!window.createImageBitmap)return file;
+ try{const bmp=await createImageBitmap(file);const scale=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+  const c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.height=Math.round(bmp.height*scale);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.85));return blob&&blob.size<file.size?blob:file}catch(e){return file}}
+async function chatUpload(a){const r=await fetch('https://'+CHAT_HOST+'/api/media?kind='+a.kind,{method:'POST',body:a.blob,
+  headers:{'X-Chat-Code':chatCode(),'Content-Type':a.blob.type||'application/octet-stream'}});
+ let j={};try{j=await r.json()}catch(e){}if(!r.ok||!j.media)throw Error(j.error||'upload');return j.media}
+// Voice messages: the microphone until 🎤 again, 60 seconds at most.
+async function chatRecord(){const btn=$c('chat-rec');
+ if(chat.rec){chat.rec.stop();return}
+ let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){chatNote(T('chatNoMic'));return}
+ const type=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+ let rec;try{rec=new MediaRecorder(stream,type?{mimeType:type,audioBitsPerSecond:32000}:{})}catch(e){stream.getTracks().forEach(t=>t.stop());chatNote(T('chatNoMic'));return}
+ const parts=[],start=Date.now();chat.rec=rec;btn.setAttribute('aria-pressed','true');
+ const tick=setInterval(()=>{const s=Math.round((Date.now()-start)/1000);chatNote(T('chatRecording').replace('{s}',s));if(s>=60)rec.stop()},500);
+ rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+ rec.onstop=()=>{clearInterval(tick);stream.getTracks().forEach(t=>t.stop());chat.rec=null;btn.setAttribute('aria-pressed','false');chatNote('');
+  const blob=new Blob(parts,{type:(rec.mimeType||'audio/webm').split(';')[0]});
+  if(blob.size)chatAttachShow({kind:'audio',blob,label:T('chatVoice').replace('{s}',Math.max(1,Math.round((Date.now()-start)/1000)))})};
+ rec.start()}
 function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws=ws;
  ws.onopen=()=>{chat.connected=true;chat.retry=1000;chatNote('');const key=store.get('chatKey');if(key)ws.send(JSON.stringify({type:'auth',key}));
   ws.send(JSON.stringify({type:'identify',code:chatCode()}))};
  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}
   if(m.type==='hello'){chat.messages=m.messages;chat.online=m.online;chatRender()}
+  else if(m.type==='mine'){for(const x of chat.messages)if(m.ids.includes(x.id))x.own=true;chatRender()}
   else if(m.type==='online'){chat.online=m.count;$c('chat-online').textContent=m.count}
-  else if(m.type==='message'){chat.messages.push(m.message);if(chat.messages.length>100)chat.messages.shift();
+  else if(m.type==='message'){if(chat.messages.some(x=>x.id===m.message.id))return;chat.messages.push(m.message);if(chat.messages.length>100)chat.messages.shift();
    if(!chat.open)chat.unread++;const log=$c('chat-log');const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
-   if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));if(near)log.scrollTop=log.scrollHeight}chatBadge()}
+   if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));if(near||m.message.own)log.scrollTop=log.scrollHeight}chatBadge()}
+  else if(m.type==='edited'){const i=chat.messages.findIndex(x=>x.id===m.message.id);if(i>=0){chat.messages[i]=m.message;chatRender()}}
   else if(m.type==='removed'){chat.messages=chat.messages.filter(x=>!m.ids.includes(x.id));chatRender()}
-  else if(m.type==='you'){chat.me=m;if(m.name){chat.renaming=false;store.set('chatName',m.name)}chatMe();
-   if(chat.pending&&m.name){const text=chat.pending;chat.pending=null;if(chatSend({type:'say',text})){$c('chat-text').value='';$c('chat-text').style.height='auto'}}}
-  else if(m.type==='error'){chat.pending=null;chatNote((T('chatErrors')[m.error]||m.error).replace('{d}',m.until?chatDate(m.until):''))}
+  else if(m.type==='you'){const was=chat.me&&chat.me.name;chat.me=m;if(m.name)store.set('chatName',m.name);chatMe();
+   if(m.name&&chat.settings&&was!==m.name){chatNote(T('chatSaved'));chatShowSettings(false)}
+   if(chat.pending&&m.name){const p=chat.pending;chat.pending=null;chatSend(p)}}
+  else if(m.type==='error'){chat.pending=null;chatError(m.error,m.until)}
   else if(m.type==='auth'){chat.admin=m.ok;if(!m.ok)store.set('chatKey',null);chatNote(T(m.ok?'chatAdminOn':'chatAdminOff'));chatRender();chatMe()}};
  ws.onclose=()=>{chat.connected=false;chat.ws=null;chatRender();setTimeout(chatConnect,chat.retry);chat.retry=Math.min(chat.retry*2,30000)}}
 function chatToggle(open){chat.open=open;$c('chat').hidden=!open;$c('chat-bubble').setAttribute('aria-expanded',open);
- if(open){chat.unread=0;chatBadge();const log=$c('chat-log');log.scrollTop=log.scrollHeight;($c('chat-name').value?$c('chat-text'):$c('chat-name')).focus()}
+ if(open){chat.unread=0;chatBadge();const log=$c('chat-log');log.scrollTop=log.scrollHeight;
+  if(!(chat.me&&chat.me.name))chatShowSettings(true);else $c('chat-text').focus()}
  else $c('chat-bubble').focus()}
 $c('chat-bubble').onclick=()=>chatToggle(!chat.open);
 $c('chat-close').onclick=()=>chatToggle(false);
-$c('chat').addEventListener('keydown',e=>{if(e.key==='Escape')chatToggle(false)});
-$c('chat-name').value=store.get('chatName')||'';
-$c('chat-rename').onclick=()=>{chat.renaming=true;chatMe();const i=$c('chat-name');i.focus();i.select()};
-$c('chat-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const n=e.target.value.trim();
- if(n&&(!chat.me||n!==chat.me.name))chatSend({type:'register',name:n});else{chat.renaming=false;chatMe()}}});
-$c('chat-code').onclick=async()=>{const c=chatCode();try{await navigator.clipboard.writeText(c);chatNote(T('chatCodeCopied'))}catch(e){chatNote('/code '+c)}};
+$c('chat-gear').onclick=()=>chatShowSettings(!chat.settings);
+$c('chat-back').onclick=()=>chatShowSettings(false);
+$c('chat').addEventListener('keydown',e=>{if(e.key==='Escape'){if(chat.settings)chatShowSettings(false);else chatToggle(false)}});
+const chatSaveName=()=>{const n=$c('chat-name').value.trim();if(!n){chatError('name');return}
+ if(chat.me&&n===chat.me.name){chatShowSettings(false);return}chatSend({type:'register',name:n})};
+$c('chat-save').onclick=chatSaveName;
+$c('chat-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(!e.target.readOnly)chatSaveName()}});
+$c('chat-code').onclick=async()=>{const c=chatCode();try{await navigator.clipboard.writeText(c);chatNote(T('chatCodeCopied'))}catch(e){$c('chat-import').value=c;$c('chat-import').select()}};
+$c('chat-import-go').onclick=()=>{const c=$c('chat-import').value.trim();if(!/^[A-Za-z0-9_-]{16,128}$/.test(c)){chatError('invalid');return}
+ store.set('chatCode',c);$c('chat-import').value='';chatSend({type:'identify',code:c});chatNote(T('chatCodeSet'))};
+$c('chat-file').onclick=()=>$c('chat-file-input').click();
+$c('chat-file-input').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ const kind=f.type.startsWith('image/')?'image':f.type.startsWith('video/')?'video':null;if(!kind){chatError('media_type');return}
+ const blob=kind==='image'?await chatShrink(f):f;if(blob.size>(kind==='image'?3:8)*1048576){chatError('media_size');return}
+ chatAttachShow({kind,blob,label:f.name||T(kind==='image'?'chatPhoto':'chatVideo')})};
+$c('chat-attach-drop').onclick=chatAttachClear;
+$c('chat-rec').onclick=chatRecord;
 $c('chat-text').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$c('chat-form').requestSubmit()}});
 $c('chat-text').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});
 // "/login <key>" turns team mode on for this browser, "/logout" off; never sent as a message.
-$c('chat-form').onsubmit=e=>{e.preventDefault();const t=$c('chat-text'),text=t.value.trim();if(!text)return;
+$c('chat-form').onsubmit=async e=>{e.preventDefault();if(chat.busy)return;const t=$c('chat-text'),text=t.value.trim();if(!text&&!chat.attach)return;
  const login=text.match(/^\/login\s+(\S+)$/);
  if(login){store.set('chatKey',login[1]);chatSend({type:'auth',key:login[1]});t.value='';return}
  if(text==='/logout'){store.set('chatKey',null);chat.admin=false;chatRender();chatMe();t.value='';return}
- // "/code <code>" brings the name registered on another device.
- const code=text.match(/^\/code\s+([A-Za-z0-9_-]{16,128})$/);
- if(code){store.set('chatCode',code[1]);chatSend({type:'identify',code:code[1]});chatNote(T('chatCodeSet'));t.value='';return}
- const name=$c('chat-name').value.trim();if(!name){chatNote(T('chatErrors').name);$c('chat-name').focus();return}
- chatNote('');
- // A new or changed name is registered first; the message follows once it is accepted.
- if(!chat.me||!chat.me.name||name!==chat.me.name){chat.pending=text;chatSend({type:'register',name});return}
- if(chatSend({type:'say',text})){t.value='';t.style.height='auto'}};
+ if(!(chat.me&&chat.me.name)){chatNote(T('chatNeedName'));chatShowSettings(true);return}
+ const say={type:'say',text};
+ if(chat.attach){chat.busy=true;$c('chat-send').disabled=true;chatNote(T('chatUploading'));
+  try{say.media={id:(await chatUpload(chat.attach)).id};chatNote('')}catch(err){chatError(err.message);return}
+  finally{chat.busy=false;$c('chat-send').disabled=false}}
+ if(chatSend(say)){t.value='';t.style.height='auto';chatAttachClear()}};
 chatConnect();
 
 apply();refresh();setInterval(()=>{if(!document.hidden)refresh()},20000);
