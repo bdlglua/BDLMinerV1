@@ -136,7 +136,15 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat-log .empty{color:var(--label);text-align:center;margin:auto 0;font-size:14px}
 .chat-log .media{margin-top:6px}
 .chat-log .media img,.chat-log .media video{display:block;max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--border);background:#000}
-.chat-log .media audio{width:100%;height:40px}
+.voice{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:5px 14px 5px 5px;max-width:320px}
+.voice .vplay{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:#000;cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 3px rgba(247,147,26,.15)}
+.voice .vplay svg{width:14px;height:14px}
+.voice .vwave{flex:1;min-width:0;height:30px;display:flex;align-items:center;gap:2px;cursor:pointer;border-radius:4px}
+.voice .vwave i{flex:1;min-height:3px;border-radius:2px;background:#3a4252;transition:background .1s}
+.voice .vwave i.on{background:var(--accent)}
+.voice .vtime{flex:none;font-size:12px;color:var(--label);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+.voice.playing .vtime{color:var(--fg)}
+.chat-attach .voice{flex:1;max-width:none;background:none;border:0;padding:0}
 .chat-log .editing textarea{width:100%;margin-top:4px}
 .chat-log .editing .row{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}
 .chat-note{margin:0;padding:6px 14px;font-size:13px;color:#ffb36b}
@@ -164,8 +172,8 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat-attach{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px}
 .chat-attach[hidden]{display:none}
 .chat-attach img,.chat-attach video{width:44px;height:44px;object-fit:cover;border-radius:6px}
-.chat-attach audio{height:32px;max-width:200px}
-.chat-attach span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label)}
+.chat-attach>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label)}
+.chat-attach>span:empty{display:none}
 .chat-rules{margin:0;padding:0 12px 10px;color:var(--label);font-size:11px}
 @media (max-width:520px){.chat{right:0;left:0;bottom:0;width:100%;height:85vh;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}
 @media (prefers-reduced-motion:reduce){.chat-bubble{transition:none}.chat .rec[aria-pressed=true]{animation:none}}
@@ -410,7 +418,7 @@ chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatAttach:'Pho
 chatRules:'Messages, photos et vidéos publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
 chatEmpty:'Aucun message pour l\'instant : dis bonjour !',chatTeam:'équipe',chatEdited:'modifié',chatEdit:'Modifier',chatDelete:'Supprimer',chatSure:'Sûr ?',chatBan:'Bannir',
 chatSaveEdit:'Enregistrer',chatCancel:'Annuler',chatOffline:'Connexion au chat…',chatUploading:'Envoi du fichier…',chatRecording:'Enregistrement… {s} s (clique sur 🎤 pour arrêter)',
-chatVoice:'Message vocal ({s} s)',chatPhoto:'Photo',chatVideo:'Vidéo',chatNoMic:'Micro indisponible ou refusé.',
+chatVoice:'Message vocal ({s} s)',chatPlay:'Écouter',chatPause:'Pause',chatPosition:'Position dans le message vocal',chatPhoto:'Photo',chatVideo:'Vidéo',chatNoMic:'Micro indisponible ou refusé.',
 chatCodeCopied:'Code copié. Sur ton autre appareil : ⚙ Réglages → coller le code → Importer.',chatCodeSet:'Code importé : ton pseudo te suit.',
 chatErrors:{taken:'Ce pseudo est déjà pris.',wait:'Tu pourras changer de pseudo le {d}.',too_many:'Trop de nouveaux pseudos depuis ta connexion aujourd\'hui : réessaie demain.',
  name:'Choisis d\'abord ton pseudo.',reserved:'Ce pseudo est réservé à l\'équipe.',empty:'Le message est vide.',too_long:'Message trop long (500 caractères au plus).',
@@ -433,7 +441,7 @@ noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
 const EN={chatWhen:'Name registered · changeable on {d}',chatNow:'Name registered · changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
-chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPhoto:'Photo',chatVideo:'Video',
+chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatCodeCopied:'Code copied. On your other device: ⚙ Settings → paste the code → Import.',chatCodeSet:'Code imported: your name follows you.',
 chatErrors:{taken:'This name is already taken.',wait:'You can change your name on {d}.',too_many:'Too many new names from your connection today: try again tomorrow.',
  name:'Choose your name first.',reserved:'This name is kept for the team.',empty:'The message is empty.',too_long:'Message too long (500 characters at most).',
@@ -582,11 +590,46 @@ function chatError(key,until){chatNote((T('chatErrors')[key]||key).replace('{d}'
 function chatText(el,text){for(const part of text.split(/(https?:\/\/[^\s]+)/g)){
  if(/^https?:\/\//.test(part)){const a=document.createElement('a');a.href=part;a.textContent=part;a.target='_blank';a.rel='noopener noreferrer nofollow ugc';el.appendChild(a)}
  else el.appendChild(document.createTextNode(part))}}
+// Voice messages: a round orange play button, the message's own waveform
+// (orange as it plays) and its time; one plays at a time.
+const VOICE_BARS=36,PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>',PAUSE='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+let voicePlaying=null;
+function voiceClock(s){s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+// The peaks of the decoded sound; made-up but steady bars when it cannot be decoded.
+async function voicePeaks(source,seed){try{const buf=source instanceof Blob?await source.arrayBuffer():await (await fetch(source)).arrayBuffer();
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();const audio=await ctx.decodeAudioData(buf);ctx.close();
+  const data=audio.getChannelData(0),step=Math.floor(data.length/VOICE_BARS)||1,peaks=[];
+  for(let i=0;i<VOICE_BARS;i++){let m=0;for(let j=i*step;j<(i+1)*step&&j<data.length;j+=16)m=Math.max(m,Math.abs(data[j]));peaks.push(m)}
+  const top=Math.max(...peaks)||1;return peaks.map(p=>.15+.85*p/top)}
+ catch(e){let h=[...String(seed)].reduce((a,c)=>a*31+c.charCodeAt(0)>>>0,7);return Array.from({length:VOICE_BARS},()=>{h=(h*1103515245+12345)>>>0;return .25+.75*((h>>>16)%100)/100})}}
+function voicePlayer(src,seed){const box=document.createElement('div');box.className='voice';
+ const btn=document.createElement('button');btn.type='button';btn.className='vplay';btn.innerHTML=PLAY;btn.setAttribute('aria-label',T('chatPlay'));
+ const wave=document.createElement('div');wave.className='vwave';wave.tabIndex=0;wave.setAttribute('role','slider');wave.setAttribute('aria-label',T('chatPosition'));
+ const time=document.createElement('span');time.className='vtime';time.textContent='0:00';
+ const audio=new Audio();audio.preload='metadata';audio.src=src instanceof Blob?URL.createObjectURL(src):src;
+ const bars=[];for(let i=0;i<VOICE_BARS;i++){const b=document.createElement('i');b.style.height='30%';bars.push(b);wave.appendChild(b)}
+ voicePeaks(src,seed).then(p=>p.forEach((h,i)=>bars[i].style.height=Math.round(h*100)+'%'));
+ // MediaRecorder files may not know their length until played through.
+ const length=()=>isFinite(audio.duration)&&audio.duration>0?audio.duration:0;
+ const draw=()=>{const d=length(),f=d?audio.currentTime/d:0;bars.forEach((b,i)=>b.classList.toggle('on',(i+.5)/VOICE_BARS<=f));
+  time.textContent=audio.paused&&!audio.currentTime?voiceClock(d):voiceClock(audio.currentTime);
+  wave.setAttribute('aria-valuemin','0');wave.setAttribute('aria-valuemax',String(Math.round(d)));wave.setAttribute('aria-valuenow',String(Math.round(audio.currentTime)));
+  wave.setAttribute('aria-valuetext',voiceClock(audio.currentTime)+' / '+voiceClock(d))};
+ const state=()=>{const on=!audio.paused;box.classList.toggle('playing',on);btn.innerHTML=on?PAUSE:PLAY;btn.setAttribute('aria-label',T(on?'chatPause':'chatPlay'))};
+ audio.addEventListener('loadedmetadata',()=>{if(audio.duration===Infinity){audio.currentTime=1e9;audio.addEventListener('durationchange',()=>{audio.currentTime=0;draw()},{once:true})}draw()});
+ audio.addEventListener('timeupdate',draw);audio.addEventListener('play',state);audio.addEventListener('pause',state);
+ audio.addEventListener('ended',()=>{audio.currentTime=0;state();draw()});
+ btn.onclick=()=>{if(audio.paused){if(voicePlaying&&voicePlaying!==audio)voicePlaying.pause();voicePlaying=audio;audio.play()}else audio.pause()};
+ const seek=t=>{const d=length();if(d){audio.currentTime=Math.min(d,Math.max(0,t));draw()}};
+ wave.onclick=e=>{const r=wave.getBoundingClientRect();seek((e.clientX-r.left)/r.width*length())};
+ wave.onkeydown=e=>{if(e.key==='ArrowRight'){e.preventDefault();seek(audio.currentTime+2)}else if(e.key==='ArrowLeft'){e.preventDefault();seek(audio.currentTime-2)}
+  else if(e.key===' '||e.key==='Enter'){e.preventDefault();btn.click()}};
+ box.append(btn,wave,time);return box}
 function chatMedia(m){const box=document.createElement('div');box.className='media';const src='https://'+CHAT_HOST+'/media/'+m.id;
  if(m.kind==='image'){const a=document.createElement('a');a.href=src;a.target='_blank';a.rel='noopener';
   const img=document.createElement('img');img.src=src;img.loading='lazy';img.alt=T('chatPhoto');a.appendChild(img);box.appendChild(a)}
- else{const v=document.createElement(m.kind==='video'?'video':'audio');v.src=src;v.controls=true;v.preload='metadata';
-  if(m.kind==='video')v.playsInline=true;else v.setAttribute('aria-label',T('chatRecord'));box.appendChild(v)}
+ else if(m.kind==='video'){const v=document.createElement('video');v.src=src;v.controls=true;v.preload='metadata';v.playsInline=true;box.appendChild(v)}
+ else box.appendChild(voicePlayer(src,m.id));
  return box}
 // A button that asks once more before acting.
 function chatConfirm(label,action){const b=document.createElement('button');b.type='button';b.className='danger';b.textContent=T(label);let armed=0;
@@ -631,9 +674,11 @@ function chatShowSettings(on){chat.settings=on;$c('chat-settings').hidden=!on;$c
  $c('chat-gear').setAttribute('aria-pressed',on);chatMe();if(on)$c('chat-name').focus();else $c('chat-text').focus()}
 function chatAttachClear(){if(chat.attach?.url)URL.revokeObjectURL(chat.attach.url);chat.attach=null;$c('chat-attach').hidden=true}
 function chatAttachShow(a){chatAttachClear();chat.attach=a;const box=$c('chat-attach');box.querySelectorAll('img,video,audio').forEach(e=>e.remove());
- a.url=URL.createObjectURL(a.blob);const el=document.createElement(a.kind==='image'?'img':a.kind);el.src=a.url;
- if(a.kind==='audio')el.controls=true;else if(a.kind==='video'){el.muted=true;el.playsInline=true}else el.alt='';
- box.insertBefore(el,box.firstChild);$c('chat-attach-name').textContent=a.label;box.hidden=false;$c('chat-text').focus()}
+ box.querySelectorAll('.voice').forEach(e=>e.remove());a.url=URL.createObjectURL(a.blob);
+ if(a.kind==='audio'){box.insertBefore(voicePlayer(a.blob,'preview'),box.firstChild);$c('chat-attach-name').textContent=''}
+ else{const el=document.createElement(a.kind==='image'?'img':'video');el.src=a.url;if(a.kind==='video'){el.muted=true;el.playsInline=true}else el.alt='';
+  box.insertBefore(el,box.firstChild);$c('chat-attach-name').textContent=a.label}
+ box.hidden=false;$c('chat-text').focus()}
 // Photos are made smaller in the browser (1600 px, about 0.85 quality); a GIF stays as it is, to keep moving.
 async function chatShrink(file){if(file.type==='image/gif'||!window.createImageBitmap)return file;
  try{const bmp=await createImageBitmap(file);const scale=Math.min(1,1600/Math.max(bmp.width,bmp.height));
