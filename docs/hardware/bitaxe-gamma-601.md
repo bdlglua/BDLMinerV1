@@ -38,7 +38,7 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    rollback, back up the flash with esptool before erasing it. BDLMiner does not
    import AxeOS NVS settings.
 2. Download **`bitaxe-gamma-601-factory.bin`** from the
-   [v1.9.2 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.2) and
+   [v1.9.3 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.3) and
    flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
    the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
    Alternatively, build with PlatformIO 6.1.19:

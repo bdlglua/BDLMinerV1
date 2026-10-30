@@ -5,14 +5,15 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.2](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.2)**
+**Latest release: [v1.9.3](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.3)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.9.2.md)
+· [Release notes](docs/releases/v1.9.3.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.2** shares the hashrate every 5 minutes, for live statistics, and 1.9.1
+Version **1.9.3** no longer asks for a sign-in on the local dashboard (the web
+password is optional). Version 1.9.2 shares the hashrate every 5 minutes, for live statistics, and 1.9.1
 lets *Check now* look for an update without the web password. Version 1.9.0 shares the miner's hashrate anonymously (version, board and hashrate,
 every 5 minutes since 1.9.2; a setting turns it off) to count the live
 [total hashrate of BDLMiner](https://bdlminer-stats.bdlminer-bot.workers.dev/). Earlier
