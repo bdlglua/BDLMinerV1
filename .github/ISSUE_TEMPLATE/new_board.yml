@@ -1,0 +1,42 @@
+name: New board
+description: Ask for support of another board.
+labels: ["new board"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Board
+      placeholder: "LilyGO T-Display S3 AMOLED"
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Chip
+      options:
+        - ESP32
+        - ESP32-S2
+        - ESP32-S3
+        - ESP32-C3
+        - ESP32 + mining ASIC
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: display
+    attributes:
+      label: Display
+      placeholder: "ST7789 170x320, parallel"
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: Product page, schematic, pinout, or the source of another firmware for it.
+    validations:
+      required: true
+  - type: checkboxes
+    id: test
+    attributes:
+      label: Testing
+      options:
+        - label: I own this board and can test a development build.

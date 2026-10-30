@@ -1,0 +1,71 @@
+name: Bug report
+description: Something does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! A **security problem**? Please do not post it here: see [SECURITY.md](https://github.com/bdlglua/BDLMinerV1/blob/main/SECURITY.md).
+        Before posting logs, remove passwords, webhook URLs and ntfy topics (your payout address is fine).
+  - type: dropdown
+    id: board
+    attributes:
+      label: Board
+      options:
+        - M5StickC Plus2 (m5stickc-plus2)
+        - Other M5Stack ESP32 (m5stack-esp32)
+        - M5Stack ESP32-S3 (m5stack-s3)
+        - LilyGO T-Display (lilygo-t-display)
+        - LilyGO T-Display-S3 (lilygo-t-display-s3)
+        - NerdNOS (nerdnos)
+        - CYD ESP32-2432S028R (esp32-2432s028r)
+        - ESP32 without screen (esp32-headless)
+        - ESP32-S3 without screen (esp32s3-headless)
+        - ESP32-S2 without screen (esp32s2-headless)
+        - ESP32-C3 without screen (esp32c3-headless)
+        - Bitaxe Gamma 601 (bitaxe-gamma-601)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Firmware version
+      description: Shown on the dashboard's Device tile and in /api/stats ("firmware").
+      placeholder: "1.8.0"
+    validations:
+      required: true
+  - type: input
+    id: pool
+    attributes:
+      label: Pool and protocol
+      placeholder: "public-pool.io:3333, Stratum V1"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: From the Log page (http://<miner>/log) or the serial monitor (115200 baud).
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues.
+          required: true
+        - label: I removed passwords, webhook URLs and ntfy topics from what I posted.
+          required: true

@@ -1,0 +1,34 @@
+name: Feature request
+description: An idea to improve BDLMiner.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The need behind the idea helps more than a solution alone.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Screen
+        - Web dashboard
+        - Settings
+        - Notifications / Home Assistant
+        - Pools / Stratum
+        - Updates
+        - Other
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, links, similar features elsewhere.
