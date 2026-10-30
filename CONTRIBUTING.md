@@ -92,7 +92,9 @@ you tested on a real board, say which one and what you saw in the pull request.
 
 Releases are made by the maintainers: pushing a `vX.Y.Z` tag builds every board,
 signs the firmware with the release key (kept outside the repository) and publishes
-the release and the web installer. Pull requests do not need to change
+the release and the web installer. The release notes are `docs/releases/vX.Y.Z.md`; a French
+translation, `docs/releases/vX.Y.Z.fr.md`, is what the community Discord bot shows to
+French speakers (read from `main`, so it can follow the release). Pull requests do not need to change
 `FW_VERSION` or the release notes.
 
 ## License
