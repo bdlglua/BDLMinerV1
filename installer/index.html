@@ -77,6 +77,13 @@ ol{padding-left:20px;margin:0}li{margin:6px 0}
 .chart-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .chart-head .live{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:#3ddc84}
 .chart-head .live .dot{width:9px;height:9px}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px}
+.split h3{font-size:13px;font-weight:600;color:var(--label);margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em}
+table.by{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
+table.by th,table.by td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--border)}
+table.by th{color:var(--label);font-weight:500;font-size:13px}
+table.by .num{text-align:right}
+table.by .empty{color:var(--label)}
 .range{margin-left:auto;display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .range button{background:none;border:0;color:var(--label);font:inherit;font-size:13px;padding:5px 12px;cursor:pointer}
 .range button[aria-pressed=true]{background:var(--accent);color:#000;font-weight:700}
@@ -223,7 +230,11 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
    </div>
    <svg class="chart" id="st-chart" viewBox="0 0 960 200" role="img" aria-label="Total hashrate, last 24 hours"></svg>
   </div>
-  <p class="s" id="st-status" data-h="statsMore">Details by board and version on the <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">statistics page</a>.</p>
+  <div class="split">
+   <div class="card"><h3 data-t="byBoard">By board</h3><table class="by" id="st-boards"></table></div>
+   <div class="card"><h3 data-t="byVersion">By version</h3><table class="by" id="st-versions"></table></div>
+  </div>
+  <p class="s" id="st-status" data-h="statsMore">Raw data: <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary">JSON</a> · <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">statistics page</a>.</p>
  </div>
 </section>
 
@@ -282,8 +293,8 @@ statsTitle:'BDLMiner en ce moment',statsLead:'Le total en direct des miners qui 
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
-live:'En direct',week:'7 jours',period:'Période',updated:'mis à jour il y a {s} s',now:'maintenant',
-statsMore:'Le détail par carte et par version est sur la <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">page des statistiques</a>.',
+live:'En direct',week:'7 jours',byBoard:'Par carte',byVersion:'Par version',colBoard:'Carte',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'Aucun miner en ce moment.',period:'Période',updated:'mis à jour il y a {s} s',now:'maintenant',
+statsMore:'Données brutes : <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary">JSON</a> · <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">page des statistiques</a>.',
 lotteryTitle:'Un billet de loterie, pas un revenu',
 lottery:'Un bloc rapporte 3,125 BTC plus les frais sur ta propre adresse, mais à 1 MH/s il faut en moyenne des milliards d\'années pour en trouver un. Chaque hash a la même minuscule chance, sans progression entre eux : le plaisir est dans le montage, les statistiques et la course à la meilleure difficulté. N\'y dépense que ce que tu mettrais dans un gadget.',
 communityTitle:'Communauté',communityLead:'Questions, installations, meilleures shares et idées : viens dire bonjour.',
@@ -294,7 +305,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
+const EN={colBoard:'Board',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'No miner right now.',devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
 experimental:'experimental',chartDay:'Total hashrate every 5 minutes, last 24 hours',chartWeek:'Total hashrate per hour, last 7 days',noChart:'The chart fills up as the reports come.',
 updated:'updated {s} s ago',now:'now'};
 document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
@@ -379,7 +390,19 @@ function fleet(){const ul=document.getElementById('st-fleet');ul.innerHTML='';
   li.append(dot,name,count);ul.appendChild(li)}
  document.getElementById('st-on').textContent=summary?on:'–';document.getElementById('st-off').textContent=summary?off:'–'}
 
-function stats(){const set=(id,v)=>document.getElementById(id).textContent=v;fleet();
+// The miners online now, by board and by firmware version.
+function table(id,rows,head,label){const el=document.getElementById(id);el.innerHTML='';
+ if(!rows.length){const td=document.createElement('td');td.className='empty';td.textContent=T('noneNow');el.insertRow().appendChild(td);return}
+ const h=el.createTHead().insertRow();
+ for(const [k,cls] of [[head,''],['colMiners','num'],['colHashrate','num']]){const th=document.createElement('th');th.textContent=T(k);th.className=cls;h.appendChild(th)}
+ const body=el.createTBody();
+ for(const r of rows){const tr=body.insertRow();
+  for(const [v,cls] of [[label(r.name),''],[r.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'),'num'],[rate(r.hashrate),'num']]){const td=tr.insertCell();td.textContent=v;td.className=cls}}}
+function breakdowns(){
+ table('st-boards',summary?.boards||[],'colBoard',env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env});
+ table('st-versions',summary?.versions||[],'colVersion',v=>v)}
+
+function stats(){const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}
  set('st-hashrate',rate(summary.hashrate));set('st-miners',summary.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'));
  set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
