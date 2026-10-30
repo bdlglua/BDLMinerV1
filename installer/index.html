@@ -150,12 +150,15 @@ footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label)
 .chat-note{margin:0;padding:6px 14px;font-size:13px;color:#ffb36b}
 .chat-note:empty{display:none}
 .chat-settings{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:14px}
-.chat-settings[hidden]{display:none}
+.chat-settings[hidden],.chat .chat-log[hidden],.chat form[hidden]{display:none}
 .chat-settings h3{margin:0;font-size:15px}
 .chat-settings .field{display:flex;flex-direction:column;gap:6px}
 .chat-settings label{color:var(--label);font-size:13px;margin:0}
 .chat-settings .row{display:flex;gap:8px}
 .chat-settings .hint{color:var(--label);font-size:12px;margin:0}
+.chat-qr{display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px}
+.chat-qr[hidden]{display:none}
+.chat-qr svg{width:200px;height:200px;border-radius:8px;display:block}
 .chat input,.chat textarea{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
 .chat input[readonly]{background:var(--panel2);color:var(--accent);font-weight:700;border-color:transparent}
 .chat .btn-s{flex:none;background:var(--accent);color:#000;border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
@@ -359,10 +362,13 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
   </div>
   <div class="field">
    <label data-t="chatCodeTitle">Use your name on another device</label>
-   <div class="row"><button type="button" class="btn-s ghost" id="chat-code" data-t="chatCode">Copy my code</button></div>
-   <div class="row"><input id="chat-import" data-ph="chatImportPh" placeholder="Paste a code" autocomplete="off">
-    <button type="button" class="btn-s ghost" id="chat-import-go" data-t="chatImport">Import</button></div>
-   <p class="hint" data-t="chatCodeHint">Your code is your key to your name: keep it secret.</p>
+   <p class="hint" data-t="chatQrHint">Scan your QR code with the other device's camera: the chat opens there with your name.</p>
+   <div class="row"><button type="button" class="btn-s ghost" id="chat-qr-show" aria-expanded="false" aria-controls="chat-qr" data-t="chatQrShow">Show my QR code</button></div>
+   <div class="chat-qr" id="chat-qr" hidden>
+    <div id="chat-qr-img" role="img" data-al="chatQrAlt" aria-label="QR code to open the chat with your name"></div>
+    <button type="button" class="btn-s ghost" id="chat-link" data-t="chatLink">Copy the link</button>
+   </div>
+   <p class="hint" data-t="chatCodeHint">This QR code is the key to your name: show it to no one.</p>
   </div>
   <button type="button" class="btn-s" id="chat-back" data-t="chatBack">Back to the chat</button>
  </div>
@@ -412,14 +418,14 @@ devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
 chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Ton pseudo',chatNamePh:'Ton pseudo',
 chatSave:'Enregistrer',chatNameHint:'Choisi une fois puis gardé : tu pourras le changer tous les 30 jours.',chatWhen:'Pseudo enregistré · modifiable le {d}',chatNow:'Pseudo enregistré · modifiable dès maintenant',
-chatCodeTitle:'Utiliser ton pseudo sur un autre appareil',chatCode:'Copier mon code',chatImportPh:'Coller un code',chatImport:'Importer',chatCodeHint:'Ton code est la clé de ton pseudo : garde-le secret.',
+chatCodeTitle:'Utiliser ton pseudo sur un autre appareil',chatQrHint:'Scanne ton QR code avec l\'appareil photo de l\'autre appareil : la discussion s\'y ouvre avec ton pseudo.',chatQrShow:'Afficher mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'Ce QR code est la clé de ton pseudo : ne le montre à personne.',
 chatBack:'Retour à la discussion',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
 chatMessage:'Message',chatTextPh:'Message…',chatSend:'Envoyer',chatAttach:'Photo ou vidéo',chatRecord:'Message vocal',chatRemove:'Retirer',
 chatRules:'Messages, photos et vidéos publics, gardés 7 jours. Ne partage jamais de phrase de récupération, de clé privée ni de mot de passe.',
 chatEmpty:'Aucun message pour l\'instant : dis bonjour !',chatTeam:'équipe',chatEdited:'modifié',chatEdit:'Modifier',chatDelete:'Supprimer',chatSure:'Sûr ?',chatBan:'Bannir',
 chatSaveEdit:'Enregistrer',chatCancel:'Annuler',chatOffline:'Connexion au chat…',chatUploading:'Envoi du fichier…',chatRecording:'Enregistrement… {s} s (clique sur 🎤 pour arrêter)',
 chatVoice:'Message vocal ({s} s)',chatPlay:'Écouter',chatPause:'Pause',chatPosition:'Position dans le message vocal',chatPhoto:'Photo',chatVideo:'Vidéo',chatNoMic:'Micro indisponible ou refusé.',
-chatCodeCopied:'Code copié. Sur ton autre appareil : ⚙ Réglages → coller le code → Importer.',chatCodeSet:'Code importé : ton pseudo te suit.',
+chatCodeSet:'Ton pseudo t\'a suivi sur cet appareil.',
 chatErrors:{taken:'Ce pseudo est déjà pris.',wait:'Tu pourras changer de pseudo le {d}.',too_many:'Trop de nouveaux pseudos depuis ta connexion aujourd\'hui : réessaie demain.',
  name:'Choisis d\'abord ton pseudo.',reserved:'Ce pseudo est réservé à l\'équipe.',empty:'Le message est vide.',too_long:'Message trop long (500 caractères au plus).',
  blocked:'Message bloqué : il ressemble à une arnaque.',link:'Les liens ne sont permis que vers GitHub, Discord, Reddit et le site.',slow:'Doucement : un message toutes les 3 secondes.',
@@ -442,7 +448,7 @@ experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 d
 const EN={chatWhen:'Name registered · changeable on {d}',chatNow:'Name registered · changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
-chatNoMic:'Microphone unavailable or refused.',chatCodeCopied:'Code copied. On your other device: ⚙ Settings → paste the code → Import.',chatCodeSet:'Code imported: your name follows you.',
+chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
 chatErrors:{taken:'This name is already taken.',wait:'You can change your name on {d}.',too_many:'Too many new names from your connection today: try again tomorrow.',
  name:'Choose your name first.',reserved:'This name is kept for the team.',empty:'The message is empty.',too_long:'Message too long (500 characters at most).',
  blocked:'Message blocked: it looks like a scam.',link:'Links are only allowed to GitHub, Discord, Reddit and the site.',slow:'Easy: one message every 3 seconds.',
@@ -670,7 +676,7 @@ function chatMe(){const input=$c('chat-name'),me=chat.me;if(!input)return;
  if(named&&document.activeElement!==input)input.value=me.name;else if(!named&&!input.value)input.value=store.get('chatName')||'';
  input.readOnly=!free;$c('chat-save').hidden=!free;
  $c('chat-when').textContent=!named?T('chatNameHint'):free?T('chatNow'):T('chatWhen').replace('{d}',chatDate(me.changeAt))}
-function chatShowSettings(on){chat.settings=on;$c('chat-settings').hidden=!on;$c('chat-log').hidden=on;$c('chat-form').hidden=on;
+function chatShowSettings(on){if(!on&&window.chatQr)chatQr(false);chat.settings=on;$c('chat-settings').hidden=!on;$c('chat-log').hidden=on;$c('chat-form').hidden=on;
  $c('chat-gear').setAttribute('aria-pressed',on);chatMe();if(on)$c('chat-name').focus();else $c('chat-text').focus()}
 function chatAttachClear(){if(chat.attach?.url)URL.revokeObjectURL(chat.attach.url);chat.attach=null;$c('chat-attach').hidden=true}
 function chatAttachShow(a){chatAttachClear();chat.attach=a;const box=$c('chat-attach');box.querySelectorAll('img,video,audio').forEach(e=>e.remove());
@@ -714,7 +720,8 @@ function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws
   else if(m.type==='removed'){chat.messages=chat.messages.filter(x=>!m.ids.includes(x.id));chatRender()}
   else if(m.type==='you'){const was=chat.me&&chat.me.name;chat.me=m;if(m.name)store.set('chatName',m.name);chatMe();
    if(m.name&&chat.settings&&was!==m.name){chatNote(T('chatSaved'));chatShowSettings(false)}
-   if(chat.pending&&m.name){const p=chat.pending;chat.pending=null;chatSend(p)}}
+   if(chat.pending&&m.name){const p=chat.pending;chat.pending=null;chatSend(p)}
+   if(chat.imported){chat.imported=false;if(!chat.open)chatToggle(true);if(m.name){chatShowSettings(false);chatNote(T('chatCodeSet'))}}}
   else if(m.type==='error'){chat.pending=null;chatError(m.error,m.until)}
   else if(m.type==='auth'){chat.admin=m.ok;if(!m.ok)store.set('chatKey',null);chatNote(T(m.ok?'chatAdminOn':'chatAdminOff'));chatRender();chatMe()}};
  ws.onclose=()=>{chat.connected=false;chat.ws=null;chatRender();setTimeout(chatConnect,chat.retry);chat.retry=Math.min(chat.retry*2,30000)}}
@@ -731,9 +738,27 @@ const chatSaveName=()=>{const n=$c('chat-name').value.trim();if(!n){chatError('n
  if(chat.me&&n===chat.me.name){chatShowSettings(false);return}chatSend({type:'register',name:n})};
 $c('chat-save').onclick=chatSaveName;
 $c('chat-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();if(!e.target.readOnly)chatSaveName()}});
-$c('chat-code').onclick=async()=>{const c=chatCode();try{await navigator.clipboard.writeText(c);chatNote(T('chatCodeCopied'))}catch(e){$c('chat-import').value=c;$c('chat-import').select()}};
-$c('chat-import-go').onclick=()=>{const c=$c('chat-import').value.trim();if(!/^[A-Za-z0-9_-]{16,128}$/.test(c)){chatError('invalid');return}
- store.set('chatCode',c);$c('chat-import').value='';chatSend({type:'identify',code:c});chatNote(T('chatCodeSet'))};
+// Another device: a QR code (or link) to this page whose fragment carries the
+// secret code. A fragment is never sent to any server; the page takes it out
+// of the address at once.
+const chatLinkTo=()=>location.origin+location.pathname+'#chat-code='+chatCode();
+let qrHide=0;
+function chatQrLib(){if(window.qrcode)return Promise.resolve();return new Promise((ok,fail)=>{const s=document.createElement('script');
+ s.src='https://unpkg.com/qrcode-generator@1.4.4/qrcode.js';s.onload=ok;s.onerror=fail;document.head.appendChild(s)})}
+async function chatQr(show){const box=$c('chat-qr'),btn=$c('chat-qr-show');clearTimeout(qrHide);
+ if(!show){box.hidden=true;$c('chat-qr-img').innerHTML='';btn.textContent=T('chatQrShow');btn.setAttribute('aria-expanded','false');return}
+ try{await chatQrLib()}catch(e){chatNote(T('chatQrFailed'));return}
+ const qr=qrcode(0,'M');qr.addData(chatLinkTo());qr.make();const n=qr.getModuleCount(),q=4;let d='';
+ for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))d+='M'+(x+q)+' '+(y+q)+'h1v1h-1z';
+ $c('chat-qr-img').innerHTML='<svg viewBox="0 0 '+(n+2*q)+' '+(n+2*q)+'" shape-rendering="crispEdges" aria-hidden="true"><rect width="100%" height="100%" fill="#fff"/><path d="'+d+'" fill="#0b0d12"/></svg>';
+ box.hidden=false;btn.textContent=T('chatQrHide');btn.setAttribute('aria-expanded','true');
+ // Shown only as long as needed.
+ qrHide=setTimeout(()=>chatQr(false),90000)}
+$c('chat-qr-show').onclick=()=>chatQr($c('chat-qr').hidden);
+$c('chat-link').onclick=async()=>{try{await navigator.clipboard.writeText(chatLinkTo());chatNote(T('chatLinkCopied'))}catch(e){chatNote(chatLinkTo())}};
+// Opened from such a QR code or link: keep the code, clean the address, open the chat.
+{const m=location.hash.match(/^#chat-code=([A-Za-z0-9_-]{16,128})$/);
+ if(m){store.set('chatCode',m[1]);history.replaceState(null,'',location.pathname+location.search);chat.imported=true}}
 $c('chat-file').onclick=()=>$c('chat-file-input').click();
 $c('chat-file-input').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
  const kind=f.type.startsWith('image/')?'image':f.type.startsWith('video/')?'video':null;if(!kind){chatError('media_type');return}
