@@ -8,7 +8,7 @@ and MQTT credentials. Reports that help keep that safe are very welcome.
 
 | Version | Supported |
 |---|---|
-| 1.8.x (latest release) | ✅ security fixes |
+| 1.9.x (latest release) | ✅ security fixes |
 | older releases | ❌ — miners install the latest release by themselves (GitHub updates, setting `2`, the default) |
 
 Fixes ship as a new release; the boards marked **experimental** (Bitaxe Gamma 601,
