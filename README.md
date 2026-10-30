@@ -14,7 +14,7 @@ whose reward is paid to **your** address.
 
 Version **1.9.1** lets *Check now* look for an update without the web password.
 Version 1.9.0 shares the miner's hashrate anonymously (version, board and hashrate,
-once an hour; a setting turns it off) to count the
+every 5 minutes since 1.9.2; a setting turns it off) to count the live
 [total hashrate of BDLMiner](https://bdlminer-stats.bdlminer-bot.workers.dev/). Earlier
 versions are described in [docs/releases](docs/releases/).
 
@@ -120,17 +120,17 @@ by default; turn it off with the *Anonymous usage count* setting (`count`).
 
 ### Anonymous hashrate sharing
 
-To know the total hashrate of the BDLMiner miners, once an hour (the first time 15
-minutes after boot) the miner posts its firmware version, its board and its hashrate
-(the average of the last minute, rounded to 3 digits) to the
+To know the total hashrate of the BDLMiner miners, every 5 minutes (the first time 3
+minutes after boot) the miner posts its firmware version, its board, its hashrate (the
+average of the last minute, rounded to 3 digits) and the interval until its next report to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.0", "board": "m5stickc-plus2", "hashrate": 1.02e6}
+{"v": "1.9.2", "board": "m5stickc-plus2", "hashrate": 1.02e6, "every": 300}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
-adds up the reports of the last hour and keeps them 35 days; the sender's network
+adds the reports up live and keeps a 5-minute sample of the total 35 days; the sender's network
 address only limits the number of reports and is never stored. The totals are public:
 **<https://bdlminer-stats.bdlminer-bot.workers.dev/>** (total hashrate, miners, 7-day
 chart, by board and version). A paused miner sends

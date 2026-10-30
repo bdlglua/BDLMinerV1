@@ -17,11 +17,14 @@
 namespace {
 
 // The first report waits for a settled hashrate (the average of the last
-// minute) once mining has started; then one an hour, which is what the
-// Worker adds up. A failed report is not retried sooner: the next one comes.
-constexpr uint32_t kFirstMs = 15 * 60 * 1000UL;
-constexpr uint32_t kEveryMs = 3600 * 1000UL;
-constexpr uint32_t kWaitMs = 5 * 60 * 1000UL;  // no WiFi, memory or hashrate yet
+// minute) once mining has started; then one every 5 minutes, for the live
+// statistics. Each report says how long it stands for ("every"), which the
+// Worker needs to add them up without an identifier. A failed report is not
+// retried sooner: the next one comes.
+constexpr uint32_t kFirstMs = 3 * 60 * 1000UL;
+constexpr uint32_t kEverySeconds = 300;
+constexpr uint32_t kEveryMs = kEverySeconds * 1000UL;
+constexpr uint32_t kWaitMs = 60 * 1000UL;  // no WiFi, memory or hashrate yet
 uint32_t next = kFirstMs;
 
 }  // namespace
@@ -32,7 +35,8 @@ size_t shareBody(char *out, size_t size, double hashrate) {
         double scale = pow(10, floor(log10(rounded)) - 2);
         rounded = round(rounded / scale) * scale;
     }
-    int n = snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g}", FW_VERSION, FW_ENV, rounded);
+    int n = snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g,\"every\":%u}", FW_VERSION, FW_ENV,
+                     rounded, (unsigned)kEverySeconds);
     return n > 0 && (size_t)n < size ? (size_t)n : 0;
 }
 

@@ -57,19 +57,20 @@ tests = r'''
 int main() {
     char out[128];
     assert(shareBody(out, sizeof(out), 1.0234e6));
-    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06})"));
-    shareBody(out, sizeof(out), 987654321.0); assert(strstr(out, "\"hashrate\":9.88e+08}"));
-    shareBody(out, sizeof(out), 0); assert(strstr(out, "\"hashrate\":0}"));
-    shareBody(out, sizeof(out), NAN); assert(strstr(out, "\"hashrate\":0}"));
+    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300})"));
+    shareBody(out, sizeof(out), 987654321.0); assert(strstr(out, "\"hashrate\":9.88e+08,"));
+    shareBody(out, sizeof(out), 0); assert(strstr(out, "\"hashrate\":0,"));
+    shareBody(out, sizeof(out), NAN); assert(strstr(out, "\"hashrate\":0,"));
     assert(shareBody(out, 20, 1e6) == 0);
 
-    sharePoll(); assert(posted.empty());                       // not before 15 minutes
+    sharePoll(); assert(posted.empty());                       // not before 3 minutes
     nowMs = kFirstMs; sharePoll(); assert(posted.size() == 1);
     assert(hosts.back() == "stats.example");
-    assert(posted[0] == R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06})");
+    assert(posted[0] == R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300})");
+    assert(kEveryMs == kEverySeconds * 1000 && kEverySeconds == 300);
     nowMs += kEveryMs - 1; sharePoll(); assert(posted.size() == 1);
     nowMs += 1; answer = 500; sharePoll(); assert(posted.size() == 2);
-    nowMs += 60000; sharePoll(); assert(posted.size() == 2);   // a failure waits for the next hour
+    nowMs += 60000; sharePoll(); assert(posted.size() == 2);   // a failure waits for the next report
     nowMs = next; rate = 0; sharePoll(); assert(posted.size() == 2);  // paused: nothing sent
     nowMs += kWaitMs; rate = 1e6; memoryOk = false; sharePoll(); assert(posted.size() == 2);
     nowMs += kWaitMs; memoryOk = true; settings.shareHashrate = false; sharePoll(); assert(posted.size() == 2);

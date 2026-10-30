@@ -87,7 +87,7 @@ that reports can focus on what goes beyond them:
 - **A firmware uploaded through the web page is not signature-checked**, so that
   people can install their own builds: the web password is what protects it.
 - **MQTT is plain TCP**; its user and password travel unencrypted to the broker.
-- **Hashrate sharing is on by default**: once an hour the version, the board and the
+- **Hashrate sharing is on by default**: every 5 minutes the version, the board and the
   hashrate go to the BDLMiner statistics service (nothing else; see the README). Turn it
   off with the *Share my hashrate anonymously* setting.
 - **Crash reports are memory images** and may contain secrets: downloading or erasing

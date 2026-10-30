@@ -79,7 +79,7 @@ const SettingInfo kSettings[] = {
     S("count", Bool, usageCount, "Network",
       "Anonymous usage count: once a day, download a 2-byte file of this version's release (nothing is sent)"),
     S("sharehr", Bool, shareHashrate, "Network",
-      "Share my hashrate anonymously: once an hour, send the version, the board and the hashrate (nothing else)"),
+      "Share my hashrate anonymously: every 5 minutes, send the version, the board and the hashrate (nothing else)"),
 };
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
