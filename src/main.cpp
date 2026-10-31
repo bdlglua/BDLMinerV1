@@ -49,6 +49,9 @@ void setup() {
     // sleeps 20 ms per pass, so they still get the core.
     vTaskPrioritySet(nullptr, 3);
     Serial.begin(115200);
+#ifdef LOG_MIRROR_UART0
+    Serial0.begin(115200);  // Serial is the native USB port: the log goes to both
+#endif
     delay(200);
     Serial.println();
     logf("BDLMiner V1 %s on %s\n", FW_VERSION, BOARD_NAME);

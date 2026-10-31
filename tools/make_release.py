@@ -39,6 +39,38 @@ if not os.path.exists(PYTHON):  # PlatformIO installed with pip (CI)
 ESPTOOL = os.path.join(PIO_HOME, "packages", "tool-esptoolpy", "esptool.py")
 
 
+# Above this share of its update slot, a firmware is flagged: a little more and
+# it no longer installs over WiFi (the slot is set when the board is flashed).
+SLOT_WARNING = 0.95
+
+
+def app_slot(partitions):
+    """The smallest update (OTA) slot of a partitions.bin, in bytes."""
+    data = Path(partitions).read_bytes()
+    sizes = []
+    for offset in range(0, len(data) - 31, 32):
+        entry = data[offset:offset + 32]
+        if entry[:2] != b"\xaa\x50":
+            break
+        kind, subtype = entry[2], entry[3]
+        if kind == 0 and 0x10 <= subtype <= 0x1f:  # app, ota_0..ota_15
+            sizes.append(int.from_bytes(entry[8:12], "little"))
+    return min(sizes) if sizes else 0
+
+
+def slot_report(env, firmware, partitions):
+    """One line per board: how full its update slot is, a warning near the top."""
+    slot = app_slot(partitions)
+    if not slot:
+        return
+    size = os.path.getsize(firmware)
+    share = size / slot
+    print(f"[{env}] firmware {size // 1024} KB = {share:.0%} of its {slot // 1024} KB update slot", flush=True)
+    if share >= SLOT_WARNING:
+        print(f"::warning title=Firmware size::{env} fills {share:.0%} of its update slot "
+              f"({(slot - size) // 1024} KB left)", flush=True)
+
+
 def envs():
     text = (Path(ROOT) / "platformio.ini").read_text(encoding="utf-8")
     return re.findall(r"^\[env:([^\]]+)\]", text, re.M)
@@ -166,6 +198,7 @@ def build_release(targets, out, release_version, key):
         if os.path.exists(firmware + ".sig"):
             os.remove(firmware + ".sig")
         shutil.copyfile(images[-1][1], firmware)
+        slot_report(env, firmware, next(path for _, path in images if path.endswith("partitions.bin")))
         if key:
             sign(key, firmware)
         boards[env] = mcu

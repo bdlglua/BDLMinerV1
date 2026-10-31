@@ -7,6 +7,7 @@
 #endif
 #include <atomic>
 #include "core/mining_safety.h"
+#include "log.h"
 
 #define LONG_PRESS_MS 5000
 
@@ -163,7 +164,7 @@ public:
         b.spi_host = HSPI_HOST;
         b.spi_mode = 0;
         b.freq_write = 40000000;
-        b.freq_read = 16000000;
+        b.freq_read = 6000000;  // the panel ID read below: both chips read at 6.6 MHz at most
         b.pin_sclk = 14;
         b.pin_mosi = 13;
         b.pin_miso = 12;
@@ -339,6 +340,16 @@ void begin() {
 
 #if defined(HAS_DISPLAY) && !defined(DISPLAY_M5UNIFIED)
     lcd.init();
+#ifdef DISPLAY_LGFX_CYD
+    // The CYD with two USB ports carries an ST7789 instead of the ILI9341: the
+    // same commands drive it, but its colours come out inverted. Its ID (RDDID,
+    // 04h: 85 85 52) tells them apart.
+    uint32_t id = lcd.getPanel()->readCommand(0x04, 0, 3);
+    if ((id & 0xFF) == 0x85 && (id >> 16 & 0xFF) == 0x52) {
+        lcd.invertDisplay(true);
+        logf("[board] ST7789 display (CYD with two USB ports): colours inverted\n");
+    }
+#endif
 #ifdef BOARD_GAMMA601
     gamma601::begin();
 #endif

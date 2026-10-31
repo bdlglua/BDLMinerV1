@@ -32,6 +32,9 @@ Boards without a display report everything on the serial monitor and the
   (no QR code); then follow [First-time setup](#first-time-setup).
 * **Button**: BOOT (GPIO0, GPIO9 on ESP32‑C3). Hold it during boot to reopen the
   portal, or for 5 s while running to erase all settings.
+* **Serial port**: on ESP32‑S3 and ESP32‑C3 boards, the log comes out on the native
+  USB port (boards with only that one, such as the Super Mini) and on UART0 as well
+  (DevKits, through their USB‑serial chip), since 1.9.10.
 * **Status LED**: steady while connecting to the pool, blinking once per second while
   mining. Only `esp32-headless` defines one by default (GPIO2); for the other boards,
   or if your LED is elsewhere, add `-DLED_PIN=<gpio>` to `build_flags`
@@ -169,6 +172,9 @@ and physical-device throughput still require hardware/network validation.
 | Brightness 100→60→30→10→off | B (side) or Power | BOOT button | — | — |
 | Setup portal (hold at boot) | A | right button | BOOT | BOOT |
 | Reset (5 s) | A | right button | BOOT | BOOT |
+
+The CYD with two USB ports carries an ST7789 display instead of the ILI9341: since
+1.9.10 the firmware recognises it at boot and inverts its colours.
 
 Touch screens (CYD, M5Stack Core2 / CoreS3): a tap shows the next screen, a press of
 one second changes the brightness.

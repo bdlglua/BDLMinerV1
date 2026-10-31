@@ -54,6 +54,11 @@ void logf(const char *fmt, ...) {
     vsnprintf(line + n, sizeof(line) - n, fmt, ap);
     va_end(ap);
     Serial.print(line + n);  // the serial monitor keeps its own timestamps if wanted
+#ifdef LOG_MIRROR_UART0
+    // Serial is the native USB port here; DevKits show UART0 through their
+    // USB-serial chip. Nothing waits when no USB host listens.
+    Serial0.print(line + n);
+#endif
     append(line, strlen(line));
 }
 
