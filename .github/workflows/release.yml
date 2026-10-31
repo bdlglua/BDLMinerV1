@@ -11,10 +11,10 @@ on:
   push:
     tags: ["v*"]
 
+# Publishing the release needs to write the repository; the Pages rights go to
+# the pages job alone.
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: release
@@ -91,7 +91,10 @@ jobs:
             echo "RELEASE_NOTES_PATH=$NOTES" >> "$GITHUB_ENV"
           fi
 
-      - uses: softprops/action-gh-release@v3
+      # A third-party action running with write access, next to the factory
+      # images the web installer serves (USB installs check no signature):
+      # pinned to a commit, not to a tag its author can move.
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
         with:
           name: BDLMiner V1 ${{ env.VERSION }}
           body_path: ${{ env.RELEASE_NOTES_PATH }}
@@ -108,6 +111,9 @@ jobs:
   pages:
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

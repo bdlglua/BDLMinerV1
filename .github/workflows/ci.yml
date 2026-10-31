@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Tests and builds only read the repository.
+permissions:
+  contents: read
+
 jobs:
   web:
     runs-on: ubuntu-latest
