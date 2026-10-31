@@ -645,7 +645,12 @@ document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{local
 
 const sel=document.getElementById('board'),btn=document.getElementById('installer');
 for(const b of BOARDS){const o=document.createElement('option');o.value=b.env;o.textContent=b.name;sel.appendChild(o)}
-sel.onchange=()=>btn.manifest='manifest-'+sel.value+'.json';sel.onchange();
+// The chosen board is remembered: a reload or the next visit keeps it. The button
+// gets it as an attribute too: esp-web-tools may load after this script, and its
+// element then starts with an empty manifest property.
+try{const saved=localStorage.getItem('board');if(BOARDS.some(b=>b.env===saved))sel.value=saved}catch(e){}
+sel.onchange=()=>{const m='manifest-'+sel.value+'.json';btn.setAttribute('manifest',m);btn.manifest=m;
+ try{localStorage.setItem('board',sel.value)}catch(e){}};sel.onchange();
 // --- Live chat (BDLMiner-chat Worker) ---
 const CHAT_HOST='bdlminer-chat.bdlminer-bot.workers.dev';
 const CHAT='wss://'+CHAT_HOST+'/ws';
