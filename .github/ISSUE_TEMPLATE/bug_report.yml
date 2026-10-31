@@ -32,7 +32,7 @@ body:
     attributes:
       label: Firmware version
       description: Shown on the dashboard's Device tile and in /api/stats ("firmware").
-      placeholder: "1.9.8"
+      placeholder: "1.9.9"
     validations:
       required: true
   - type: input
