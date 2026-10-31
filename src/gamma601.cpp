@@ -84,21 +84,43 @@ bool verify16(uint8_t reg, uint16_t value) {
 }
 // A number may come back in the regulator's own format (another exponent),
 // or rounded to its resolution (VIN_ON: 0.25 V steps): compared as values.
-bool linearWord(uint8_t reg, uint16_t word, float value) {
+bool linearWord(uint8_t reg, uint16_t word, float value, float tolerance = NAN) {
     uint16_t actual;
     if (!write16(reg, word) || !read16(kTps, reg, actual)) return unset(kTps, reg, "no answer");
-    if (std::fabs(bm1370::linear11(actual) - value) > std::max(0.01f, std::fabs(value) * 0.03f))
-        return unset(kTps, reg, "reads back another value");
+    if (!std::isfinite(tolerance)) tolerance = std::max(0.01f, std::fabs(value) * 0.03f);
+    if (std::fabs(bm1370::linear11(actual) - value) > tolerance) return unset(kTps, reg, "reads back another value");
     return true;
 }
-bool linear(uint8_t reg, float value) { return linearWord(reg, bm1370::encodeLinear11(value), value); }
+bool linear(uint8_t reg, float value, float tolerance = NAN) {
+    return linearWord(reg, bm1370::encodeLinear11(value), value, tolerance);
+}
 // Temperatures and timings: whole numbers, written as ESP-Miner does.
 bool linearInt(uint8_t reg, unsigned value) { return linearWord(reg, bm1370::encodeLinear11Int(value), value); }
-bool voltage(uint8_t reg, float value) {
+bool voltage(uint8_t reg, float value, float tolerance = 0.004f) {
     uint16_t word, actual;
     if (!bm1370::voltageWord(value, voltageMode, word)) return unset(kTps, reg, "unsupported VOUT_MODE");
     if (!write16(reg, word) || !read16(kTps, reg, actual)) return unset(kTps, reg, "no answer");
-    if (std::abs(int(actual) - int(word)) > 2) return unset(kTps, reg, "reads back another value");
+    int e = voltageMode & 31; if (e & 16) e -= 32;
+    if (std::fabs(std::ldexp(float(actual) - float(word), e)) > tolerance)
+        return unset(kTps, reg, "reads back another value");
+    return true;
+}
+constexpr float kVout = 1.15f;
+// The margin and OV/UV limits, as a fraction of VOUT_COMMAND. The TPS546
+// keeps them relative by default (VOUT_MODE bit 7, as on the Bitaxe), else
+// in volts. Its hardware rounds them to steps of 1 to 10% (the OV fault
+// limit: 10% while the output is off): compared within 6%.
+bool limit(uint8_t reg, float fraction) {
+    bool relative = voltageMode & 0x80;
+    return relative ? voltage(reg, fraction, 0.06f) : voltage(reg, fraction * kVout, 0.06f * kVout);
+}
+// PIN_DETECT_OVERRIDE (EEh) only matters when the regulator restores itself at
+// power-on; written as ESP-Miner does (FFFFh). Some of its bits are reserved:
+// a different read-back is logged, not a failure.
+bool pinDetectOverride() {
+    uint16_t actual;
+    if (!write16(0xee, 0xffff) || !read16(kTps, 0xee, actual)) return unset(kTps, 0xee, "no answer");
+    if (actual != 0xffff && logSetup) logf("[gamma] PIN_DETECT_OVERRIDE reads 0x%04x\n", actual);
     return true;
 }
 bool clearFaults() {
@@ -285,14 +307,16 @@ bool configure() {
     bool tps = verify8(kTps,0x02,0x1b) && verify16(0xec,0) && verify8(kTps,0xe4,0x10) &&
         verify8(kTps,0x04,0) && linearInt(0x33,650) && linear(0x35,4.8) && linear(0x36,4.5) &&
         linear(0x55,6.5) && verify8(kTps,0x56,0xb7) && linear(0x29,0.25) &&
-        voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,1.15) &&
-        // These registers are multipliers of VOUT_COMMAND, not absolute voltages.
-        voltage(0x40,1.25) && voltage(0x42,1.16) && voltage(0x25,1.1) &&
-        voltage(0x26,0.9) && voltage(0x43,0.9) && voltage(0x44,0.75) &&
-        linear(0x4a,25) && linear(0x46,30) && verify8(kTps,0x47,0xc0) &&
+        voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,kVout) &&
+        limit(0x40,1.25) && limit(0x42,1.16) && limit(0x25,1.1) &&
+        limit(0x26,0.9) && limit(0x43,0.9) && limit(0x44,0.75) &&
+        // Current limits: the hardware rounds them up to 2 A steps.
+        linear(0x4a,25,2) && linear(0x46,30,2) && verify8(kTps,0x47,0xc0) &&
         linearInt(0x51,105) && linearInt(0x4f,145) && verify8(kTps,0x50,0xff) &&
         linearInt(0x60,0) && linearInt(0x61,3) && linearInt(0x62,0) && verify8(kTps,0x63,0x3b) &&
-        linearInt(0x64,0) && linearInt(0x65,0) && verify16(0xee,0xffff) && clearFaults();
+        // TOFF_FALL (65h) accepts 0.5 to 31.75 ms only: the 0 ESP-Miner writes is
+        // refused, so the regulator keeps its own value; left as it is here too.
+        linearInt(0x64,0) && pinDetectOverride() && clearFaults();
     if (tps) logf("[gamma] regulator and sensors configured\n");
     return logSetup = tps;
 }
@@ -381,6 +405,9 @@ void begin() {
     pinMode(kReset, OUTPUT); digitalWrite(kReset, LOW);
     configured = configure();
     live.state = configured ? "Ready / waiting for pool" : kNotFound; publish();
+    // A first reading at once: the thermal policy then has a temperature from
+    // the start, without a "temperature unavailable" notification at boot.
+    if (configured) collect(false);
 }
 bool start() {
     live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;

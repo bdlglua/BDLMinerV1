@@ -65,6 +65,7 @@ int main() {
     assert(std::fabs(linear11(encodeLinear11(4.8))-4.8)<.01);
     assert(std::fabs(linear11(encodeLinear11(-12.5))+12.5)<.01);
     uint16_t v;assert(voltageWord(1.15,0x17,v)&&v==589);
+    assert(voltageWord(1.15,0x97,v)&&v==589); // REL bit (relative limits, the TPS546 default)
     assert(!voltageWord(1.15,0x37,v)&&!voltageWord(NAN,0x17,v)&&!voltageWord(3,0x17,v));
     assert(diodeTemperature(55,0x80)==55.5f);
     assert(std::isnan(diodeTemperature(0x7f,0x00))&&std::isnan(diodeTemperature(0x7f,0xe0)));

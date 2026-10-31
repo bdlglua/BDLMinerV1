@@ -29,7 +29,7 @@ static void reset(){
     live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1};publish();
     testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
     testUartTx.clear();testUartTxTimes.clear();testUartRx.clear();testDelayHook=nullptr;testMillis=1000;testReset=1;power=100;generation=1;powerUntil=UINT32_MAX;
-    bytes(0x4c,0xfd,{0x16});bytes(0x24,0xad,{6,0x54,0x49,0x54,0x6d,0x24,0x41});bytes(0x24,0x20,{0x17});health();
+    bytes(0x4c,0xfd,{0x16});bytes(0x24,0xad,{6,0x54,0x49,0x54,0x6d,0x24,0x41});bytes(0x24,0x20,{0x97});health(); // relative limits, exponent -9: the TPS546 default
     testChipReply={0xaa,0x55,0x13,0x70,0,0,0,0,0,0,0};
     for(int crc=0;crc<32;++crc){testChipReply[10]=crc;if(bm1370::crc5(testChipReply.data()+2,9)==0)break;}
 }
@@ -45,7 +45,12 @@ int main(){
     assert(storedWord(0x26)==461 && storedWord(0x43)==461); // 0.90x
     assert(storedWord(0x44)==384); // 0.75x
     assert(storedWord(0x21)==589); // only VOUT_COMMAND is an absolute voltage
+    // In absolute mode, the same limits in volts (fractions of 1.15 V).
+    reset();bytes(0x24,0x20,{0x17});begin();assert(configured);
+    assert(storedWord(0x40)==736&&storedWord(0x44)==442&&storedWord(0x21)==589);
+    reset();begin();
     for(auto &w:testI2cWrites)assert(w[0]!=0x11&&w[0]!=0x15&&w[0]!=0x16); // no STORE/RESTORE NVM commands
+    for(auto &w:testI2cWrites)assert(!(w.size()==3&&w[0]==0x65)); // TOFF_FALL left to the regulator
     AsicWork w;w.generation=1;w.versionMask=bm1370::kVersionMask;
     assert(initAsic(w)&&live.running&&powered&&testReset==1&&live.frequency==525);
     assert(testI2c[std::make_pair(0x24,1)][0]==0x80);
@@ -76,6 +81,9 @@ int main(){
     // to its resolution (VIN_ON 4.8 V -> 4.75 V). The same values: configured.
     testTpsStore=[](int reg,uint16_t w)->uint16_t{
         static const int ulinear16[]={0x21,0x24,0x2b,0x40,0x42,0x25,0x26,0x43,0x44,0xec,0xee};
+        if(reg==0x40)return uint16_t(666); // OV fault 1.25x rounded up to its 10% step: 1.30x
+        if(reg==0xee)return uint16_t(w&0x1b3f); // reserved bits read 0
+        if(reg==0x4a||reg==0x46){float a=bm1370::linear11(w);return bm1370::encodeLinear11(std::ceil(a/2)*2);} // 2 A steps
         for(int r:ulinear16)if(r==reg)return w;
         float v=bm1370::linear11(w);int e=-2;while(std::floor(std::ldexp(v,-e))>1023)++e;
         return uint16_t(((e&31)<<11)|(int(std::floor(std::ldexp(v,-e)))&2047));

@@ -120,7 +120,9 @@ uint16_t encodeLinear11Int(unsigned value) {
 }
 bool voltageWord(float volts, uint8_t mode, uint16_t &out) {
     int e = mode & 31; if (e & 16) e -= 32;
-    if ((mode & 0xe0) || e >= 0 || e < -16 || !std::isfinite(volts) || volts < 0.7f || volts > 2.0f) return false;
+    // Bits 6:5 must be 00 (linear); bit 7 (REL, relative limits, the TPS546's
+    // default) does not change the encoding.
+    if ((mode & 0x60) || e >= 0 || e < -16 || !std::isfinite(volts) || volts < 0.7f || volts > 2.0f) return false;
     float word = std::round(std::ldexp(volts, -e));
     if (word < 0 || word > 65535) return false;
     out = uint16_t(word); return true;
