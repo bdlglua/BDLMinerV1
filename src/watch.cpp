@@ -122,7 +122,13 @@ void events(uint32_t now) {
     }
 
     // The red LED lights for a second on each 32-bit share (not at night).
+    // An ASIC finds several every second (its own filter is above difficulty
+    // 1): no log line, beep or notification for each there, they would drown
+    // the log (1.5 minutes of it on a Gamma 601) and spam the phone.
     bool led = false;
+#ifdef BOARD_ASIC
+    lastOver32 = stats.over32bits;
+#endif
     if (stats.over32bits != lastOver32) {
         lastOver32 = stats.over32bits;
         logf("[miner] 32-bit share found (%u so far)\n", (unsigned)lastOver32);

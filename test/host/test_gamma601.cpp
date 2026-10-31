@@ -9,6 +9,8 @@ static uint32_t generation=1, powerUntil=UINT32_MAX;
 static uint64_t hashes=0;
 uint8_t minerPowerPercent(){return testMillis < powerUntil ? power : 0;}
 bool minerAsicCurrent(uint32_t g){return g==generation;}
+static bool poolReady=true;
+bool minerAsicReady(){return poolReady;}
 bool minerAsicWork(AsicWork &){return false;}
 void minerAsicCandidate(AsicWork &,uint32_t,uint32_t){}
 void minerAsicHashes(uint64_t n){hashes+=n;}
@@ -28,7 +30,7 @@ static void reset(){
     latched=powered=configured=forceStock=false;settings=Settings();settings.asicFrequency=525;
     live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1};publish();
     testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
-    testUartTx.clear();testUartTxTimes.clear();testUartRx.clear();testDelayHook=nullptr;testMillis=1000;testReset=1;power=100;generation=1;powerUntil=UINT32_MAX;
+    testUartTx.clear();testUartTxTimes.clear();testUartRx.clear();testDelayHook=nullptr;testMillis=1000;testReset=1;power=100;generation=1;poolReady=true;powerUntil=UINT32_MAX;
     bytes(0x4c,0xfd,{0x16});bytes(0x24,0xad,{6,0x54,0x49,0x54,0x6d,0x24,0x41});bytes(0x24,0x20,{0x97});health(); // relative limits, exponent -9: the TPS546 default
     testChipReply={0xaa,0x55,0x13,0x70,0,0,0,0,0,0,0};
     for(int crc=0;crc<32;++crc){testChipReply[10]=crc;if(bm1370::crc5(testChipReply.data()+2,9)==0)break;}
@@ -113,7 +115,9 @@ int main(){
     word(0x79,0);word(0x88,bm1370::encodeLinear11(4.7));assert(collect(true)&&powered);
     word(0x88,bm1370::encodeLinear11(4.5));assert(!collect(true)&&latched&&!powered);
     reset();begin();power=0;assert(!initAsic(w)&&!powered&&testReset==0&&!latched);
-    reset();begin();generation=2;assert(!initAsic(w)&&!powered&&testReset==0);
+    // No pool work: the ASIC stays off. A new block (another generation) does not stop it.
+    reset();begin();poolReady=false;assert(!initAsic(w)&&!powered&&testReset==0);
+    reset();begin();generation=2;assert(initAsic(w)&&live.running&&powered);
     reset();begin();powerUntil=1250;assert(!initAsic(w)&&!powered&&testReset==0&&!latched);
     reset();begin();
     testDelayHook=[](uint32_t){

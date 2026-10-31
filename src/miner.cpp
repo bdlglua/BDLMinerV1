@@ -1044,6 +1044,7 @@ bool minerAsicWork(AsicWork &out) {
     return valid;
 }
 bool minerAsicCurrent(uint32_t generation) { return boardValid && generation == workGeneration.load(); }
+bool minerAsicReady() { return boardValid; }
 void minerAsicCandidate(AsicWork &w, uint32_t nonce, uint32_t bits) {
     if (!minerAsicCurrent(w.generation) || (bits & ~w.versionMask)) return;
     AsicWork candidate = w;

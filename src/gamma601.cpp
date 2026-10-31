@@ -213,7 +213,7 @@ bool waitSafe(uint32_t ms, bool requireDiode = false) {
     uint32_t since = millis();
     do {
         uint8_t power = minerPowerPercent();
-        if (power < 10 || !minerAsicCurrent(activeGeneration)) {
+        if (power < 10 || !minerAsicReady()) {
             off(power && power < 10 ? "Gamma power limit must be 10-100% or paused" : "Paused / waiting for pool");
             return false;
         }
@@ -231,7 +231,7 @@ bool initAsic(const AsicWork &first) {
     if (!collect(false)) return false;
     // On USB alone there is no 5 V for the ASIC and its fan: wait for it.
     if (const char *wait = readings().notReady()) { live.state = wait; publish(); return false; }
-    if (minerPowerPercent() < 10 || !minerAsicCurrent(activeGeneration)) return false;
+    if (minerPowerPercent() < 10 || !minerAsicReady()) return false;
     // An undervoltage latched while the supply was missing must not stop this start.
     if (!clearFaults() || !write8(kTps, 0x01, 0x80)) { off("ASIC power enable failed", true); return false; }
     powered = true; powerEnabledAt = lastHealthSample = millis();
@@ -342,7 +342,7 @@ void worker(void *) {
         }
         // Keep sampling while paused so thermal hysteresis can observe cooldown.
         if (now - sampled >= 250) { sampled = now; if (!collect(powered)) continue; }
-        if (!minerPowerPercent() || (powered && !minerAsicCurrent(activeGeneration))) {
+        if (!minerPowerPercent() || (powered && !minerAsicReady())) {
             if (powered) off("Paused / waiting for pool");
             delay(10); continue;
         }
@@ -355,6 +355,13 @@ void worker(void *) {
                 live.state = "Pool needs version rolling and difficulty >= 16"; publish(); delay(100); continue;
             }
             if (powered && activeMask != next.versionMask) off("Changing version mask");
+            // A clean job (a new block): the ASIC keeps running on the new work, as
+            // in ESP-Miner. Results of earlier jobs are dropped by their generation
+            // (and would fail the SHA-256 check of the job now in their slot).
+            if (powered && next.generation != activeGeneration) {
+                activeGeneration = next.generation;
+                for (auto &slot : slots) slot.valid = false;
+            }
             if (!powered) {
                 if (!initAsic(next)) {
                     if (!latched && powered) off("BM1370 initialization failed", true);

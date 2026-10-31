@@ -162,6 +162,8 @@ Throttle minerThrottle();
 struct AsicWork : work::Work { uint32_t generation = 0, height = 0; };
 bool minerAsicWork(AsicWork &out);
 bool minerAsicCurrent(uint32_t generation);
+// Whether the pool has work at all (a clean job only makes earlier jobs stale).
+bool minerAsicReady();
 void minerAsicCandidate(AsicWork &work, uint32_t nonce, uint32_t versionBits);
 void minerAsicHashes(uint64_t hashes);
 #endif
