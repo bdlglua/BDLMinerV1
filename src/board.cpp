@@ -540,7 +540,9 @@ void sampleTemperature() {
 float temperature() { return lastTemperature; }
 
 const char *temperatureSource() {
-#ifdef BOARD_ASIC
+#ifdef BOARD_GAMMA601
+    return gamma601::temperatureSource();
+#elif defined(BOARD_ASIC)
     return "asic";
 #endif
     switch (temperatureSensor.load()) {

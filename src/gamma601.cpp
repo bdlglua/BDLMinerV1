@@ -425,5 +425,9 @@ float temperature() {
     float asic = status().temperature;
     return std::isfinite(asic) ? asic : boardTemperature.load();
 }
+const char *temperatureSource() {
+    if (std::isfinite(status().temperature)) return "asic";
+    return std::isfinite(boardTemperature.load()) ? "board" : "unavailable";
+}
 } // namespace gamma601
 #endif

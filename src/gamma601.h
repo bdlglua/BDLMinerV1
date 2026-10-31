@@ -18,5 +18,8 @@ void begin();
 bool start();
 Status status();
 float temperature();
+// Where temperature() comes from: "asic" (its diode), "board" (EMC2101, while
+// the ASIC is off and its diode silent) or "unavailable".
+const char *temperatureSource();
 }
 #endif

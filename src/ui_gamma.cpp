@@ -45,7 +45,9 @@ uint32_t screenAge() { return millis()-since; }
 void render() {
     if (alertShown) { lines("*** BLOCK FOUND! ***",String("Height ")+foundHeight,"Check pool and wallet","Press the button"); return; }
     auto s = minerStats(); auto a = gamma601::status();
-    String temp = std::isfinite(a.temperature)?String(a.temperature,1):"--";
+    // The ASIC diode, or the board's sensor while the ASIC is off.
+    float t = gamma601::temperature();
+    String temp = std::isfinite(t)?String(t,1):"--";
     if (!a.running) { lines("Gamma 601 / BM1370",a.state,temp+" C  Fan "+String(a.rpm),WiFi.localIP().toString()); return; }
     if (page == 0) lines(a.stockFallback?"BM1370 525M FALLBACK":"BDLMiner / BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
         temp+" C  Fan "+String(a.rpm),String("Accepted ")+s.accepted+" / "+s.rejected);
