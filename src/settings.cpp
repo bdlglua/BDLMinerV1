@@ -372,11 +372,15 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pWeb);
 
     String ap = portalApName();
-    bool connected;
-    if (forcePortal) {
-        connected = wm.startConfigPortal(ap.c_str(), PORTAL_AP_PASSWORD);
-    } else {
-        connected = wm.autoConnect(ap.c_str(), PORTAL_AP_PASSWORD);
+    // The portal runs in this loop, which pauses between two passes, rather
+    // than in WiFiManager's, which never does: a Gamma 601 restarted twice on
+    // the task watchdog during its setup.
+    wm.setConfigPortalBlocking(false);
+    bool connected = forcePortal ? wm.startConfigPortal(ap.c_str(), PORTAL_AP_PASSWORD)
+                                 : wm.autoConnect(ap.c_str(), PORTAL_AP_PASSWORD);
+    while (!connected && wm.getConfigPortalActive()) {
+        connected = wm.process();  // false once the portal times out
+        delay(10);
     }
 
     if (shouldSave) {

@@ -20,7 +20,7 @@ static uint16_t storedWord(int reg) {
     return uint16_t(v[0])|uint16_t(v[1])<<8;
 }
 static void health(){
-    bytes(0x4c,1,{50});bytes(0x4c,0x10,{0});bytes(0x4c,0x46,{0x08});bytes(0x4c,0x47,{0x07});
+    bytes(0x4c,0,{35});bytes(0x4c,1,{50});bytes(0x4c,0x10,{0});bytes(0x4c,0x46,{0x08});bytes(0x4c,0x47,{0x07});
     word(0x88,bm1370::encodeLinear11(5));word(0x8b,589);word(0x8c,bm1370::encodeLinear11(15));
     word(0x8d,bm1370::encodeLinear11(50));word(0x79,0);
 }
@@ -64,6 +64,8 @@ int main(){
     assert(testI2c[std::make_pair(0x24,1)][0]==0&&testI2c[std::make_pair(0x4c,0x4c)][0]==63);
     reset();begin();assert(initAsic(w));off("Thermal pause");assert(!latched&&testReset==0);
     bytes(0x4c,1,{40});assert(collect(false)&&temperature()==40); // cooldown still observable while unpowered
+    // A silent diode (ASIC off) reads as the board's own temperature, not as a lost sensor.
+    bytes(0x4c,1,{0x7f});bytes(0x4c,0x10,{0xe0});assert(collect(false)&&!latched&&temperature()==35);
     // A regulator that does not answer (no 5 V yet) or does not hold a setting: not
     // configured, the ASIC stays off, and the task tries again (not latched).
     reset();bytes(0x24,0xad,{6,0,0,0,0,0,0});begin();assert(!configured&&!latched&&testReset==0);

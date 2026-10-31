@@ -4,6 +4,7 @@
 #include <M5GFX.h>
 #include <cmath>
 #include <algorithm>
+#include <atomic>
 #include "core/bm1370.h"
 #include "miner.h"
 #include "settings.h"
@@ -22,6 +23,9 @@ bool configured = false, latched = false, powered = false;
 bool logSetup = true;  // the setup's failures are logged once, not at every retry
 const char kNotFound[] = "Regulator or sensors not found: plug in the 5V supply";
 uint8_t voltageMode = 0;
+// The board's own temperature (EMC2101 internal sensor), for the thermal policy
+// while the ASIC diode has no reading: before the ASIC first runs, or paused.
+std::atomic<float> boardTemperature{NAN};
 uint32_t powerEnabledAt = 0, lastHealthSample = 0;
 bm1370::Receiver receiver;
 bm1370::Counter counter;
@@ -156,8 +160,8 @@ bm1370::Health readings() {
 }
 bool collect(bool requireDiode) {
     lastHealthSample = millis();
-    uint8_t msb, lsb, tachLow, tachHigh; uint16_t vin, vout, current, vr, status;
-    bool ok = read(kEmc, 0x01, &msb, 1) && read(kEmc, 0x10, &lsb, 1) &&
+    uint8_t internal, msb, lsb, tachLow, tachHigh; uint16_t vin, vout, current, vr, status;
+    bool ok = read(kEmc, 0x00, &internal, 1) && read(kEmc, 0x01, &msb, 1) && read(kEmc, 0x10, &lsb, 1) &&
         read(kEmc, 0x46, &tachLow, 1) && read(kEmc, 0x47, &tachHigh, 1) && read16(kTps, 0x88, vin) && read16(kTps, 0x8b, vout) &&
         read16(kTps, 0x8c, current) && read16(kTps, 0x8d, vr) && read16(kTps, 0x79, status);
     if (!ok) {
@@ -166,6 +170,7 @@ bool collect(bool requireDiode) {
     }
     int e = voltageMode & 31; if (e & 16) e -= 32;
     live.regulatorStatus = status;
+    boardTemperature = internal < 0x80 ? float(internal) : NAN;  // two's complement; below 0 C is not a reading here
     live.temperature = bm1370::diodeTemperature(msb, lsb);
     live.regulatorTemperature = bm1370::linear11(vr);
     live.inputVoltage = bm1370::linear11(vin);
@@ -387,6 +392,11 @@ bool start() {
     return ok;
 }
 Status status() { portENTER_CRITICAL(&mux); Status out = snapshot; portEXIT_CRITICAL(&mux); return out; }
-float temperature() { return status().temperature; }
+// The ASIC diode when it reads; else the board's sensor, so that a pause
+// (the ASIC off, its diode silent) never looks like a lost sensor.
+float temperature() {
+    float asic = status().temperature;
+    return std::isfinite(asic) ? asic : boardTemperature.load();
+}
 } // namespace gamma601
 #endif
