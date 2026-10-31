@@ -164,12 +164,14 @@ void publishState() {
 
 void mqttTask(void *) {
     uint32_t lastState = 0, lastTry = 0;
+    bool tried = false;  // the first attempt comes at once, then one every 30 s
     for (;;) {
         if (settings.mqttHost.isEmpty() || !WiFi.isConnected()) {
             vTaskDelay(pdMS_TO_TICKS(10000));
             continue;
         }
-        if (!mqtt.connected() && millis() - lastTry > 30000) {
+        if (!mqtt.connected() && (!tried || millis() - lastTry > 30000)) {
+            tried = true;
             lastTry = millis();
             base = "bdlminer/" + webHostName();
             mqtt.setServer(settings.mqttHost.c_str(), settings.mqttPort);
