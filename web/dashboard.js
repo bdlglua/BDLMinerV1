@@ -4,8 +4,8 @@ let historyRange=21600,historySelected=null,plotViews=[],historyWidth=0,historyS
 let historyPointerFrame=0,peerCacheKey='',peerCache=[],peerCacheAt=0;
 try{const saved=Number(localStorage.getItem('bdl-history-range'));if([3600,21600,86400].includes(saved))historyRange=saved}catch(e){}
 const SI=['','k','M','G','T','P','E','Z','Y'];
-function si(v,u=''){if(v==null||!Number.isFinite(v))return'-';if(v===0)return'0'+(u?' '+u:'');let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return v.toFixed(v<10?2:v<100?1:0)+' '+SI[i]+u}
-function diff(d){return!d?'-':d<1?d.toFixed(5):si(d)}
+function si(v,u=''){if(v==null||!Number.isFinite(v))return'-';if(v===0)return'0'+(u?' '+u:'');let i=0;while(Math.abs(v)>=1000&&i<SI.length-1){v/=1000;i++}return fix(v,v<10?2:v<100?1:0)+' '+SI[i]+u}
+function diff(d){return!d?'-':d<1?fix(d,5):si(d)}
 function dur(s){if(!Number.isFinite(s))return'-';s=Math.max(0,s);if(s<60)return Math.round(s)+'s';const d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+(LANG=='fr'?'j ':'d '):'')+(d||h?h+'h ':'')+m+'m'}
 function share64Wait(hr){if(!(hr>0))return'-';const s=18446744073709551616/hr;return s>=31557600?si(s/31557600)+' '+t('years'):dur(s)}
 function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*4294967296));return(LANG=='fr'?'1 sur ':'1 in ')+si(1/p).replace(' ','')}
@@ -76,7 +76,7 @@ function sharesTile(log){
 // Connected time since restart, reconnections and switches to the backup pool.
 function poolUptime(p){
  if(!Number.isFinite(p.connected_percent))return'';
- const parts=[t('connected')+' '+p.connected_percent.toFixed(1)+' % '+t('since restart')];
+ const parts=[t('connected')+' '+fix(p.connected_percent,1)+' % '+t('since restart')];
  if(p.sessions>1)parts.push((p.sessions-1)+' '+t(p.sessions>2?'reconnections':'reconnection'));
  if(p.failovers)parts.push(p.failovers+' '+t(p.failovers>1?'switches to backup':'switch to backup'));
  return'\n'+parts.join(' · ');
@@ -94,14 +94,14 @@ function apiError(code){return t('the pool\'s statistics API is not answering')+
 function integrationsTile(x,pv){
  const n=x.notify||{},lines=[];
  lines.push('MQTT: '+(x.mqtt==='off'?t('off'):t(x.mqtt)+(x.mqtt_host?' · '+x.mqtt_host:'')));
- lines.push(t('Notifications')+': '+(!n.enabled?t('off'):n.title?'ntfy '+t(n.ntfy)+' · webhook '+t(n.webhook)+' ('+t(n.title)+')':t('none sent yet')));
- lines.push(t('Pool statistics')+': '+(pv.source?pv.source+(pv.error?' · ⚠ '+apiError(pv.error):''):pv.supported===false?t('no stats API found for this pool'):t('searching…')));
+ lines.push(t('Notifications')+COLON+(!n.enabled?t('off'):n.title?'ntfy '+t(n.ntfy)+' · webhook '+t(n.webhook)+' ('+t(n.title)+')':t('none sent yet')));
+ lines.push(t('Pool statistics')+COLON+(pv.source?pv.source+(pv.error?' · ⚠ '+apiError(pv.error):''):pv.supported===false?t('no stats API found for this pool'):t('searching…')));
  const bad=pv.error||x.mqtt==='disconnected'||(n.title&&[n.ntfy,n.webhook].some(s=>s!=='OK'&&s!=='off'));
  const e=tile(t('Integrations'),bad?'⚠ '+t('check'):t('OK'),lines.join('\n'));e.dataset.group='device';return e;
 }
 // The current core dump (downloadable) and the last crashes, newest first.
 function crashTile(c){
- const past=(c.history||[]).map(h=>(h.t?new Date(h.t*1e3).toLocaleString():t('date unknown'))+' · v'+h.version+' · '+h.summary.split(', backtrace')[0]);
+ const past=(c.history||[]).map(h=>(h.t?new Date(h.t*1e3).toLocaleString(LOCALE):t('date unknown'))+' · v'+h.version+' · '+h.summary.split(', backtrace')[0]);
  const detail=(c.summary?c.summary+'\n'+si(c.size,'B'):'')+(past.length?(c.summary?'\n\n':'')+t('Crash history')+' ('+past.length+')\n'+past.join('\n'):'');
  const e=tile(t(c.summary?'Last crash':'Crash history'),c.summary?c.summary.split(',')[0]:past.length,detail,true);
  if(c.summary){const link=document.createElement('a');link.className='button secondary';link.href='/api/coredump';link.textContent=t('Download report');e.append(link)}
@@ -147,7 +147,7 @@ function show(j){
   document.documentElement.style.setProperty('--accent',j.accent);
   const st=document.getElementById('st');textAt('st',t(j.pool.connected?'ONLINE':'OFFLINE'));st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';st.dataset.state=j.pool.connected?'online':'disconnected';
   const state=j.throttle=='paused'?'⚠ '+t('mining paused'):j.throttle=='half'?t('battery saver: half speed'):j.throttle=='reduced'?t('power limited'):'';
-  const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),t('1-minute average')+(Number.isFinite(j.hashrate_live)?' · '+t('Live (10 s)')+': '+si(j.hashrate_live,'H/s'):'')+'\n'+j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state+' · '+j.power_percent+' %':''),true),
+  const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),t('1-minute average')+(Number.isFinite(j.hashrate_live)?' · '+t('Live (10 s)')+COLON+si(j.hashrate_live,'H/s'):'')+'\n'+j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state+' · '+j.power_percent+' %':''),true),
    tile(t('Shares'),j.shares.accepted,t('accepted')+(j.shares.rejected?' · '+j.shares.rejected+' '+t('rejected'):'')+'\n'+t('pool diff')+' '+diff(j.pool.difficulty)+(j.pool.pending_shares?' · '+j.pool.pending_shares+' '+t('awaiting response'):'')),
    tile(t('Best difficulty'),diff(j.best.session),t('best ever')+' '+diff(j.best.ever)),
    tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
@@ -164,26 +164,26 @@ function show(j){
   else if(!pv.supported||pv.error){const work=j.shares.work,since=j.uptime_s,note=pv.error?'\n⚠ '+apiError(pv.error):'';
    T.push(work>0&&since>0?tile(t('Seen by the pool'),si(work*4294967296/since,'H/s'),t('estimated from accepted shares')+' · '+j.shares.accepted+' '+t('shares')+' · '+t('since restart')+note):tile(t('Seen by the pool'),'-',t('waiting for accepted shares')+note))}
   const now=Date.now()/1e3,B=j.blocks_recent||[];
-  if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+': '+t('your best')+' '+diff(B[0].best):''),true));
+  if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+COLON+t('your best')+' '+diff(B[0].best):''),true));
   if(Array.isArray(j.shares_log)&&j.shares_log.length)T.push(sharesTile(j.shares_log));
   if(j.top&&j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
-  if(m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString()+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString()+' '+t('sats')+' / '+m.currency:'',true),
+  if(m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString(LOCALE)+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString(LOCALE)+' '+t('sats')+' / '+m.currency:'',true),
    tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),
-   tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString()+' '+t('tx in mempool')),
-   tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+m.retarget.change.toFixed(2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+m.retarget.progress.toFixed(0)+' % '+t('done')+')'))}
+   tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString(LOCALE)+' '+t('tx in mempool')),
+   tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+fix(m.retarget.change,2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+fix(m.retarget.progress,0)+' % '+t('done')+')'))}
   T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')+poolUptime(j.pool)),
    tile(t('Payout address'),j.address,j.address_type==='invalid'?'⚠ '+t('not a valid Bitcoin address'):j.address_type),
-   tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+': '+j.max_temp_c+' °C':'')),
-   tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+': '+(j.power_limit_percent??'-')+' %'),
-   tile(t('Memory'),si(j.heap,'B'),t('largest block')+': '+si(j.heap_max_block,'B')),
-   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+si(j.heap,'B')+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+': '+j.boot_reason+(j.firmware_trial?'\n'+t('Firmware on trial: confirmed after 3 minutes of mining'):'')),
+   tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+COLON+j.max_temp_c+' °C':'')),
+   tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+COLON+(j.power_limit_percent??'-')+' %'),
+   tile(t('Memory'),si(j.heap,'B'),t('largest block')+COLON+si(j.heap_max_block,'B')),
+   tile(t('Device'),j.board,'v'+j.firmware+(j.temp_c==null?'':' · '+j.temp_c+' °C')+' · '+si(j.heap,'B')+(j.night?' · '+t('night mode'):'')+'\n'+t('last reset')+COLON+j.boot_reason+(j.firmware_trial?'\n'+t('Firmware on trial: confirmed after 3 minutes of mining'):'')),
    tile(t('WiFi'),j.ip,j.ssid+' · '+j.rssi+' dBm'));
   if(j.crash)T.push(crashTile(j.crash));
   if(j.integrations)T.push(integrationsTile(j.integrations,pv));
-  if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):'—';
+  if(j.asic){const a=j.asic,number=(v,n=2)=>Number.isFinite(v)?fix(v,n):'—';
    // Only the readings this board has: NerdNOS has no fan, regulator or input sensors.
    const has=k=>a[k]!==undefined;
-   const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz'+(has('core_v')?' · '+number(a.core_v,3)+' V':'')+(has('current_a')?' · '+number(a.current_a,1)+' A':''),has('fan_rpm')?t('Fan')+': '+a.fan_rpm+' RPM · '+t('Regulator')+': '+number(a.regulator_temp_c,1)+' °C':'',has('input_v')?t('Input')+': '+number(a.input_v)+' V':'',has('results')?t('Verified ASIC results')+': '+a.results:'',a.profile_mhz?t('Requested profile')+': '+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+': '+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+': '+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
+   const hardware=tile('ASIC · '+a.model,t(a.state),[t('Experimental hardware support'),number(a.frequency_mhz,0)+' MHz'+(has('core_v')?' · '+number(a.core_v,3)+' V':'')+(has('current_a')?' · '+number(a.current_a,1)+' A':''),has('fan_rpm')?t('Fan')+COLON+a.fan_rpm+' RPM · '+t('Regulator')+COLON+number(a.regulator_temp_c,1)+' °C':'',has('input_v')?t('Input')+COLON+number(a.input_v)+' V':'',has('results')?t('Verified ASIC results')+COLON+a.results:'',a.profile_mhz?t('Requested profile')+COLON+a.profile_mhz+' MHz':'',a.hardware_error_percent!=null?t('ASIC hardware errors')+COLON+number(a.hardware_error_percent)+' %':'',a.stock_fallback?t('Stock fallback')+COLON+t(a.fallback_reason||''):''].filter(Boolean).join('\n'),true);
    hardware.dataset.group='device';T.push(hardware);
   }
   for(const [group,id]of Object.entries({pool:'pool-grid',market:'market-grid',device:'device-grid',records:'records-grid',main:'m'}))syncTiles(id,T.filter(e=>(e.dataset.group||'main')===group));
@@ -295,7 +295,7 @@ function drawPlot(host,key,values,color,small=false){
  const x=i=>values.length===1?right:left+i*(right-left)/Math.max(1,values.length-1),y=v=>bottom-(v-low)*(bottom-top)/(high-low||1);
  const svg=svgNode('svg',{viewBox:`0 0 ${width} ${height}`,preserveAspectRatio:'none','aria-hidden':'true'});
  svg.appendChild(svgNode('text',{x:small?10:12,y:11,class:'plot-axis'},axisUnit));
- for(let i=0;i<=Math.round((high-low)/step);++i){const value=low+i*step,py=y(value);svg.append(svgNode('line',{x1:left,y1:py,x2:right,y2:py,class:'plot-grid'}),svgNode('text',{x:left-9,y:py+3,'text-anchor':'end',class:'plot-axis'},String(+(value/divisor).toFixed(divisor>1?2:1))))}
+ for(let i=0;i<=Math.round((high-low)/step);++i){const value=low+i*step,py=y(value);svg.append(svgNode('line',{x1:left,y1:py,x2:right,y2:py,class:'plot-grid'}),svgNode('text',{x:left-9,y:py+3,'text-anchor':'end',class:'plot-axis'},String(+(value/divisor).toFixed(divisor>1?2:1)).replace('.',LANG=='fr'?',':'.')))}
  const ticks=width>550?5:3;
  if(values.length){const used=new Set();for(let i=0;i<ticks;++i){const index=Math.round(i*(values.length-1)/(ticks-1));if(used.has(index))continue;used.add(index);svg.appendChild(svgNode('text',{x:x(index),y:height-8,'text-anchor':i===0&&values.length>1?'start':index===values.length-1?'end':'middle',class:'plot-axis'},sampleAge(index,values.length,cachedHistory.interval_s||300)))}}
  const segments=[];let current=[];
@@ -318,8 +318,8 @@ function seriesCard(label,key,unit,color,history){
  const values=history[key],valid=values.filter(Number.isFinite),last=values[values.length-1],card=document.createElement('div');card.className='t big chart-series';
  const heading=document.createElement('div');heading.className='series-heading';
  const title=document.createElement('span');title.className='l';const marker=document.createElement('i');marker.className='legend-dot';marker.style.color=color;const name=document.createElement('span');name.textContent=label;title.append(marker,name);
- const value=document.createElement('span');value.className='v';value.style.color=color;value.textContent=Number.isFinite(last)?last.toFixed(1)+' '+unit:'—';heading.append(title,value);card.appendChild(heading);
- const range=document.createElement('div');range.className='series-range';range.textContent=valid.length?t('range')+' '+Math.min(...valid).toFixed(1)+'–'+Math.max(...valid).toFixed(1)+' '+unit:t('No observations yet.');
+ const value=document.createElement('span');value.className='v';value.style.color=color;value.textContent=Number.isFinite(last)?fix(last,1)+' '+unit:'—';heading.append(title,value);card.appendChild(heading);
+ const range=document.createElement('div');range.className='series-range';range.textContent=valid.length?t('range')+' '+fix(Math.min(...valid),1)+'–'+fix(Math.max(...valid),1)+' '+unit:t('No observations yet.');
  if(key==='temperature_c'&&latestStats?.max_temp_c>0){const limit=document.createElement('span');limit.className='limit-key';limit.textContent=t('Configured limit')+' '+latestStats.max_temp_c+' °C';range.append(' · ',limit)}card.appendChild(range);
  const host=document.createElement('div');host.className='plot-host small-plot';card.appendChild(host);card._plot={host,key,values,color};return card;
 }
@@ -330,8 +330,8 @@ function renderHistory(){
  const cards=[seriesCard(t('Temperature'),'temperature_c','°C','#65b7ff',h),seriesCard(t('Effective power'),'power_percent','%','#50dba1',h)];document.getElementById('history-grid').replaceChildren(...cards);
  plotViews=[];drawPlot(document.getElementById('hashrate-history'),'hashrate',h.hashrate,'var(--accent)');for(const card of cards){const p=card._plot;drawPlot(p.host,p.key,p.values,p.color,true)}
  const duration=Math.max(0,h.hashrate.length-1)*h.interval_s;
- const scope=h.hashrate.length>1?t('Displayed history')+': '+historyDuration(duration):t(h.hashrate.length?'One recorded sample':'No observations yet.');
- textAt('history-caption',scope+' · '+t('Sampling interval')+': '+historyDuration(h.interval_s)+(h.hashrate.some(v=>v===null)||h.temperature_c.some(v=>v===null)?' · '+t('Gaps mean missing observations.') :''));
+ const scope=h.hashrate.length>1?t('Displayed history')+COLON+historyDuration(duration):t(h.hashrate.length?'One recorded sample':'No observations yet.');
+ textAt('history-caption',scope+' · '+t('Sampling interval')+COLON+historyDuration(h.interval_s)+(h.hashrate.some(v=>v===null)||h.temperature_c.some(v=>v===null)?' · '+t('Gaps mean missing observations.') :''));
  document.getElementById('download-history').disabled=!h.hashrate.length;
  selectHistory(historySelected);
 }
@@ -341,8 +341,8 @@ function selectHistory(index){
  const inspector=document.getElementById('chart-inspection');
  if(!count){inspector.textContent=t('No observations yet.');return}
  const age=document.createElement('span');age.className='sample-age';age.textContent=sampleAge(selected,count,h.interval_s);
- const nodes=[age];for(const [key,color,unit,label]of [['hashrate','var(--accent)','H/s','Hashrate'],['temperature_c','#65b7ff','°C','Temperature'],['power_percent','#50dba1','%','Effective power']]){const value=h[key][selected],span=document.createElement('span');span.className='sample-value';const dot=document.createElement('i');dot.className='legend-dot';dot.style.color=color;dot.setAttribute('aria-hidden','true');const name=document.createElement('span');name.className='sr-only';name.textContent=t(label)+': ';const number=document.createElement('strong');number.style.color=color;number.textContent=!Number.isFinite(value)?'—':key==='hashrate'?si(value,unit):value.toFixed(1)+' '+unit;span.append(dot,name,number);nodes.push(span)}
- if(Number.isFinite(h.coverage_percent[selected])&&h.coverage_percent[selected]<100){const coverage=document.createElement('span');coverage.className='sample-coverage';coverage.textContent=t('Observation coverage')+': '+h.coverage_percent[selected]+' %';nodes.push(coverage)}
+ const nodes=[age];for(const [key,color,unit,label]of [['hashrate','var(--accent)','H/s','Hashrate'],['temperature_c','#65b7ff','°C','Temperature'],['power_percent','#50dba1','%','Effective power']]){const value=h[key][selected],span=document.createElement('span');span.className='sample-value';const dot=document.createElement('i');dot.className='legend-dot';dot.style.color=color;dot.setAttribute('aria-hidden','true');const name=document.createElement('span');name.className='sr-only';name.textContent=t(label)+': ';const number=document.createElement('strong');number.style.color=color;number.textContent=!Number.isFinite(value)?'—':key==='hashrate'?si(value,unit):fix(value,1)+' '+unit;span.append(dot,name,number);nodes.push(span)}
+ if(Number.isFinite(h.coverage_percent[selected])&&h.coverage_percent[selected]<100){const coverage=document.createElement('span');coverage.className='sample-coverage';coverage.textContent=t('Observation coverage')+COLON+h.coverage_percent[selected]+' %';nodes.push(coverage)}
  inspector.replaceChildren(...nodes);
 }
 function downloadText(name,text,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -358,8 +358,8 @@ async function refreshDiagnostics(){
   const d=await request('/api/diagnostics');
   if(!d?.tls||!Array.isArray(d.engines))throw Error(t('Invalid response from the miner.'));
   latestDiagnostics=d;
-  const cards=[tile(t('TLS handshakes'),d.tls.handshakes,t('Elapsed time')+': '+dur(d.tls.total_ms/1000)+' · '+d.tls.failures+' '+t('failures'),true)];
-  for(const e of d.engines)cards.push(tile(t('Mining worker')+' '+e.index+' · '+e.name,dur(e.hashing_ms/1000),t('Batch time')+'\n'+t('Rest')+': '+dur(e.rest_ms/1000)+' · '+t('Waiting for work')+': '+dur(e.waiting_ms/1000)+' · '+t('Paused')+': '+dur(e.paused_ms/1000),true));
+  const cards=[tile(t('TLS handshakes'),d.tls.handshakes,t('Elapsed time')+COLON+dur(d.tls.total_ms/1000)+' · '+d.tls.failures+' '+t('failures'),true)];
+  for(const e of d.engines)cards.push(tile(t('Mining worker')+' '+e.index+' · '+e.name,dur(e.hashing_ms/1000),t('Batch time')+'\n'+t('Rest')+COLON+dur(e.rest_ms/1000)+' · '+t('Waiting for work')+COLON+dur(e.waiting_ms/1000)+' · '+t('Paused')+COLON+dur(e.paused_ms/1000),true));
   syncTiles('profile-grid',cards);document.getElementById('profile-status').textContent='';
  }catch(e){document.getElementById('profile-status').textContent=errorText(e)}
 }
@@ -421,7 +421,7 @@ async function finishBenchmark(){
  const temps=b.samples.map(s=>s.temperature_c).filter(Number.isFinite),power=b.samples.map(s=>s.power_percent).filter(Number.isFinite);
  const report={format:'bdlminer-measurement-v1',client_started_at:b.startedAt,client_finished_at:new Date().toISOString(),firmware:b.firmware,boot_id:b.bootId,board:b.board,elapsed_s:elapsed,hashes:end.total_hashes-b.start.total_hashes,hashrate_hps:(end.total_hashes-b.start.total_hashes)/elapsed,temperature_min_c:temps.length?Math.min(...temps):null,temperature_max_c:temps.length?Math.max(...temps):null,power_min_percent:power.length?Math.min(...power):null,power_max_percent:power.length?Math.max(...power):null,sample_gaps:b.gap,samples:b.samples,profiling_start:b.profileStart};
  try{const endProfile=await request('/api/diagnostics');if(endProfile.uptime_s<b.profileStart.uptime_s||endProfile.firmware!==b.profileStart.firmware||(endProfile.boot_id&&b.profileStart.boot_id&&endProfile.boot_id!==b.profileStart.boot_id))throw Error(t('Miner restarted. Start a new measurement.'));report.profiling_end=endProfile;report.profiling_delta={elapsed_s:endProfile.uptime_s-b.profileStart.uptime_s,tls:{handshakes:endProfile.tls.handshakes-b.profileStart.tls.handshakes,failures:endProfile.tls.failures-b.profileStart.tls.failures,total_ms:endProfile.tls.total_ms-b.profileStart.tls.total_ms},engines:endProfile.engines.map(e=>{const before=b.profileStart.engines.find(p=>p.index===e.index&&p.name===e.name);if(!before)return null;const delta={index:e.index,name:e.name};for(const key of ['hashing_ms','rest_ms','waiting_ms','paused_ms'])delta[key]=Math.max(0,e[key]-before[key]);return delta}).filter(Boolean)}}catch(e){report.profiling_error=errorText(e)}
- benchmarkReport=report;benchmarkBusy=false;benchmarkFinishing=false;benchmarkControls();benchmarkStatus.textContent=t('Measured hashrate')+': '+si(report.hashrate_hps,'H/s')+' · '+dur(elapsed)+(b.gap?' · '+t('Temperature samples contain gaps.'):'');
+ benchmarkReport=report;benchmarkBusy=false;benchmarkFinishing=false;benchmarkControls();benchmarkStatus.textContent=t('Measured hashrate')+COLON+si(report.hashrate_hps,'H/s')+' · '+dur(elapsed)+(b.gap?' · '+t('Temperature samples contain gaps.'):'');
 }
 document.getElementById('start-benchmark').onclick=startBenchmark;
 document.getElementById('stop-benchmark').onclick=finishBenchmark;
