@@ -1,10 +1,10 @@
 # Bitaxe Gamma 601 — experimental native BDLMiner
 
 This target replaces AxeOS. It drives the single BM1370; it does not use software
-SHA on the ESP32 as a substitute. **Since v1.9.7, the regulator and sensor setup is
-verified on a real Gamma 601** (input, fan, regulator and board temperatures read,
-regulator held off). **Powering the BM1370, its real hashrate and accepted pool shares
-still need validation on a board.** Do not interpret simulated TH/s tests as measurements.
+SHA on the ESP32 as a substitute. **Since v1.9.8, it is verified mining on a real
+Gamma 601** at the stock 525 MHz: about 1.07 TH/s, core 1.145 V and 13 A, ASIC near
+52 °C and regulator near 55 °C, over 1,200 accepted shares and none rejected in three
+hours. Overclock profiles above 525 MHz are still untested on a board.
 
 ### OLED preview (v1.6.1)
 
@@ -39,7 +39,7 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    rollback, back up the flash with esptool before erasing it. BDLMiner does not
    import AxeOS NVS settings.
 2. Download **`bitaxe-gamma-601-factory.bin`** from the
-   [v1.9.7 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.7) and
+   [v1.9.8 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.8) and
    flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
    the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
    Alternatively, build with PlatformIO 6.1.19:

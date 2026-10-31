@@ -5,15 +5,15 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.7](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.7)**
+**Latest release: [v1.9.8](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.8)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.9.7.md)
+· [Release notes](docs/releases/v1.9.8.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.7** makes the Bitaxe Gamma 601 version work on a real board: its regulator
-is now set up, and it waits for its 5 V supply. Earlier versions are described in
+Version **1.9.8** makes the Bitaxe Gamma 601 mine steadily: no restart at each block, no
+false overheat, and mining on any pool difficulty. Earlier versions are described in
 [docs/releases](docs/releases/).
 
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
@@ -125,7 +125,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.7", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "1.9.8", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service

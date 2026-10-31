@@ -59,7 +59,7 @@ browser and host tests, firmware `X.Y.Z` for every board (the version comes from
 the GitHub release with all the files, and the web installer on GitHub Pages.
 
 ```sh
-git tag v1.9.7 && git push origin v1.9.7
+git tag v1.9.8 && git push origin v1.9.8
 ```
 
 It needs, once: the repository secret **`RELEASE_SIGNING_KEY`** holding
@@ -83,7 +83,7 @@ build instead of silently producing unsigned firmware.
 
 The [repository and script review](audits/2026-10-27-scripts.md) and
 [local dashboard review](audits/2026-10-27-dashboard.md) document the
-corrections shipped in v1.5.3 and retained in v1.9.7.
+corrections shipped in v1.5.3 and retained in v1.9.8.
 
 ## Architecture
 
