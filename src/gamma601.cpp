@@ -16,9 +16,11 @@ constexpr uint8_t kTps = 0x24, kEmc = 0x4c;
 constexpr int kReset = 1;
 HardwareSerial uart(1);
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting", 600, false, "", -1};
+Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting", 525, false, "", -1};
 Status live = snapshot;
 bool configured = false, latched = false, powered = false;
+bool logSetup = true;  // the setup's failures are logged once, not at every retry
+const char kNotFound[] = "Regulator or sensors not found: plug in the 5V supply";
 uint8_t voltageMode = 0;
 uint32_t powerEnabledAt = 0, lastHealthSample = 0;
 bm1370::Receiver receiver;
@@ -58,16 +60,46 @@ bool read16(uint8_t addr, uint8_t reg, uint16_t &value) {
     uint8_t bytes[2]; if (!read(addr, reg, bytes, 2)) return false;
     value = uint16_t(bytes[0]) | uint16_t(bytes[1]) << 8; return true;
 }
+// Every setting is read back; one that does not hold stops the setup, and
+// the log says which.
+bool unset(uint8_t addr, uint8_t reg, const char *why) {
+    if (logSetup) logf("[gamma] device 0x%02x register 0x%02x: %s\n", addr, reg, why);
+    return false;
+}
 bool verify8(uint8_t addr, uint8_t reg, uint8_t value) {
     uint8_t actual;
-    return write8(addr, reg, value) && read(addr, reg, &actual, 1) && actual == value;
+    if (!write8(addr, reg, value) || !read(addr, reg, &actual, 1)) return unset(addr, reg, "no answer");
+    if (actual != value) return unset(addr, reg, "reads back another value");
+    return true;
 }
 bool verify16(uint8_t reg, uint16_t value) {
-    uint16_t actual; return write16(reg, value) && read16(kTps, reg, actual) && actual == value;
+    uint16_t actual;
+    if (!write16(reg, value) || !read16(kTps, reg, actual)) return unset(kTps, reg, "no answer");
+    if (actual != value) return unset(kTps, reg, "reads back another value");
+    return true;
 }
-bool linear(uint8_t reg, float value) { return verify16(reg, bm1370::encodeLinear11(value)); }
+// A number may come back in the regulator's own format (another exponent),
+// or rounded to its resolution (VIN_ON: 0.25 V steps): compared as values.
+bool linearWord(uint8_t reg, uint16_t word, float value) {
+    uint16_t actual;
+    if (!write16(reg, word) || !read16(kTps, reg, actual)) return unset(kTps, reg, "no answer");
+    if (std::fabs(bm1370::linear11(actual) - value) > std::max(0.01f, std::fabs(value) * 0.03f))
+        return unset(kTps, reg, "reads back another value");
+    return true;
+}
+bool linear(uint8_t reg, float value) { return linearWord(reg, bm1370::encodeLinear11(value), value); }
+// Temperatures and timings: whole numbers, written as ESP-Miner does.
+bool linearInt(uint8_t reg, unsigned value) { return linearWord(reg, bm1370::encodeLinear11Int(value), value); }
 bool voltage(uint8_t reg, float value) {
-    uint16_t word; return bm1370::voltageWord(value, voltageMode, word) && verify16(reg, word);
+    uint16_t word, actual;
+    if (!bm1370::voltageWord(value, voltageMode, word)) return unset(kTps, reg, "unsupported VOUT_MODE");
+    if (!write16(reg, word) || !read16(kTps, reg, actual)) return unset(kTps, reg, "no answer");
+    if (std::abs(int(actual) - int(word)) > 2) return unset(kTps, reg, "reads back another value");
+    return true;
+}
+bool clearFaults() {
+    uint8_t clear = 0x03;
+    return lgfx::i2c::transactionWrite(0, kTps, &clear, 1, 400000).has_value();
 }
 void invalidate() {
     for (auto &slot : slots) slot.valid = false;
@@ -118,23 +150,35 @@ bool reg(uint8_t address, uint32_t value, bool all = true) { return send(bm1370:
 bool request(uint8_t address, bool broadcast = true) {
     uint8_t payload[]{0, address}; return send(bm1370::command(broadcast ? 0x52 : 0x42, payload, 2));
 }
+bm1370::Health readings() {
+    return {live.temperature, live.regulatorTemperature, live.inputVoltage,
+            live.coreVoltage, live.current, live.rpm, live.regulatorStatus};
+}
 bool collect(bool requireDiode) {
     lastHealthSample = millis();
-    uint8_t msb, lsb, tachLow, tachHigh; uint16_t vin, vout, current, vr;
+    uint8_t msb, lsb, tachLow, tachHigh; uint16_t vin, vout, current, vr, status;
     bool ok = read(kEmc, 0x01, &msb, 1) && read(kEmc, 0x10, &lsb, 1) &&
         read(kEmc, 0x46, &tachLow, 1) && read(kEmc, 0x47, &tachHigh, 1) && read16(kTps, 0x88, vin) && read16(kTps, 0x8b, vout) &&
-        read16(kTps, 0x8c, current) && read16(kTps, 0x8d, vr) && read16(kTps, 0x79, live.regulatorStatus);
-    if (!ok) { live.temperature = NAN; off("Sensor I2C fault; restart required", true); return false; }
+        read16(kTps, 0x8c, current) && read16(kTps, 0x8d, vr) && read16(kTps, 0x79, status);
+    if (!ok) {
+        logf("[gamma] sensors not answering on I2C\n");
+        live.temperature = NAN; off("Sensor I2C fault; restart required", true); return false;
+    }
     int e = voltageMode & 31; if (e & 16) e -= 32;
+    live.regulatorStatus = status;
     live.temperature = bm1370::diodeTemperature(msb, lsb);
     live.regulatorTemperature = bm1370::linear11(vr);
     live.inputVoltage = bm1370::linear11(vin);
     live.coreVoltage = std::ldexp(float(vout), e);
     live.current = bm1370::linear11(current); live.rpm = bm1370::fanRpm(uint16_t(tachLow) | uint16_t(tachHigh) << 8);
-    bm1370::Health health{live.temperature, live.regulatorTemperature, live.inputVoltage,
-                          live.coreVoltage, live.current, live.rpm, live.regulatorStatus};
-    const char *fault = health.fault(powered, requireDiode);
-    if (fault) { off(fault, true); return false; }
+    const char *fault = readings().fault(powered, requireDiode);
+    if (fault) {
+        // What the first boards will need to tell: every reading at the fault.
+        logf("[gamma] %s: regulator status 0x%04x, input %.2f V, core %.3f V, %.1f A, ASIC %.1f C, "
+             "regulator %.1f C, fan %u rpm\n", fault, live.regulatorStatus, live.inputVoltage, live.coreVoltage,
+             live.current, live.temperature, live.regulatorTemperature, live.rpm);
+        off(fault, true); return false;
+    }
     publish(); return true;
 }
 // All startup waits are short and keep the main-loop/OTA safety lease checked.
@@ -158,8 +202,11 @@ bool initAsic(const AsicWork &first) {
     live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
     live.hardwareErrorPercent=-1; errors.reset(); errorSeen=false;
     if (!collect(false)) return false;
+    // On USB alone there is no 5 V for the ASIC and its fan: wait for it.
+    if (const char *wait = readings().notReady()) { live.state = wait; publish(); return false; }
     if (minerPowerPercent() < 10 || !minerAsicCurrent(activeGeneration)) return false;
-    if (!write8(kTps, 0x01, 0x80)) { off("ASIC power enable failed", true); return false; }
+    // An undervoltage latched while the supply was missing must not stop this start.
+    if (!clearFaults() || !write8(kTps, 0x01, 0x80)) { off("ASIC power enable failed", true); return false; }
     powered = true; powerEnabledAt = lastHealthSample = millis();
     live.state = "Initializing BM1370"; publish();
     if (!waitSafe(500)) return false;
@@ -210,14 +257,56 @@ bool initAsic(const AsicWork &first) {
     logf("[gamma] BM1370 %.2f MHz, requested profile %u MHz%s\n", live.frequency, live.requestedMHz, forceStock ? " (stock fallback)" : "");
     publish(); return true;
 }
+// The regulator and sensor setup, volatile and verified; false if anything
+// does not answer or hold (a regulator without its 5 V supply does not answer).
+bool configure() {
+    // The regulator is kept off throughout configuration and WiFi provisioning.
+    bool disabled = write8(kTps, 0x01, 0);
+    uint8_t id, device[7];
+    if (!read(kEmc, 0xfd, &id, 1) || (id != 0x16 && id != 0x28)) {
+        if (logSetup) logf("[gamma] EMC2101 fan/temperature sensor not found\n");
+        return logSetup = false;
+    }
+    bool emc = verify8(kEmc, 0x4a, 0x23) && verify8(kEmc, 0x4c, 63) &&
+        verify8(kEmc, 0x03, 0x04) && verify8(kEmc, 0x17, 0x24) && verify8(kEmc, 0x18, 0);
+    const uint8_t prefix[]{6, 0x54, 0x49, 0x54, 0x6d, 0x24};
+    if (!emc || !disabled || !read(kTps, 0xad, device, 7) || memcmp(device, prefix, 6) ||
+        (device[6] != 0x41 && device[6] != 0x62) || !read(kTps, 0x20, &voltageMode, 1)) {
+        if (logSetup && emc) logf("[gamma] TPS546 regulator not found (is the 5V supply plugged in?)\n");
+        return logSetup = false;
+    }
+    // Volatile PMBus writes only, the values of ESP-Miner. Never issue
+    // STORE_USER_ALL or any NVM command.
+    bool tps = verify8(kTps,0x02,0x1b) && verify16(0xec,0) && verify8(kTps,0xe4,0x10) &&
+        verify8(kTps,0x04,0) && linearInt(0x33,650) && linear(0x35,4.8) && linear(0x36,4.5) &&
+        linear(0x55,6.5) && verify8(kTps,0x56,0xb7) && linear(0x29,0.25) &&
+        voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,1.15) &&
+        // These registers are multipliers of VOUT_COMMAND, not absolute voltages.
+        voltage(0x40,1.25) && voltage(0x42,1.16) && voltage(0x25,1.1) &&
+        voltage(0x26,0.9) && voltage(0x43,0.9) && voltage(0x44,0.75) &&
+        linear(0x4a,25) && linear(0x46,30) && verify8(kTps,0x47,0xc0) &&
+        linearInt(0x51,105) && linearInt(0x4f,145) && verify8(kTps,0x50,0xff) &&
+        linearInt(0x60,0) && linearInt(0x61,3) && linearInt(0x62,0) && verify8(kTps,0x63,0x3b) &&
+        linearInt(0x64,0) && linearInt(0x65,0) && verify16(0xee,0xffff) && clearFaults();
+    if (tps) logf("[gamma] regulator and sensors configured\n");
+    return logSetup = tps;
+}
 void worker(void *) {
-    if (!configured) { off("Hardware initialization failed; restart required", true); vTaskDelete(nullptr); return; }
     delay(2000); // fan spin-up, ASIC held in reset and unpowered
-    uint32_t sampled = millis(), sent = 0, requested = 0;
+    uint32_t sampled = millis(), sent = 0, requested = 0, setupAt = millis();
     AsicWork next;
     for (;;) {
         uint32_t now = millis();
         if (latched) { delay(100); continue; }
+        // A regulator without its 5 V does not answer: try again until it does.
+        if (!configured) {
+            if (now - setupAt >= 5000) {
+                setupAt = now;
+                configured = configure();
+                live.state = configured ? "Ready / waiting for pool" : kNotFound; publish();
+            }
+            delay(100); continue;
+        }
         if (minerPowerPercent() > 0 && minerPowerPercent() < 10) {
             if (powered) off("Gamma power limit must be 10-100% or paused");
             live.state = "Gamma power limit must be 10-100% or paused"; publish(); delay(10); continue;
@@ -238,7 +327,11 @@ void worker(void *) {
             }
             if (powered && activeMask != next.versionMask) off("Changing version mask");
             if (!powered) {
-                if (!initAsic(next)) { if (!latched && powered) off("BM1370 initialization failed", true); continue; }
+                if (!initAsic(next)) {
+                    if (!latched && powered) off("BM1370 initialization failed", true);
+                    else if (!powered) delay(500);  // waiting for the supply, the fan or the pool
+                    continue;
+                }
                 now = millis(); sampled = now;
             }
             float target = targetFrequency();
@@ -281,36 +374,13 @@ void worker(void *) {
 
 void begin() {
     pinMode(kReset, OUTPUT); digitalWrite(kReset, LOW);
-    // The regulator is kept off throughout configuration and WiFi provisioning.
-    bool disabled = write8(kTps, 0x01, 0);
-    uint8_t id, device[7];
-    bool emc = read(kEmc, 0xfd, &id, 1) && (id == 0x16 || id == 0x28) &&
-        verify8(kEmc, 0x4a, 0x23) && verify8(kEmc, 0x4c, 63) &&
-        verify8(kEmc, 0x03, 0x04) && verify8(kEmc, 0x17, 0x24) && verify8(kEmc, 0x18, 0);
-    const uint8_t prefix[]{6, 0x54, 0x49, 0x54, 0x6d, 0x24};
-    bool tps = disabled && read(kTps, 0xad, device, 7) && !memcmp(device, prefix, 6) &&
-        (device[6] == 0x41 || device[6] == 0x62) && read(kTps, 0x20, &voltageMode, 1);
-    // Volatile PMBus writes only. Never issue STORE_USER_ALL or any NVM command.
-    tps = tps && verify8(kTps,0x02,0x1b) && verify16(0xec,0) && verify8(kTps,0xe4,0x10) &&
-        verify8(kTps,0x04,0) && linear(0x33,650) && linear(0x35,4.8) && linear(0x36,4.5) &&
-        linear(0x55,6.5) && verify8(kTps,0x56,0xb7) && linear(0x29,0.25) &&
-        voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,1.15) &&
-        // These registers are multipliers of VOUT_COMMAND, not absolute voltages.
-        voltage(0x40,1.25) && voltage(0x42,1.16) && voltage(0x25,1.1) &&
-        voltage(0x26,0.9) && voltage(0x43,0.9) && voltage(0x44,0.75) &&
-        linear(0x4a,25) && linear(0x46,30) && verify8(kTps,0x47,0xc0) &&
-        linear(0x51,105) && linear(0x4f,145) && verify8(kTps,0x50,0xff) &&
-        linear(0x60,0) && linear(0x61,3) && linear(0x62,0) && verify8(kTps,0x63,0x3b) &&
-        linear(0x64,0) && linear(0x65,0) && verify16(0xee,0xffff);
-    uint8_t clear = 0x03;
-    configured = emc && tps && lgfx::i2c::transactionWrite(0,kTps,&clear,1,400000).has_value();
-    if (!configured) off("Gamma 601 hardware not detected/configured", true);
-    else { live.state = "Ready / waiting for pool"; publish(); }
+    configured = configure();
+    live.state = configured ? "Ready / waiting for pool" : kNotFound; publish();
 }
 bool start() {
     live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
     publish();
-    if (!configured) return false;
+    // Started even when the setup failed: the task tries it again.
     bool ok = runtime::started(xTaskCreatePinnedToCore(worker, "bm1370", 8192, nullptr, 3, nullptr, 1) == pdPASS,
         runtime::Miner, "BM1370 task");
     if (!ok) off("ASIC task allocation failed", true);

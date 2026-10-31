@@ -72,13 +72,25 @@ int main() {
     Health h{55,60,5.0,1.15,15,3000,0};assert(!h.fault(true));
     auto healthy=h;
     h.temperature=70;assert(h.fault(true));h=healthy;h.temperature=NAN;assert(h.fault(true));
-    assert(!h.fault(false,false));h=healthy;h.rpm=0;assert(h.fault(false,false));
-    h=healthy;h.inputVoltage=4.7;assert(h.fault(true));h=healthy;h.regulatorTemperature=90;assert(h.fault(true));
+    assert(!h.fault(false,false)&&!h.notReady());
+    // A stopped fan stops mining; before power-on, the ASIC waits for it.
+    h=healthy;h.rpm=0;assert(h.fault(true)&&!h.fault(false,false)&&h.notReady());
+    // 4.8 V to start, then down to 4.6 V while mining (a 5 V supply sags under load).
+    h=healthy;h.inputVoltage=4.7;assert(!h.fault(true)&&h.notReady()&&!h.fault(false,false));
+    h.inputVoltage=4.55;assert(h.fault(true));h.inputVoltage=0;assert(!h.fault(false,false)&&h.notReady());
+    h.inputVoltage=5.6;assert(h.fault(true)&&h.fault(false,false));
+    h=healthy;h.regulatorTemperature=90;assert(h.fault(true));
     h=healthy;h.coreVoltage=1.3;assert(h.fault(true));h=healthy;h.current=30;assert(h.fault(true));
-    for(uint16_t flag:{0x8000,0x4000,0x2000,0x1000,0x0200,0x0020,0x0010,0x0008,0x0004,0x0002}){
-        h=healthy;h.status=flag;assert(h.fault(true)&&h.fault(false,false));
+    // Regulator status: the faults ESP-Miner stops on, not warnings or latched flags.
+    for(uint16_t flag:{0x0020,0x0010,0x0004}){h=healthy;h.status=flag;assert(h.fault(true)&&h.fault(false,false));}
+    for(uint16_t flag:{0x0040,0x0008}){h=healthy;h.status=flag;assert(h.fault(true)&&!h.fault(false,false));}
+    for(uint16_t flag:{0x8000,0x4000,0x2000,0x1000,0x0800,0x0200,0x0080,0x0002,0x0001}){
+        h=healthy;h.status=flag;assert(!h.fault(true)&&!h.fault(false,false));
     }
     h=healthy;h.status=0x0840;h.coreVoltage=0;assert(!h.fault(false));assert(h.fault(true));
+    // Whole numbers as ESP-Miner encodes them.
+    assert(encodeLinear11Int(0)==0&&encodeLinear11Int(3)==3&&encodeLinear11Int(105)==105&&encodeLinear11Int(650)==650);
+    assert(encodeLinear11Int(2000)==(1<<11|1000)&&linear11(encodeLinear11Int(2000))==2000);
     for(unsigned mhz=525;mhz<=800;mhz+=25)assert(validProfile(mhz));
     assert(!validProfile(524)&&!validProfile(801)&&!validProfile(825)&&!validProfile(601)&&!validProfile(526));
     ErrorMonitor guard;assert(!guard.update(100,1000,0));

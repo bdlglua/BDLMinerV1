@@ -104,7 +104,7 @@ int main() {
         changes.clear();changes["asicmhz"]=mhz;
         assert(!settingsError(changes.as<JsonObjectConst>()));
         Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);
-        assert(staged.asicFrequency==mhz&&settings.asicFrequency==600);
+        assert(staged.asicFrequency==mhz&&settings.asicFrequency==525); // stock default
     }
 #endif
     puts("V1/V2 and automatic/manual settings: validation, staged isolation and preserved manual identity passed");

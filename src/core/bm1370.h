@@ -44,13 +44,26 @@ public:
 };
 float linear11(uint16_t word);
 uint16_t encodeLinear11(float value);
+// A whole number with the smallest exponent from 0 up, as ESP-Miner writes
+// temperatures and timings (0 -> 0x0000, 105 -> 0x0069).
+uint16_t encodeLinear11Int(unsigned value);
 bool voltageWord(float volts, uint8_t mode, uint16_t &out);
 float diodeTemperature(uint8_t msb, uint8_t lsb);
 uint16_t fanRpm(uint16_t tach);
+// TPS546 STATUS_WORD bits that stop the ASIC, as ESP-Miner: OFF (while
+// powered), VOUT_OV, IOUT_OC, VIN_UV and TEMP. The other bits also report
+// warnings, and some stay latched (OTHER), while the measured limits below
+// already cover what they would tell.
+constexpr uint16_t kStatusOff = 0x0040, kStatusVinUv = 0x0008;
+constexpr uint16_t kStatusFaults = 0x0020 | 0x0010 | 0x0004;  // VOUT_OV, IOUT_OC, TEMP
 struct Health {
     float temperature, regulatorTemperature, inputVoltage, coreVoltage, current;
     uint16_t rpm, status;
+    // A fault stops the ASIC until restart (null: none).
     const char *fault(bool powered, bool requireDiode = true) const;
+    // Before power-on: why the ASIC cannot start yet (null: ready). Waiting,
+    // not a fault: a Gamma on USB only has neither 5 V nor a turning fan.
+    const char *notReady() const;
 };
 struct Counter {
     uint32_t previous = 0, at = 0;

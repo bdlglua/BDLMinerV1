@@ -76,12 +76,12 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 
 ## Controls, telemetry and safety
 
-* Since v1.6.1, the firmware defaults to an **experimental 600 MHz profile** at
-  **1150 mV**. Since v1.6.2, local Settings > Safety offers
-  **525–800 MHz in 25 MHz steps** (v1.6.1 only offers 525 / 550 / 575 / 600 MHz);
-  changes apply after restart and are included in backups. Older Gamma settings
-  without this new key inherit the requested 600 MHz default. Invalid stored profile
-  values fall back to 525 MHz; API requests outside the available profiles are rejected.
+* Since v1.9.7, the firmware defaults to the **stock 525 MHz profile** at
+  **1150 mV**, as ESP-Miner (v1.6.1 to v1.9.6 defaulted to an experimental 600 MHz).
+  Local Settings > Safety offers **525–800 MHz in 25 MHz steps**; changes apply
+  after restart and are included in backups. A profile saved earlier is kept. Invalid
+  stored profile values fall back to 525 MHz; API requests outside the available
+  profiles are rejected.
 * Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
   Values 1–9 keep the ASIC off with an explanatory status. The fan remains **100%**.
   Thermal limiting may reduce the actual frequency below the requested profile.
@@ -100,14 +100,28 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 * BOOT short press cycles the three compact OLED pages; a long press follows the
   existing reset/setup behavior. OLED rotation maps 0/1 to normal and 2/3 to 180°.
 * No ASIC power during provisioning. Startup checks device identities and verifies
-  volatile PMBus writes. VOUT warning/fault/margin registers are programmed as
-  ratios of `VOUT_COMMAND`, while command/min/max registers use absolute voltage.
-  **No regulator NVM/STORE commands are sent.**
+  volatile PMBus writes with ESP-Miner's values and encodings. A number read back is
+  compared as a value (the regulator may store it with another exponent, or rounded
+  to its resolution); a setting that does not hold is named in the log. VOUT
+  warning/fault/margin registers are programmed as ratios of `VOUT_COMMAND`, while
+  command/min/max registers use absolute voltage. **No regulator NVM/STORE commands
+  are sent.**
+* Without its 5 V barrel supply (USB only), the regulator does not answer: the
+  dashboard shows *Regulator or sensors not found: plug in the 5V supply* and the
+  setup is tried again every 5 seconds. Before powering the ASIC, the firmware waits
+  for an input of at least **4.8 V** and a turning fan, then clears the regulator's
+  latched faults (an undervoltage from the missing supply).
 * The user thermal limit (default 65°C) still throttles/pauses mining. Independent
   hard interlocks stop at **70°C ASIC**, **90°C regulator**, lost sensors, fan
-  <500 RPM, input outside **4.8–5.5 V**, core voltage outside **1.0–1.25 V** while
-  powered, output current >=30 A or regulator faults. Hard limits remain active
-  even if the user temperature setting is disabled. Faults latch until restart.
+  <500 RPM, input below **4.6 V** while mining (a 5 V supply sags under load; the
+  regulator itself stops at 4.5 V) or above **5.5 V**, core voltage outside
+  **1.0–1.25 V** while powered, output current >=30 A, or a regulator fault. As in
+  ESP-Miner, the regulator faults are `STATUS_WORD` OFF (while powered), VOUT_OV,
+  IOUT_OC, VIN_UV and TEMP; its other bits also report warnings or stay latched
+  (OTHER) and do not stop mining, the measured limits covering them. Hard limits
+  remain active even if the user temperature setting is disabled. Faults latch
+  until restart, and the log gives every reading at the fault (status word, input
+  and core voltage, current, temperatures, fan).
 * Startup waits 500 ms for core power stabilization, then ramps the PLL in
   6.25 MHz steps spaced by 100 ms, following ESP-Miner. Fan, voltage/current and
   regulator temperature are sampled throughout startup after the power-good grace

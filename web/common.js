@@ -41,7 +41,7 @@ const COLON=LANG=='fr'?'\u00a0: ':': ',LOCALE=LANG=='fr'?'fr-FR':'en-US';
 
 Object.assign(FR,{
  '525 MHz (stock)':'525 MHz (origine)',
- 'Profiles above 525 MHz are experimental, up to 800 MHz. Default: 600 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.':'Les profils au-dessus de 525 MHz sont expérimentaux, jusqu’à 800 MHz. Par défaut : 600 MHz. La tension reste à 1 150 mV. En cas d’instabilité, repli à 525 MHz jusqu’au redémarrage.',
+ 'Profiles above 525 MHz are experimental, up to 800 MHz. Default: 525 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.':'Les profils au-dessus de 525 MHz sont expérimentaux, jusqu’à 800 MHz. Par défaut : 525 MHz. La tension reste à 1 150 mV. En cas d’instabilité, repli à 525 MHz jusqu’au redémarrage.',
  'Requested profile':'Profil demandé','ASIC hardware errors':'Erreurs matérielles ASIC','Stock fallback':'Repli à la fréquence d’origine',
  'Overclock fallback: mining at the stock profile.':'Repli de l’overclock : minage à la fréquence d’origine.',
  'Mining (525 MHz fallback profile)':'Minage à 525 MHz (repli)',
@@ -59,6 +59,9 @@ Object.assign(FR,{
  'Pool needs version rolling and difficulty >= 16':'Le pool doit accepter le version rolling et une difficulté >= 16',
  'Paused / waiting for pool':'En pause / en attente du pool',
  'Ready / waiting for pool':'Prêt / en attente du pool',
+ 'Regulator or sensors not found: plug in the 5V supply':'Régulateur ou capteurs introuvables : branche l’alimentation 5 V',
+ 'Waiting for the 5V supply (barrel jack)':'En attente de l’alimentation 5 V (prise jack)',
+ 'Waiting for the fan to turn':'En attente du ventilateur',
 
  'automatic':'automatique',
  'manual':'manuel','Automatic':'Automatique','Manual':'Manuel',

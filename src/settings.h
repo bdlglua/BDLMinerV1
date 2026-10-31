@@ -69,7 +69,7 @@ struct Settings {
     uint8_t alertMinutes = 15;  // ... for that long
     uint8_t summaryHour = 20;   // daily summary notification at this local hour, HOUR_OFF = none
 #ifdef BOARD_GAMMA601
-    uint16_t asicFrequency = 600; // requested Gamma profile; automatic stock fallback
+    uint16_t asicFrequency = 525; // requested Gamma profile (stock, as ESP-Miner); automatic stock fallback
 #endif
     // Safety
 #ifdef BOARD_NERDNOS

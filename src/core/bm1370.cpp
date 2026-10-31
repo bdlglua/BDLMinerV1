@@ -113,6 +113,11 @@ uint16_t encodeLinear11(float value) {
     }
     return 0;
 }
+uint16_t encodeLinear11Int(unsigned value) {
+    for (int e = 0; e <= 15; ++e)
+        if ((value >> e) < 1024) return uint16_t(e << 11 | (value >> e));
+    return 0;
+}
 bool voltageWord(float volts, uint8_t mode, uint16_t &out) {
     int e = mode & 31; if (e & 16) e -= 32;
     if ((mode & 0xe0) || e >= 0 || e < -16 || !std::isfinite(volts) || volts < 0.7f || volts > 2.0f) return false;
@@ -133,13 +138,21 @@ const char *Health::fault(bool powered, bool requireDiode) const {
     if (std::isfinite(temperature) && temperature >= 70) return "ASIC overtemperature; restart required";
     if (!std::isfinite(regulatorTemperature) || regulatorTemperature < -20 || regulatorTemperature >= 90)
         return "Regulator temperature fault; restart required";
-    if (!std::isfinite(inputVoltage) || inputVoltage < 4.8f || inputVoltage > 5.5f)
+    // Mining needs 4.8 V to start (notReady); a 5 V supply then sags under
+    // load, and the regulator itself stops at 4.5 V (VIN_OFF).
+    if (!std::isfinite(inputVoltage) || inputVoltage > 5.5f || (powered && inputVoltage < 4.6f))
         return "5V supply fault; restart required";
-    if (rpm < 500) return "Fan stopped; restart required";
+    if (powered && rpm < 500) return "Fan stopped; restart required";
     if (!std::isfinite(current) || current < -1 || current >= 30) return "ASIC current fault; restart required";
     if (powered && (!std::isfinite(coreVoltage) || coreVoltage < 1.0f || coreVoltage > 1.25f))
         return "ASIC voltage fault; restart required";
-    if (status & (powered ? 0xfb7fu : 0xf33fu)) return "Regulator reports a fault; restart required";
+    if (status & (powered ? kStatusFaults | kStatusOff | kStatusVinUv : kStatusFaults))
+        return "Regulator reports a fault; restart required";
+    return nullptr;
+}
+const char *Health::notReady() const {
+    if (!std::isfinite(inputVoltage) || inputVoltage < 4.8f) return "Waiting for the 5V supply (barrel jack)";
+    if (rpm < 500) return "Waiting for the fan to turn";
     return nullptr;
 }
 bool ErrorMonitor::update(uint32_t errorValue, uint32_t totalValue, uint32_t now) {
