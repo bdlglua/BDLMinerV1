@@ -319,31 +319,53 @@ void View::graph(const Model &m, Rect r) {
     graphValid_ = true;
     graphRevision_ = m.graphRevision;
     paint(r, kBackground, [&](lgfx::LovyanGFX &d, int ox, int oy) {
-        int labelW = width_ >= 200 ? 32 : 23;
-        int x0 = labelW, y0 = 3, w = r.w - labelW - 3, h = r.h - 15;
         float maximum = 1;
         for (int i = 0; i < m.pointCount; ++i)
             if (std::isfinite(m.points[i].rate)) maximum = std::max(maximum, m.points[i].rate);
         float ceiling = maximum * 1.12f;
+        int y0 = 3, h = r.h - 15;
         int ticks = h < 24 ? 2 : 3;
+        // The axis takes the width of its widest label ("1.14M" did not fit the
+        // 23 px of small screens and lost its first digit).
+        labelFont(d, 8);
+        std::string labels[3];
+        int labelW = width_ >= 200 ? 32 : 23;
+        for (int i = 0; i < ticks; ++i) {
+            labels[i] = i == ticks - 1 ? "0" : rateLabel(ceiling * (ticks - 1 - i) / (ticks - 1));
+            labelW = std::max(labelW, int(d.textWidth(labels[i].c_str())) + 4);
+        }
+        labelW = std::min(labelW, r.w / 3);
+        // Still too wide (80 px screens): one decimal less, "1.14M" -> "1.1M" -> "1M".
+        for (int i = 0; i < ticks; ++i) {
+            std::string &l = labels[i];
+            while (int(d.textWidth(l.c_str())) + 4 > labelW && l.find('.') != std::string::npos) {
+                size_t last = l.find_last_of("0123456789");
+                l.erase(last, 1);
+                if (l[last - 1] == '.') l.erase(last - 1, 1);
+            }
+        }
+        int x0 = labelW, w = r.w - labelW - 3;
+        d.setTextColor(kMuted);
         for (int i = 0; i < ticks; ++i) {
             int yy = y0 + i * (h - 1) / (ticks - 1);
             d.drawFastHLine(ox + x0, oy + yy, w, kBorder);
-            labelFont(d, 8);
             d.setTextDatum(lgfx::middle_right);
-            d.setTextColor(kMuted);
-            std::string label = i == ticks - 1 ? "0" : rateLabel(ceiling * (ticks - 1 - i) / (ticks - 1));
-            d.drawString(label.c_str(), ox + x0 - 3, oy + yy);
+            d.drawString(labels[i].c_str(), ox + x0 - 3, oy + yy);
         }
-        labelFont(d, 8);
-        d.setTextColor(kMuted);
+        const char *now = language_ ? "maint." : "now";
+        uint32_t span = m.pointCount ? m.points[m.pointCount - 1].ms - m.points[0].ms : 0;
+        char age[24] = "";
+        if (m.pointCount) {
+            // The time span, shortened, then without "now", when both do not fit
+            // under the graph (80 px wide screens).
+            int room = r.w - 3 - x0 - 4;
+            std::snprintf(age, sizeof(age), "-%lum%02lus", (unsigned long)(span / 60000), (unsigned long)(span / 1000 % 60));
+            if (d.textWidth(age) + d.textWidth(now) > room) std::snprintf(age, sizeof(age), "-%lumin", (unsigned long)(span / 60000));
+            if (d.textWidth(age) + d.textWidth(now) > room) now = "";
+        }
         d.setTextDatum(lgfx::bottom_right);
-        d.drawString(language_ ? "maint." : "now", ox + r.w - 3, oy + r.h);
+        d.drawString(now, ox + r.w - 3, oy + r.h);
         if (!m.pointCount) return;
-        const uint32_t latest = m.points[m.pointCount - 1].ms;
-        uint32_t span = latest - m.points[0].ms;
-        char age[24];
-        std::snprintf(age, sizeof(age), "-%lum%02lus", (unsigned long)(span / 60000), (unsigned long)(span / 1000 % 60));
         d.setTextDatum(lgfx::bottom_left);
         d.drawString(age, ox + x0, oy + r.h);
         bool previous = false;
