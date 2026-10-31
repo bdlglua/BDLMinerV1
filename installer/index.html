@@ -475,7 +475,7 @@ chatErrors:{taken:'Ce pseudo est déjà pris.',wait:'Tu pourras changer de pseud
  banned:'Tu ne peux plus écrire dans ce chat.',forbidden:'Tu ne peux modifier ou supprimer que tes propres messages.',invalid:'Message invalide.',gone:'Ce message n\'existe plus.',
  media:'Fichier introuvable : renvoie-le.',media_type:'Format non accepté : photos, vidéos et sons seulement.',media_size:'Fichier trop lourd (photo 3 Mo, vocal 2 Mo, vidéo 8 Mo).',
  media_slow:'Pas plus de 10 fichiers par heure.',media_full:'Le chat est plein pour l\'instant : réessaie plus tard.',upload:'L\'envoi du fichier a échoué.'},
-chatAdminOn:'Mode équipe activé.',chatAdminOff:'Clé refusée.',
+chatAdminOn:'Mode équipe activé.',chatAdminOff:'Clé refusée.',chatAdminSlow:'Trop d\'essais : réessaie dans une heure.',
 live:'En direct',week:'7 jours',byBoard:'Par carte',byVersion:'Par version',colBoard:'Carte',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'Aucun miner en ce moment.',period:'Période',updated:'mis à jour il y a {s} s',now:'maintenant',
 statsMore:'Données brutes : <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary">JSON</a> · <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">page des statistiques</a>.',
 lotteryTitle:'Un billet de loterie, pas un revenu',
@@ -498,7 +498,7 @@ chatErrors:{taken:'This name is already taken.',wait:'You can change your name o
  banned:'You can no longer write in this chat.',forbidden:'You can only edit or delete your own messages.',invalid:'Invalid message.',gone:'This message no longer exists.',
  media:'File not found: send it again.',media_type:'Format not accepted: photos, videos and sounds only.',media_size:'File too large (photo 3 MB, voice 2 MB, video 8 MB).',
  media_slow:'No more than 10 files an hour.',media_full:'The chat is full for now: try again later.',upload:'Sending the file failed.'},
-chatAdminOn:'Team mode on.',chatAdminOff:'Key refused.',colBoard:'Board',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'No miner right now.',devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
+chatAdminOn:'Team mode on.',chatAdminOff:'Key refused.',chatAdminSlow:'Too many tries: try again in an hour.',colBoard:'Board',colVersion:'Version',colMiners:'Miners',colHashrate:'Hashrate',noneNow:'No miner right now.',devOnline:'online',devOffline:'offline',devNone:'none yet',noStats:'No reports yet: miners share their hashrate from version 1.9.0 on.',statsDown:'Statistics unavailable for now.',
 experimental:'experimental',chartDay:'Total hashrate every 5 minutes, last 24 hours',chartWeek:'Total hashrate per hour, last 7 days',noChart:'The chart fills up as the reports come.',
 updated:'updated {s} s ago',now:'now'};
 document.querySelectorAll('[data-t]').forEach(e=>EN[e.dataset.t]=e.textContent);
@@ -811,7 +811,7 @@ function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws
    if(chat.pending&&m.name){const p=chat.pending;chat.pending=null;chatSend(p)}
    if(chat.imported){chat.imported=false;if(!chat.open)chatToggle(true);if(m.name){chatShowSettings(false);chatNote(T('chatCodeSet'))}}}
   else if(m.type==='error'){chat.pending=null;chatError(m.error,m.until)}
-  else if(m.type==='auth'){chat.admin=m.ok;if(!m.ok)store.set('chatKey',null);chatNote(T(m.ok?'chatAdminOn':'chatAdminOff'));chatRender();chatMe()}};
+  else if(m.type==='auth'){chat.admin=m.ok;if(!m.ok&&m.error!=='slow')store.set('chatKey',null);chatNote(T(m.ok?'chatAdminOn':m.error==='slow'?'chatAdminSlow':'chatAdminOff'));chatRender();chatMe()}};
  ws.onclose=()=>{chat.connected=false;chat.ws=null;chatRender();setTimeout(chatConnect,chat.retry);chat.retry=Math.min(chat.retry*2,30000)}}
 // On a phone, focusing the message field would open the keyboard at once and
 // push the chat's header, with its close button, off the screen.
