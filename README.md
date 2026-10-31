@@ -5,7 +5,7 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.6](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.7)**
+**Latest release: [v1.9.7](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.7)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
 · [Release notes](docs/releases/v1.9.7.md)
 · [User guide](docs/guide.md)
