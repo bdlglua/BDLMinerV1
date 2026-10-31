@@ -31,8 +31,14 @@ struct ThermalPolicy {
     bool hot = false;
     bool sensorSeen = false;
     bool sensorFault = false;
+    // ASIC boards: no 50% / 25% steps below the limit (each power change
+    // restarts the ASIC, which then cools at once: a Gamma 601 at 600 MHz
+    // restarted every 40 s at 55 C), and once hot, a pause of at least
+    // holdMs (the ASIC's own sensor is silent while it is off).
+    bool steps = true;
+    uint32_t holdMs = 0, hotAt = 0;
 
-    uint8_t power(float temperature, uint8_t limit, uint8_t requested, bool batterySaver) {
+    uint8_t power(float temperature, uint8_t limit, uint8_t requested, bool batterySaver, uint32_t now = 0) {
         uint8_t result = requested > 100 ? 100 : requested;
         if (batterySaver && result > 50) result = 50;
         sensorFault = limit && !std::isfinite(temperature);
@@ -45,9 +51,14 @@ struct ThermalPolicy {
             if (result > 25) result = 25;
         } else {
             sensorSeen = true;
-            if (temperature >= limit) hot = true;
-            else if (temperature <= limit - 5) hot = false;
+            if (temperature >= limit) {
+                if (!hot) hotAt = now;
+                hot = true;
+            } else if (temperature <= limit - 5 && (!holdMs || now - hotAt >= holdMs)) {
+                hot = false;
+            }
             if (hot) return 0;
+            if (!steps) return result;
             if (temperature >= limit - 5 && result > 25) result = 25;
             else if (temperature >= limit - 10 && result > 50) result = 50;
         }

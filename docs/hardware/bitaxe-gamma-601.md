@@ -4,7 +4,10 @@ This target replaces AxeOS. It drives the single BM1370; it does not use softwar
 SHA on the ESP32 as a substitute. **Since v1.9.8, it is verified mining on a real
 Gamma 601** at the stock 525 MHz: about 1.07 TH/s, core 1.145 V and 13 A, ASIC near
 52 °C and regulator near 55 °C, over 1,200 accepted shares and none rejected in three
-hours. Overclock profiles above 525 MHz are still untested on a board.
+hours. Since v1.9.10, the 550, 600 and 625 MHz profiles are verified too, three minutes
+each on the same board at 1150 mV: 1.126, 1.225 and 1.267 TH/s, ASIC up to 58 °C,
+regulator up to 71.5 °C, 16.9 A, hardware errors 0.2 %. Profiles above 625 MHz (the
+highest ESP-Miner offers at this voltage) are still untested.
 
 ### OLED preview (v1.6.1)
 
@@ -115,7 +118,10 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   setup is tried again every 5 seconds. Before powering the ASIC, the firmware waits
   for an input of at least **4.8 V** and a turning fan, then clears the regulator's
   latched faults (an undervoltage from the missing supply).
-* The user thermal limit (default 65°C) still throttles/pauses mining. Independent
+* The user thermal limit (default 65°C) pauses mining. Since v1.9.10 an ASIC board has
+  no 50% / 25% steps below it (each power change restarted the ASIC, which then cooled
+  at once: at 600 MHz a Gamma restarted every 40 s at 55 °C), and once hot it stays
+  paused at least two minutes, its own sensor being silent while it is off. Independent
   hard interlocks stop at **70°C ASIC**, **90°C regulator**, lost sensors, fan
   <500 RPM, input below **4.6 V** while mining (a 5 V supply sags under load; the
   regulator itself stops at 4.5 V) or above **5.5 V**, core voltage outside

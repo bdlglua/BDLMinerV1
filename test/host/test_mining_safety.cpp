@@ -34,6 +34,18 @@ int main() {
     assert(thermal.power(45, 65, 75, false) == 75);
     assert(thermal.power(NAN, 0, 75, false) == 75); // explicit disable
 
+    // ASIC boards: no steps below the limit, and a 2-minute pause once hot.
+    mining::ThermalPolicy asic;
+    asic.steps = false; asic.holdMs = 120000;
+    assert(asic.power(55, 65, 100, false, 1000) == 100);
+    assert(asic.power(64, 65, 100, false, 2000) == 100);
+    assert(asic.power(65, 65, 100, false, 3000) == 0 && asic.hot);
+    assert(asic.power(40, 65, 100, false, 3000 + 60000) == 0);   // cool board, still held
+    assert(asic.power(40, 65, 100, false, 3000 + 120000) == 100 && !asic.hot);
+    assert(asic.power(66, 65, 100, false, UINT32_MAX - 1000) == 0);  // across the millis wrap
+    assert(asic.power(40, 65, 100, false, 50000) == 0);
+    assert(asic.power(40, 65, 100, false, 120000) == 100);
+
     mining::ThermalPolicy missing;
     assert(missing.power(NAN, 65, 75, false) == 25);
     assert(missing.sensorFault && !missing.sensorSeen);

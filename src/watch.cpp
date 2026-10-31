@@ -28,7 +28,14 @@ constexpr int kNormalPoints = 6;                     // 30 minutes of full-speed
 
 std::atomic<bool> night{false};
 std::atomic<const char *> limitReason{"supervision"};
-mining::ThermalPolicy thermal;
+mining::ThermalPolicy thermal = [] {
+    mining::ThermalPolicy policy;
+#ifdef BOARD_ASIC
+    policy.steps = false;     // each power change restarts the ASIC
+    policy.holdMs = 120000;   // its sensor is silent while it is off
+#endif
+    return policy;
+}();
 bool awake = false;
 uint32_t wakeStarted = 0;  // night mode suspended for 30 s after a button press
 
@@ -56,7 +63,7 @@ void throttle() {
     float t = board::temperature();
     bool wasHot = thermal.hot, wasFault = thermal.sensorFault;
     bool saver = settings.batterySaver && board::onBattery() == 1;
-    uint8_t power = thermal.power(t, settings.maxTemp, settings.miningPower, saver);
+    uint8_t power = thermal.power(t, settings.maxTemp, settings.miningPower, saver, millis());
     const char *reason = "full";
     if (!settings.miningPower) reason = "user_pause";
     else if (thermal.sensorFault) reason = "sensor";
