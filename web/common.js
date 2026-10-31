@@ -56,7 +56,7 @@ Object.assign(FR,{
  'ASIC temperature sensor fault; restart required':'Sonde ASIC en défaut ; redémarrage nécessaire',
  'Regulator temperature fault; restart required':'Température du régulateur en défaut ; redémarrage nécessaire',
  '5V supply fault; restart required':'Alimentation 5 V en défaut ; redémarrage nécessaire',
- 'Pool needs version rolling and difficulty >= 16':'Le pool doit accepter le version rolling et une difficulté >= 16',
+ 'Pool needs version rolling':'Le pool doit accepter le version rolling',
  'Paused / waiting for pool':'En pause / en attente du pool',
  'Ready / waiting for pool':'Prêt / en attente du pool',
  'Regulator or sensors not found: plug in the 5V supply':'Régulateur ou capteurs introuvables : branche l’alimentation 5 V',

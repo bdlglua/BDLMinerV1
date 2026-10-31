@@ -60,9 +60,12 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    `http://192.168.4.1`. Set WiFi, your payout address/worker, and a web password.
 4. Defaults are `public-pool.io:3333`, Stratum V1, suggested difficulty **1024**,
    automatic BDLMiner user agent. The pool must accept BIP310 version rolling
-   (>=8 bits) and difficulty **>=16**. ESP32-only low-difficulty ports such as 21496
-   are unsuitable for this ASIC target. A refused/unsupported pool keeps the ASIC
-   off and shows the requirement in the dashboard.
+   (>=8 bits); without it the ASIC stays off and the dashboard says so. Below a pool
+   difficulty of **16** (a pool taking the miner for a NerdMiner, for instance with
+   the `NerdMinerV2` user agent), the ASIC keeps mining since v1.9.8, as ESP-Miner:
+   its filter stays at 16, so only those shares are sent. The odds of a block do not
+   change, but the pool shows a lower hashrate; a suggested difficulty of 1024 and
+   the automatic user agent avoid it.
 5. Open the miner's local IP. Check **ASIC · BM1370**, fan RPM, input/core voltage,
    regulator temperature and the physical ASIC temperature. A connected pool alone
    does not mean the ASIC is mining. Establish accepted shares before unattended use.

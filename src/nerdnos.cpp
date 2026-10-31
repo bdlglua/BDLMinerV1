@@ -157,14 +157,17 @@ void worker(void *) {
                 if (powered) off("Waiting for pool");
                 delay(10); continue;
             }
-            // Four midstates need rolling bits; the hardware filter needs a pool difficulty to match.
-            if (__builtin_popcount(next.versionMask) < 2 || next.shareDifficulty < 16.0) {
-                const char *why = "Pool needs version rolling and difficulty >= 16";
+            // Four midstates need rolling bits.
+            if (__builtin_popcount(next.versionMask) < 2) {
+                const char *why = "Pool needs version rolling";
                 if (powered) off(why);
                 live.state = why; publish();
                 delay(100); continue;
             }
-            uint8_t power = std::min<int>(kMaxMaskPower, int(std::floor(std::log2(next.shareDifficulty))));
+            // The hardware filter follows the pool difficulty, from 16 up: below it
+            // (a pool taking the miner for a NerdMiner) only shares from 16 are sent,
+            // as in ESP-Miner. Block odds do not change.
+            uint8_t power = std::min<int>(kMaxMaskPower, std::max(4, int(std::floor(std::log2(next.shareDifficulty)))));
             if (powered && next.versionMask != activeMask) off("Changing version mask");
             if (powered && power != maskPower) {
                 maskPower = power;

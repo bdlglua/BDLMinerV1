@@ -286,6 +286,13 @@ bool initAsic(const AsicWork &first) {
 }
 // The regulator and sensor setup, volatile and verified; false if anything
 // does not answer or hold (a regulator without its 5 V supply does not answer).
+void lowDifficultyNote(double difficulty) {
+    static double noted = 0;
+    if (difficulty < 16.0 && difficulty != noted)
+        logf("[gamma] pool difficulty %g is below 16: only shares from 16 up are sent, the pool shows a lower hashrate\n",
+             difficulty);
+    noted = difficulty;
+}
 bool configure() {
     // The regulator is kept off throughout configuration and WiFi provisioning.
     bool disabled = write8(kTps, 0x01, 0);
@@ -350,10 +357,15 @@ void worker(void *) {
             if (!minerAsicWork(next)) { if (powered) off("Waiting for pool"); delay(10); continue; }
             // Without enough negotiated rolling bits the chip exhausts its nonce space.
             // Refuse that pool instead of displaying a fictitious stock hashrate.
-            if (__builtin_popcount(next.versionMask) < 8 || next.shareDifficulty < 16.0) {
-                if (powered) off("Pool needs version rolling and difficulty >= 16");
-                live.state = "Pool needs version rolling and difficulty >= 16"; publish(); delay(100); continue;
+            if (__builtin_popcount(next.versionMask) < 8) {
+                if (powered) off("Pool needs version rolling");
+                live.state = "Pool needs version rolling"; publish(); delay(100); continue;
             }
+            // Below difficulty 16 (a pool taking the miner for a NerdMiner) the ASIC
+            // keeps mining, as in ESP-Miner: its filter stays at 16, so only those
+            // shares are sent. Block odds do not change; the pool's view of the
+            // hashrate is lower.
+            lowDifficultyNote(next.shareDifficulty);
             if (powered && activeMask != next.versionMask) off("Changing version mask");
             // A clean job (a new block): the ASIC keeps running on the new work, as
             // in ESP-Miner. Results of earlier jobs are dropped by their generation
