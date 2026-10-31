@@ -5,6 +5,8 @@
 #include <cmath>
 #include <algorithm>
 #include <atomic>
+#include <ctime>
+#include <Preferences.h>
 #include "core/bm1370.h"
 #include "miner.h"
 #include "settings.h"
@@ -26,6 +28,19 @@ uint8_t voltageMode = 0;
 // The board's own temperature (EMC2101 internal sensor), for the thermal policy
 // while the ASIC diode has no reading: before the ASIC first runs, or paused.
 std::atomic<float> boardTemperature{NAN};
+// The ASIC diode alone can stop the ASIC: a reading out of bounds must hold for
+// kDiodeConfirm readings in a row (0.75 s while mining). A real overheat takes
+// far longer; one false reading (102 C between two 52 C on a Gamma) no longer
+// stops it until restart. Meanwhile the last good reading stands.
+constexpr uint8_t kDiodeConfirm = 3;
+uint8_t diodeStrikes = 0;
+float lastDiode = NAN;
+// Once powered, the diode only reads after the BM1370 routes it (analog mux,
+// register 54h): before that, a real Gamma read 106 C on a 25 C board.
+bool diodeReady = false;
+// The last fault that stopped the ASIC, with every reading, kept across restarts.
+char lastFaultText[192] = "";
+uint32_t lastFaultTime = 0;  // Unix time, 0 if the clock was not set
 uint32_t powerEnabledAt = 0, lastHealthSample = 0;
 bm1370::Receiver receiver;
 bm1370::Counter counter;
@@ -131,14 +146,42 @@ void invalidate() {
     for (auto &slot : slots) slot.valid = false;
     receiver.clear(); counter.reset(); errors.reset(); errorSeen=false; nextSlot = 0;
 }
+void saveFault(const char *reason) {
+    char text[sizeof(lastFaultText)];
+    snprintf(text, sizeof(text), "%s (regulator status 0x%04x, input %.2f V, core %.3f V, %.1f A, ASIC %.1f C, "
+             "regulator %.1f C, fan %u rpm)", reason, live.regulatorStatus, live.inputVoltage, live.coreVoltage,
+             live.current, live.temperature, live.regulatorTemperature, live.rpm);
+    time_t now = time(nullptr);
+    portENTER_CRITICAL(&mux);
+    memcpy(lastFaultText, text, sizeof(text));
+    lastFaultTime = now > 1700000000 ? uint32_t(now) : 0;
+    portEXIT_CRITICAL(&mux);
+    Preferences p;
+    if (p.begin("gamma", false)) {
+        p.putBytes("fault", text, strlen(text));
+        p.putBytes("faultt", &lastFaultTime, sizeof(lastFaultTime));
+        p.end();
+    }
+}
+void loadFault() {
+    Preferences p;
+    if (!p.begin("gamma", true)) return;
+    size_t n = p.getBytesLength("fault");
+    if (n && n < sizeof(lastFaultText) && p.getBytes("fault", lastFaultText, n) == n) {
+        lastFaultText[n] = 0;
+        if (p.getBytes("faultt", &lastFaultTime, sizeof(lastFaultTime)) != sizeof(lastFaultTime)) lastFaultTime = 0;
+    }
+    p.end();
+}
 void off(const char *reason, bool fault = false) {
     // Assert reset first: even a broken I2C bus must stop the ASIC immediately.
     digitalWrite(kReset, LOW);
     bool disabled = write8(kTps, 0x01, 0);
     bool fan = write8(kEmc, 0x4c, 63);
-    powered = false; live.running = false; live.frequency = 0;
+    powered = false; diodeReady = false; live.running = false; live.frequency = 0;
     if (fault || !disabled || !fan) latched = true;
     live.state = !disabled || !fan ? "I2C shutdown fault; restart required" : reason;
+    if (latched) saveFault(live.state);
     invalidate(); publish();
 }
 void instability(const char *reason) {
@@ -193,12 +236,21 @@ bool collect(bool requireDiode) {
     int e = voltageMode & 31; if (e & 16) e -= 32;
     live.regulatorStatus = status;
     boardTemperature = internal < 0x80 ? float(internal) : NAN;  // two's complement; below 0 C is not a reading here
-    live.temperature = bm1370::diodeTemperature(msb, lsb);
+    float diode = powered && !diodeReady ? NAN : bm1370::diodeTemperature(msb, lsb);
+    bool suspect = std::isfinite(diode) ? diode >= bm1370::kAsicMaxC : requireDiode;
+    bool unconfirmed = suspect && ++diodeStrikes < kDiodeConfirm;
+    if (unconfirmed) {
+        logf("[gamma] ASIC temperature reading %.1f C not confirmed yet (%u of %u)\n", diode, diodeStrikes, kDiodeConfirm);
+        live.temperature = lastDiode;
+    } else {
+        if (!suspect) { diodeStrikes = 0; lastDiode = diode; }
+        live.temperature = diode;
+    }
     live.regulatorTemperature = bm1370::linear11(vr);
     live.inputVoltage = bm1370::linear11(vin);
     live.coreVoltage = std::ldexp(float(vout), e);
     live.current = bm1370::linear11(current); live.rpm = bm1370::fanRpm(uint16_t(tachLow) | uint16_t(tachHigh) << 8);
-    const char *fault = readings().fault(powered, requireDiode);
+    const char *fault = readings().fault(powered, requireDiode && !unconfirmed);
     if (fault) {
         // What the first boards will need to tell: every reading at the fault.
         logf("[gamma] %s: regulator status 0x%04x, input %.2f V, core %.3f V, %.1f A, ASIC %.1f C, "
@@ -234,7 +286,7 @@ bool initAsic(const AsicWork &first) {
     if (minerPowerPercent() < 10 || !minerAsicReady()) return false;
     // An undervoltage latched while the supply was missing must not stop this start.
     if (!clearFaults() || !write8(kTps, 0x01, 0x80)) { off("ASIC power enable failed", true); return false; }
-    powered = true; powerEnabledAt = lastHealthSample = millis();
+    powered = true; diodeReady = false; powerEnabledAt = lastHealthSample = millis();
     live.state = "Initializing BM1370"; publish();
     if (!waitSafe(500)) return false;
     digitalWrite(kReset, HIGH);
@@ -269,7 +321,9 @@ bool initAsic(const AsicWork &first) {
     if (!reg(0x28, 0x11300200)) return false;
     uart.flush(); uart.updateBaudRate(1000000);
     // Let the external-diode conversion settle after configuring the ASIC mux.
-    if (!waitSafe(100) || !collect(true)) return false;
+    if (!waitSafe(100)) return false;
+    diodeReady = true;
+    if (!collect(true)) return false;
     // Match ESP-Miner's 6.25 MHz / 100 ms steps, with live safety checks.
     float target = targetFrequency();
     for (float f = 50; f < target; f += 6.25f) {
@@ -422,6 +476,8 @@ void worker(void *) {
 
 void begin() {
     pinMode(kReset, OUTPUT); digitalWrite(kReset, LOW);
+    loadFault();
+    if (lastFaultText[0]) logf("[gamma] last fault before this start: %s\n", lastFaultText);
     configured = configure();
     live.state = configured ? "Ready / waiting for pool" : kNotFound; publish();
     // A first reading at once: the thermal policy then has a temperature from
@@ -443,6 +499,13 @@ Status status() { portENTER_CRITICAL(&mux); Status out = snapshot; portEXIT_CRIT
 float temperature() {
     float asic = status().temperature;
     return std::isfinite(asic) ? asic : boardTemperature.load();
+}
+uint32_t lastFault(char *out, size_t size) {
+    portENTER_CRITICAL(&mux);
+    snprintf(out, size, "%s", lastFaultText);
+    uint32_t when = lastFaultTime;
+    portEXIT_CRITICAL(&mux);
+    return when;
 }
 const char *temperatureSource() {
     if (std::isfinite(status().temperature)) return "asic";

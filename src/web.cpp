@@ -280,6 +280,12 @@ void buildStats(JsonDocument &j, bool history) {
     a["fallback_reason"] = asic.fallbackReason;
     if (asic.hardwareErrorPercent < 0) a["hardware_error_percent"] = nullptr;
     else a["hardware_error_percent"] = asic.hardwareErrorPercent;
+    char fault[192];
+    uint32_t faultTime = gamma601::lastFault(fault, sizeof(fault));
+    if (fault[0]) {
+        a["last_fault"] = fault;
+        a["last_fault_time"] = faultTime;
+    }
 #endif
 #ifdef BOARD_NERDNOS
     auto asic = nerdnos::status();

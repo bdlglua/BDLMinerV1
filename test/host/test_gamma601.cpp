@@ -2,6 +2,7 @@
 #define BOARD_ASIC 1
 #include "../../src/gamma601.cpp"
 #include <cassert>
+#include <string>
 void logf(const char *, ...) {}
 Settings settings;
 static uint8_t power=100;
@@ -26,8 +27,10 @@ static void health(){
     word(0x88,bm1370::encodeLinear11(5));word(0x8b,589);word(0x8c,bm1370::encodeLinear11(15));
     word(0x8d,bm1370::encodeLinear11(50));word(0x79,0);
 }
+// Three readings in a row confirm an ASIC diode fault.
+static bool confirmed(bool requireDiode){return collect(requireDiode)&&collect(requireDiode)&&!collect(requireDiode);}
 static void reset(){
-    latched=powered=configured=forceStock=false;settings=Settings();settings.asicFrequency=525;
+    latched=powered=configured=forceStock=false;diodeStrikes=0;lastDiode=NAN;lastFaultText[0]=0;lastFaultTime=0;Preferences::data.clear();settings=Settings();settings.asicFrequency=525;
     live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1};publish();
     testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
     testUartTx.clear();testUartTxTimes.clear();testUartRx.clear();testDelayHook=nullptr;testMillis=1000;testReset=1;power=100;generation=1;poolReady=true;powerUntil=UINT32_MAX;
@@ -67,7 +70,17 @@ int main(){
     assert(request(0x8c,false));const auto &poll=testUartTx.back();
     assert(poll.size()==7&&poll[2]==0x42&&poll[4]==0&&poll[5]==0x8c);
 
-    bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!powered&&testReset==0);
+    // One false reading (102 C between two 52 C, seen on a real Gamma) does not stop it.
+    bytes(0x4c,1,{102});assert(collect(true)&&!latched&&powered&&temperature()==50);
+    bytes(0x4c,1,{52});assert(collect(true)&&!latched&&powered&&temperature()==52&&diodeStrikes==0);
+    // Nor does a lone missing reading.
+    bytes(0x4c,1,{0x7f});bytes(0x4c,0x10,{0xe0});assert(collect(true)&&!latched&&powered);
+    bytes(0x4c,1,{52});bytes(0x4c,0x10,{0});assert(collect(true)&&diodeStrikes==0);
+    // A real overheat, three readings in a row: stopped, and the fault kept across a restart.
+    bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!powered&&testReset==0);
+    assert(strstr(lastFaultText,"ASIC overtemperature")&&strstr(lastFaultText,"ASIC 70.0 C"));
+    {std::string saved=lastFaultText;lastFaultText[0]=0;loadFault();assert(saved==lastFaultText);
+     char out[192];lastFault(out,sizeof(out));assert(saved==out);}
     assert(testI2c[std::make_pair(0x24,1)][0]==0&&testI2c[std::make_pair(0x4c,0x4c)][0]==63);
     reset();begin();assert(initAsic(w));off("Thermal pause");assert(!latched&&testReset==0);
     bytes(0x4c,1,{40});assert(collect(false)&&temperature()==40); // cooldown still observable while unpowered
@@ -153,6 +166,13 @@ int main(){
         }
     };
     assert(initAsic(w)&&live.running&&temperature()==50);
+    // Before the mux routes the diode, a real Gamma read 106 C: ignored, no strike.
+    reset();begin();bytes(0x4c,1,{50});
+    testDelayHook=[](uint32_t){
+        bool routed=false;for(auto &p:testUartTx)if(p.size()==11&&p[5]==0x54&&p[9]==2)routed=true;
+        bytes(0x4c,1,{uint8_t(powered&&!routed?106:50)});
+    };
+    assert(initAsic(w)&&live.running&&!latched&&temperature()==50&&diodeStrikes==0);
     reset();begin();testUartFail=true;assert(!initAsic(w));off("UART failed",true);assert(latched&&testReset==0);
     reset();begin();testTaskFailAt=testTaskStarts;assert(!start()&&latched&&testReset==0);
     assert(Settings().asicFrequency==525); // stock, as ESP-Miner
@@ -190,11 +210,11 @@ int main(){
     testI2cFail=true;instability("High ASIC hardware error rate");
     assert(latched&&!powered&&testReset==0); // failed shutdown cannot auto-restart
     reset();settings.asicFrequency=600;begin();assert(initAsic(w));
-    bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!forceStock&&!powered); // hard limits still stop
+    bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered); // hard limits still stop
     reset();settings.asicFrequency=800;begin();assert(initAsic(w));
     testMillis+=3100;checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
     assert(initAsic(w)&&live.frequency==525); // highest profile still falls back to stock
     reset();settings.asicFrequency=800;begin();assert(initAsic(w));
-    bytes(0x4c,1,{70});assert(!collect(true)&&latched&&!forceStock&&!powered);
+    bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered);
     puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, relative VOUT limits, supervised PLL ramp, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
 }

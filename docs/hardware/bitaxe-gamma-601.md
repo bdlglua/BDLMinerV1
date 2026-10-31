@@ -125,7 +125,14 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   (OTHER) and do not stop mining, the measured limits covering them. Hard limits
   remain active even if the user temperature setting is disabled. Faults latch
   until restart, and the log gives every reading at the fault (status word, input
-  and core voltage, current, temperatures, fan).
+  and core voltage, current, temperatures, fan). The last one is kept across
+  restarts: logged at boot and shown on the dashboard's ASIC tile, with its date.
+* The ASIC diode only reads once the BM1370 routes it (analog mux, register 54h):
+  from power-on until then it is ignored (a real Gamma read 106 °C there on a 25 °C
+  board) and the board's EMC2101 temperature stands in. Afterwards, a diode fault
+  (70 °C or more, or no reading) must hold for **three readings in a row**, 0.75 s
+  while mining, before it stops the ASIC: a real overheat takes far longer, and one
+  false reading no longer stops it until restart.
 * Startup waits 500 ms for core power stabilization, then ramps the PLL in
   6.25 MHz steps spaced by 100 ms, following ESP-Miner. Fan, voltage/current and
   regulator temperature are sampled throughout startup after the power-good grace

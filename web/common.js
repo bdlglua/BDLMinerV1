@@ -59,6 +59,7 @@ Object.assign(FR,{
  'Pool needs version rolling':'Le pool doit accepter le version rolling',
  'Paused / waiting for pool':'En pause / en attente du pool',
  'Ready / waiting for pool':'Prêt / en attente du pool',
+ 'Last fault':'Dernier défaut',
  'Regulator or sensors not found: plug in the 5V supply':'Régulateur ou capteurs introuvables : branche l’alimentation 5 V',
  'Waiting for the 5V supply (barrel jack)':'En attente de l’alimentation 5 V (prise jack)',
  'Waiting for the fan to turn':'En attente du ventilateur',
