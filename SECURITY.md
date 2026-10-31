@@ -65,9 +65,16 @@ Out of scope:
 These are deliberate design choices for a device on a home network, documented so
 that reports can focus on what goes beyond them:
 
+- **Only the miner's own pages can change it.** Settings, backups, firmware uploads,
+  restarts and crash reports refuse a request sent by another site's page (its
+  `Origin` header) or reaching the miner under a name of another site (its `Host`
+  header: DNS rebinding). Since 1.9.6.
+- **Passwords and the webhook URL never leave the miner** in the settings page: a set
+  one reads as `••••••••`, kept as it is when the page saves. Backups hold them only
+  when a web password is set. Since 1.9.6.
 - **The web password is optional, and off by default.** Without one, anyone on the
   local network can change the settings (the payout address included), download
-  backups (they hold the WiFi and other passwords) and crash reports, restart the
+  backups (without the passwords) and crash reports, restart the
   miner and upload a firmware. Setting one protects all of that, through HTTP Basic
   authentication, which an attacker on the same network can still read (the dashboard
   is plain HTTP). Checking for an update never asks for it (one request every 30
@@ -102,5 +109,5 @@ that reports can focus on what goes beyond them:
   different from your WiFi password.
 - Keep the miner on your home or IoT network; **never forward its port 80** to the internet.
 - Leave **GitHub updates** on, so security fixes reach the miner by themselves.
-- Treat your **webhook URL**, **ntfy topic** and **backup files** as secrets: a backup
-  contains every setting and password.
+- Treat your **webhook URL**, **ntfy topic** and **backup files** as secrets: with a web
+  password set, a backup contains every setting and password.

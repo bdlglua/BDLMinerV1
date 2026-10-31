@@ -12,7 +12,7 @@ function poolURLChanged(key){
   input.setCustomValidity('');dirtyState();sync();
  }catch(e){input.setCustomValidity(t('Enter a valid value.'))}
 }
-$('bh').textContent=LANG==='fr'?t('backup_help'):'The backup contains all settings, passwords and lifetime statistics. Keep it private.';
+$('bh').textContent=LANG==='fr'?t('backup_help'):'The backup contains all settings and lifetime statistics. Passwords and the webhook are only in it when a web password is set: keep it private then.';
 function sync(){
  const off=busy||restarting||!S;
  for(const id of ['save','backup','restore','restart','discard'])$(id).disabled=off;

@@ -23,9 +23,11 @@ Settings settings;
 const SettingInfo kSettings[] = {
  {"pool",SettingType::Text,&settings.poolHost,0,"",""},
  {"addr",SettingType::Text,&settings.btcAddress,0,"",""},
- {"power",SettingType::Number,&settings.miningPower,8,"",""}
+ {"power",SettingType::Number,&settings.miningPower,8,"",""},
+ {"hook",SettingType::Secret,&settings.webhookUrl,0,"",""}
 };
-const size_t kSettingCount=3;
+const size_t kSettingCount=4;
+const char kSecretMask[] = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
 struct Preferences {
  static inline std::map<std::string,std::vector<uint8_t>> data;
  static inline bool failOpen=false, failWrite=false, corrupt=false;
@@ -84,6 +86,11 @@ int main() {
  assert(settingsstore::load(p,loaded,sequence) && loaded.miningPower==50);
  // Nothing changed: nothing written.
  handlePostSettings();assert(server.status==200 && settingsSequence==2 && server.message.find("\"changed\":0")!=std::string::npos);
+ // A secret sent back masked (as the page shows it) is kept as it is.
+ settings.webhookUrl="https://hook.example/token";
+ server.body=std::string(R"({"hook":")")+kSecretMask+R"(","power":50})";handlePostSettings();
+ assert(server.status==200 && settingsSequence==2 && settings.webhookUrl=="https://hook.example/token");
+ assert(server.message.find("\"changed\":0")!=std::string::npos);
  // A pool change is saved and restarts; live strings stay until then.
  server.body=R"({"pool":"new.pool","power":75})";handlePostSettings();
  assert(server.status==200 && restarts==1 && settingsSequence==3 && settings.poolHost=="pool.example" && settings.miningPower==50);

@@ -88,4 +88,21 @@ int main() {
     assert(!deserializeJson(j, exported));
     assert(valid(j));
     puts("Backup validation tests passed");
+
+    using webvalidation::hostAllowed;
+    using webvalidation::originAllowed;
+    for (const char *host : {"", "192.168.1.40", "192.168.1.40:80", "[fe80::1]", "bdlminer-f4e1", "BDLMiner-F4E1.local",
+                             "bdlminer-f4e1.local.", "bdlminer-f4e1.box.example", "miner.lan", "miner.home.arpa", "router"})
+        assert(hostAllowed(host, "bdlminer-f4e1"));
+    for (const char *host : {"evil.example", "bdlminer-f4e1x.example", "192.168.1.40.nip.io", "local.example",
+                             "bdlminer.example:80"})
+        assert(!hostAllowed(host, "bdlminer-f4e1"));
+    assert(!hostAllowed("x.example", ""));
+    assert(originAllowed(nullptr, "192.168.1.40") && originAllowed("", "192.168.1.40"));
+    assert(originAllowed("http://192.168.1.40", "192.168.1.40"));
+    assert(originAllowed("http://BDLMINER-f4e1.local", "bdlminer-f4e1.local"));
+    for (const char *origin : {"null", "https://evil.example", "http://evil.example", "http://192.168.1.40.evil",
+                               "https://192.168.1.40", "http://192.168.1.4"})
+        assert(!originAllowed(origin, "192.168.1.40"));
+    puts("Request origin tests passed");
 }

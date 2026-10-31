@@ -47,6 +47,8 @@ struct {
     void requestAuthentication(int, const char *, const char *) { status=401; }
 } server;
 struct { String webPassword = "password"; } settings;
+bool ownPage = true;  // fromOwnPage(): Host and Origin of this miner
+bool fromOwnPage() { return ownPage; }
 struct Writer {
     bool running = false, failBegin = false, failWrite = false, failEnd = false;
     int begins = 0, ends = 0, aborts = 0;
@@ -70,7 +72,7 @@ void reset() {
     ota::release(ota::Owner::Github);
     resetUpload();
     server.file=HTTPUpload(); server.auth=true; server.status=0;
-    settings.webPassword="password"; Update=Writer(); restartAt=0; restarts=0;
+    settings.webPassword="password"; Update=Writer(); restartAt=0; restarts=0; ownPage=true;
 }
 void event(int status) { server.file.status=status; handleUpload(); }
 void complete() { event(UPLOAD_FILE_START); event(UPLOAD_FILE_WRITE); event(UPLOAD_FILE_END); }
@@ -131,6 +133,12 @@ int main() {
     // Without a web password (the default) no sign-in is asked.
     reset(); settings.webPassword=""; server.auth=false; complete(); handleUpdateDone();
     assert(server.status==200 && Update.ends==1 && restarts==1);
+
+    // Another site's page: refused before anything is written, password or not.
+    for (const char *password : {"", "password"}) {
+        reset(); settings.webPassword=password; ownPage=false; complete(); handleUpdateDone();
+        assert(server.status==403 && Update.begins==0 && restarts==0 && !ota::busy());
+    }
     puts("Production HTTP upload callbacks: authorization, ownership, aborts, multipart and activation passed");
 }
 '''

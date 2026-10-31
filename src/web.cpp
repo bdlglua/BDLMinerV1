@@ -44,7 +44,58 @@
 
 namespace {
 
-WebServer server(80);
+// The library serves one connection at a time and waits up to 5 s for the
+// request of a new one. Browsers open spare connections they use later or
+// never: each stalled the page's other files for 5 s, and some gave up. New
+// connections now wait here, and the first one to send its request is served.
+class Server : public WebServer {
+public:
+    using WebServer::WebServer;
+    void handleClient() override {
+        if (_currentStatus == HC_NONE) {
+            uint32_t now = millis();
+            while (_server.hasClient()) {
+                int slot = 0;  // a free slot, or the oldest connection
+                for (int i = 0; i < kWaiting; i++) {
+                    if (!waiting[i]) { slot = i; break; }
+                    if ((int32_t)(since[i] - since[slot]) < 0) slot = i;
+                }
+                waiting[slot].stop();
+                waiting[slot] = _server.available();
+                since[slot] = now;
+            }
+            for (int i = 0; i < kWaiting; i++) {
+                if (!waiting[i]) {  // closed by the browser: free its socket
+                    waiting[i] = WiFiClient();
+                    continue;
+                }
+                if (waiting[i].available()) {
+                    _currentClient = waiting[i];
+                    waiting[i] = WiFiClient();
+                    _currentStatus = HC_WAIT_READ;
+                    _statusChange = now;
+                    break;
+                }
+                if (now - since[i] > kIdleMs) {
+                    waiting[i].stop();
+                    waiting[i] = WiFiClient();
+                }
+            }
+            // Nothing to serve: the library would take the next new
+            // connection itself and wait for its request.
+            if (_currentStatus == HC_NONE) return;
+        }
+        WebServer::handleClient();
+    }
+
+private:
+    static constexpr int kWaiting = 6;  // a browser opens up to 6 per site
+    static constexpr uint32_t kIdleMs = 10000;
+    WiFiClient waiting[kWaiting];
+    uint32_t since[kWaiting] = {};
+};
+
+Server server(80);
 String hostName;
 std::atomic<uint32_t> restartAt{0};  // restart due at this millis(), 0 = none
 std::atomic<const char *> restartWhy{""};
@@ -88,9 +139,22 @@ void sendAsset(const char *mime, const uint8_t *data, size_t size, bool gzip = t
     server.send_P(200, mime, reinterpret_cast<PGM_P>(data), size);
 }
 
-// Settings, backups, firmware and crash reports need the web password when
-// one is set; without one (the default) they are open to the local network.
+// Whether the request comes from the miner's own pages: another site's page
+// (or a name of another site leading here) cannot change it or read its secrets.
+bool fromOwnPage() {
+    String host = server.hostHeader();
+    return webvalidation::hostAllowed(host.c_str(), hostName.c_str()) &&
+           webvalidation::originAllowed(server.header("Origin").c_str(), host.c_str());
+}
+
+// Settings, backups, firmware and crash reports: from the miner's own pages
+// only, then with the web password when one is set; without one (the
+// default) they are open to the local network.
 bool authorized() {
+    if (!fromOwnPage()) {
+        server.send(403, "text/plain", "Refused: open the miner's own page (http://its address/) to do this");
+        return false;
+    }
     if (settings.webPassword.isEmpty()) return true;
     if (!server.authenticate("admin", settings.webPassword.c_str())) {
         server.requestAuthentication(BASIC_AUTH, "BDLMiner", "Wrong password");
@@ -447,16 +511,27 @@ void handleDiagnostics() {
     server.send(200, "application/json", body);
 }
 
-// Every setting's value, under its key.
-void settingValues(JsonObject values) {
+// A set password or webhook as the pages see it: secrets never leave the
+// miner (anyone on the network can open these pages), and a save that sends
+// this back keeps the secret as it is.
+const char kSecretMask[] = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+
+// Every setting's value, under its key; the secrets themselves only with
+// `secrets` (a backup protected by the web password).
+void settingValues(JsonObject values, bool secrets) {
     Settings visible = settings;
     visible.brightness = settingsBrightness();
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
         const void *value = settingValue(s, visible);
         switch (s.type) {
-            case SettingType::Text:
-            case SettingType::Secret: values[s.key] = *(const String *)value; break;
+            case SettingType::Text: values[s.key] = *(const String *)value; break;
+            case SettingType::Secret: {
+                const String &secret = *(const String *)value;
+                if (secrets || secret.isEmpty()) values[s.key] = secret;
+                else values[s.key] = kSecretMask;
+                break;
+            }
             case SettingType::Number:
                 values[s.key] = s.bits == 8 ? *(const uint8_t *)value : *(const uint16_t *)value;
                 break;
@@ -480,6 +555,13 @@ int applySettings(JsonObjectConst values) {
     return changed;
 }
 
+// Drops the secrets sent back masked: they stay as they are.
+void keepSecrets(JsonObject values) {
+    for (size_t i = 0; i < kSettingCount; i++)
+        if (kSettings[i].type == SettingType::Secret && values[kSettings[i].key] == kSecretMask)
+            values.remove(kSettings[i].key);
+}
+
 void handleGetSettings() {
     if (!authorized()) return;
     static const char *kTypes[] = {"text", "secret", "number", "decimal", "bool"};
@@ -501,7 +583,7 @@ void handleGetSettings() {
             limits["max"] = range.maximum;
         } else if (s.type == SettingType::Decimal) limits["min"] = 0;
     }
-    settingValues(j["values"].to<JsonObject>());
+    settingValues(j["values"].to<JsonObject>(), false);
     JsonArray live = j["live"].to<JsonArray>();
     for (size_t i = 0; i < kSettingCount; i++)
         if (settingIsLive(kSettings[i].key)) live.add(kSettings[i].key);
@@ -525,6 +607,7 @@ void handlePostSettings() {
         server.send(400, "text/plain", "Not a settings object");
         return;
     }
+    keepSecrets(j.as<JsonObject>());
     if (const char *error = settingsError(j.as<JsonObjectConst>())) {
         server.send(400, "text/plain", error);
         return;
@@ -561,7 +644,8 @@ void handlePostSettings() {
     }
 }
 
-// GET /api/backup: settings (passwords included) and lifetime statistics.
+// GET /api/backup: settings (passwords included when a web password protects
+// them) and lifetime statistics.
 void handleGetBackup() {
     if (!authorized()) return;
     JsonDocument j;
@@ -570,7 +654,8 @@ void handleGetBackup() {
     j["firmware"] = FW_VERSION;
     time_t now = time(nullptr);
     j["date"] = now > 1700000000 ? (uint32_t)now : 0;
-    settingValues(j["settings"].to<JsonObject>());
+    // Without a web password, anyone on the network could download it: no secrets then.
+    settingValues(j["settings"].to<JsonObject>(), !settings.webPassword.isEmpty());
     StatsSnapshot s;
     minerStatsSnapshot(s);
     JsonObject st = j["stats"].to<JsonObject>();
@@ -613,6 +698,7 @@ void handlePostBackup() {
         return;
     }
     bool full = j["bdlminer_backup"].is<unsigned>();
+    keepSecrets(full ? j["settings"].as<JsonObject>() : j.as<JsonObject>());
     JsonObjectConst values = full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>();
     if (const char *error = settingsError(values)) {
         server.send(400, "text/plain", error);
@@ -702,7 +788,8 @@ void handleUpload() {
         }
         resetUpload();
         uploadStarted = true;
-        updateAllowed = settings.webPassword.isEmpty() || server.authenticate("admin", settings.webPassword.c_str());
+        updateAllowed = fromOwnPage() &&
+                        (settings.webPassword.isEmpty() || server.authenticate("admin", settings.webPassword.c_str()));
         if (!updateAllowed) return;
         if (restartAt) { updateBusy = true; return; }
         String name = up.filename;
@@ -892,6 +979,10 @@ void webStart() {
     server.on("/api/github-check", HTTP_POST, []() {
         static uint32_t lastRequest = 0;
         static bool requested = false;
+        if (!fromOwnPage()) {
+            server.send(403, "text/plain", "Refused: open the miner's own page to do this");
+            return;
+        }
         if (!settings.githubUpdate) {
             server.send(409, "text/plain", "GitHub updates are disabled in settings");
             return;
@@ -945,6 +1036,8 @@ void webStart() {
     });
     server.on("/metrics", HTTP_GET, handleMetrics);
     server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
+    static const char *kHeaders[] = {"Origin"};  // for fromOwnPage(); Host is always kept
+    server.collectHeaders(kHeaders, 1);
     server.begin();
     // Slow HTTP clients must never stop the loop that owns the I2C sensors,
     // thermal control, buttons and screen. The worker uses cached snapshots.

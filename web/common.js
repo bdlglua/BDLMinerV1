@@ -17,7 +17,7 @@ const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','
 'Update':'Mettre à jour','Not a backup file':'Ce n\'est pas un fichier de sauvegarde','Restore this backup? The miner restarts afterwards.':'Restaurer cette sauvegarde ? Le miner redémarre ensuite.',
 'Saved, restarting… reload in 15 s':'Enregistré, redémarrage… recharge dans 15 s','Upload failed':'Échec de l\'envoi',
 'Refreshes every 5 s. Times are since the last start.':'Actualisé toutes les 5 s. Heures depuis le dernier démarrage.',
-'backup_help':'Le fichier de sauvegarde contient tous les réglages (mots de passe compris : garde-le privé) et les statistiques à vie : meilleure difficulté, les 10 meilleures shares, hashes, shares, blocs, durée de fonctionnement. Le restaurer sur un autre miner lui donne aussi ces statistiques.',
+'backup_help':'Le fichier de sauvegarde contient tous les réglages (les mots de passe et le webhook seulement si un mot de passe web est défini : garde-le alors privé) et les statistiques à vie : meilleure difficulté, les 10 meilleures shares, hashes, shares, blocs, durée de fonctionnement. Le restaurer sur un autre miner lui donne aussi ces statistiques.',
 'Display':'Affichage','Notifications':'Notifications','Safety':'Sécurité','Network':'Réseau'};
 // Settings labels by key.
 const FR_SET={asicmhz:'Fréquence ASIC Gamma (MHz)',pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
@@ -35,6 +35,9 @@ peers:'Autres miners du tableau de bord (IP ou noms, séparés par des virgules)
 update:'Mises à jour depuis GitHub : 0 non, 1 vérifier et proposer, 2 installer automatiquement',
 count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fichier de 2 octets de la release de cette version (rien n\'est envoyé)'};
 function t(s){return LANG=='fr'&&FR[s]||s}
+// Numbers and labels as the page's language writes them: « 1,00 MH/s », « Pool : … ».
+function fix(v,n){const s=v.toFixed(n);return LANG=='fr'?s.replace('.',','):s}
+const COLON=LANG=='fr'?'\u00a0: ':': ',LOCALE=LANG=='fr'?'fr-FR':'en-US';
 
 Object.assign(FR,{
  '525 MHz (stock)':'525 MHz (origine)',
