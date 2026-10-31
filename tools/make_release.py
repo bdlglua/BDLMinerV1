@@ -198,7 +198,9 @@ def build_release(targets, out, release_version, key):
         if os.path.exists(firmware + ".sig"):
             os.remove(firmware + ".sig")
         shutil.copyfile(images[-1][1], firmware)
-        slot_report(env, firmware, next(path for _, path in images if path.endswith("partitions.bin")))
+        partitions = next((path for _, path in images if path.endswith("partitions.bin")), None)
+        if partitions and os.path.isfile(partitions):
+            slot_report(env, firmware, partitions)
         if key:
             sign(key, firmware)
         boards[env] = mcu

@@ -18,6 +18,25 @@ import build_output
 
 
 class ReleaseToolsTests(unittest.TestCase):
+    def test_slot_report_warns_near_a_full_update_slot(self):
+        def entry(kind, subtype, offset, size):
+            return b"\xaa\x50" + bytes([kind, subtype]) + offset.to_bytes(4, "little") + size.to_bytes(4, "little") + b"\0" * 20
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            table = root / "partitions.bin"
+            # nvs (data), ota_0 and ota_1 of 1920 KB, a factory app that does not count.
+            table.write_bytes(entry(1, 2, 0x9000, 0x5000) + entry(0, 0x10, 0x10000, 1920 * 1024)
+                              + entry(0, 0x11, 0x1F0000, 1920 * 1024) + entry(0, 0, 0x3D0000, 64 * 1024) + b"\xff" * 32)
+            self.assertEqual(make_release.app_slot(table), 1920 * 1024)
+            firmware = root / "firmware.bin"
+            for size, warned in ((1788 * 1024, False), (1840 * 1024, True)):
+                firmware.write_bytes(b"\0" * size)
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    make_release.slot_report("board", firmware, table)
+                self.assertIn("of its 1920 KB update slot", out.getvalue())
+                self.assertEqual("::warning" in out.getvalue(), warned)
+
     def test_packaging_failure_keeps_the_actual_tool_diagnostic(self):
         output = io.StringIO()
         error = subprocess.CalledProcessError(2, ["esptool"], output=b"tool output", stderr=b"missing input image")
