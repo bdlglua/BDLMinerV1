@@ -21,7 +21,10 @@ shares still need to be confirmed on a board. Reports are welcome.
 | Temperature | GPIO2 (ADC1) | 10 kΩ NTC, beta 3380, next to the ASIC |
 | Buttons, screen | GPIO14, GPIO0, LCD | as on any T-Display-S3 |
 
-These pins come from the NerdNOS firmware
+These pins, the start-up sequence, the PLL, the job format and the NTC formula were
+checked again against that firmware in v1.9.10: they match it (BDLMiner takes the
+version mask from the pool where the stock firmware assumes 1fffe000, and verifies every
+result by hashing). These pins come from the NerdNOS firmware
 ([WantClue/NerdMiner_v2](https://github.com/WantClue/NerdMiner_v2/tree/nerdnos), branch
 `nerdnos`, revision `22588347597d`), the code that ships on the boards; the KiCad files in the hardware
 repository name different header pins, probably another revision.
@@ -37,11 +40,15 @@ repository name different header pins, probably another revision.
   difficulty is between 16 and 64). Every one is verified by hashing it on the ESP32
   before it counts: the hashrate comes from these verified results, corrupted frames
   count as hardware errors and are never submitted.
-- **Heat**: *Pause mining above* defaults to **75 °C** for this board (throttling from
-  65 °C); the stock firmware cuts power at 80 °C. A broken sensor limits mining to 25 %.
+- **Heat**: *Pause mining above* defaults to **75 °C** for this board; the stock firmware
+  cuts power at 80 °C. Since v1.9.10 there are no 50 % / 25 % steps below the limit (each
+  power change restarts the ASIC), and once hot it stays paused at least two minutes.
+  The NTC reads with the ASIC off as well. A broken sensor limits mining to 25 %.
 - **Watchdog**: no verified result for a minute restarts the chip.
 - **Pool**: defaults to `public-pool.io:3333`, Stratum V1, suggested difficulty
-  **1024**. A pool difficulty below 16 is refused with a message, as on the Gamma.
+  **1024**. Since v1.9.8 a pool difficulty below 16 no longer stops the ASIC: its filter
+  stays at 16 and only those shares are sent (block odds unchanged). Only a pool without
+  version rolling keeps it off.
 - **Updates**: GitHub updates are offered (setting `1`) rather than installed
   automatically, as for the other experimental board.
 
