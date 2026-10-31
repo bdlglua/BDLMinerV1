@@ -376,10 +376,22 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     // than in WiFiManager's, which never does: a Gamma 601 restarted twice on
     // the task watchdog during its setup.
     wm.setConfigPortalBlocking(false);
+    // After a failed attempt (a mistyped password, a network out of reach),
+    // WiFiManager's own loop turns the station off so that the access point
+    // stays steady; its non-blocking mode does not, and the miner kept trying
+    // the wrong network while the phone could drop off the portal. Done here
+    // the same way; the next attempt turns the station back on.
+    bool attempted = false;
+    wm.setPreSaveConfigCallback([&attempted]() { attempted = true; });
     bool connected = forcePortal ? wm.startConfigPortal(ap.c_str(), PORTAL_AP_PASSWORD)
                                  : wm.autoConnect(ap.c_str(), PORTAL_AP_PASSWORD);
     while (!connected && wm.getConfigPortalActive()) {
         connected = wm.process();  // false once the portal times out
+        if (attempted && !connected) {
+            attempted = false;
+            WiFi.disconnect();
+            WiFi.enableSTA(false);
+        }
         delay(10);
     }
 
