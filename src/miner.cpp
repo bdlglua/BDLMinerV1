@@ -1224,14 +1224,17 @@ bool minerAsicWork(AsicWork &out) {
 }
 bool minerAsicCurrent(uint32_t generation) { return boardValid && generation == workGeneration.load(); }
 bool minerAsicReady() { return boardValid; }
-void minerAsicCandidate(AsicWork &w, uint32_t nonce, uint32_t bits) {
-    if (!minerAsicCurrent(w.generation) || (bits & ~w.versionMask)) return;
+double minerAsicCandidate(AsicWork &w, uint32_t nonce, uint32_t bits, double minimumDifficulty) {
+    if (!minerAsicCurrent(w.generation) || (bits & ~w.versionMask)) return -1;
     AsicWork candidate = w;
     uint32_t version; memcpy(&version, candidate.header, 4); version |= bits;
     memcpy(candidate.header, &version, 4); memcpy(candidate.header + 76, &nonce, 4);
     uint8_t hash[32]; sha::sha256d(candidate.header, 80, hash);
     // Independently reject UART corruption/hardware errors before counting a share.
-    if (work::hashDifficulty(hash) >= 1.0 && minerAsicCurrent(w.generation)) onCandidate(nonce, hash, &candidate);
+    double difficulty = work::hashDifficulty(hash);
+    if (!minerAsicCurrent(w.generation)) return -1;
+    if (difficulty >= std::max(1.0, minimumDifficulty)) onCandidate(nonce, hash, &candidate);
+    return difficulty;
 }
 void minerAsicHashes(uint64_t hashes) {
     portENTER_CRITICAL(&statsMux); stats.hashes[0] += hashes; portEXIT_CRITICAL(&statsMux);

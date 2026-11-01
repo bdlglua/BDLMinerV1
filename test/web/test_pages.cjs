@@ -986,16 +986,35 @@ if(process.env.BDL_SCREENSHOT_DIR){
  const previewHistory={hashrate:[],temperature_c:[],power_percent:[],coverage_percent:[],interval_s:300,revision:1};
  for(let i=0;i<288;i++){const limited=i>=244&&i<252,gap=i>=262&&i<265;previewHistory.hashrate.push(gap?null:Math.round((limited?510000:997000)+17000*Math.sin(i/9)+8000*Math.cos(i/3)));previewHistory.temperature_c.push(gap?null:Math.round((51+8*Math.sin(i/19)+(limited?3:0))*10)/10);previewHistory.power_percent.push(gap?null:limited?50:100);previewHistory.coverage_percent.push(gap?0:100)}
  fs.mkdirSync(process.env.BDL_SCREENSHOT_DIR,{recursive:true});
- for(const [name,options,route]of [['dashboard',{language:'fr'},'/'],['mobile',{mobile:true,language:'fr'},'/'],['settings',{language:'fr'},'/settings'],['log',{language:'fr'},'/log']]){
-  check('visual preview '+name,()=>run({...options,history:previewHistory,stats:{firmware:'1.3.0',hashrate:1001240,hashrate_live:1004820,engines:[{name:'hw',rate:968500},{name:'sw',rate:27000},{name:'fill',rate:5740}],power_percent:100,power_limit_percent:100,throttle:'full',limitation_reason:'full',max_temp_c:65,uptime_s:18432,shares:{accepted:247,rejected:1},best:{session:0.0034,ever:1.28},history:undefined,history_revision:1,boot_id:'preview',github_update:{mode:2,checked:true,version:'1.3.0',available:false},board:'M5StickC Plus2'}},async f=>{
+ for(const [name,options,route]of [['desktop-en',{language:'en'},'/'],['dashboard',{language:'fr'},'/'],['mobile',{mobile:true,language:'fr'},'/'],['settings',{language:'fr'},'/settings'],['log',{language:'fr'},'/log']]){
+  check('visual preview '+name,()=>run({...options,history:previewHistory,stats:{firmware:'2.0.0-beta.1',hashrate:1001240,hashrate_live:1004820,engines:[{name:'hw',rate:968500},{name:'sw',rate:27000},{name:'fill',rate:5740}],power_percent:100,power_limit_percent:100,throttle:'full',limitation_reason:'full',max_temp_c:65,uptime_s:18432,shares:{accepted:247,rejected:1},best:{session:0.0034,ever:1.28},history:undefined,history_revision:1,boot_id:'preview',github_update:{mode:2,checked:true,version:'2.0.0-beta.1',available:false},board:'M5StickC Plus2 · Demo data'}},async f=>{
    await f.page.goto(f.url+route);await f.page.waitForTimeout(200);
    await f.page.screenshot({path:path.join(process.env.BDL_SCREENSHOT_DIR,name+'.png'),fullPage:true});
   }));
  }
 }
 
+check('V2 overview prioritizes live state and keeps diagnostics out of the KPI row',()=>run({realPolling:true,stats:{board:'M5StickC Plus2',firmware:'2.0.0-beta.1',hashrate:1e6,hashrate_live:1e6,shares:{accepted:0,rejected:0}}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForSelector('#m .hero');
+ assert.match(await f.page.locator('#miner-identity').textContent(),/M5StickC Plus2.*2\.0\.0-beta\.1/);
+ assert.equal(await f.page.locator('#mining-state').textContent(),'Mining');
+ assert.match(await f.page.locator('#m').textContent(),/No pool replies yet/);
+ assert.equal(await f.page.locator('#pool-diagnostic-panel').getAttribute('open'),null);
+ assert.ok(await f.page.locator('#m').evaluate(m=>m.getBoundingClientRect().top)<await f.page.locator('#performance-panel').evaluate(p=>p.getBoundingClientRect().top));
+ await f.page.click('#open-pool-diagnostics');assert.equal(await f.page.locator('#check-pool').isVisible(),true);
+}));
+
+check('V2 French overview separates cooling stopped ASIC and pool socket states',()=>run({language:'fr',realPolling:true,stats:{hashrate:1e12,hashrate_live:1e12,shares:{accepted:9,rejected:1}}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForSelector('#m .hero');
+ assert.match(await f.page.locator('#m').textContent(),/90,0 % Acceptation/);
+ await f.page.evaluate(()=>{latestStats.asic={model:'BM1370',running:false,state:'Fan stopped'};show(latestStats)});
+ assert.equal(await f.page.locator('#mining-state').textContent(),'ASIC arrêté');
+ await f.page.evaluate(()=>{delete latestStats.asic;latestStats.limitation_reason='hot';show(latestStats)});
+ assert.equal(await f.page.locator('#mining-state').textContent(),'Refroidissement');
+}));
+
 check('V2 diagnostics distinguish rare shares from incompatible ASIC jobs',()=>run({realPolling:true,stats:{pool_diagnostics:{code:'infrequent_shares',compatible:true,protocol:'Stratum V2 (Noise)',expected_share_seconds:42949672.96,accepted_samples:0,share_based_hashrate:null,version_rolling_bits:0,required_rolling_bits:0}}},async f=>{
- await f.page.goto(f.url);await f.page.waitForSelector('#pool-diagnostic-values .t');
+ await f.page.goto(f.url);await f.page.click('#open-pool-diagnostics');await f.page.waitForSelector('#pool-diagnostic-values .t');
  assert.match(await f.page.locator('#pool-diagnostic-status').textContent(),/infrequent|rare|difficulty/i);
  await f.page.click('#check-pool');await f.page.waitForFunction(()=>!document.querySelector('#check-pool').disabled);
  assert.ok(f.state.requests.includes('GET /api/pool/diagnostics'));

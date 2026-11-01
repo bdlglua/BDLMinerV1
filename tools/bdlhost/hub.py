@@ -28,6 +28,7 @@ class Fleet:
         self.lock = threading.RLock()
         self.stop = threading.Event()
         self.state, self.jobs = {}, {}
+        self.poll_sequence = {d.id: 0 for d in devices}
         self.cancellations = {}
         self.db = sqlite3.connect(database, check_same_thread=False)
         self.db.execute('PRAGMA journal_mode=WAL')
@@ -38,16 +39,23 @@ class Fleet:
     def poll_one(self, miner):
         if self.stop.is_set():
             return
+        with self.lock:
+            self.poll_sequence[miner] += 1
+            sequence = self.poll_sequence[miner]
         now = time.time()
         try:
             sample = self.clients[miner].stats()
             with self.lock:
+                if sequence != self.poll_sequence[miner]:
+                    return
                 self.state[miner] = {'online': True, 'sample': sample, 'at': now, 'attempted_at': now}
                 self.db.execute('INSERT OR REPLACE INTO readings VALUES (?,?,?,?,?)',
                                 (miner, now, sample.get('boot_id'), sample['hashrate'], sample.get('temp_c')))
                 self.db.commit()
         except Exception as error:
             with self.lock:
+                if sequence != self.poll_sequence[miner]:
+                    return
                 old = self.state.get(miner, {})
                 self.state[miner] = {**old, 'online': False, 'attempted_at': now,
                                      'error': str(error) if isinstance(error, DeviceError) else 'Invalid miner response'}
@@ -146,6 +154,8 @@ class Fleet:
                                {}, method='POST', raw=True)
             else:
                 raise ValueError('Unknown action')
+            if action in ('power', 'channel'):
+                self.poll_one(miner)  # show the applied setting rather than the preceding cached snapshot
             return {'ok': True}
         finally:
             operation.release()

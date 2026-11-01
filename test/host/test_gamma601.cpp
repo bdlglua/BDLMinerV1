@@ -13,7 +13,7 @@ bool minerAsicCurrent(uint32_t g){return g==generation;}
 static bool poolReady=true;
 bool minerAsicReady(){return poolReady;}
 bool minerAsicWork(AsicWork &){return false;}
-void minerAsicCandidate(AsicWork &,uint32_t,uint32_t){}
+double minerAsicCandidate(AsicWork &,uint32_t,uint32_t,double){return 0;}
 void minerAsicHashes(uint64_t n){hashes+=n;}
 using namespace gamma601;
 static void bytes(int addr,int reg,std::initializer_list<uint8_t> value){testI2c[{addr,reg}]=value;}

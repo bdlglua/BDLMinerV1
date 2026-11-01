@@ -4,6 +4,72 @@ The seven V2 features are implemented on `v2/development`. The firmware version
 is `2.0.0-beta.1`; this branch is not a published release. Stable V1 remains
 [1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15).
 
+## First M5 / Gamma test kit
+
+The successful V2 [CI runs](https://github.com/bdlglua/BDLMinerV1/actions/workflows/ci.yml?query=branch%3Av2%2Fdevelopment)
+provide a `v2-linux-test-kit` artifact. Sign in to GitHub, download that artifact
+and extract the complete ZIP. It contains the M5StickC Plus2 and Gamma 601
+firmware/factory images, their checksums, the optional hub and the read-only
+readiness checker. It does not install firmware automatically.
+
+From the extracted folder on a Linux computer on the miners' LAN:
+
+```bash
+sh check-miners.sh
+sh start-hub.sh
+```
+
+The readiness check saves `bdlminer-v2-check.json`. Exit code 2 / `review` means a
+miner needs attention: inspect its firmware, trial, connection, health and mining
+checks. A paused miner or a board still running V1 does not get a V2-ready pass.
+No settings are changed by this check. The hub opens at **http://127.0.0.1:8787**.
+Edit `bdlhub.local.json` if the supplied addresses differ from your network.
+
+For a manual OTA trial, use the matching `firmware/<board>-firmware.bin` in the
+existing local Settings page. `*-factory.bin` is for USB installation/recovery.
+Keep your working firmware and private settings backup. Development CI artifacts
+are unsigned and cannot be installed by automatic GitHub OTA. The kit records
+signature availability in `kit.json`; it does not represent a published release.
+
+Maintainers can build the same kit from verified local release images:
+
+```bash
+python3 tools/make_beta_bundle.py --archive .pio/BDLMiner-V2-Linux-test-kit.zip
+```
+
+The builder checks chip/target/version, binary hashes, factory application and
+both OTA slots. The ZIP contains only checksum-listed distribution files;
+runtime databases/caches, private keys and local reports are excluded.
+
+## Local dashboard and mining work
+
+The embedded dashboard now opens with the device identity and actual mining
+state, hashrate, pool acceptance and device overview. Detailed pool diagnostics
+open on demand below the history chart. Existing history inspection/export,
+block records, thermal/fan information and EN/FR support remain available.
+Everything is served by the miner, with no CDN or extra background device polling.
+
+The optional fleet hub distinguishes the configured power limit from effective
+power after thermal/duty limiting. Unsaved edits survive polling. Outages mark
+cached data as stale and disable controls; late fleet/chart responses cannot
+overwrite newer selections. Power/channel writes refresh the affected miner's
+cached reading, so the hub can show the applied setting.
+
+Portable SHA-256d reuses the first digest's words and specializes the fixed
+32-byte second hash. NerdNOS verifies each returned proof once through the shared
+ASIC adapter, preserving generation, mask, hardware difficulty and share/block
+checks. The per-nonce software scan, hardware assembly kernels, clocks, voltage
+and cooling/thermal interlocks are unchanged. A repeatable native comparison is:
+
+```bash
+python3 tools/benchmark_sha256d.py --baseline 3eb9b5a --output native-sha-benchmark.json
+```
+
+This measures portable SHA-256d on the computer running the tool. It does not
+establish ESP32 hardware MH/s, ASIC silicon TH/s or a temperature reduction.
+The [beta readiness record](../audits/2026-11-02-v2-beta-readiness.md) separates
+software evidence from the remaining board tests.
+
 ## Fleet dashboard on Linux / Raspberry Pi
 
 Python 3.10 or newer is sufficient; no pip dependencies or cloud account are

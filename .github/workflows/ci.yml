@@ -127,6 +127,14 @@ jobs:
           path: build-inputs
       - name: Independently validate every parallel build and OTA slot
         run: python3 tools/assemble_release.py --inputs build-inputs --unsigned
+      - name: Prepare the offline Linux test kit
+        run: python3 tools/make_beta_bundle.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: v2-linux-test-kit
+          path: .pio/v2-test-kit/
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: verified-unsigned-v2-preview

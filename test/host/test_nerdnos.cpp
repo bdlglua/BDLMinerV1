@@ -10,13 +10,22 @@ static uint8_t power = 100;
 static uint32_t generation = 1;
 static uint64_t hashes = 0;
 static int candidates = 0;
+static int verifications = 0;
 static uint32_t candidateBits = 99;
 static bool poolReady = true;
 uint8_t minerPowerPercent() { return power; }
 bool minerAsicCurrent(uint32_t g) { return g == generation; }
 bool minerAsicReady() { return poolReady; }
 bool minerAsicWork(AsicWork &) { return false; }
-void minerAsicCandidate(AsicWork &, uint32_t, uint32_t bits) { ++candidates; candidateBits = bits; }
+double minerAsicCandidate(AsicWork &w, uint32_t nonce, uint32_t bits, double minimum) {
+    ++verifications;
+    uint8_t header[80],hash[32];uint32_t version;
+    std::memcpy(header,w.header,80);std::memcpy(&version,header,4);version|=bits;
+    std::memcpy(header,&version,4);std::memcpy(header+76,&nonce,4);
+    sha::sha256d(header,80,hash);double difficulty=work::hashDifficulty(hash);
+    if(difficulty>=minimum){++candidates;candidateBits=bits;}
+    return difficulty;
+}
 void minerAsicHashes(uint64_t n) { hashes += n; }
 using namespace nerdnos;
 static uint32_t reg(const std::vector<uint8_t> &p) {
@@ -24,7 +33,7 @@ static uint32_t reg(const std::vector<uint8_t> &p) {
 }
 static void reset() {
     testPins.clear(); testUartTx.clear(); testUartRx.clear(); testChips = 1; testMillis = 1000;
-    power = 100; generation = 1; hashes = 0; candidates = 0; powered = false; maskPower = 6;
+    power = 100; generation = 1; hashes = 0; candidates = verifications = 0; powered = false; maskPower = 6;
     poolReady = true;testNerdDelayHook=nullptr;
     live = {NAN, 0, false, "Starting", -1, 0}; publish();
 }
@@ -71,6 +80,7 @@ int main() {
     assert(status().results == 1); // publish each verified result, including the first one
     result(r, testMillis);  // the same result again
     assert(candidates == 1 && hashes == uint64_t(1) << 38);
+    assert(verifications == 1); // no duplicate digest or submission for one UART proof
     r.nonce = 0x7c2bac1e; result(r, testMillis);  // corrupted: counted as an error, never submitted
     assert(candidates == 1 && windowBad == 1);
     r.midstate = 1; r.nonce = 0x7c2bac1d; result(r, testMillis);  // no such midstate in this job

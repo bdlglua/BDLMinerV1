@@ -20,7 +20,8 @@ class Miner(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/stats'):
             data = reading()
-            data['power_percent'] = power
+            data['power_limit_percent'] = power
+            data['power_percent'] = power // 2
             data['pool']['protocol'] = 'Stratum V2 (Noise)'
             data['github_update'] = {'available': False, 'channel': 'beta'}
         elif self.path == '/api/pool/diagnostics':

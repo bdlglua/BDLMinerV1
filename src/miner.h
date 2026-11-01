@@ -180,6 +180,8 @@ bool minerAsicWork(AsicWork &out);
 bool minerAsicCurrent(uint32_t generation);
 // Whether the pool has work at all (a clean job only makes earlier jobs stale).
 bool minerAsicReady();
-void minerAsicCandidate(AsicWork &work, uint32_t nonce, uint32_t versionBits);
+// One independent SHA-256d verification. Returns its difficulty, or -1 for
+// stale/invalid work. Results below the hardware filter are never recorded.
+double minerAsicCandidate(AsicWork &work, uint32_t nonce, uint32_t versionBits, double minimumDifficulty = 1.0);
 void minerAsicHashes(uint64_t hashes);
 #endif

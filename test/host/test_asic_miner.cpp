@@ -20,6 +20,8 @@ int main(){
     assert(work::fromHex(genesis,w.header,80));w.versionMask=0;w.shareDifficulty=1;
     memset(w.networkTarget,0,32);
     stratum::Share share;
+    assert(minerAsicCandidate(w,2083236893,0,3000)>2500);
+    assert(!minerNextShare(share,0)&&stats.over32bits==0); // below the requested hardware filter
     minerAsicCandidate(w,2083236892,0);assert(!minerNextShare(share,0)&&stats.over32bits==0);
     minerAsicCandidate(w,2083236893,0x2000);assert(!minerNextShare(share,0)); // unnegotiated bits
     minerAsicCandidate(w,2083236893,0);assert(minerNextShare(share,0));

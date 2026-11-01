@@ -62,11 +62,7 @@ inline uint32_t bswap(uint32_t v) { return __builtin_bswap32(v); }
     ROUND(c, d, e, f, g, h, a, b, K[(i) + 6], W[(i) + 6]);              \
     ROUND(b, c, d, e, f, g, h, a, K[(i) + 7], W[(i) + 7])
 
-}  // namespace
-
-void transform(uint32_t state[8], const uint8_t block[64]) {
-    uint32_t W[64];
-    for (int i = 0; i < 16; i++) W[i] = be32(block + 4 * i);
+void compressWords(uint32_t state[8], uint32_t W[64]) {
     for (int i = 16; i < 64; i++) W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
 
     uint32_t a = state[0], b = state[1], c = state[2], d = state[3];
@@ -78,30 +74,61 @@ void transform(uint32_t state[8], const uint8_t block[64]) {
     state[4] += e; state[5] += f; state[6] += g; state[7] += h;
 }
 
-void sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
-    uint32_t st[8];
-    memcpy(st, IV, sizeof(st));
+void hashState(const uint8_t *data, size_t len, uint32_t st[8]) {
+    memcpy(st, IV, sizeof(IV));
 
     size_t full = len / 64;
     for (size_t i = 0; i < full; i++) transform(st, data + 64 * i);
 
     uint8_t tail[128] = {0};
     size_t rem = len - full * 64;
-    memcpy(tail, data + full * 64, rem);
+    if (rem) memcpy(tail, data + full * 64, rem);
     tail[rem] = 0x80;
     size_t tailLen = rem < 56 ? 64 : 128;
     uint64_t bits = (uint64_t)len * 8;
     for (int i = 0; i < 8; i++) tail[tailLen - 1 - i] = (uint8_t)(bits >> (8 * i));
     transform(st, tail);
     if (tailLen == 128) transform(st, tail + 64);
+}
 
+// Keep the second hash's schedule outside the first hash's padding stack.
+__attribute__((noinline)) void secondDigest(const uint32_t digest[8], uint8_t out[32]) {
+    uint32_t W[64];
+    // The first digest is already eight big-endian SHA words. Reuse them
+    // directly: no byte serialization, generic padding or input reload.
+    memcpy(W, digest, 8 * sizeof(uint32_t));
+    W[8] = 0x80000000;
+    for (int i = 9; i < 15; ++i) W[i] = 0;
+    W[15] = 256;
+    // Unrolling this fixed-length block lets the compiler remove the zero
+    // padding's schedule operations and fold the initial-state round terms.
+#pragma GCC unroll 48
+    for (int i = 16; i < 64; ++i) W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
+    uint32_t a=IV[0],b=IV[1],c=IV[2],d=IV[3],e=IV[4],f=IV[5],g=IV[6],h=IV[7];
+    ROUND8(0,W); ROUND8(8,W); ROUND8(16,W); ROUND8(24,W);
+    ROUND8(32,W); ROUND8(40,W); ROUND8(48,W); ROUND8(56,W);
+    const uint32_t result[]{IV[0]+a,IV[1]+b,IV[2]+c,IV[3]+d,IV[4]+e,IV[5]+f,IV[6]+g,IV[7]+h};
+    for (int i = 0; i < 8; ++i) put_be32(out + 4 * i, result[i]);
+}
+
+}  // namespace
+
+void transform(uint32_t state[8], const uint8_t block[64]) {
+    uint32_t W[64];
+    for (int i = 0; i < 16; i++) W[i] = be32(block + 4 * i);
+    compressWords(state, W);
+}
+
+void sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
+    uint32_t st[8];
+    hashState(data, len, st);
     for (int i = 0; i < 8; i++) put_be32(out + 4 * i, st[i]);
 }
 
 void sha256d(const uint8_t *data, size_t len, uint8_t out[32]) {
-    uint8_t tmp[32];
-    sha256(data, len, tmp);
-    sha256(tmp, 32, out);
+    uint32_t st[8];
+    hashState(data, len, st);
+    secondDigest(st, out);
 }
 
 void prepare(MidState &ms, const uint8_t header[80]) {

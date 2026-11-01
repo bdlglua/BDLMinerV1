@@ -55,6 +55,7 @@ Object.assign(FR,{
  'low_difficulty':'difficulté insuffisante','authorization':'authentification','invalid':'invalide','unknown':'inconnue',
  'Share intervals are statistical means, not deadlines. Share-based rates fluctuate with luck and pool difficulty.':'Les intervalles sont des moyennes statistiques, sans échéance garantie. Le débit estimé varie avec la chance et la difficulté du pool.'
 });
+Object.assign(FR,{'Mining overview':'Vue du minage','Firmware':'Firmware','Connecting…':'Connexion…','Pool acceptance':'Acceptation par le pool','No pool replies yet':'Aucune réponse du pool pour le moment','Updating firmware':'Mise à jour du firmware','Cooling down':'Refroidissement','ASIC stopped':'ASIC arrêté','Waiting for pool':'En attente du pool','Starting mining':'Démarrage du minage'});
 function t(s){return LANG=='fr'&&FR[s]||s}
 FR['ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.']='Le minage ASIC reste en pause au moins 2 minutes, puis reprend une fois la température abaissée de 5 °C.';
 // Numbers and labels as the page's language writes them: « 1,00 MH/s », « Pool : … ».

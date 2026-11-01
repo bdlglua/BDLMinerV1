@@ -220,6 +220,28 @@ class HostTests(unittest.TestCase):
             finally:
                 fleet.close()
 
+    def test_late_poll_body_or_error_cannot_replace_a_newer_applied_setting(self):
+        for failed in (False,True):
+            with tempfile.TemporaryDirectory() as tmp:
+                fleet=Fleet([Device('m5','M5','http://127.0.0.1')],Path(tmp)/'data.sqlite')
+                started=threading.Event();release=threading.Event()
+                old=sanitize(reading());old['power_limit_percent']=100
+                fresh=copy.deepcopy(old);fresh['power_limit_percent']=65
+                def delayed():
+                    started.set();release.wait(3)
+                    if failed:raise DeviceError('old error')
+                    return old
+                fleet.clients['m5'].stats=delayed
+                thread=threading.Thread(target=fleet.poll_one,args=('m5',));thread.start()
+                try:
+                    self.assertTrue(started.wait(1))
+                    fleet.clients['m5'].stats=lambda:fresh
+                    fleet.poll_one('m5');release.set();thread.join(3)
+                    sample=fleet.snapshot()['miners'][0]
+                    self.assertTrue(sample['online']);self.assertEqual(sample['sample']['power_limit_percent'],65)
+                finally:
+                    release.set();thread.join(3);fleet.close()
+
     def test_hub_auth_origin_host_allowlist_and_real_control_forwarding(self):
         with tempfile.TemporaryDirectory() as tmp:
             fleet = Fleet([Device('m5', 'M5', 'http://127.0.0.1')], Path(tmp) / 'data.sqlite')
@@ -231,6 +253,7 @@ class HostTests(unittest.TestCase):
             thread.start()
             writes = []
             fleet.clients['m5'].patch = lambda changes: writes.append(changes)
+            fleet.clients['m5'].stats = lambda: sanitize(reading())
             def request(path, data=None, headers=None):
                 req = urllib.request.Request(url + path, data=json.dumps(data).encode() if data else None,
                                              headers={'Content-Type': 'application/json', **(headers or {})})

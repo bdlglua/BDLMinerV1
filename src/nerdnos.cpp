@@ -122,19 +122,18 @@ void result(const bm1397::Response &r, uint32_t now) {
     for (uint64_t seen : slot.seen) if (seen == proof + 1) return;
     slot.seen[slot.seenHead] = proof + 1; slot.seenHead = (slot.seenHead + 1) % 8;
     uint32_t version = slot.versions[r.midstate];
-    uint8_t header[80], hash[32];
-    std::memcpy(header, slot.work.header, 80);
-    std::memcpy(header, &version, 4);
-    std::memcpy(header + 76, &r.nonce, 4);
-    sha::sha256d(header, 80, hash);
-    if (work::hashDifficulty(hash) < double(1u << maskPower) * 0.999) {
+    uint32_t base;
+    std::memcpy(&base, slot.work.header, 4);
+    double minimum = double(1u << maskPower) * 0.999;
+    // Verification and submission share one digest. The common adapter still
+    // rejects stale generations, unnegotiated versions and corrupted proofs.
+    double difficulty = minerAsicCandidate(slot.work, r.nonce, version & ~base, minimum);
+    if (difficulty < 0) return;
+    if (difficulty < minimum) {
         ++windowBad;  // UART corruption or an ASIC hardware error
     } else {
         ++windowGood; lastResult = now; ++live.results;
         minerAsicHashes(uint64_t(1) << (32 + maskPower));
-        uint32_t base;
-        std::memcpy(&base, slot.work.header, 4);
-        minerAsicCandidate(slot.work, r.nonce, version & ~base);
     }
     if (windowGood + windowBad >= 50) {
         live.hardwareErrorPercent = 100.0f * windowBad / (windowGood + windowBad);

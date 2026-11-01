@@ -120,7 +120,7 @@ def sanitize(data):
         if not finite(data.get(key)):
             raise DeviceError('Miner returned invalid counters')
     allowed = ('api_version', 'board', 'firmware', 'firmware_env', 'boot_id', 'uptime_s', 'total_hashes', 'hashrate',
-               'hashrate_live', 'temp_c', 'temperature_source', 'max_temp_c', 'power_percent',
+               'hashrate_live', 'temp_c', 'temperature_source', 'max_temp_c', 'power_percent', 'power_limit_percent',
                'limitation_reason', 'heap', 'heap_max_block', 'firmware_trial')
     result = {k: data[k] for k in allowed if k in data}
     fields = {

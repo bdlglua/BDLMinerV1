@@ -23,7 +23,7 @@ the published V1 release and user settings. Branch: `v2/development`.
 
 ## Design constraints
 
-Mining kernels, CPU clocks and electrical/thermal/fan interlocks stay intact.
+Per-nonce mining loops, CPU clocks and electrical/thermal/fan interlocks stay intact.
 Heavy fleet/history/calibration operations run on the optional host, not on the
 ESP32 mining cores. Credentials stay on the host and never enter dashboard JSON,
 logs or public reports. New NVS settings have defaults and do not change the
@@ -65,3 +65,17 @@ Physical V2 validation remains pending on M5, Gamma, NerdNOS and the other board
 The owner's earlier V1 measurements and OTA reports are not counted as V2 tests.
 No release/tag was published and no owner's miner was flashed by this work.
 Setup and real test commands are in [the V2 guide](README.md).
+
+## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
+
+The next development step combines a first Linux test kit, the embedded dashboard
+redesign and mining-work optimization. Portable SHA-256d now specializes its
+second hash; NerdNOS no longer recalculates an already verified proof before
+submission. The original `prepare()`/`scan()` source and assembly interfaces are
+unchanged. Independent hashlib vectors cover empty/null data, every padding
+boundary through 512 bytes, larger blocks, unaligned and overlapping buffers.
+
+The optional hub now separates requested/effective power, preserves edits, orders
+poll responses and marks lost connections as stale. The CI assembles a validated
+M5/Gamma Linux kit with read-only checks and launchers; its scripts never flash a
+board automatically. See the [readiness audit](../audits/2026-11-02-v2-beta-readiness.md).

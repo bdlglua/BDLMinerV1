@@ -15,6 +15,7 @@ if [ "$1" = "pool" ]; then
 fi
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_core.cpp $CORE -o .pio/host/test_core
 .pio/host/test_core
+python3 test/host/test_sha256_oracle.py
 g++ -std=c++17 -O2 -Wall -Isrc test/host/test_v2_core.cpp -o .pio/host/test_v2_core
 .pio/host/test_v2_core
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_bm1370.cpp src/core/bm1370.cpp $CORE -o .pio/host/test_bm1370

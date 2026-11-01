@@ -164,6 +164,7 @@ function show(j){
   statsOnline=true;
   if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){++statsSession;historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;textAt('history-status','');renderHistory()}
   lastUptime=j.uptime_s;lastBootId=j.boot_id||null;latestStats=j;
+  renderIntro(j);
   if(j.pool_diagnostics)showPoolReport(j.pool_diagnostics,j.shares?.rejected_reasons);
   if(j.history){
    try{const signature=JSON.stringify(j.history);if(signature!==historySignature){cachedHistory=normalizeHistory(j.history);historySignature=signature;renderHistory()}textAt('history-status','')}
@@ -175,7 +176,7 @@ function show(j){
   const st=document.getElementById('st');textAt('st',t(j.pool.connected?'ONLINE':'OFFLINE'));st.style.color=j.pool.connected?'var(--ok)':'var(--bad)';st.dataset.state=j.pool.connected?'online':'disconnected';
   const state=j.throttle=='paused'?'⚠ '+t('mining paused'):j.throttle=='half'?t('battery saver: half speed'):j.throttle=='reduced'?t('power limited'):'';
   const T=[tile(t('Hashrate'),si(j.hashrate,'H/s'),t('1-minute average')+(Number.isFinite(j.hashrate_live)?' · '+t('Live (10 s)')+COLON+si(j.hashrate_live,'H/s'):'')+'\n'+j.engines.map(e=>e.name+' '+si(e.rate,'H/s')).join(' + ')+(state?'\n'+state+' · '+j.power_percent+' %':''),true),
-   tile(t('Shares'),j.shares.accepted,t('accepted')+(j.shares.rejected?' · '+j.shares.rejected+' '+t('rejected'):'')+'\n'+t('pool diff')+' '+diff(j.pool.difficulty)+(j.pool.pending_shares?' · '+j.pool.pending_shares+' '+t('awaiting response'):'')),
+   tile(t('Shares'),j.shares.accepted,t('accepted')+(j.shares.rejected?' · '+j.shares.rejected+' '+t('rejected'):'')+'\n'+t('pool diff')+' '+diff(j.pool.difficulty)+(j.pool.pending_shares?' · '+j.pool.pending_shares+' '+t('awaiting response'):'')+'\n'+(j.shares.accepted+j.shares.rejected?fix(100*j.shares.accepted/(j.shares.accepted+j.shares.rejected),1)+' % '+t('Pool acceptance'):t('No pool replies yet'))),
    tile(t('Best difficulty'),diff(j.best.session),t('best ever')+' '+diff(j.best.ever)),
    tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
    tile(t('64-bit shares'),j.over64bits??0,t('Since restart')+' · '+t('1 every')+' '+share64Wait(j.hashrate)+' '+t('on average')),
@@ -219,7 +220,7 @@ function show(j){
   if(lastChartLimit!==j.max_temp_c){lastChartLimit=j.max_temp_c;renderHistory()}
   document.getElementById('market-note').textContent=m.updated_s>=0?'':t('Public market data is temporarily unavailable. Mining can continue.');
   renderHealth(j);
-  document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString()+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
+  document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString(LOCALE)+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
 
   // Auxiliary requests have their own non-overlapping schedulers. A slow
   // history response or unreachable peer must not hold up local readings.
@@ -232,7 +233,7 @@ async function tick(){
  // including across a reboot where uptime alone cannot establish ordering.
  const version=statsVersion;
  try{const j=await request('/api/stats?history=0');if(version!==statsVersion)return;show(j);peersPoll.refresh()}
- catch(e){if(version!==statsVersion)return;statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
+ catch(e){if(version!==statsVersion)return;statsOnline=false;renderIntro(null);if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
 }
 // The live rate already averages ten seconds. Poll at that cadence to avoid
 // making an open dashboard compete continuously with the ESP32 miners.
@@ -284,6 +285,21 @@ function renderOverview(j){
  const host=document.getElementById('overview-strip');
  values.forEach(([label,value,warm],i)=>{let node=host.children[i];if(!node){node=document.createElement('div');node.append(document.createElement('span'),document.createElement('strong'));host.appendChild(node)}if(node.children[0].textContent!==label)node.children[0].textContent=label;if(node.children[1].textContent!==value)node.children[1].textContent=value;node.children[1].classList.toggle('warm',!!warm)});
 }
+
+function renderIntro(j){
+ const badge=document.getElementById('mining-state');
+ if(!j){badge.textContent=t('NO CONNECTION');badge.dataset.state='offline';return}
+ textAt('miner-identity',j.board+' · '+t('Firmware')+' '+j.firmware+(j.ip?' · '+j.ip:''));
+ let label='Mining',state='mining';
+ if(j.github_update?.installing){label='Updating firmware';state='attention'}
+ else if(j.limitation_reason==='hot'){label='Cooling down';state='attention'}
+ else if(j.power_percent===0){label='mining paused';state='attention'}
+ else if(j.asic&&!j.asic.running){label='ASIC stopped';state='attention'}
+ else if(!j.pool.connected){label='Waiting for pool';state='attention'}
+ else if(j.hashrate===0&&!(j.hashrate_live>0)){label='Starting mining';state='attention'}
+ badge.textContent=t(label);badge.dataset.state=state;
+}
+document.getElementById('open-pool-diagnostics').onclick=()=>{document.getElementById('pool-diagnostic-panel').open=true};
 
 async function refreshHistory(j){
  if(j.history||j.history_revision==null||historyRevision===j.history_revision||Date.now()<historyRetryAt)return;
@@ -475,6 +491,7 @@ function showPoolReport(d,reasons){
  const labels={ready:'Pool ready',disconnected:'Waiting for a pool connection.',waiting_work:'Waiting for mining work',version_rolling_required:'Version rolling is required by this ASIC',infrequent_shares:'Mining with infrequent pool shares',invalid_difficulty:'Invalid pool difficulty'};
  const status=document.getElementById('pool-diagnostic-status');if(!status)return;
  status.textContent=t(labels[d.code]||d.code)+(d.status?' · '+t(d.status):'');
+ textAt('pool-diagnostic-summary',t(labels[d.code]||d.code));
  const tiles=[tile(t('Protocol'),d.protocol||'—',(d.required_rolling_bits||0)?d.version_rolling_bits+'/'+d.required_rolling_bits+' bits':'') ,
   tile(t('Expected share interval'),shareInterval(d.expected_share_seconds)),
   tile(t('Share-based rate'),Number.isFinite(d.share_based_hashrate)?si(d.share_based_hashrate,'H/s'):'—',
