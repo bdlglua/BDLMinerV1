@@ -593,17 +593,30 @@ crash still leaves a trace; **Erase** clears this history too.
 | Block candidates | Locally verified hashes meeting the work's network target; not confirmed blocks or payouts. |
 
 Candidates use reserved priority storage, separate from ordinary queued shares.
-The dashboard shows the latest candidate this boot, its original height, full
+The dashboard shows the latest candidate, its original height, full
 block identifier and submission status: queued, submitted, share accepted,
-share rejected, unanswered, stale or candidate queue full. Candidate records are
-bounded in RAM; only their lifetime count persists across reboots. An unanswered
+share rejected, unanswered, stale or candidate queue full. Recent records are
+bounded in RAM; the latest hash/height/state is also saved in alternating,
+CRC-checked NVS extension slots without changing the existing statistics format.
+After reboot it is labelled as a previous-session proof and is never resubmitted
+or announced as newly found. Interrupted queued/submitted work becomes stale
+or unanswered. Statistics backup files keep their original layout; candidate
+evidence stays in device-local NVS. An unanswered
 submission has an unknown result, including if the connection closed after send.
-The firmware does not verify inclusion in the Bitcoin chain: check the pool and
-a block explorer independently, including confirmations and the payout policy.
+For a local/saved candidate, the background task queries mempool.space using
+certificate/hostname-verified HTTPS, validates the reported height and reads the
+chain tip for confirmations. The dashboard identifies this external observation,
+its age and any error; it is not an ESP32 full-chain validation or a payout
+guarantee. A 404 means not yet indexed. Errors leave current chain acceptance
+unknown, and a later reorganization can reverse an earlier observation. There
+are no explorer requests without a candidate; retries back off automatically.
 
 For API compatibility, `blocks` and `lifetime.blocks` keep their existing field
 names and represent local candidates. The optional `block_candidate` object in
-`/api/stats` has `height`, `hash`, `status` and `chain_confirmed: null` (unknown).
+`/api/stats` has `height`, `hash`, `status`, `previous_session`, `chain_source`,
+`confirmations`, `chain_checked_s` and `chain_confirmed` (true/false for a valid
+explorer observation, null when unknown or the latest check failed). Optional
+`chain_not_found` and `chain_error` describe an unindexed hash or failed check.
 Prometheus exposes `bdlminer_block_candidates_total`; the previous
 `bdlminer_blocks_found_total` remains an alias for existing dashboards.
 

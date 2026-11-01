@@ -9,6 +9,8 @@ on:
     branches: [main]
     paths: ["installer/**", "tools/make_installer.py", ".github/workflows/site.yml"]
   workflow_dispatch:
+  release:
+    types: [published]
   workflow_run:
     workflows: [Release]
     types: [completed]
@@ -24,7 +26,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && !startsWith(github.event.workflow_run.head_branch, 'release/prepare-'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

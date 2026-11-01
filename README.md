@@ -17,6 +17,11 @@ startup/status, idle pool failover, stale dashboard requests, notification tests
 firmware confirmation and the ESP32-C3 CPU configuration. Earlier
 versions are described in [docs/releases](docs/releases/).
 
+Development **v1.9.14** adds durable block-candidate evidence, authenticated
+explorer observations and Gamma OLED fixes. See the [candidate release notes](docs/releases/v1.9.14.md)
+and [LAN hardware-validation procedure](docs/hardware/validation.md). A draft is
+excluded from automatic updates; the latest published release remains above.
+
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
