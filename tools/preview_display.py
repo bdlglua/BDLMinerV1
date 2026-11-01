@@ -67,7 +67,9 @@ def main():
             label = "APERCU / DONNEES DE DEMO" if language else "PREVIEW / DEMO DATA"
             draw.text((x, y), f"{i + 1}/8 - {label}", fill="white")
             with Image.open(args.output / f"{name}_240x135{language}.png") as image:
-                sheet.paste(image.resize((720, 405), Image.Resampling.LANCZOS), (x, y + 18))
+                # Preserve the firmware's existing glyph coverage exactly at
+                # integer 3x zoom; a second interpolation makes previews softer.
+                sheet.paste(image.resize((720, 405), Image.Resampling.NEAREST), (x, y + 18))
         sheet.save(args.output / f"overview_240x135{language}.png")
     print("Previews use DEMO readings, not measurements from a connected miner:", args.output)
 

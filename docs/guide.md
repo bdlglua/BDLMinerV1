@@ -231,6 +231,13 @@ sample arrives, preserves elapsed time and gaps, and uses a zero baseline. Text 
 light antialiasing compressed in flash (4-bit coverage, run-length encoded); there is
 no image, decoded bitmap, font-loading heap, filesystem or animation loop.
 
+Color-screen fonts are drawn at their native size with 16 coverage levels;
+the firmware does not resample the completed text or apply a blur pass.
+Exported overview sheets use exact integer enlargement, preserving those
+original pixels rather than adding another smoothing filter. The Gamma's
+128×32 OLED is monochrome: it uses a native 6×8 pixel font, without per-pixel
+gray levels for the color screens' antialiasing.
+
 | Resolution | Boards |
 |---|---|
 | 240×135 | M5StickC Plus2 / Plus, Cardputer, T‑Display |
