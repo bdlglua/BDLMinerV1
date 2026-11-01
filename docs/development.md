@@ -84,6 +84,8 @@ build instead of silently producing unsigned firmware.
 The [repository and script review](audits/2026-10-27-scripts.md) and
 [local dashboard review](audits/2026-10-27-dashboard.md) document the
 corrections shipped in v1.5.3 and retained in v1.9.11.
+The [1 November review](audits/2026-11-01.md) documents the subsequent fixes
+on `main`, their regressions and the remaining hardware validation limits.
 
 ## Architecture
 

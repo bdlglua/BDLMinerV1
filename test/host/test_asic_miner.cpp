@@ -33,16 +33,25 @@ int main(){
     // Stop must decay to zero without unsigned overflow or imaginary work.
     for(int i=0;i<60;++i){testMillis+=1000;minerTick();}
     assert(minerHashrate()==0&&minerTotalHashes()==72000000000000ULL);
-    // Share log: answers settle the oldest pending share; a lost connection leaves the rest unanswered.
+    // Answers may be out of order and arrive after a difficulty change.
     minerPoolConnected(true);
-    minerShareSent(1.5,false);minerShareSent(2.5,true);minerShareSent(3.5,false);
-    minerShareResult(true);minerShareResult(false);
+    minerShareSent(1.5,false,10);minerShareSent(2.5,true,11);minerShareSent(3.5,false,12);
+    stats.poolDiff=100; stats.acceptedWork=0;
+    minerShareResult(false,{11,0.5});minerShareResult(true,{12,0.25});
     ShareEntry log[20];int n=minerShareLog(log,20);
-    assert(n==3&&log[0].difficulty==3.5f&&log[0].state==SharePending&&log[1].state==ShareRejected&&log[1].backup&&log[2].state==ShareAccepted);
-    minerPoolConnected(false);n=minerShareLog(log,20);assert(log[0].state==ShareUnanswered&&log[2].state==ShareAccepted);
-    for(int i=0;i<25;++i)minerShareSent(i,false);
+    assert(n==3&&log[0].difficulty==3.5f&&log[0].state==ShareAccepted&&log[1].state==ShareRejected&&log[1].backup&&log[2].state==SharePending);
+    assert(stats.acceptedWork==0.25);
+    minerPoolConnected(false);n=minerShareLog(log,20);assert(log[0].state==ShareAccepted&&log[2].state==ShareUnanswered);
+    for(int i=0;i<25;++i)minerShareSent(i,false,100+i);
     assert(minerShareLog(log,20)==20&&log[0].difficulty==24.0f&&log[19].difficulty==5.0f);
+    // A response for an entry evicted from the 20-row log still counts, but
+    // must not settle a newer pending share.
+    minerShareResult(true,{100,0.125});
+    assert(stats.acceptedWork==0.375);
+    minerShareLog(log,20);assert(log[19].state==SharePending);
+    minerShareResult(true,{124,0.5});
+    minerShareLog(log,20);assert(log[0].state==ShareAccepted&&stats.acceptedWork==0.875);
     double period=minerTakePeriodBest();assert(minerTakePeriodBest()==0&&period>=0);
-    puts("Share log: in-order answers, unanswered after disconnect, 20 newest kept; period best resets");
+    puts("Share log: out-of-order IDs, delayed vardiff credit, evicted entries, unanswered after disconnect and 20 newest kept passed");
     puts("Native ASIC mining: unique work/version masks, independent SHA-256d, corrupted/stale results, no software fallback and accurate 1.2 TH/s counters/stop decay passed");
 }

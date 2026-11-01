@@ -23,6 +23,8 @@ public:
     bool opened() const { return state_ == 2; }
     size_t pending() const { return pendingCount_; }
     uint32_t acknowledged() const { return acknowledged_; }
+    uint32_t submissionId() const { return sequence_ - 1; }
+    const stratum::ShareAck &acknowledgment(size_t i) const { return acknowledgments_[i]; }
     double difficulty() const;
     const std::string &error() const { return error_; }
 private:
@@ -34,7 +36,8 @@ private:
     std::array<Slot, 8> jobs_;
     size_t pendingCount_ = 0;
     uint32_t order_ = 0;
-    uint32_t pending_[32]{}, sequence_ = 0, channel_ = 0, group_ = 0, acknowledged_ = 0;
+    stratum::ShareAck pending_[32]{}, acknowledgments_[32]{};
+    uint32_t sequence_ = 0, channel_ = 0, group_ = 0, acknowledged_ = 0;
     uint8_t target_[32]{}, previous_[32]{};
     uint32_t ntime_ = 0, nbits_ = 0;
     std::vector<uint8_t> prefix_;

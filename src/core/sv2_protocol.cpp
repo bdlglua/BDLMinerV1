@@ -87,15 +87,15 @@ size_t Protocol::freeSlot() const {
     return best;
 }
 size_t Protocol::pendingIndex(uint32_t sequence) const {
-    for (size_t i = 0; i < pendingCount_; ++i) if (pending_[i] == sequence) return i;
+    for (size_t i = 0; i < pendingCount_; ++i) if (pending_[i].id == sequence) return i;
     return pendingCount_;
 }
 Frame Protocol::submit(const stratum::Share &s) {
     if (!opened() || pendingCount_ >= 32 || !haveCurrent_) return {};
-    bool valid = false; uint32_t id = 0;
+    bool valid = false; uint32_t id = 0; double assignedDifficulty = 0;
     for (const auto &slot : jobs_) if (slot.valid && !slot.future && slot.job.id == s.jobId && ((slot.job.version ^ s.version) & ~slot.job.versionMask) == 0) {
         if (!work::meetsTarget(s.hash, slot.job.shareTarget)) return {};
-        valid = true; id = slot.id; break;
+        valid = true; id = slot.id; assignedDifficulty = slot.job.difficulty; break;
     }
     if (!valid) return {};
     std::vector<uint8_t> extranonce;
@@ -103,7 +103,7 @@ Frame Protocol::submit(const stratum::Share &s) {
     Frame f; f.type = 0x1b; f.extension = 0x8000; auto &b = f.payload;
     put(b, channel_); put(b, sequence_); put(b, id); put(b, s.nonce); put(b, s.ntime); put(b, s.version);
     b.push_back(extranonce.size()); b.insert(b.end(), extranonce.begin(), extranonce.end());
-    pending_[pendingCount_++] = sequence_++; return f;
+    pending_[pendingCount_++] = {sequence_++, assignedDifficulty}; return f;
 }
 Event Protocol::handle(const Frame &f) {
     acknowledged_ = 0;
@@ -192,16 +192,20 @@ Event Protocol::handle(const Frame &f) {
         if (!r.end() || channel != channel_) return fail("Invalid SV2 share acknowledgment");
         if (pendingIndex(last) == pendingCount_) return Event::None; // duplicate/unknown acknowledgment
         size_t eligible = 0;
-        for (size_t i = 0; i < pendingCount_; ++i) if (int32_t(pending_[i] - last) <= 0) ++eligible;
+        for (size_t i = 0; i < pendingCount_; ++i) if (int32_t(pending_[i].id - last) <= 0) ++eligible;
         if (!count || count != eligible) return fail("Invalid SV2 share acknowledgment count");
         size_t keep = 0;
-        for (size_t i = 0; i < pendingCount_; ++i) if (int32_t(pending_[i] - last) > 0) pending_[keep++] = pending_[i];
+        for (size_t i = 0; i < pendingCount_; ++i) {
+            if (int32_t(pending_[i].id - last) > 0) pending_[keep++] = pending_[i];
+            else acknowledgments_[acknowledged_++] = pending_[i];
+        }
         pendingCount_ = keep; acknowledged_ = count; return Event::Accepted;
     }
     if (f.type == 0x1d) {
         uint32_t channel = r.number(4), sequence = r.number(4); std::string error = r.text();
         if (!r.end() || channel != channel_) return fail("Invalid SV2 share rejection");
         size_t index = pendingIndex(sequence); if (index == pendingCount_) return Event::None;
+        acknowledgments_[0] = pending_[index];
         for (size_t i = index + 1; i < pendingCount_; ++i) pending_[i - 1] = pending_[i];
         --pendingCount_; acknowledged_ = 1; error_ = error; return Event::Rejected;
     }

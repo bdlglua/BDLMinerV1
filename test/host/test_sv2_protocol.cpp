@@ -49,11 +49,31 @@ int main(int argc, char **) {
     Frame rejected(0x8000,0x1d);u(rejected.payload,7);u(rejected.payload,1);rejected.payload.push_back(3);
     rejected.payload.insert(rejected.payload.end(),{'b','a','d'});
     assert(p.handle(rejected)==Event::Rejected && p.acknowledged()==1 && p.pending()==2);
+    assert(p.acknowledgment(0).id==1 && p.acknowledgment(0).difficulty==w.shareDifficulty);
     assert(p.handle(rejected)==Event::None && p.acknowledged()==0);
     auto invalid=p;
     assert(invalid.handle(ack(2,3))==Event::Error && invalid.pending()==2);
     assert(p.handle(ack(2,2))==Event::Accepted && p.acknowledged()==2 && p.pending()==0);
+    assert(p.acknowledgment(0).id==0 && p.acknowledgment(1).id==2);
+    assert(p.acknowledgment(0).difficulty==w.shareDifficulty && p.acknowledgment(1).difficulty==w.shareDifficulty);
     assert(p.handle(ack(2,2))==Event::None && p.acknowledged()==0);
+    {   // A batch may cover shares submitted under different dynamic targets.
+        sv2::Protocol credits;
+        assert(credits.handle(success())==Event::Setup && credits.handle(channel())==Event::Opened);
+        assert(credits.handle(job(1,true))==Event::None && credits.handle(previous(1))==Event::Job);
+        work::Work original;work::build(credits.job(),1,original);
+        auto candidate=share(original);memset(candidate.hash,0,32);
+        double first=credits.job().difficulty;
+        assert(!credits.submit(candidate).payload.empty() && credits.submissionId()==0);
+        Frame changed(0x8000,0x21);u(changed.payload,7);changed.payload.resize(36,255);changed.payload[35]=0x7f;
+        assert(credits.handle(changed)==Event::Target);
+        double second=credits.job().difficulty;assert(second>first);
+        assert(!credits.submit(candidate).payload.empty() && credits.submissionId()==1);
+        changed.payload[35]=0x3f;assert(credits.handle(changed)==Event::Target);
+        assert(credits.handle(ack(1,2))==Event::Accepted && credits.acknowledged()==2);
+        assert(credits.acknowledgment(0).id==0 && credits.acknowledgment(0).difficulty==first);
+        assert(credits.acknowledgment(1).id==1 && credits.acknowledgment(1).difficulty==second);
+    }
     assert(p.handle(job(43,false,1800000001))==Event::Job && !p.job().clean);
     {   // A future job announced early survives many template updates before its block.
         auto early=p;

@@ -139,11 +139,11 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         break;
                     case stratum::Event::ShareAccepted:
                         lastShareReply = millis();
-                        minerShareResult(true);
+                        minerShareResult(true, proto.acknowledgment());
                         break;
                     case stratum::Event::ShareRejected:
                         lastShareReply = millis();
-                        minerShareResult(false);
+                        minerShareResult(false, proto.acknowledgment());
                         logf("[pool] share rejected: %s\n", proto.lastError().c_str());
                         break;
                     default:
@@ -187,7 +187,7 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
             if (!proto.pendingShares()) lastShareReply = millis();
             std::string line = proto.submit(share);
             if (line.empty() || !sendLine(client, line)) return;
-            minerShareSent(share.difficulty, onBackup);
+            minerShareSent(share.difficulty, onBackup, proto.submissionId());
             pendingShares = proto.pendingShares();
         }
     }

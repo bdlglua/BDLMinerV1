@@ -35,6 +35,7 @@ peers:'Autres miners du tableau de bord (IP ou noms, séparés par des virgules)
 update:'Mises à jour depuis GitHub : 0 non, 1 vérifier et proposer, 2 installer automatiquement',
 count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fichier de 2 octets de la release de cette version (rien n\'est envoyé)'};
 function t(s){return LANG=='fr'&&FR[s]||s}
+FR['ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.']='Le minage ASIC reste en pause au moins 2 minutes, puis reprend une fois la température abaissée de 5 °C.';
 // Numbers and labels as the page's language writes them: « 1,00 MH/s », « Pool : … ».
 function fix(v,n){const s=v.toFixed(n);return LANG=='fr'?s.replace('.',','):s}
 const COLON=LANG=='fr'?'\u00a0: ':': ',LOCALE=LANG=='fr'?'fr-FR':'en-US';

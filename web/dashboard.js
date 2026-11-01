@@ -135,6 +135,9 @@ function show(j){
   if(!m||!pv||!j.pool||!j.shares||!j.best||!j.network||!j.lifetime||!Array.isArray(j.engines)||
      ![j.hashrate,j.uptime_s,j.total_hashes,j.shares.accepted,j.shares.rejected].every(v=>Number.isFinite(v)&&v>=0))
    throw Error(t('Invalid response from the miner.'));
+  // A poll started before a newer live event can arrive afterwards. With
+  // the same boot ID this is an older snapshot, not a device restart.
+  if(lastBootId&&j.boot_id===lastBootId&&j.uptime_s<lastUptime)return;
   statsOnline=true;
   if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){++statsSession;historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;textAt('history-status','');renderHistory()}
   lastUptime=j.uptime_s;lastBootId=j.boot_id||null;latestStats=j;
@@ -209,7 +212,18 @@ async function tick(){
 // takes over whenever nothing has arrived for 12 s (stream refused, closed...).
 let streamAt=0;
 startPolling(tick,10000);
-if(window.EventSource){const stream=new EventSource('/api/events');stream.onmessage=e=>{try{const j=JSON.parse(e.data);show(j);streamAt=Date.now()}catch(err){}}}
+let liveStream=null;
+function closeLiveStream(){if(liveStream){liveStream.onmessage=null;liveStream.close();liveStream=null}streamAt=0}
+function syncLiveStream(){
+ if(document.hidden){closeLiveStream();return}
+ if(!window.EventSource||liveStream)return;
+ const stream=new EventSource('/api/events');liveStream=stream;
+ stream.onmessage=e=>{if(liveStream!==stream||document.hidden)return;try{show(JSON.parse(e.data));streamAt=Date.now()}catch(err){}};
+}
+document.addEventListener('visibilitychange',syncLiveStream);
+window.addEventListener('pagehide',closeLiveStream);
+window.addEventListener('pageshow',syncLiveStream);
+syncLiveStream();
 
 async function refreshPeers(){
  if(!statsOnline||!latestStats)return;

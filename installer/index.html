@@ -675,12 +675,13 @@ const VOICE_BARS=36,PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="
 let voicePlaying=null;
 function voiceClock(s){s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 // The peaks of the decoded sound; made-up but steady bars when it cannot be decoded.
-async function voicePeaks(source,seed){try{const buf=source instanceof Blob?await source.arrayBuffer():await (await fetch(source)).arrayBuffer();
-  const ctx=new (window.AudioContext||window.webkitAudioContext)();const audio=await ctx.decodeAudioData(buf);ctx.close();
+async function voicePeaks(source,seed){let ctx;try{const buf=source instanceof Blob?await source.arrayBuffer():await (await fetch(source)).arrayBuffer();
+  ctx=new (window.AudioContext||window.webkitAudioContext)();const audio=await ctx.decodeAudioData(buf);
   const data=audio.getChannelData(0),step=Math.floor(data.length/VOICE_BARS)||1,peaks=[];
   for(let i=0;i<VOICE_BARS;i++){let m=0;for(let j=i*step;j<(i+1)*step&&j<data.length;j+=16)m=Math.max(m,Math.abs(data[j]));peaks.push(m)}
   const top=Math.max(...peaks)||1;return peaks.map(p=>.15+.85*p/top)}
- catch(e){let h=[...String(seed)].reduce((a,c)=>a*31+c.charCodeAt(0)>>>0,7);return Array.from({length:VOICE_BARS},()=>{h=(h*1103515245+12345)>>>0;return .25+.75*((h>>>16)%100)/100})}}
+ catch(e){let h=[...String(seed)].reduce((a,c)=>a*31+c.charCodeAt(0)>>>0,7);return Array.from({length:VOICE_BARS},()=>{h=(h*1103515245+12345)>>>0;return .25+.75*((h>>>16)%100)/100})}
+ finally{if(ctx)try{await ctx.close()}catch(e){}}}
 function voicePlayer(src,seed){const box=document.createElement('div');box.className='voice';
  const btn=document.createElement('button');btn.type='button';btn.className='vplay';btn.innerHTML=PLAY;btn.setAttribute('aria-label',T('chatPlay'));
  const wave=document.createElement('div');wave.className='vwave';wave.tabIndex=0;wave.setAttribute('role','slider');wave.setAttribute('aria-label',T('chatPosition'));
@@ -808,7 +809,10 @@ function chatConnect(){let ws;try{ws=new WebSocket(CHAT)}catch(e){return}chat.ws
   else if(m.type==='presence'){chat.presence=m;chatMembers()}
   else if(m.type==='message'){if(chat.messages.some(x=>x.id===m.message.id))return;chat.messages.push(m.message);if(chat.messages.length>100)chat.messages.shift();
    if(!chat.open&&!m.message.own)chat.unread++;else if(chat.open)chatSeen();const log=$c('chat-log');const near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
-   if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));if(near||m.message.own)log.scrollTop=log.scrollHeight}chatBadge()}
+   if(log.querySelector('.empty'))chatRender();else{log.appendChild(chatItem(m.message));
+    while(log.children.length>100){const old=log.firstElementChild;
+     if(old.querySelector('.voice.playing')&&voicePlaying){voicePlaying.pause();voicePlaying=null}old.remove()}
+    if(near||m.message.own)log.scrollTop=log.scrollHeight}chatBadge()}
   else if(m.type==='edited'){const i=chat.messages.findIndex(x=>x.id===m.message.id);if(i>=0){chat.messages[i]=m.message;chatRender()}}
   else if(m.type==='removed'){chat.messages=chat.messages.filter(x=>!m.ids.includes(x.id));chatRender()}
   else if(m.type==='you'){const was=chat.me&&chat.me.name;chat.me=m;if(m.name)store.set('chatName',m.name);chatMe();

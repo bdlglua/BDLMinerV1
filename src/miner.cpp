@@ -184,6 +184,7 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         s.ntime = w.ntime;
         s.nonce = nonce;
         s.difficulty = d;
+        s.poolDifficulty = w.shareDifficulty;
         s.versionMask = w.versionMask;
         s.version = uint32_t(w.header[0]) | uint32_t(w.header[1]) << 8 | uint32_t(w.header[2]) << 16 | uint32_t(w.header[3]) << 24;
         memcpy(s.hash, hash, 32);
@@ -495,22 +496,25 @@ uint32_t poolConnectedMs = 0, poolSince = 0, poolSessions = 0;
 
 constexpr int kShareLog = 20;
 ShareEntry shareLog[kShareLog];
+uint32_t shareLogIds[kShareLog];
 int shareLogHead = 0, shareLogCount = 0;
 
-void minerShareSent(double difficulty, bool backup) {
+void minerShareSent(double difficulty, bool backup, uint32_t submissionId) {
     time_t now = time(nullptr);
     portENTER_CRITICAL(&statsMux);
     shareLog[shareLogHead] = ShareEntry{now > 1700000000 ? uint32_t(now) : 0, float(difficulty), SharePending, backup};
+    shareLogIds[shareLogHead] = submissionId;
     shareLogHead = (shareLogHead + 1) % kShareLog;
     if (shareLogCount < kShareLog) shareLogCount++;
     portEXIT_CRITICAL(&statsMux);
 }
 
 // Called with statsMux held.
-void settleOldestShare(uint8_t state) {
+void settleShare(uint32_t submissionId, uint8_t state) {
     for (int i = shareLogCount; i > 0; --i) {
-        ShareEntry &e = shareLog[(shareLogHead - i + kShareLog) % kShareLog];
-        if (e.state == SharePending) {
+        int index = (shareLogHead - i + kShareLog) % kShareLog;
+        ShareEntry &e = shareLog[index];
+        if (e.state == SharePending && shareLogIds[index] == submissionId) {
             e.state = state;
             return;
         }
@@ -557,14 +561,14 @@ void minerPoolDifficulty(double difficulty) {
     portEXIT_CRITICAL(&statsMux);
 }
 
-void minerShareResult(bool accepted) {
+void minerShareResult(bool accepted, const stratum::ShareAck &ack) {
     portENTER_CRITICAL(&statsMux);
-    settleOldestShare(accepted ? ShareAccepted : ShareRejected);
+    settleShare(ack.id, accepted ? ShareAccepted : ShareRejected);
     if (accepted) {
         stats.accepted++;
-        // What the pool credits: its difficulty at acceptance (vardiff changes
-        // apply to later shares). Pools estimate a worker's hashrate this way.
-        stats.acceptedWork += stats.poolDiff;
+        // A delayed reply may arrive after vardiff or a new job. Credit the
+        // submitted target, never the candidate's luck or the latest target.
+        stats.acceptedWork += ack.difficulty;
     } else stats.rejected++;
     portEXIT_CRITICAL(&statsMux);
 }

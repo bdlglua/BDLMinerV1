@@ -554,9 +554,11 @@ static void testStratumJob() {
     strcpy(s.extranonce2, "00000001");
     s.ntime = 0x4dd7f5c7;
     s.nonce = 0x9546a142;
+    s.poolDifficulty = w.shareDifficulty;
     std::string line = p.submit(s);
     CHECK(line == "{\"id\":10,\"method\":\"mining.submit\",\"params\":[\"addr.worker\",\"bf\",\"00000001\",\"4dd7f5c7\",\"9546a142\"]}\n");
     CHECK(p.handleLine(R"({"id":10,"result":true,"error":null})") == stratum::Event::ShareAccepted);
+    CHECK(p.acknowledgment().id == 10 && p.acknowledgment().difficulty == 0.0005);
     CHECK(p.handleLine(R"({"id":10,"result":true,"error":null})") == stratum::Event::None);
     CHECK(p.handleLine(R"({"id":999,"result":true,"error":null})") == stratum::Event::None);
     p.submit(s);
@@ -575,6 +577,24 @@ static void testStratumJob() {
     p.reset();
     CHECK(p.pendingShares() == 0);
     CHECK(p.handleLine(R"({"id":12,"result":true,"error":null})") == stratum::Event::None);
+
+    // Targets follow the submitted work even when vardiff and notify arrive
+    // before the answers, including old non-clean work submitted later.
+    s.poolDifficulty = 0.25; s.difficulty = 2536;
+    CHECK(!p.submit(s).empty() && p.submissionId() == 10);
+    s.poolDifficulty = 0.5;
+    CHECK(!p.submit(s).empty() && p.submissionId() == 11);
+    CHECK(p.handleLine(R"({"method":"mining.set_difficulty","params":[100]})") == stratum::Event::Difficulty);
+    CHECK(p.handleLine(notify) == stratum::Event::NewJob && p.job().difficulty == 100);
+    s.poolDifficulty = 0.125;
+    CHECK(!p.submit(s).empty() && p.submissionId() == 12);
+    CHECK(p.handleLine(R"({"id":11,"result":false,"error":null})") == stratum::Event::ShareRejected);
+    CHECK(p.acknowledgment().id == 11 && p.acknowledgment().difficulty == 0.5);
+    CHECK(p.handleLine(R"({"id":10,"result":true,"error":null})") == stratum::Event::ShareAccepted);
+    CHECK(p.acknowledgment().id == 10 && p.acknowledgment().difficulty == 0.25);
+    CHECK(p.handleLine(R"({"id":12,"result":true,"error":null})") == stratum::Event::ShareAccepted);
+    CHECK(p.acknowledgment().id == 12 && p.acknowledgment().difficulty == 0.125);
+    CHECK(p.pendingShares() == 0);
 }
 
 // Known-good addresses (genesis coinbase, BIP13, BIP173 and BIP350 vectors)

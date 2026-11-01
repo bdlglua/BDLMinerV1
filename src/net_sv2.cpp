@@ -142,7 +142,8 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
             if (event == Event::Target && !protocol->hasJob()) minerPoolDifficulty(protocol->difficulty());
             if (event == Event::Accepted || event == Event::Rejected) {
                 lastReply = millis();
-                for (uint32_t i = 0; i < protocol->acknowledged(); ++i) minerShareResult(event == Event::Accepted);
+                for (uint32_t i = 0; i < protocol->acknowledged(); ++i)
+                    minerShareResult(event == Event::Accepted, protocol->acknowledgment(i));
                 if (event == Event::Rejected)
                     logf("[pool] SV2 %u share(s) rejected: %s\n", protocol->acknowledged(), protocol->error().c_str());
             }
@@ -158,7 +159,7 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
             if (submit.payload.empty()) { logf("[pool] SV2 obsolete share dropped (job %s)\n", share.jobId); continue; }
             if (first) lastReply = millis();
             if (!transport->send(client, submit)) return result;
-            minerShareSent(share.difficulty, netOnBackup());
+            minerShareSent(share.difficulty, netOnBackup(), protocol->submissionId());
             pending = protocol->pending();
         } else vTaskDelay(pdMS_TO_TICKS(10));
     }

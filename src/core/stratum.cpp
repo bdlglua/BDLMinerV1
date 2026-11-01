@@ -62,6 +62,8 @@ void Protocol::reset() {
     versionMask_ = 0;
     configureRequested_ = false;
     pendingCount_ = 0;
+    acknowledgment_ = {};
+    submissionId_ = 0;
     lastError_.clear();
 }
 
@@ -120,7 +122,7 @@ std::string Protocol::submit(const Share &share) {
         id = nextId_++;
         if (nextId_ < 10) nextId_ = 10;
         used = false;
-        for (size_t i = 0; i < pendingCount_; ++i) if (pendingIds_[i] == id) used = true;
+        for (size_t i = 0; i < pendingCount_; ++i) if (pending_[i].id == id) used = true;
     } while (used);
     doc["id"] = id;
     doc["method"] = "mining.submit";
@@ -135,7 +137,10 @@ std::string Protocol::submit(const Share &share) {
         p.add(bits);
     }
     std::string line = serialize(doc);
-    if (!doc.overflowed()) pendingIds_[pendingCount_++] = id;
+    if (!doc.overflowed()) {
+        pending_[pendingCount_++] = {id, share.poolDifficulty > 0 ? share.poolDifficulty : job_.difficulty};
+        submissionId_ = id;
+    }
     else line.clear();
     return line;
 }
@@ -231,7 +236,7 @@ Event Protocol::handleLine(const char *line) {
     uint32_t id = doc["id"].as<uint32_t>();
     size_t pending = pendingCount_;
     if (id >= 10) {
-        for (size_t i = 0; i < pendingCount_; ++i) if (pendingIds_[i] == id) { pending = i; break; }
+        for (size_t i = 0; i < pendingCount_; ++i) if (pending_[i].id == id) { pending = i; break; }
         if (pending == pendingCount_) return Event::None;
     }
     JsonVariant result = doc["result"];
@@ -290,7 +295,8 @@ Event Protocol::handleLine(const char *line) {
     if (id == kIdSuggest) return Event::None;
     if (id >= 10) {
         if (!result.is<bool>() && error.isNull()) return invalid("invalid share response");
-        pendingIds_[pending] = pendingIds_[--pendingCount_];
+        acknowledgment_ = pending_[pending];
+        pending_[pending] = pending_[--pendingCount_];
         return ok ? Event::ShareAccepted : Event::ShareRejected;
     }
     return Event::None;

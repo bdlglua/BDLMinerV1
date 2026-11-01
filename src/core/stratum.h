@@ -32,6 +32,13 @@ struct Share {
     uint32_t version;
     uint32_t versionMask = 0;
     uint8_t hash[32]; // exact SV2 target recheck if the pool changes target before submission
+    double poolDifficulty = 0;  // target assigned to the work, distinct from this hash's difficulty
+};
+
+struct ShareAck {
+    uint32_t id;
+    double difficulty;  // assigned target when submitted
+    ShareAck(uint32_t submission = 0, double assigned = 0) : id(submission), difficulty(assigned) {}
 };
 
 class Protocol {
@@ -47,6 +54,8 @@ public:
     static constexpr size_t kMaxPendingShares = 32;
     size_t pendingShares() const { return pendingCount_; }
     bool canSubmit() const { return pendingCount_ < kMaxPendingShares; }
+    uint32_t submissionId() const { return submissionId_; }
+    const ShareAck &acknowledgment() const { return acknowledgment_; }
 
     Event handleLine(const char *line);
 
@@ -68,7 +77,9 @@ private:
     uint32_t versionMask_ = 0;
     bool configureRequested_ = false;
     uint32_t nextId_ = 10;
-    uint32_t pendingIds_[kMaxPendingShares] = {};
+    ShareAck pending_[kMaxPendingShares] = {};
+    ShareAck acknowledgment_;
+    uint32_t submissionId_ = 0;
     size_t pendingCount_ = 0;
     std::string lastError_;
 };

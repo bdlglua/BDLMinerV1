@@ -574,6 +574,11 @@ void handleGetSettings() {
     JsonDocument j;
     j["capabilities"]["ota"] = esp_ota_get_next_update_partition(nullptr) != nullptr;
     j["capabilities"]["firmware_env"] = FW_ENV;
+#ifdef BOARD_ASIC
+    j["capabilities"]["thermal_steps"] = false;
+#else
+    j["capabilities"]["thermal_steps"] = true;
+#endif
     JsonArray schema = j["schema"].to<JsonArray>();
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];

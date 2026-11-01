@@ -49,8 +49,7 @@ struct MinerStats {
 // Coherent copy for UI/network consumers; shared storage stays in miner.cpp.
 MinerStats minerStats();
 void minerPoolConnected(bool connected);
-// The last shares sent to the pool and its answers, for the dashboard. The
-// pool answers in order, so each result goes to the oldest pending share.
+// The last shares sent to the pool and its answers, matched by submission ID.
 struct ShareEntry {
     uint32_t time;      // Unix time, 0 when the clock was not set
     float difficulty;   // of the hash
@@ -58,7 +57,7 @@ struct ShareEntry {
     bool backup;        // sent to the backup pool
 };
 enum : uint8_t { SharePending, ShareAccepted, ShareRejected, ShareUnanswered };
-void minerShareSent(double difficulty, bool backup);
+void minerShareSent(double difficulty, bool backup, uint32_t submissionId);
 int minerShareLog(ShareEntry *out, int capacity);  // newest first
 struct PoolUptime {
     uint32_t connectedMs = 0;  // since boot
@@ -66,7 +65,7 @@ struct PoolUptime {
 };
 PoolUptime minerPoolUptime();
 void minerPoolDifficulty(double difficulty);
-void minerShareResult(bool accepted);
+void minerShareResult(bool accepted, const stratum::ShareAck &ack);
 uint32_t minerUptimeSeconds();
 
 // Publish a new job to the miners. `clean` makes them drop current work.

@@ -90,6 +90,20 @@ void announceControls(const String &id) {
     }
 }
 
+// MQTT payloads are text, but toInt() also accepts "50oops", "1.5" and
+// "-oops" (as zero). Only complete percentages may change power or light.
+bool parsePercent(const char *text, size_t length, int &out) {
+    if (!text || !length) return false;
+    int value = 0;
+    for (size_t i = 0; i < length; ++i) {
+        if (text[i] < '0' || text[i] > '9') return false;
+        value = value * 10 + (text[i] - '0');
+        if (value > 100) return false;
+    }
+    out = value;
+    return true;
+}
+
 void onCommand(char *topic, uint8_t *payload, unsigned int length) {
     String value;
     value.reserve(length);
@@ -98,8 +112,8 @@ void onCommand(char *topic, uint8_t *payload, unsigned int length) {
     String prefix = base + "/set/";
     if (strncmp(topic, prefix.c_str(), prefix.length())) return;
     const char *key = topic + prefix.length();
-    long number = value.toInt();
-    bool numeric = value.length() && (isdigit((unsigned char)value[0]) || value[0] == '-');
+    int number = 0;
+    bool numeric = parsePercent(value.c_str(), value.length(), number);
     if (!strcmp(key, "mining")) {
         if (value.equalsIgnoreCase("ON")) pendingPower = resumePower ? resumePower : 100;
         else if (value.equalsIgnoreCase("OFF")) pendingPower = 0;

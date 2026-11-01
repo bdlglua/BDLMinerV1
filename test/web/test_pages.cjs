@@ -50,6 +50,10 @@ async function fixture(options={}){
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
     const body=Buffer.concat(chunks).toString();state.requests.push(req.method+' '+req.url);
     if(req.method==='POST')state.posts.push({url:req.url,body});
+    if(req.url==='/site'){
+      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
+      return res.end(fs.readFileSync(path.join(__dirname,'../../installer/index.html'),'utf8').replace('__BOARDS__',JSON.stringify([{env:'m5stickc-plus2',name:'M5StickC Plus2'}])).replaceAll('__VERSION__','test'));
+    }
     if(['/', '/settings', '/log'].includes(req.url)){
       const page=req.url==='/'?'dashboard':req.url==='/settings'?'settings':'log';
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
@@ -69,9 +73,10 @@ async function fixture(options={}){
       return json(res,state.settings);
     }
     if(req.url==='/api/events'&&options.stream){
+      state.activeStreams=(state.activeStreams||0)+1;
       res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});
       const push=()=>{state.streamed=(state.streamed||0)+1;res.write('data: '+JSON.stringify({...state.stats,hashrate:state.stats.hashrate+state.streamed})+'\n\n')};
-      push();const timer=setInterval(push,100);res.on('close',()=>clearInterval(timer));return;
+      push();const timer=setInterval(push,100);res.on('close',()=>{clearInterval(timer);state.activeStreams--});return;
     }
     if(req.url.split('?')[0]==='/api/stats'){
       state.peak=Math.max(state.peak,++state.inflight);
@@ -112,6 +117,35 @@ async function fixture(options={}){
 }
 async function loaded(f){await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_pool');}
 async function run(options,fn){const f=await fixture(options);try{await fn(f);assert.deepEqual(f.errors,[],'uncaught browser errors')}finally{await f.close()}}
+async function loadSite(f){
+  // Exercise the shipped site offline: no real chat messages, media uploads
+  // or dependency downloads are made by this fixture.
+  await f.page.route('https://**/*',route=>route.fulfill({status:200,contentType:'text/javascript',body:''}));
+  await f.page.addInitScript(()=>{window.WebSocket=class {
+    constructor(){this.readyState=1;window.__siteSocket=this;setTimeout(()=>this.onopen?.(),0)}
+    send(){} close(){}
+  }});
+  await f.page.goto(f.url+'/site');await f.page.waitForFunction(()=>window.__siteSocket?.onmessage);
+}
+
+check('site chat keeps only the 100 newest message elements during a long session',()=>run({},async f=>{
+  await loadSite(f);
+  const result=await f.page.evaluate(()=>{
+    for(let id=1;id<=125;++id)__siteSocket.onmessage({data:JSON.stringify({type:'message',message:{id,name:'Test',text:'message '+id,t:1793500000000+id}})});
+    return {stored:chat.messages.length,rows:document.querySelectorAll('#chat-log>li').length,first:document.querySelector('#chat-log>li').dataset.id};
+  });
+  assert.deepEqual(result,{stored:100,rows:100,first:'26'});
+}));
+check('site voice decoding closes its audio context even for corrupt media',()=>run({},async f=>{
+  await loadSite(f);
+  const result=await f.page.evaluate(async()=>{
+    let closed=0;
+    window.AudioContext=class {async decodeAudioData(){throw Error('corrupt audio')}async close(){closed++}};
+    const peaks=await voicePeaks(new Blob(['invalid audio']),'test');
+    return {closed,bars:peaks.length,finite:peaks.every(Number.isFinite)};
+  });
+  assert.deepEqual(result,{closed:1,bars:36,finite:true});
+}));
 
 check('settings cannot submit before load, and failed loads can be retried',()=>run({settingsDelay:150,settingsFailure:true},async f=>{
   await f.page.goto(f.url+'/settings');
@@ -441,6 +475,22 @@ check('full performance is an explicit 100 percent choice and preserves thermal 
   const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.power,100);assert.equal(saved.maxtemp,65);
 }));
 
+check('ESP32 settings explain thermal steps and update their threshold',()=>run({},async f=>{
+  await loaded(f);const help=f.page.locator('[data-key="maxtemp"] .field-help');
+  assert.match(await help.textContent(),/Throttling starts at 55 °C.*Mining pauses at 65 °C/);
+  await f.page.fill('#k_maxtemp','70');assert.match(await help.textContent(),/Throttling starts at 60 °C.*Mining pauses at 70 °C/);
+}));
+check('ASIC settings describe the two-minute thermal pause without ESP32 throttle steps',()=>run({capabilities:{ota:true,thermal_steps:false}},async f=>{
+  await loaded(f);const help=f.page.locator('[data-key="maxtemp"] .field-help');
+  assert.match(await help.textContent(),/Mining pauses at 65 °C.*at least 2 minutes.*5 °C/);
+  assert.doesNotMatch(await help.textContent(),/Throttling starts/);
+  await f.page.fill('#k_maxtemp','0');assert.equal(await help.textContent(),'Thermal protection is disabled.');
+}));
+check('ASIC thermal pause help is translated into French',()=>run({language:'fr',capabilities:{thermal_steps:false}},async f=>{
+  await loaded(f);const text=await f.page.locator('[data-key="maxtemp"] .field-help').textContent();
+  assert.match(text,/65 °C.*au moins 2 minutes.*5 °C/);assert.doesNotMatch(text,/Throttling|Mining|starts/);
+}));
+
 check('secret visibility toggles do not submit settings',()=>run({},async f=>{
   await loaded(f);const show=f.page.getByRole('button',{name:'Show Web password',exact:true});await show.click();
   assert.equal(await f.page.locator('#k_webpass').getAttribute('type'),'text');assert.equal(f.state.posts.length,0);
@@ -482,6 +532,31 @@ check('hidden tabs stop polling and visibility resumes without overlap',()=>run(
   await f.page.waitForTimeout(100);assert.equal(f.state.requests.filter(x=>x.startsWith('GET /api/stats')).length,paused);
   await f.page.evaluate(()=>{window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'))});
   await f.page.waitForTimeout(120);assert.ok(f.state.requests.filter(x=>x.startsWith('GET /api/stats')).length>paused);assert.equal(f.state.peak,1);
+}));
+
+check('hidden dashboards close their live stream and reopen exactly one on return',()=>run({stream:true},async f=>{
+  await f.page.addInitScript(()=>{window.__hidden=false;Object.defineProperty(document,'hidden',{get:()=>window.__hidden})});
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>latestStats&&streamAt>0);
+  assert.equal(f.state.activeStreams,1);
+  await f.page.evaluate(()=>{window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'))});
+  await f.page.waitForTimeout(200);assert.equal(f.state.activeStreams,0);
+  const snapshots=f.state.streamed;await f.page.waitForTimeout(150);assert.equal(f.state.streamed,snapshots);
+  await f.page.evaluate(()=>{window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'));document.dispatchEvent(new Event('visibilitychange'))});
+  await f.page.waitForFunction(()=>latestStats&&streamAt>0);assert.equal(f.state.activeStreams,1);
+  assert.equal(f.state.requests.filter(x=>x==='GET /api/events').length,2);
+  await f.page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+  await f.page.waitForTimeout(150);assert.equal(f.state.activeStreams,0);
+  await f.page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+  await f.page.waitForFunction(()=>streamAt>0);assert.equal(f.state.activeStreams,1);
+}));
+
+check('a delayed snapshot of the same boot cannot rewind live statistics or history',()=>run({stats:{boot_id:'same',uptime_s:100,history:undefined,history_revision:1}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>latestStats?.uptime_s===100);
+  const before=await f.page.evaluate(()=>({session:statsSession,history:historyRevision}));
+  await f.page.evaluate(()=>show({...latestStats,uptime_s:99,hashrate:123,history_revision:0}));
+  assert.equal(await f.page.evaluate(()=>latestStats.uptime_s),100);
+  assert.equal(await f.page.evaluate(()=>statsSession),before.session);
+  assert.equal(await f.page.evaluate(()=>historyRevision),before.history);
 }));
 
 check('log filtering and pause leave the original text available for download',()=>run({},async f=>{

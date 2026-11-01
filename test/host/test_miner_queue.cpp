@@ -41,11 +41,13 @@ int main() {
     MiningWork original = miner.work;
     onCandidate(1, hash, &original);
     assert(minerNextShare(result, 0) && result.nonce == 1);
+    assert(result.poolDifficulty == original.shareDifficulty);
 
     // A non-clean notification keeps previously issued work valid.
     minerPublishJob(job, false);
     onCandidate(2, hash, &original);
     assert(minerNextShare(result, 0) && result.nonce == 2);
+    assert(result.poolDifficulty == original.shareDifficulty);
 
     // An old batch may enqueue after the clean notification reset the queue.
     minerPublishJob(job, true);
@@ -128,6 +130,29 @@ int main() {
         assert(minerUptimeSeconds() == elapsed / 1000);
         assert(minerStats().lifetimeSeconds == baseSeconds + elapsed / 1000);
     }
+
+    // A constant measured 1 MH/s must stay at 1 MH/s through irregular
+    // supervision intervals and 32-bit engine-counter wrap. Never clamp a
+    // faster rate: a subsequent real 1.2 MH/s must remain visible too.
+    stats = {}; stats.minerCount = 3;
+    rateCount = rateHead = 0; totalHashes = 0; sessionMs = 0;
+    testMillis = lastTickMs = 1000;
+    for (int i = 0; i < 3; ++i) stats.hashes[i] = lastHashes[i] = UINT32_MAX - 100;
+    const uint32_t rates[] = {950000, 35000, 15000}, intervals[] = {550, 950, 1700};
+    uint64_t expected = 0;
+    for (int second = 0; second < 7200; ++second) {
+        uint32_t ms = intervals[second % 3]; testMillis += ms;
+        for (int i = 0; i < 3; ++i) stats.hashes[i] += uint32_t(uint64_t(rates[i]) * ms / 1000);
+        expected += uint64_t(1000000) * ms / 1000;
+        minerTick();
+        assert(minerHashrate() == 1000000 && minerHashrateLive() == 1000000);
+        assert(minerTotalHashes() == expected);
+    }
+    for (int i = 0; i < 60; ++i) { testMillis += 1000; stats.hashes[0] += 1200000; minerTick(); }
+    assert(minerHashrate() == 1200000 && minerHashrateLive() == 1200000);
+    for (int i = 0; i < 60; ++i) { testMillis += 1000; minerTick(); }
+    assert(minerHashrate() == 0 && minerHashrateLive() == 0);
+    puts("Hashrate: irregular ticks, 32-bit counter wrap, real 1.0/1.2 MH/s and decay to zero passed");
 
     minerSetPower(75);
     assert(minerPowerPercent() == 75);

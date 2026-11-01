@@ -63,8 +63,8 @@ void minerPoolConnected(bool v) { poolConnected = v; }
 void minerPublishJob(const work::Job &, bool) { ++published; if (!poolConnected) ++premature; }
 double poolDifficulty = 0;
 void minerPoolDifficulty(double value) { poolDifficulty = value; }
-void minerShareResult(bool) {}
-void minerShareSent(double, bool) {}
+void minerShareResult(bool, const stratum::ShareAck &) {}
+void minerShareSent(double, bool, uint32_t) {}
 bool minerNextShare(stratum::Share &, uint32_t) { ++polled; if (!poolConnected) ++premature; return false; }
 '''
 tests = r'''
