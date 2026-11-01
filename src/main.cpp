@@ -4,6 +4,10 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#if CONFIG_IDF_TARGET_ESP32C3 && F_CPU > 160000000L
+#error "ESP32-C3 CPU frequency must not exceed 160 MHz"
+#endif
+
 #include "board.h"
 #include "crashlog.h"
 #include "core/address.h"
