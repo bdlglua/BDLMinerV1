@@ -5,22 +5,18 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.13](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.13)**
+**Latest release: [v1.9.14](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.14)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.9.13.md)
+· [Release notes](docs/releases/v1.9.14.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.13** adds live manual/automatic Gamma fan control and fixes NerdNOS
-startup/status, idle pool failover, stale dashboard requests, notification tests,
-firmware confirmation and the ESP32-C3 CPU configuration. Earlier
-versions are described in [docs/releases](docs/releases/).
-
-Development **v1.9.14** adds durable block-candidate evidence, authenticated
-explorer observations and Gamma OLED fixes. See the [candidate release notes](docs/releases/v1.9.14.md)
-and [LAN hardware-validation procedure](docs/hardware/validation.md). A draft is
-excluded from automatic updates; the latest published release remains above.
+Version **1.9.14** adds durable block-candidate evidence, authenticated explorer
+observations, Gamma OLED fixes and LAN measurement/OTA observation tools.
+Owner-run reports cover M5/Gamma OTA confirmation, controlled Gamma rollback
+and readable physical screens. See the [validation record and limits](docs/hardware/validation.md).
+Earlier versions are described in [docs/releases](docs/releases/).
 
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
 > engine, the Bitcoin network ~10^21 H/s.
