@@ -44,3 +44,18 @@ Tests replace HTTP/TLS/notifications locally and cover confirmations, reorgs,
 height mismatches, invalid tip values, HTTP errors, bounded/chunked/truncated
 bodies, changed work during requests, low memory, WiFi loss and timer wrap.
 Browser cases cover source attribution, counts, uncertainty on errors and French.
+
+## 3. Complete loopback Stratum block test
+
+The integration test runs a real loopback TCP server and the production V1
+session, miner job builder, ASIC SHA-256d verification, priority queue, share ACK
+correlation and NVS save/load. It reconstructs the genesis coinbase through
+Stratum's extranonce fields, then supplies the known ASIC nonce. The Python
+server independently rebuilds and hashes the submitted header with hashlib.
+Only `127.0.0.1` is contacted; no block or share reaches a public pool.
+
+Acceptance, explicit rejection, disconnection before ACK and a clean job before
+the ACK all pass. The last case delivers a stale ASIC result and asserts it is
+ignored. A full ordinary-share queue cannot displace the candidate, duplicate
+ASIC results do not double-submit, and the observed pool outcome survives reboot
+without replay. Both TCP reads and writes are deliberately fragmented.
