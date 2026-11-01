@@ -74,6 +74,9 @@ struct CandidateRecord {
 };
 CandidateRecord candidates[4];
 unsigned candidateHead = 0, candidateCount = 0;
+BlockCandidate previousCandidate{};
+bool havePreviousCandidate = false;
+uint32_t candidateRevision = 0, savedCandidateRevision = 0;
 bool bestDirty = false;
 BestShare top[TOP_SHARES];  // best first, difficulty 0 = empty
 BlockBest blockBests[BLOCK_BESTS];  // ring, blockHead = the height mined now
@@ -215,6 +218,7 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
                 record.info.height = w.height;
                 memcpy(record.info.hash, hash, 32);
                 record.info.state = enqueued ? BlockQueued : BlockQueueFull;
+                ++candidateRevision;
                 candidateHead = (candidateHead + 1) % 4;
                 if (candidateCount < 4) ++candidateCount;
                 stats.lifetimeBlocks = baseBlocks + stats.blocksFound;
@@ -421,7 +425,10 @@ void invalidateBlockQueue() {
     portENTER_CRITICAL(&statsMux);
     blockQueueCount = 0;
     for (unsigned i = 0; i < candidateCount; ++i)
-        if (candidates[i].info.state == BlockQueued) candidates[i].info.state = BlockStale;
+        if (candidates[i].info.state == BlockQueued) {
+            candidates[i].info.state = BlockStale;
+            ++candidateRevision;
+        }
     portEXIT_CRITICAL(&statsMux);
 }
 
@@ -573,6 +580,7 @@ void minerShareSent(double difficulty, bool backup, uint32_t submissionId, const
         if (record.info.state == BlockQueued && !memcmp(record.info.hash, hash, 32)) {
             record.submissionId = submissionId;
             record.info.state = BlockSubmitted;
+            ++candidateRevision;
         }
     }
     portEXIT_CRITICAL(&statsMux);
@@ -583,8 +591,10 @@ void settleShare(uint32_t submissionId, uint8_t state) {
     // Track candidates independently of the short ordinary-share log.
     for (unsigned i = 0; i < candidateCount; ++i) {
         CandidateRecord &record = candidates[i];
-        if (record.info.state == BlockSubmitted && record.submissionId == submissionId)
+        if (record.info.state == BlockSubmitted && record.submissionId == submissionId) {
             record.info.state = state == ShareAccepted ? BlockShareAccepted : BlockShareRejected;
+            ++candidateRevision;
+        }
     }
     for (int i = shareLogCount; i > 0; --i) {
         int index = (shareLogHead - i + kShareLog) % kShareLog;
@@ -598,8 +608,9 @@ void settleShare(uint32_t submissionId, uint8_t state) {
 
 bool minerLastBlockCandidate(BlockCandidate &out) {
     portENTER_CRITICAL(&statsMux);
-    bool found = candidateCount != 0;
-    if (found) out = candidates[(candidateHead + 3) % 4].info;
+    bool found = candidateCount != 0 || havePreviousCandidate;
+    if (candidateCount) out = candidates[(candidateHead + 3) % 4].info;
+    else if (found) out = previousCandidate;
     portEXIT_CRITICAL(&statsMux);
     return found;
 }
@@ -625,7 +636,10 @@ void minerPoolConnected(bool connected) {
         for (int i = 0; i < shareLogCount; ++i)
             if (shareLog[i].state == SharePending) shareLog[i].state = ShareUnanswered;
         for (unsigned i = 0; i < candidateCount; ++i)
-            if (candidates[i].info.state == BlockSubmitted) candidates[i].info.state = BlockUnanswered;
+            if (candidates[i].info.state == BlockSubmitted) {
+                candidates[i].info.state = BlockUnanswered;
+                ++candidateRevision;
+            }
     }
     stats.poolConnected = connected;
     portEXIT_CRITICAL(&statsMux);
@@ -764,7 +778,8 @@ void minerTick() {
     // most once a minute, the lifetime totals every 10 minutes.
     static uint32_t lastSave = 0, retrySaveAt = 0;
     bool save = int32_t(now - retrySaveAt) >= 0 &&
-                (stats.blocksFound != savedBlocks || (bestDirty && now - lastSave > 60000) || now - lastSave > 600000);
+                (stats.blocksFound != savedBlocks || candidateRevision != savedCandidateRevision ||
+                 (bestDirty && now - lastSave > 60000) || now - lastSave > 600000);
     portEXIT_CRITICAL(&statsMux);
     if (save) {
         if (minerSaveStats(true)) { lastSave = now; retrySaveAt = now; }
@@ -872,6 +887,68 @@ bool statsLoaded = false;  // never save before the saved stats were read back
 bool statsFrozen = false;  // a restored backup waits for the restart
 SemaphoreHandle_t saveMutex = xSemaphoreCreateMutex();
 
+// Independent extension: keep the original statA/statB layout readable by
+// rollback firmware. Never persist RTOS/session IDs or replay old submissions.
+constexpr uint32_t kCandidateMagic = 0x31434c42; // BLC1
+struct CandidateSave {
+    uint32_t magic, seq, height;
+    uint8_t hash[32];
+    uint8_t state, reserved[3];
+    uint32_t crc;
+};
+uint32_t candidateSaveSeq = 0;
+uint32_t candidateCrc(const CandidateSave &r) {
+    return esp_rom_crc32_le(0, (const uint8_t *)&r, offsetof(CandidateSave, crc));
+}
+bool readCandidateSlot(Preferences &p, const char *key, CandidateSave &r) {
+    return p.getBytesLength(key) == sizeof(r) && p.getBytes(key, &r, sizeof(r)) == sizeof(r) &&
+           r.magic == kCandidateMagic && r.state <= BlockQueueFull && r.crc == candidateCrc(r);
+}
+void loadCandidate() {
+    Preferences p;
+    if (!p.begin("stats", true)) return;
+    CandidateSave a{}, b{};
+    bool okA = readCandidateSlot(p, "blockA", a), okB = readCandidateSlot(p, "blockB", b);
+    p.end();
+    if (!okA && !okB) return;
+    const auto &r = okA && (!okB || int32_t(a.seq - b.seq) > 0) ? a : b;
+    candidateSaveSeq = r.seq;
+    previousCandidate = {};
+    previousCandidate.height = r.height;
+    memcpy(previousCandidate.hash, r.hash, 32);
+    previousCandidate.state = r.state == BlockQueued ? BlockStale : r.state == BlockSubmitted ? BlockUnanswered : r.state;
+    previousCandidate.previousSession = true;
+    havePreviousCandidate = true;
+}
+bool saveCandidate() {
+    CandidateSave r{};
+    uint32_t revision;
+    portENTER_CRITICAL(&statsMux);
+    revision = candidateRevision;
+    bool needed = candidateCount && revision != savedCandidateRevision;
+    if (needed) {
+        const auto &info = candidates[(candidateHead + 3) % 4].info;
+        r.height = info.height; r.state = info.state;
+        memcpy(r.hash, info.hash, 32);
+    }
+    portEXIT_CRITICAL(&statsMux);
+    if (!needed) return true;
+    r.magic = kCandidateMagic; r.seq = candidateSaveSeq + 1; r.crc = candidateCrc(r);
+    Preferences p;
+    if (!p.begin("stats", false)) return false;
+    const char *key = r.seq & 1 ? "blockB" : "blockA";
+    CandidateSave verified{};
+    bool ok = p.putBytes(key, &r, sizeof(r)) == sizeof(r) && readCandidateSlot(p, key, verified) && verified.seq == r.seq;
+    p.end();
+    if (ok) {
+        candidateSaveSeq = r.seq;
+        portENTER_CRITICAL(&statsMux);
+        savedCandidateRevision = revision; // a later change stays dirty
+        portEXIT_CRITICAL(&statsMux);
+    } else logf("[stats] candidate save failed; previous proof retained\n");
+    return ok;
+}
+
 uint32_t recordCrc(const StatsRecord &r) {
     return esp_rom_crc32_le(0, (const uint8_t *)&r, offsetof(StatsRecord, crc));
 }
@@ -936,6 +1013,7 @@ void minerLoadStats() {
     stats.lifetimeBlocks = baseBlocks;
     stats.lifetimeSeconds = baseSeconds;
     statsLoaded = true;
+    loadCandidate();
     findHistory();
 }
 
@@ -1106,8 +1184,9 @@ bool minerSaveStats(bool periodic) {
         savedBlocks = s.blocks - baseBlocks;
         portEXIT_CRITICAL(&statsMux);
     }
+    bool saved = ok && saveCandidate();
     xSemaphoreGive(saveMutex);
-    return ok;
+    return saved;
 }
 
 bool minerStatsRestore(const StatsSnapshot &s) {

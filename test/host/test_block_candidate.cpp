@@ -95,6 +95,37 @@ int main() {
     assert(minerNextShare(share, 0) && minerNextShare(share, 0));
     assert(!minerNextShare(share, 0));
     minerStatsSnapshot(snapshot); assert(snapshot.blocks == stats.blocksFound);
+    // The extension must keep old statA/statB records readable while saving
+    // proof metadata in two independently verified CRC slots.
+    statsLoaded = true;
+    assert(minerSaveStats() && candidateSaveSeq == 1);
+    const auto oldStatsSize = sizeof(StatsRecord);
+    assert(Preferences::data["statB"].size() == oldStatsSize);
+    uint8_t oldProof[32]; memcpy(oldProof, last.hash, 32);
+    candidate(8000); assert(minerNextShare(share, 0));
+    minerShareSent(share.difficulty, false, 200, share.hash);
+    Preferences::failWrite = true;
+    assert(!minerSaveStats() && candidateRevision != savedCandidateRevision && candidateSaveSeq == 1);
+    Preferences::failWrite = false;
+    assert(minerSaveStats() && candidateSaveSeq == 2);
+    auto reboot = [&]() {
+        candidateHead = candidateCount = blockQueueCount = 0;
+        candidateRevision = savedCandidateRevision = candidateSaveSeq = 0;
+        havePreviousCandidate = false; previousCandidate = {}; stats = {};
+        minerLoadStats();
+    };
+    reboot();
+    assert(minerLastBlockCandidate(last) && last.previousSession && last.number == 0);
+    assert(last.state == BlockUnanswered && !memcmp(last.hash, share.hash, 32));
+    assert(!minerNextShare(share, 0)); // never replay a saved proof
+    Preferences::data["blockA"][offsetof(CandidateSave, hash)] ^= 1;
+    reboot();
+    assert(minerLastBlockCandidate(last) && last.state == BlockQueueFull && !memcmp(last.hash, oldProof, 32));
+    // A corrupted/truncated extension must not erase ordinary lifetime stats.
+    Preferences::data["blockB"].resize(3);
+    reboot();
+    assert(!minerLastBlockCandidate(last) && stats.lifetimeBlocks > 0);
     delete shareQueue;
+    puts("Candidate persistence: compatible stats layout, alternating CRC slots, failure/retry, reboot state, no replay and corrupt-slot fallback passed");
     puts("Block candidates: genesis proof/hash, full share queue, priority, deduplication, original height, immediate snapshot, delayed ACK/rejection, disconnect/ID reuse, stale work and explicit overflow passed");
 }

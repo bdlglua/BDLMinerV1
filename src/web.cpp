@@ -205,6 +205,7 @@ void buildStats(JsonDocument &j, bool history) {
         j["block_candidate"]["height"] = candidate.height;
         j["block_candidate"]["hash"] = work::toHex(id, 32);
         j["block_candidate"]["status"] = states[candidate.state];
+        j["block_candidate"]["previous_session"] = candidate.previousSession;
         j["block_candidate"]["chain_confirmed"] = nullptr; // unknown: a pool ACK is not chain proof
     }
     j["over32bits"] = stats.over32bits;

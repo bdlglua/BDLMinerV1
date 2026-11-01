@@ -68,8 +68,10 @@ struct BlockCandidate {
     uint32_t height;
     uint8_t hash[32];  // digest byte order; reverse for the usual block identifier
     uint8_t state;
+    bool previousSession = false;
 };
-// Latest candidate this boot. Even an accepted share is not a chain confirmation.
+// Latest candidate, including a saved proof from an earlier boot. Saved proofs
+// are never resubmitted or announced as newly found. Pool ACK != chain proof.
 bool minerLastBlockCandidate(BlockCandidate &out);
 struct PoolUptime {
     uint32_t connectedMs = 0;  // since boot

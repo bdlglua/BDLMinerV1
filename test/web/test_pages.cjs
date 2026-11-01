@@ -654,6 +654,14 @@ check('block candidates retain the proof height and distinguish a pool ACK from 
   assert.ok(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 }));
 
+check('a saved block candidate remains visible after reboot without a new session count',()=>run({stats:{blocks:0,lifetime:{...baseStats.lifetime,blocks:1},block_candidate:{height:100,hash:'000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f',status:'unanswered',previous_session:true,chain_confirmed:null}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
+  const tile=f.page.locator('#records-grid .t').filter({has:f.page.locator('.l',{hasText:'Block candidates'})});
+  assert.match(await tile.textContent(),/Block candidates0/);
+  assert.match(await tile.textContent(),/Saved from a previous session/);
+  assert.match(await tile.textContent(),/No pool answer/);
+}));
+
 check('block candidate failures and unknown status are translated and safely rendered',()=>run({language:'fr',stats:{blocks:1,block_candidate:{height:100,hash:'<img src=x onerror=alert(1)>',status:'queue_full'}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
   assert.match(await f.page.locator('#records-grid').textContent(),/File de candidats pleine : non envoyé/);

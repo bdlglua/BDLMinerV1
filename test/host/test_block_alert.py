@@ -38,6 +38,8 @@ int main() {
     settings.beep = false; latest.number = 2; latest.height = 101;
     blockAlert();
     assert(notifications == 2 && wakeups == 2 && beeps == 1 && shownHeight == 101);
+    latest.number = 3; latest.previousSession = true; blockAlert();
+    assert(notifications == 2 && wakeups == 2); // no celebration on reboot
     puts("Block alert: startup candidate, own proof height, no duplicate alert, wake and optional beep passed");
 }
 '''

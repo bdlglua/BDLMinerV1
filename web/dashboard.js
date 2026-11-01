@@ -77,6 +77,7 @@ function blockCandidateTile(j){
  const labels={queued:'Queued with priority',submitted:'Submitted to pool',share_accepted:'Share accepted by pool',share_rejected:'Share rejected by pool',unanswered:'No pool answer',stale:'Obsolete work',queue_full:'Candidate queue full: not sent'};
  const c=j.block_candidate,lines=[t('lifetime')+' '+j.lifetime.blocks,t('Local candidates; chain confirmation unknown')];
  if(c){
+  if(c.previous_session)lines.push(t('Saved from a previous session'));
   lines.push(t('Block height')+COLON+(c.height||'-'),t(labels[c.status]||'Unknown submission status'));
   if(c.hash)lines.push(String(c.hash));
  }

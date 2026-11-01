@@ -103,7 +103,7 @@ void summary(uint32_t now, const MinerStats &stats);
 void blockAlert() {
     static uint32_t lastBlocks = 0; // session count: include candidates before the first watch tick
     BlockCandidate candidate{};
-    if (!minerLastBlockCandidate(candidate) || candidate.number == lastBlocks) return;
+    if (!minerLastBlockCandidate(candidate) || candidate.previousSession || candidate.number == lastBlocks) return;
     lastBlocks = candidate.number;
     char msg[160];
     snprintf(msg, sizeof(msg), "Block candidate at height %u by %s. Check pool submission and Bitcoin chain confirmation.",
