@@ -42,7 +42,7 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    rollback, back up the flash with esptool before erasing it. BDLMiner does not
    import AxeOS NVS settings.
 2. Download **`bitaxe-gamma-601-factory.bin`** from the
-   [v1.9.11 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.11) and
+   [latest release](https://github.com/bdlglua/BDLMinerV1/releases/latest) and
    flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
    the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
    Alternatively, build with PlatformIO 6.1.19:
@@ -90,7 +90,8 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   stored profile values fall back to 525 MHz; API requests outside the available
   profiles are rejected.
 * Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
-  Values 1–9 keep the ASIC off with an explanatory status. The fan remains **100%**.
+  Values 1–9 keep the ASIC off with an explanatory status. Fan speed defaults to
+  **100%**; unreleased fan controls are described below.
   Thermal limiting may reduce the actual frequency below the requested profile.
 * Three consecutive ten-second hardware-error windows at **>=2%**, a missing/stalled
   hash counter, or unavailable hardware-error telemetry trigger a reset/power-off and
@@ -160,6 +161,37 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   rather than all difficulty-1 candidates. Pool shares still use the assigned target.
 * Automatic GitHub installation defaults to **check/offer** on this experimental
   target. Existing published releases do not acquire a Gamma binary retroactively.
+
+## Fan control (unreleased)
+
+In the local **Settings > Safety > Cooling**, select **Manual** (30–100%) or
+**Automatic**. Saving changes applies them without restarting the ASIC. The
+mode and manual percentage are included in settings backups. Existing records
+retain **manual 100%**, so installing this code does not reduce their cooling.
+This feature is in the source tree and is not yet in a published release.
+
+The dashboard shows the last verified PWM command, measured RPM, control mode and
+any cooling override. The EMC2101 has 64 duty levels, so a requested 40% becomes
+a displayed 41% after rounding up. A percentage is a control command, not an
+RPM target. An unverified controller command is reported as unknown.
+
+- Startup, stopped ASIC and an unavailable temperature force **100%**.
+- At the default thermal limit, **60 °C ASIC** or **80 °C regulator** forces
+  full cooling. Both must cool by 5 °C before that override clears, including
+  across ordinary mining pauses. A lower user thermal limit moves the ASIC
+  cooling threshold to 5 °C below that limit. Disabling the user limit retains
+  the 60/80 °C cooling override and the independent hard shutdowns.
+- Automatic mode starts at 30% below 40 °C ASIC / 60 °C regulator and rises
+  to full at those cooling thresholds. Increases are immediate; reductions
+  wait at least five seconds between changes. The ASIC curve shifts down
+  when a lower user temperature limit is selected.
+- PWM writes are read back. A write/read-back failure asserts ASIC reset,
+  requests regulator shutdown and full fan speed, and latches the fault. The
+  existing <500 RPM stop remains active.
+
+The worker owns the I2C transactions; the web handler only updates one atomic
+configuration. Unchanged PWM commands are not repeatedly rewritten.
+See the [implementation and validation review](../audits/2026-11-01-gamma-fan.md).
 
 ## Validation before calling this support stable
 

@@ -272,7 +272,11 @@ void buildStats(JsonDocument &j, bool history) {
     auto asic = gamma601::status();
     JsonObject a = j["asic"].to<JsonObject>();
     a["model"] = "BM1370"; a["experimental"] = true; a["running"] = asic.running; a["state"] = asic.state;
-    a["frequency_mhz"] = asic.frequency; a["fan_rpm"] = asic.rpm; a["fan_percent"] = 100;
+    a["frequency_mhz"] = asic.frequency; a["fan_rpm"] = asic.rpm;
+    if (asic.fanPercent < 0) a["fan_percent"] = nullptr;
+    else a["fan_percent"] = asic.fanPercent;
+    a["fan_requested_percent"] = asic.requestedFanPercent; a["fan_auto"] = asic.fanAutomatic;
+    a["fan_override"] = asic.fanOverride; a["fan_reason"] = asic.fanReason;
     a["input_v"] = asic.inputVoltage; a["core_v"] = asic.coreVoltage;
     a["current_a"] = asic.current; a["regulator_temp_c"] = asic.regulatorTemperature;
     a["regulator_status"] = asic.regulatorStatus;
@@ -574,6 +578,9 @@ void handleGetSettings() {
     JsonDocument j;
     j["capabilities"]["ota"] = esp_ota_get_next_update_partition(nullptr) != nullptr;
     j["capabilities"]["firmware_env"] = FW_ENV;
+#ifdef BOARD_GAMMA601
+    j["capabilities"]["fan_control"] = true;
+#endif
 #ifdef BOARD_ASIC
     j["capabilities"]["thermal_steps"] = false;
 #else
@@ -649,6 +656,9 @@ void handlePostSettings() {
         restartSoon("settings changed from the web page");
     } else if (change.count) {
         settingsCopyLive(settings, pending);
+#ifdef BOARD_GAMMA601
+        gamma601::setFanControl(pending.fanAuto, pending.fanPercent, pending.maxTemp);
+#endif
         if (pending.brightness != current.brightness) settingsSetBrightness(pending.brightness);
         settingsChanged = true;  // the loop applies the screen settings
         logf("[web] %d settings applied without restarting\n", change.count);

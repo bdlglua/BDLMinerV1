@@ -6,6 +6,8 @@ Settings settings;
 const SettingInfo kSettings[] = {
 #ifdef BOARD_GAMMA601
     {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
+    {"fanauto", SettingType::Bool, &settings.fanAuto, 0, "", ""},
+    {"fanpct", SettingType::Number, &settings.fanPercent, 8, "", ""},
 #endif
     {"pool", SettingType::Text, &settings.poolHost, 0, "", ""},
     {"power", SettingType::Number, &settings.miningPower, 8, "", ""},
@@ -41,11 +43,13 @@ int main() {
     Settings oldGammaSettings;const char *old=R"({"power":100})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(old),strlen(old),oldGammaSettings));
     assert(oldGammaSettings.asicFrequency==525); // old Gamma records without the key: the stock default
+    assert(!oldGammaSettings.fanAuto&&oldGammaSettings.fanPercent==100); // preserve old full-speed cooling
     for(unsigned frequency=525;frequency<=800;frequency+=25) {
-        Settings profile;profile.asicFrequency=frequency;std::string encoded;
+        Settings profile;profile.asicFrequency=frequency;profile.fanAuto=frequency%50==0;profile.fanPercent=30+frequency%71;std::string encoded;
         assert(settingsstore::encode(profile,encoded));Settings decoded;
         assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(encoded.data()),encoded.size(),decoded));
         assert(decoded.asicFrequency==frequency);
+        assert(decoded.fanAuto==profile.fanAuto&&decoded.fanPercent==profile.fanPercent);
     }
 #endif
     Storage storage;

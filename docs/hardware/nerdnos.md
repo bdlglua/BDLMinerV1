@@ -52,6 +52,17 @@ repository name different header pins, probably another revision.
 - **Updates**: GitHub updates are offered (setting `1`) rather than installed
   automatically, as for the other experimental board.
 
+## Unreleased reliability corrections
+
+- The dashboard result counter is published on every verified result, rather
+  than waiting for a 50-result error-statistics window.
+- A lost pool job interrupts startup within its next short supervision wait,
+  holding reset and cutting ASIC power instead of finishing initialization.
+
+Both cases are covered by the native backend test. The default ASIC frequency,
+NTC conversion and work/nonce accounting are unchanged. Gamma's EMC2101 fan
+controls are not exposed for this backend.
+
 ## Install
 
 Use a USB supply rated for at least **2 A** (the ASIC draws about 8 W).

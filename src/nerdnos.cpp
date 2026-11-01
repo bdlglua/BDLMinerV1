@@ -60,7 +60,7 @@ void off(const char *reason) {
 bool waitSafe(uint32_t ms) {
     uint32_t since = millis();
     do {
-        if (!minerPowerPercent()) { off("Paused"); return false; }
+        if (!minerPowerPercent() || !minerAsicReady()) { off("Paused / waiting for pool"); return false; }
         delay(5);
     } while (millis() - since < ms);
     return true;
@@ -139,8 +139,8 @@ void result(const bm1397::Response &r, uint32_t now) {
     if (windowGood + windowBad >= 50) {
         live.hardwareErrorPercent = 100.0f * windowBad / (windowGood + windowBad);
         windowGood = windowBad = 0;
-        publish();
     }
+    publish(); // make the first verified result visible without waiting for a 50-result window
 }
 
 void worker(void *) {

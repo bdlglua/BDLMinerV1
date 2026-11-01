@@ -11,8 +11,10 @@ static uint32_t generation = 1;
 static uint64_t hashes = 0;
 static int candidates = 0;
 static uint32_t candidateBits = 99;
+static bool poolReady = true;
 uint8_t minerPowerPercent() { return power; }
 bool minerAsicCurrent(uint32_t g) { return g == generation; }
+bool minerAsicReady() { return poolReady; }
 bool minerAsicWork(AsicWork &) { return false; }
 void minerAsicCandidate(AsicWork &, uint32_t, uint32_t bits) { ++candidates; candidateBits = bits; }
 void minerAsicHashes(uint64_t n) { hashes += n; }
@@ -23,6 +25,7 @@ static uint32_t reg(const std::vector<uint8_t> &p) {
 static void reset() {
     testPins.clear(); testUartTx.clear(); testUartRx.clear(); testChips = 1; testMillis = 1000;
     power = 100; generation = 1; hashes = 0; candidates = 0; powered = false; maskPower = 6;
+    poolReady = true;testNerdDelayHook=nullptr;
     live = {NAN, 0, false, "Starting", -1, 0}; publish();
 }
 int main() {
@@ -65,6 +68,7 @@ int main() {
     bm1397::Response r; r.slot = 3; r.midstate = 0; r.nonce = 0x7c2bac1d;
     result(r, testMillis);
     assert(candidates == 1 && candidateBits == 0 && hashes == uint64_t(1) << 38 && live.results == 1);
+    assert(status().results == 1); // publish each verified result, including the first one
     result(r, testMillis);  // the same result again
     assert(candidates == 1 && hashes == uint64_t(1) << 38);
     r.nonce = 0x7c2bac1e; result(r, testMillis);  // corrupted: counted as an error, never submitted
@@ -79,5 +83,8 @@ int main() {
     testMilliVolts = 1650; assert(std::fabs(temperature() - 25.0f) < 0.05f && std::fabs(status().temperature - 25.0f) < 0.05f);
     testMilliVolts = 0; assert(std::isnan(temperature()));
     testMilliVolts = 3300; assert(std::isnan(temperature()));
+    // A lost job during chip detection must cut power without finishing startup.
+    reset();testNerdDelayHook=[](uint32_t){if(testMillis>=1250)poolReady=false;};
+    assert(!initAsic(bm1397::kVersionMask)&&!powered&&testPins[kReset]==HIGH&&testPins[kPower]==LOW&&testMillis<1300);
     puts("NerdNOS backend: reset before power, BM1397 start-up sequence, chip detection, power limit, verified/duplicate/corrupted/stale results and NTC passed");
 }

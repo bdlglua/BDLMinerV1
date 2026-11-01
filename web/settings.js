@@ -23,13 +23,14 @@ function sync(){
  $('retry').disabled=busy||restarting;
  document.querySelectorAll('#f input,#f select,#f button,#fw,#imp').forEach(i=>i.disabled=busy||restarting);
  if($('notify-test'))$('notify-test').disabled=off||notificationPending;
+ if($('k_fanpct'))$('k_fanpct').disabled=off||$('k_fanauto')?.value==='true';
  if($('k_ua')){$('k_ua').disabled=off||$('k_uaauto')?.value!=='false';$('k_ua').required=$('k_uaauto')?.value==='false';$('k_ua').maxLength=64}
  for(const [protocol,key]of [['proto','sv2key'],['proto2','sv2key2']])if($('k_'+key)){$('k_'+key).disabled=off||$('k_'+protocol)?.value!=='1';$('k_'+key).required=$('k_'+protocol)?.value==='1';$('k_'+key).maxLength=64}
 }
 // Presentation only: titles, hints, units and choices for the settings the
 // miner describes in /api/settings. Unknown keys keep the miner's own label.
 const GROUPS={Pool:['◎','Where your miner sends its work and how it introduces itself.'],Display:['▣','The miner\'s screen: brightness, colours, night mode and clock.'],Notifications:['◉','Phone notifications, webhook and alerts.'],Safety:['◇','Temperature, power and automatic restarts.'],Network:['⌁','Fallback WiFi, Home Assistant, other miners, password and updates.']};
-const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
+const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 const FIELDS={
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
  addr:['Bitcoin address','Your payout address. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
@@ -47,6 +48,8 @@ const FIELDS={
  summary:['Daily summary at','Average hashrate, best share, shares and pool connection of the past day. Off = none.'],
  alertpct:['Hashrate alert below','Share of the usual full-power hashrate. 0 = off.','%'],alertmin:['… for at least','','min'],
  maxtemp:['Pause mining above','0 = no thermal limit.','°C'],power:['Mining power','On USB and battery. 0 = paused.','%'],
+ fanauto:['Fan control','Manual or temperature-controlled cooling. Changes apply without restarting the ASIC.'],
+ fanpct:['Manual fan speed','Used in manual mode. The percentage is a control setting; RPM shows measured speed.','%'],
  rebooth:['Restart after no accepted share for','0 = off.','h'],saver:['Battery saver','On battery: dim the screen and mine at half speed.'],
  wifi2:['Fallback WiFi 1','Network name.'],wpass2:['Fallback WiFi 1 password'],wifi3:['Fallback WiFi 2','Network name.'],wpass3:['Fallback WiFi 2 password'],
  mqtt:['MQTT broker','Your Home Assistant broker. Empty = off.'],mqttport:['MQTT port'],mqttuser:['MQTT user'],mqttpass:['MQTT password'],
@@ -55,6 +58,7 @@ const FIELDS={
  update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.']};
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],uaauto:[['true','Automatic'],['false','Manual']],
+ fanauto:[['false','Manual'],['true','Automatic']],
  asicmhz:Array.from({length:12},(_,n)=>{const mhz=525+n*25;return[mhz,n?mhz+' MHz':'525 MHz (stock)']}),
  lang:[[0,'English'],[1,'Français']],rot:[[0,'Portrait'],[1,'Landscape'],[2,'Portrait, upside down'],[3,'Landscape, upside down']],
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
@@ -83,7 +87,7 @@ function render(data){
   const l=document.createElement('label'),i=document.createElement(options?'select':'input');l.textContent=t(title);i.id='k_'+k;l.htmlFor=i.id;
   if(options){
    for(const[v,name]of options){const option=document.createElement('option');option.value=String(v);option.textContent=t(name);i.appendChild(option)}
-   const current=String(value??(k==='asicmhz'?525:k==='uaauto'?true:0));
+   const current=String(value??(k==='asicmhz'?525:k==='uaauto'?true:k==='fanauto'?false:0));
    if(![...i.options].some(o=>o.value===current)){const option=document.createElement('option');option.value=current;option.textContent=current;i.appendChild(option)}
    i.value=current;if(k==='asicmhz')i.required=true;
   }else if(type=='bool'){i.type='checkbox';i.className='switch';i.setAttribute('role','switch');i.checked=value}
@@ -101,14 +105,19 @@ function render(data){
   if(hint){const p=document.createElement('p');p.className='field-hint';p.id='h_'+k;p.textContent=t(hint);text.appendChild(p);i.setAttribute('aria-describedby',p.id)}
   row.dataset.search=(text.textContent+' '+label+' '+k).toLocaleLowerCase();row.appendChild(text);
   const control=document.createElement('div');control.className='field-control';control.appendChild(i);row.appendChild(control);
-  if(unit){const u=document.createElement('span');u.className='unit';u.setAttribute('aria-hidden','true');u.textContent=unit;control.classList.add('with-unit');control.appendChild(u)}
+  if(k==='fanpct'){
+   i.type='range';control.classList.add('fan-speed');const output=document.createElement('output');output.id='fan-pct-value';output.htmlFor=i.id;
+   const update=()=>{output.value=i.value+' %';i.setAttribute('aria-valuetext',output.value)};i.addEventListener('input',update);update();control.appendChild(output);
+  }else if(unit){const u=document.createElement('span');u.className='unit';u.setAttribute('aria-hidden','true');u.textContent=unit;control.classList.add('with-unit');control.appendChild(u)}
   if(k==='theme'){const swatch=document.createElement('span');swatch.className='swatch';swatch.setAttribute('aria-hidden','true');const paint=()=>swatch.style.background=THEMES[Number(i.value)]||THEMES[0];i.addEventListener('change',paint);paint();control.prepend(swatch)}
   if(type==='secret'){const show=document.createElement('button');show.type='button';show.className='secondary secret-toggle';show.textContent=t('Show');show.setAttribute('aria-label',t('Show')+' '+l.textContent);show.onclick=()=>{const visible=i.type==='password';i.type=visible?'text':'password';show.textContent=t(visible?'Hide':'Show');show.setAttribute('aria-label',t(visible?'Hide':'Show')+' '+l.textContent)};control.appendChild(show)}
   if(k==='pool')row.appendChild(help(t('Choose automatic or manual user agent below. Each pool has its own protocol and authority key.')));
   if(k==='proto'||k==='proto2')row.appendChild(help(t('Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.')));
   if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental, up to 800 MHz. Default: 525 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.')));
+  if(k==='fanauto')row.appendChild(help(t('Default: manual 100%. Startup, stopped ASIC, missing temperature or heat safety force full cooling.')));
+  if(k==='fanpct')row.appendChild(help(t('Minimum 30%. Safety forces 100% at ASIC 60 °C or regulator 80 °C until both cool by 5 °C. A lower thermal limit raises cooling earlier. Fan-stop protection remains active.')));
   if(k==='power'){const h=document.createElement('div');h.className='field-help';h.textContent=t('At 100%, mining runs at full available speed. Temperature protection can still reduce it.');const presets=document.createElement('div');presets.className='presets';for(const [name,v]of [['Full performance',100],['Balanced',75],['Quiet',50]]){const button=document.createElement('button');button.type='button';button.className='secondary';button.id='preset-'+v;button.textContent=t(name)+' · '+v+' %';button.onclick=()=>{i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}))};presets.appendChild(button)}h.appendChild(presets);row.appendChild(h)}
-  if(k==='maxtemp'){const h=help('');const update=()=>{const limit=Number(i.value),stepped=data.capabilities?.thermal_steps!==false;h.textContent=limit>=30?(stepped?t('Throttling starts at')+' '+(limit-10)+' °C. ':'')+t('Mining pauses at')+' '+limit+' °C.'+(stepped?'':' '+t('ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.')):limit===0?t('Thermal protection is disabled.'):''};i.addEventListener('input',update);update();row.appendChild(h)}
+  if(k==='maxtemp'){const h=help('');const update=()=>{const limit=Number(i.value),stepped=data.capabilities?.thermal_steps!==false;h.textContent=limit>=30?(stepped?t('Throttling starts at')+' '+(limit-10)+' °C. ':'')+t('Mining pauses at')+' '+limit+' °C.'+(stepped?'':' '+t('ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.')):limit===0?t(data.capabilities?.fan_control?'User temperature limit is disabled; hardware protection and cooling safety remain active.':'Thermal protection is disabled.'):''};i.addEventListener('input',update);update();row.appendChild(h)}
   if(k==='hook'){const h=help(t('Discord: channel settings › Integrations › Webhooks › Copy URL. Telegram: https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>. Save and restart first, then:'));const test=document.createElement('button');test.type='button';test.className='secondary';test.id='notify-test';test.textContent=t('Send a test notification');test.onclick=testNotification;const out=document.createElement('span');out.id='notify-result';out.textContent=notificationMessage;out.setAttribute('role','status');out.setAttribute('aria-live','polite');const line=document.createElement('div');line.className='presets';line.append(test,out);h.appendChild(line);row.appendChild(h)}
   section.appendChild(row);
  }

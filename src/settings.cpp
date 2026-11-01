@@ -6,6 +6,7 @@
 #include <esp_wifi.h>
 #include <freertos/semphr.h>
 #include <atomic>
+#include <algorithm>
 #include <cmath>
 
 #include "log.h"
@@ -63,6 +64,10 @@ const SettingInfo kSettings[] = {
     N("asicmhz", asicFrequency, "Safety", "Gamma ASIC frequency (MHz)"),
 #endif
     N("power", miningPower, "Safety", "Mining power on USB and battery (0-100%, 0 = paused)"),
+#ifdef BOARD_GAMMA601
+    S("fanauto", Bool, fanAuto, "Safety", "Fan control"),
+    N("fanpct", fanPercent, "Safety", "Manual fan speed (%)"),
+#endif
     N("rebooth", rebootHours, "Safety", "Restart after N hours without an accepted share (0 = off)"),
     S("saver", Bool, batterySaver, "Safety", "Battery saver: dim and mine at half speed on battery"),
     S("wifi2", Text, wifi2Ssid, "Network", "Fallback WiFi 1 name"),
@@ -145,6 +150,7 @@ void settingsSanitize(Settings &settings) {
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
 #ifdef BOARD_GAMMA601
     if (!bm1370::validProfile(settings.asicFrequency)) settings.asicFrequency = bm1370::kStockMHz;
+    settings.fanPercent = std::max<uint8_t>(30, std::min<uint8_t>(100, settings.fanPercent));
 #endif
     if (settings.miningPower > 100) settings.miningPower = 100;
     if (settings.alertPercent > 100) settings.alertPercent = 100;

@@ -31,7 +31,8 @@ static void health(){
 static bool confirmed(bool requireDiode){return collect(requireDiode)&&collect(requireDiode)&&!collect(requireDiode);}
 static void reset(){
     latched=powered=configured=forceStock=false;diodeStrikes=0;lastDiode=NAN;lastFaultText[0]=0;lastFaultTime=0;Preferences::data.clear();settings=Settings();settings.asicFrequency=525;
-    live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1};publish();
+    live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1,-1,100,false,true,"Startup or stopped ASIC"};publish();
+    fanSetting=100|(65u<<16);fanPolicy=mining::FanControl();appliedFanDuty=255;testFanWriteIgnored=false;
     testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
     testUartTx.clear();testUartTxTimes.clear();testUartRx.clear();testDelayHook=nullptr;testMillis=1000;testReset=1;power=100;generation=1;poolReady=true;powerUntil=UINT32_MAX;
     bytes(0x4c,0xfd,{0x16});bytes(0x24,0xad,{6,0x54,0x49,0x54,0x6d,0x24,0x41});bytes(0x24,0x20,{0x97});health(); // relative limits, exponent -9: the TPS546 default
@@ -216,5 +217,39 @@ int main(){
     assert(initAsic(w)&&live.frequency==525); // highest profile still falls back to stock
     reset();settings.asicFrequency=800;begin();assert(initAsic(w));
     bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered);
+    // Fan settings are live: no ASIC reset, PLL ramp or job invalidation.
+    reset();begin();setFanControl(false,30);
+    testDelayHook=[](uint32_t){assert(testI2c[std::make_pair(0x4c,0x4c)][0]==63);};
+    assert(initAsic(w));testDelayHook=nullptr;
+    size_t uartWrites=testUartTx.size();assert(collect(true));
+    assert(live.running&&powered&&testReset==1&&live.frequency==525&&testUartTx.size()==uartWrites);
+    assert(live.fanPercent==30&&live.requestedFanPercent==30&&!live.fanAutomatic&&!live.fanOverride);
+    assert(testI2c[std::make_pair(0x4c,0x4c)][0]==19);
+    size_t writes=testI2cWrites.size();assert(collect(true)&&testI2cWrites.size()==writes); // no redundant writes
+    setFanControl(false,40);assert(collect(true)&&live.fanPercent==41); // rounded 6-bit PWM
+    setFanControl(false,0);assert(collect(true)&&live.requestedFanPercent==30);
+    bytes(0x4c,1,{60});assert(collect(true)&&live.fanPercent==100&&live.fanOverride&&!latched);
+    off("User pause");bytes(0x4c,1,{58});assert(initAsic(w));
+    bytes(0x4c,1,{58});assert(collect(true)&&live.fanOverride);
+    bytes(0x4c,1,{55});assert(collect(true)&&live.fanPercent==30&&!live.fanOverride);
+    word(0x8d,bm1370::encodeLinear11(80));assert(collect(true)&&live.fanPercent==100&&live.fanOverride);
+    word(0x8d,bm1370::encodeLinear11(76));assert(collect(true)&&live.fanOverride);
+    word(0x8d,bm1370::encodeLinear11(75));assert(collect(true)&&!live.fanOverride);
+    bytes(0x4c,1,{0x7f});bytes(0x4c,0x10,{0xe0});assert(collect(true)&&!latched&&live.fanPercent==100&&live.fanOverride);
+    bytes(0x4c,1,{50});bytes(0x4c,0x10,{0});assert(collect(true)&&live.fanPercent==30);
+    setFanControl(false,30,55);assert(collect(true)&&live.fanPercent==100&&live.fanOverride);
+    setFanControl(false,30,0);assert(collect(true)&&live.fanPercent==30&&!live.fanOverride);
+    off("Thermal pause");assert(live.fanPercent==100&&live.fanOverride&&testReset==0);
+    // Automatic cooling reduces gradually; the requested manual value is preserved.
+    reset();begin();setFanControl(true,40);assert(initAsic(w));testMillis+=5000;assert(collect(true));
+    assert(live.fanAutomatic&&live.requestedFanPercent==40&&live.fanPercent==65&&!live.fanOverride);
+    bytes(0x4c,1,{60});assert(collect(true)&&live.fanPercent==100&&live.fanOverride);
+    // A failed fan write or false read-back stops the ASIC before any retry.
+    for(bool ignored:{false,true}){
+        reset();begin();setFanControl(false,30);assert(initAsic(w)&&collect(true));
+        if(ignored)testFanWriteIgnored=true;else testFailRegister=0x4c;
+        setFanControl(false,40);assert(!collect(true)&&latched&&!powered&&testReset==0);
+        assert(status().fanPercent<0); // unknown, never report a successful 100% command after an I2C failure
+    }
     puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, relative VOUT limits, supervised PLL ramp, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
 }

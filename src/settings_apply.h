@@ -26,6 +26,7 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "update")) limits.maximum = 2;
 #ifdef BOARD_GAMMA601
     if (!strcmp(s.key, "asicmhz")) { limits.minimum=bm1370::kStockMHz; limits.maximum=bm1370::kMaxMHz; }
+    if (!strcmp(s.key, "fanpct")) { limits.minimum = 30; limits.maximum = 100; }
 #endif
     return limits;
 }
@@ -132,7 +133,8 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
 inline bool settingIsLive(const char *key) {
     static const char *const kLive[] = {"bright", "rot",      "autorot",  "lang",     "theme",  "cycle",
                                         "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin", "summary",
-                                        "maxtemp", "power",    "rebooth",  "saver",    "update", "count", "sharehr"};
+                                        "maxtemp", "power",    "rebooth",  "saver",    "update", "count", "sharehr",
+                                        "fanauto", "fanpct"};
     for (const char *k : kLive)
         if (!strcmp(k, key)) return true;
     return false;

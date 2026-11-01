@@ -6,6 +6,8 @@ Settings settings;
 const SettingInfo kSettings[] = {
 #ifdef BOARD_GAMMA601
     {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
+    {"fanauto", SettingType::Bool, &settings.fanAuto, 0, "", ""},
+    {"fanpct", SettingType::Number, &settings.fanPercent, 8, "", ""},
 #endif
     {"pool", SettingType::Text, &settings.poolHost, 0, "", ""},
     {"pool2", SettingType::Text, &settings.backupHost, 0, "", ""},
@@ -97,6 +99,15 @@ int main() {
     assert(!deserializeJson(changes,R"({"proto":1,"sv2key":" 9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6  "})"));
     assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
 #ifdef BOARD_GAMMA601
+    for(const char *raw:{R"({"fanpct":29})",R"({"fanpct":101})",R"({"fanpct":0})",R"({"fanpct":-1})",R"({"fanpct":30.5})",R"({"fanpct":null})",R"({"fanpct":"50"})",R"({"fanauto":1})"}) {
+        assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
+    }
+    changes.clear();changes["fanauto"]=true;changes["fanpct"]=40;
+    assert(!settingsError(changes.as<JsonObjectConst>()));
+    Settings fanSettings=settings;assert(settingsApply(fanSettings,changes.as<JsonObjectConst>())==2);
+    assert(settingsCompare(fanSettings,settings).live&&settingsCompare(fanSettings,settings).count==2);
+    Settings active=settings;settingsCopyLive(active,fanSettings);
+    assert(active.fanAuto&&active.fanPercent==40&&!settings.fanAuto&&settings.fanPercent==100);
     for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":801})",R"({"asicmhz":825})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":800.5})",R"({"asicmhz":"800"})"}) {
         assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
     }

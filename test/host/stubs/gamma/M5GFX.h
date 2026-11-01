@@ -7,6 +7,7 @@
 inline std::map<std::pair<int,int>,std::vector<uint8_t>> testI2c;
 inline std::vector<std::vector<uint8_t>> testI2cWrites;
 inline bool testI2cFail=false;
+inline bool testFanWriteIgnored=false;
 inline int testFailRegister=-1;
 // How the regulator stores a word it receives (its own format), when set.
 inline uint16_t (*testTpsStore)(int reg,uint16_t word)=nullptr;
@@ -20,6 +21,7 @@ inline Result transactionWriteRead(int,int address,const uint8_t *reg,uint8_t,ui
 inline Result transactionWrite(int,int address,const uint8_t *bytes,uint8_t length,uint32_t){
     testI2cWrites.emplace_back(bytes,bytes+length);
     if(testI2cFail||bytes[0]==testFailRegister)return {false};
+    if(address==0x4c&&bytes[0]==0x4c&&testFanWriteIgnored)return {true};
     if(length==3&&address==0x24&&testTpsStore){
         uint16_t w=testTpsStore(bytes[0],uint16_t(bytes[1]|bytes[2]<<8));
         testI2c[{address,bytes[0]}]={uint8_t(w),uint8_t(w>>8)};return {true};

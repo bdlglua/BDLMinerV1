@@ -13,10 +13,16 @@ struct Status {
     bool stockFallback;
     const char *fallbackReason;
     float hardwareErrorPercent; // -1 until a complete measurement window
+    int16_t fanPercent; // verified PWM command, -1 when the controller cannot be verified
+    uint8_t requestedFanPercent; // manual preference
+    bool fanAutomatic, fanOverride;
+    const char *fanReason;
 };
 // Call with reset already asserted, after the shared LGFX I2C bus is initialized.
 void begin();
 bool start();
+// Atomic command only: the ASIC worker owns every fan-controller transaction.
+void setFanControl(bool automatic, uint8_t percent, uint8_t thermalLimit = 65);
 Status status();
 float temperature();
 // Where temperature() comes from: "asic" (its diode), "board" (EMC2101, while

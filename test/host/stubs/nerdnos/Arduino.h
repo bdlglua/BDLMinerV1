@@ -12,7 +12,8 @@ inline void digitalWrite(int pin, int value) { testPins[pin] = value; }
 inline uint32_t testMilliVolts = 1650;
 inline void analogSetPinAttenuation(int, int) {}
 inline uint32_t analogReadMilliVolts(int) { return testMilliVolts; }
-inline void delay(uint32_t ms) { testMillis += ms; }
+inline void (*testNerdDelayHook)(uint32_t)=nullptr;
+inline void delay(uint32_t ms) { testMillis += ms; if(testNerdDelayHook)testNerdDelayHook(ms); }
 inline std::deque<uint8_t> testUartRx;
 inline std::vector<std::vector<uint8_t>> testUartTx;
 inline int testChips = 1;

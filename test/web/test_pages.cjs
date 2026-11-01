@@ -45,7 +45,11 @@ async function fixture(options={}){
   state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
   if(options.capabilities)state.settings.capabilities=options.capabilities;
   if(options.live)state.settings.live=['power','maxtemp','nightfrom','saver'];
-  if(options.gamma){state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}]);state.settings.values.asicmhz=525;}
+  if(options.gamma){
+    state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}],['fanauto','bool','Safety','Fan control',{}],['fanpct','number','Safety','Manual fan speed (%)',{min:30,max:100}]);
+    Object.assign(state.settings.values,{asicmhz:525,fanauto:false,fanpct:100});state.settings.live=[...(state.settings.live||[]),'fanauto','fanpct'];
+    state.settings.capabilities={...state.settings.capabilities,fan_control:true,thermal_steps:false};
+  }
   const server=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
     const body=Buffer.concat(chunks).toString();state.requests.push(req.method+' '+req.url);
@@ -855,6 +859,46 @@ check('Gamma stopped ASIC overrides pool-online status and escapes fault text',(
  assert.equal(await f.page.locator('#health').getAttribute('data-level'),'bad');
  assert.equal(await f.page.locator('#device-grid script').count(),0);
  assert.match(await f.page.locator('#device-grid').textContent(),/— V/);
+}));
+
+check('Gamma manual fan defaults to full speed and applies live on mobile',()=>run({gamma:true,mobile:true,postText:'{"restart":false,"changed":1}'},async f=>{
+  await loaded(f);const slider=f.page.locator('#k_fanpct');
+  assert.equal(await slider.inputValue(),'100');assert.equal(await slider.getAttribute('min'),'30');assert.equal(await slider.getAttribute('max'),'100');
+  assert.equal(await f.page.locator('#k_fanauto').inputValue(),'false');assert.equal(await slider.isEnabled(),true);
+  await slider.focus();await slider.press('Home');await slider.press('ArrowRight');
+  assert.equal(await slider.inputValue(),'31');assert.equal(await f.page.locator('#fan-pct-value').textContent(),'31 %');
+  await slider.evaluate(el=>{el.value='40';el.dispatchEvent(new Event('input',{bubbles:true}))});
+  assert.equal(await f.page.locator('#save').textContent(),'Save');await f.page.click('#save');
+  await f.page.waitForFunction(()=>document.querySelector('#msg').textContent==='Saved and applied.');
+  const posted=JSON.parse(f.state.posts[0].body);assert.equal(posted.fanpct,40);assert.equal(posted.fanauto,false);
+  assert.equal(await f.page.locator('.field.changed').count(),0);assert.equal(await f.page.locator('#save').isEnabled(),true);
+  assert.equal(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+}));
+check('Gamma automatic fan keeps its manual preset and discard restores its mode',()=>run({gamma:true,postText:'{"restart":false,"changed":1}'},async f=>{
+  f.state.settings.values.fanpct=45;await loaded(f);await f.page.selectOption('#k_fanauto','true');
+  assert.equal(await f.page.locator('#k_fanpct').isDisabled(),true);assert.equal(await f.page.locator('#save').textContent(),'Save');
+  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent==='Saved and applied.');
+  const posted=JSON.parse(f.state.posts[0].body);assert.equal(posted.fanauto,true);assert.equal(posted.fanpct,45);
+  await f.page.selectOption('#k_fanauto','false');assert.equal(await f.page.locator('#k_fanpct').isEnabled(),true);
+  await f.page.click('#discard');assert.equal(await f.page.locator('#k_fanauto').inputValue(),'true');assert.equal(await f.page.locator('#k_fanpct').isDisabled(),true);
+  assert.equal(await f.page.locator('#fan-pct-value').textContent(),'45 %');
+}));
+check('Gamma fan safety help and controls are translated in French',()=>run({gamma:true,language:'fr'},async f=>{
+  await loaded(f);assert.equal(await f.page.locator('label[for="k_fanauto"]').textContent(),'Réglage du ventilateur');
+  assert.equal(await f.page.locator('label[for="k_fanpct"]').textContent(),'Vitesse manuelle du ventilateur');
+  assert.match(await f.page.locator('[data-key="fanpct"]').textContent(),/60 °C.*80 °C/);
+  await f.page.fill('#k_maxtemp','0');assert.match(await f.page.locator('[data-key="maxtemp"]').textContent(),/protections matérielles.*restent actives/);
+  await f.page.selectOption('#k_fanauto','true');assert.equal(await f.page.locator('#k_fanpct').isDisabled(),true);
+}));
+check('Gamma dashboard shows fan command RPM mode and safety override',()=>run({stats:{asic:{model:'BM1370',running:true,state:'Mining',fan_percent:65,fan_requested_percent:40,fan_auto:true,fan_override:false,fan_reason:'Automatic',fan_rpm:3200,regulator_temp_c:55}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#device-grid').textContent.includes('Fan: 65 % · 3200 RPM'));
+  assert.match(await f.page.locator('#device-grid').textContent(),/Fan control: Automatic/);
+  assert.equal(await f.page.locator('#device-grid a[href="/settings"]').textContent(),'Adjust fan');
+  Object.assign(f.state.stats.asic,{fan_percent:100,fan_override:true,fan_reason:'Temperature safety'});
+  await f.page.waitForFunction(()=>document.querySelector('#device-grid').textContent.includes('Cooling priority: Temperature safety'));
+}));
+check('NerdNOS settings do not expose a Gamma fan controller',()=>run({capabilities:{firmware_env:'nerdnos'}},async f=>{
+  await loaded(f);assert.equal(await f.page.locator('#k_fanauto,#k_fanpct').count(),0);
 }));
 
 check('Gamma profile defaults to 525 MHz (stock) and saves the selected 800 MHz numeric frequency',()=>run({gamma:true},async f=>{

@@ -25,8 +25,18 @@ const SettingInfo kSettings[] = {
  {"addr",SettingType::Text,&settings.btcAddress,0,"",""},
  {"power",SettingType::Number,&settings.miningPower,8,"",""},
  {"hook",SettingType::Secret,&settings.webhookUrl,0,"",""}
+#ifdef BOARD_GAMMA601
+ ,{"fanauto",SettingType::Bool,&settings.fanAuto,0,"",""}
+ ,{"fanpct",SettingType::Number,&settings.fanPercent,8,"",""}
+#endif
 };
-const size_t kSettingCount=4;
+const size_t kSettingCount=sizeof(kSettings)/sizeof(kSettings[0]);
+#ifdef BOARD_GAMMA601
+namespace gamma601 {
+int updates=0;bool automatic=false;uint8_t percent=100;
+void setFanControl(bool a,uint8_t p,uint8_t){++updates;automatic=a;percent=p;}
+}
+#endif
 const char kSecretMask[] = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
 struct Preferences {
  static inline std::map<std::string,std::vector<uint8_t>> data;
@@ -91,9 +101,21 @@ int main() {
  server.body=std::string(R"({"hook":")")+kSecretMask+R"(","power":50})";handlePostSettings();
  assert(server.status==200 && settingsSequence==2 && settings.webhookUrl=="https://hook.example/token");
  assert(server.message.find("\"changed\":0")!=std::string::npos);
+#ifdef BOARD_GAMMA601
+ // Gamma fan controls persist and reach the worker without restarting it.
+ server.body=R"({"fanauto":true,"fanpct":40})";handlePostSettings();
+ assert(server.status==200&&restarts==0&&settings.fanAuto&&settings.fanPercent==40);
+ assert(gamma601::automatic&&gamma601::percent==40);
+ assert(settingsstore::load(p,loaded,sequence)&&loaded.fanAuto&&loaded.fanPercent==40);
+ int fanUpdates=gamma601::updates;
+ Preferences::failWrite=true;server.body=R"({"fanpct":60})";handlePostSettings();
+ assert(server.status==500&&settings.fanPercent==40&&gamma601::updates==fanUpdates);
+ Preferences::failWrite=false;
+#endif
  // A pool change is saved and restarts; live strings stay until then.
+ uint32_t beforePool=settingsSequence;
  server.body=R"({"pool":"new.pool","power":75})";handlePostSettings();
- assert(server.status==200 && restarts==1 && settingsSequence==3 && settings.poolHost=="pool.example" && settings.miningPower==50);
+ assert(server.status==200 && restarts==1 && settingsSequence==beforePool+1 && settings.poolHost=="pool.example" && settings.miningPower==50);
  assert(settingsstore::load(p,loaded,sequence) && loaded.poolHost=="new.pool" && loaded.miningPower==75);
  assert(!settingsSave(settings,false)); // brightness cannot overwrite staged settings
  handlePostSettings();assert(server.status==409 && restarts==1);
@@ -104,7 +126,8 @@ with tempfile.TemporaryDirectory(prefix='bdl-settings-') as temp:
     cpp = Path(temp) / 'test.cpp'
     exe = Path(temp) / 'test'
     cpp.write_text(prefix + save + apply + post + tests)
-    subprocess.run(['g++', '-std=c++17', '-O2', '-Itest/host/stubs/miner', '-Isrc',
-                    '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp),
-                    'src/core/sv2_key.cpp', 'src/core/work.cpp', 'src/core/sha256.cpp', '-o', str(exe)], cwd=root, check=True)
-    subprocess.run([str(exe)], check=True)
+    for definitions in ([], ['-DBOARD_GAMMA601','-DBOARD_ASIC']):
+        subprocess.run(['g++', '-std=c++17', '-O2', *definitions, '-Itest/host/stubs/miner', '-Isrc',
+                        '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp),
+                        'src/core/sv2_key.cpp', 'src/core/work.cpp', 'src/core/sha256.cpp', '-o', str(exe)], cwd=root, check=True)
+        subprocess.run([str(exe)], check=True)

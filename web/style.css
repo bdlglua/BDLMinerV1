@@ -111,6 +111,7 @@ legend{float:left;width:100%;display:flex;align-items:center;gap:8px;padding:14p
 .field-text{min-width:0}.field-text>label{display:block;font-size:13px;font-weight:550;color:var(--fg);overflow-wrap:anywhere}
 .field-hint{margin:3px 0 0;color:var(--label);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 .field-control{display:flex;gap:6px;align-items:center;min-width:0}.field.boolean .field-control{justify-content:flex-end}
+.fan-speed input[type=range]{flex:1;min-width:0;width:100%;padding:0;border:0;background:none;accent-color:var(--accent);cursor:pointer}.fan-speed input:disabled{opacity:.45;cursor:not-allowed}.fan-speed output{min-width:45px;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
 .field-control.with-unit{position:relative}.with-unit input{padding-right:46px;-moz-appearance:textfield}.with-unit input::-webkit-inner-spin-button,.with-unit input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--label);font-size:11px;font-weight:600}.secret-toggle{padding:8px 10px;flex-shrink:0}
 .swatch{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid var(--raised);box-shadow:0 0 0 1px var(--border)}

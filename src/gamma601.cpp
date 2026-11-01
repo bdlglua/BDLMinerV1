@@ -8,6 +8,7 @@
 #include <ctime>
 #include <Preferences.h>
 #include "core/bm1370.h"
+#include "core/fan_control.h"
 #include "miner.h"
 #include "settings.h"
 #include "log.h"
@@ -19,8 +20,12 @@ constexpr uint8_t kTps = 0x24, kEmc = 0x4c;
 constexpr int kReset = 1;
 HardwareSerial uart(1);
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting", 525, false, "", -1};
+Status snapshot{NAN, NAN, NAN, NAN, NAN, 0, 0, 0, false, "Starting", 525, false, "", -1,
+                -1, 100, false, true, "Startup or stopped ASIC"};
 Status live = snapshot;
+std::atomic<uint32_t> fanSetting{100 | (65u << 16)}; // percent, auto bit 8, thermal limit byte 2
+mining::FanControl fanPolicy;
+uint8_t appliedFanDuty = 255; // unknown until the EMC2101 write/read-back succeeds
 bool configured = false, latched = false, powered = false;
 bool logSetup = true;  // the setup's failures are logged once, not at every retry
 const char kNotFound[] = "Regulator or sensors not found: plug in the 5V supply";
@@ -89,6 +94,13 @@ bool verify8(uint8_t addr, uint8_t reg, uint8_t value) {
     uint8_t actual;
     if (!write8(addr, reg, value) || !read(addr, reg, &actual, 1)) return unset(addr, reg, "no answer");
     if (actual != value) return unset(addr, reg, "reads back another value");
+    return true;
+}
+bool setFanDuty(uint8_t duty, bool force = false) {
+    if (!force && duty == appliedFanDuty) return true;
+    if (!verify8(kEmc, 0x4c, duty)) { appliedFanDuty = 255; live.fanPercent = -1; return false; }
+    appliedFanDuty = duty;
+    live.fanPercent = mining::fanPwmPercent(duty);
     return true;
 }
 bool verify16(uint8_t reg, uint16_t value) {
@@ -177,7 +189,9 @@ void off(const char *reason, bool fault = false) {
     // Assert reset first: even a broken I2C bus must stop the ASIC immediately.
     digitalWrite(kReset, LOW);
     bool disabled = write8(kTps, 0x01, 0);
-    bool fan = write8(kEmc, 0x4c, 63);
+    bool fan = setFanDuty(63, true);
+    fanPolicy.update(false, false, 100, NAN, NAN, millis()); // retain thermal hysteresis through pauses
+    live.fanOverride = true; live.fanReason = "Startup or stopped ASIC";
     powered = false; diodeReady = false; live.running = false; live.frequency = 0;
     if (fault || !disabled || !fan) latched = true;
     live.state = !disabled || !fan ? "I2C shutdown fault; restart required" : reason;
@@ -223,6 +237,21 @@ bm1370::Health readings() {
     return {live.temperature, live.regulatorTemperature, live.inputVoltage,
             live.coreVoltage, live.current, live.rpm, live.regulatorStatus};
 }
+bool updateFan(float diode) {
+    uint32_t command = fanSetting.load();
+    live.fanAutomatic = (command & 0x100) != 0;
+    live.requestedFanPercent = uint8_t(command);
+    // Use the raw diode reading: even an unconfirmed anomaly demands full
+    // cooling while the existing three-reading ASIC fault filter decides.
+    mining::FanDecision decision = fanPolicy.update(powered && live.running, live.fanAutomatic,
+        live.requestedFanPercent, diode, live.regulatorTemperature, millis(), (command >> 16) & 255);
+    live.fanOverride = decision.forced; live.fanReason = decision.reason;
+    if (!setFanDuty(mining::fanPwm(decision.percent))) {
+        off("Fan control I2C fault; restart required", true);
+        return false;
+    }
+    return true;
+}
 bool collect(bool requireDiode) {
     lastHealthSample = millis();
     uint8_t internal, msb, lsb, tachLow, tachHigh; uint16_t vin, vout, current, vr, status;
@@ -258,6 +287,7 @@ bool collect(bool requireDiode) {
              live.current, live.temperature, live.regulatorTemperature, live.rpm);
         off(fault, true); return false;
     }
+    if (!updateFan(diode)) return false;
     publish(); return true;
 }
 // All startup waits are short and keep the main-loop/OTA safety lease checked.
@@ -355,7 +385,7 @@ bool configure() {
         if (logSetup) logf("[gamma] EMC2101 fan/temperature sensor not found\n");
         return logSetup = false;
     }
-    bool emc = verify8(kEmc, 0x4a, 0x23) && verify8(kEmc, 0x4c, 63) &&
+    bool emc = verify8(kEmc, 0x4a, 0x23) && setFanDuty(63, true) &&
         verify8(kEmc, 0x03, 0x04) && verify8(kEmc, 0x17, 0x24) && verify8(kEmc, 0x18, 0);
     const uint8_t prefix[]{6, 0x54, 0x49, 0x54, 0x6d, 0x24};
     if (!emc || !disabled || !read(kTps, 0xad, device, 7) || memcmp(device, prefix, 6) ||
@@ -485,6 +515,8 @@ void begin() {
     if (configured) collect(false);
 }
 bool start() {
+    setFanControl(settings.fanAuto, settings.fanPercent, settings.maxTemp);
+    live.fanAutomatic = settings.fanAuto; live.requestedFanPercent = settings.fanPercent;
     live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
     publish();
     // Started even when the setup failed: the task tries it again.
@@ -492,6 +524,9 @@ bool start() {
         runtime::Miner, "BM1370 task");
     if (!ok) off("ASIC task allocation failed", true);
     return ok;
+}
+void setFanControl(bool automatic, uint8_t percent, uint8_t thermalLimit) {
+    fanSetting = (uint32_t(thermalLimit) << 16) | (automatic ? 0x100u : 0u) | mining::fanPercent(percent);
 }
 Status status() { portENTER_CRITICAL(&mux); Status out = snapshot; portEXIT_CRITICAL(&mux); return out; }
 // The ASIC diode when it reads; else the board's sensor, so that a pause
