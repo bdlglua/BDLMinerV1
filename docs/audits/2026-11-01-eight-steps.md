@@ -90,6 +90,24 @@ settings, flashes or restarts devices; a real rollback requires controlled
 physical/serial reset during the unconfirmed trial. Unit cases reject counter
 resets and OTA results without the required observed trial/previous version.
 
+At 18:20:29 UTC the owner supplied a completed closed/open comparison under
+1.9.13. Recomputed counter rates are 1.007335 / 1.001669 MH/s for the M5 (-0.563%)
+and 1.074122 / 1.075200 TH/s for the Gamma (+0.100%). Maximum temperatures were
+unchanged at 54 C (M5 IMU) and 52 C (Gamma ASIC). Eighteen samples per board per
+phase showed pool connections and full effective power, unchanged boot IDs and
+no health issues. The Gamma accepted 15 and 17 shares respectively with no new
+rejects, retaining its 525 MHz profile and automatic 73% fan. These approximately
+three-minute phases show no large dashboard penalty, not long-term validation
+or results for the unpublished 1.9.14 firmware.
+
+The M5 was assigned V2 difficulty 10,000, implying roughly 497 days per pool
+share on average at 1 MH/s. This explains why zero shares in this run do not
+indicate a broken submission path. The thermal limit remained disabled in both
+phases; restoring the default 65 C limit is still recommended. The next physical
+step is observing a 1.9.13 -> pending 1.9.14 -> confirmed OTA sequence, followed
+by a separate controlled rollback check. Optical inspection, controlled fan
+response and NerdNOS hardware validation remain outstanding.
+
 ## 7. Candidate release preparation
 
 The next development version is 1.9.14, with English/French notes. A dedicated

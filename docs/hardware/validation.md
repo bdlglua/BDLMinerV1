@@ -2,9 +2,9 @@
 
 The cloud workspace has no private-network/VPN route to the owner's devices;
 its read-only attempts received HTTP 403 `Domain forbidden`. That does not
-diagnose the miners themselves. Physical display appearance, real thermal/fan
-response, dashboard-load performance and bootloader rollback remain unmeasured
-until these checks run on the LAN or a reviewed private-network route is provided.
+diagnose the miners themselves. The owner has supplied baseline and dashboard
+measurements from the LAN for 1.9.13, recorded below. Physical display appearance,
+controlled thermal/fan response and actual OTA/bootloader rollback remain pending.
 An unavailable NerdNOS board cannot be validated as physical hardware.
 
 `tools/check_hardware.py` uses Python 3's standard library. It **only reads** the
@@ -49,7 +49,7 @@ difficulty; the updated tool retains that field. Restoring the M5's default
 in both phases. On the Gamma, the requested fan percentage is the saved manual
 setting when automatic mode is active. The reported regulator current is on the
 core side and must not be interpreted as the 5 V supply current. Optical screen
-inspection, fan response, dashboard load and real OTA/rollback remain pending.
+inspection, controlled fan response and real OTA/rollback remain pending.
 
 ## 5. Dashboard closed/open measurement
 
@@ -70,6 +70,41 @@ observed temperature, share deltas, assigned pool difficulty, effective power
 and pool/health conditions accompany each phase. Changed thermal settings,
 effective power or interrupted pool connections are flagged for review rather
 than silently attributing their effects to dashboard activity.
+
+### Owner-reported dashboard comparison, 1 November 2026
+
+The owner supplied a completed tool-version-2 report at 18:20:29 UTC, with the
+closed/open conditions confirmed by the operator. Both boards remained on
+**1.9.13** with unchanged boot IDs, effective power at 100% and no reported
+limitation or health issue. Each phase retained 18 samples per board over
+179–181 seconds. Recomputing rates from the supplied first/last hash and uptime
+counters reproduces the report:
+
+| Board | Dashboard closed | Dashboard open | Change | Maximum temperature, closed / open |
+| --- | --- | --- | --- | --- |
+| M5StickC Plus2 | 1.007335 MH/s | 1.001669 MH/s | -0.563% | 54 / 54 C, IMU |
+| Gamma 601 | 1.074122 TH/s | 1.075200 TH/s | +0.100% | 52 / 52 C, ASIC |
+
+Both pools were connected in every sampled response; the Gamma accepted 15
+shares in the closed phase and 17 in the open phase, with no new rejects. It
+remained at 525 MHz with an automatic fan at 73%, approximately 8,700 RPM and a
+regulator temperature of 58–58.25 C in the phase endpoints. The report flagged
+no changed comparison conditions. Differences below 1% in these short windows
+do not establish a repeatable dashboard penalty; device uptime has one-second
+resolution. No large dashboard-related drop or temperature increase was observed
+in this comparison. It does not establish long-duration stability or performance
+of other boards or the 1.9.14 draft.
+
+The M5 pool assigned difficulty **10,000** over Stratum V2. At about 1 MH/s,
+`difficulty * 2^32 / hashrate` gives roughly **497 days per proof meeting the
+pool target on average**, before transport/rejection losses; it is not a
+deadline or a block-finding estimate. Zero submitted shares over this run are
+therefore unsurprising. The client permits an easy target when opening the V2
+channel, but the pool chooses the assigned target. The configured V1
+suggested-difficulty field cannot force that V2 pool to accept easier shares.
+For frequent feedback, use a pool/port supporting ESP32-level difficulty. The M5
+thermal limit remained disabled in both phases; the recommendation to restore
+its 65 C default still applies.
 
 ## 6. Real OTA trial and rollback
 
