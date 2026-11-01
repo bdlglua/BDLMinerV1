@@ -20,6 +20,8 @@ import urllib.parse
 import urllib.request
 import webbrowser
 
+TOOL_VERSION = 3
+
 
 def device_url(value):
     if '://' not in value:
@@ -35,7 +37,7 @@ def finite_number(value):
 
 
 def read_stats(url):
-    headers = {'Accept': 'application/json', 'User-Agent': 'BDLMiner-hardware-check/1'}
+    headers = {'Accept': 'application/json', 'User-Agent': 'BDLMiner-hardware-check/' + str(TOOL_VERSION)}
     password = os.environ.get('BDLMINER_WEB_PASSWORD')
     if password:
         headers['Authorization'] = 'Basic ' + base64.b64encode(('admin:' + password).encode()).decode()
@@ -179,11 +181,25 @@ def ota_result(sample, expected, previous, mode, saw_pending, saw_previous=True)
         return 'pending'
     if not saw_pending:
         return None
-    if sample['firmware'] == previous:
+    if sample['firmware'] == previous and sample.get('firmware_trial') is False:
         return 'rollback' if mode == 'rollback' else 'unexpected_rollback'
     if sample['firmware'] == expected and sample.get('firmware_trial') is False:
         return 'confirmed' if mode == 'confirm' else 'confirmed_before_rollback'
     return None
+
+
+def record_ota_event(events, event):
+    """Keep repeated polls compact, retaining the first and recent transitions."""
+    observed = datetime.now(timezone.utc).isoformat()
+    metadata = {'first_seen_utc', 'last_seen_utc', 'observations'}
+    if events and {key: value for key, value in events[-1].items() if key not in metadata} == event:
+        events[-1]['last_seen_utc'] = observed
+        events[-1]['observations'] += 1
+        return False
+    if len(events) >= 200:
+        del events[1]  # retain the initial observation and the latest transitions
+    events.append({**event, 'first_seen_utc': observed, 'last_seen_utc': observed, 'observations': 1})
+    return True
 
 
 def monitor(args):
@@ -199,22 +215,28 @@ def monitor(args):
     while time.monotonic() < until:
         try:
             sample = read_stats(args.urls[0])
-            if baseline is None and sample['firmware'] == args.previous:
+            if baseline is None and sample['firmware'] == args.previous and sample.get('firmware_trial') is False:
                 baseline = sample
             if baseline and (sample.get('board') != baseline.get('board') or
                              sample.get('firmware_env') != baseline.get('firmware_env')):
                 return {'passed': False, 'observed_result': 'different_device', 'events': events}
             result = ota_result(sample, args.expected, args.previous, args.expect, pending, baseline is not None)
             if result == 'pending':
+                if not pending:
+                    print('Pending trial observed for firmware ' + args.expected + '.', flush=True)
+                    if args.expect == 'rollback':
+                        print('Perform the controlled physical/serial reset now, before automatic confirmation.', flush=True)
                 pending = True
-            if len(events) < 200:
-                events.append({'firmware': sample['firmware'], 'boot_id': sample.get('boot_id'), 'trial': sample.get('firmware_trial')})
+            event = {'firmware': sample['firmware'], 'boot_id': sample.get('boot_id'), 'trial': sample.get('firmware_trial')}
+            if record_ota_event(events, event):
+                print('Observed firmware ' + sample['firmware'] + '; pending trial: ' + str(sample.get('firmware_trial')), flush=True)
             if result and result != 'pending':
+                print('OTA result: ' + result, flush=True)
                 return {'observed_result': result, 'saw_pending_trial': pending, 'events': events, 'last': sample,
                         'passed': result in ('confirmed', 'rollback')}
         except Exception as error:
-            if len(events) < 200:
-                events.append({'offline_or_error': type(error).__name__})
+            if record_ota_event(events, {'offline_or_error': type(error).__name__}):
+                print('Temporarily unavailable: ' + type(error).__name__, flush=True)
         time.sleep(2)
     return {'passed': False, 'observed_result': 'timeout', 'saw_pending_trial': pending, 'events': events}
 
@@ -255,14 +277,14 @@ def main():
         passed = not (args.command == 'snapshot' and any(not item['reachable'] or item['health_issues'] for item in result.values()))
         if args.command == 'ota-monitor':
             passed = result['passed']
-        report = {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'tool_version': 2, 'kind': args.command,
+        report = {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'tool_version': TOOL_VERSION, 'kind': args.command,
                   'status': 'completed' if passed else 'failed', 'simulated': False, 'result': result}
         write_report(args.output, report)
         print('Report:', args.output)
         return 0 if passed else 1
     except (Exception, KeyboardInterrupt) as error:
         try:
-            write_report(args.output, {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'kind': args.command,
+            write_report(args.output, {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'tool_version': TOOL_VERSION, 'kind': args.command,
                                       'status': 'failed', 'simulated': False, 'error': type(error).__name__ + ': ' + str(error)})
         except OSError:
             pass

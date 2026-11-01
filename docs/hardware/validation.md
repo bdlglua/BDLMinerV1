@@ -3,8 +3,9 @@
 The cloud workspace has no private-network/VPN route to the owner's devices;
 its read-only attempts received HTTP 403 `Domain forbidden`. That does not
 diagnose the miners themselves. The owner has supplied baseline and dashboard
-measurements from the LAN for 1.9.13, recorded below. Physical display appearance,
-controlled thermal/fan response and actual OTA/bootloader rollback remain pending.
+measurements for 1.9.13 and a confirmed M5 OTA to 1.9.14 from the LAN, recorded
+below. Physical display appearance, controlled thermal/fan response, Gamma OTA
+and actual bootloader rollback remain pending.
 An unavailable NerdNOS board cannot be validated as physical hardware.
 
 `tools/check_hardware.py` uses Python 3's standard library. It **only reads** the
@@ -49,7 +50,7 @@ difficulty; the updated tool retains that field. Restoring the M5's default
 in both phases. On the Gamma, the requested fan percentage is the saved manual
 setting when automatic mode is active. The reported regulator current is on the
 core side and must not be interpreted as the 5 V supply current. Optical screen
-inspection, controlled fan response and real OTA/rollback remain pending.
+inspection, controlled fan response, Gamma OTA and real rollback remain pending.
 
 ## 5. Dashboard closed/open measurement
 
@@ -116,17 +117,48 @@ dashboard to upload a known, signed CI artifact:
 python3 tools/check_hardware.py ota-monitor http://MINER_IP --previous PREVIOUS_VERSION --expected NEW_VERSION --expect confirm --output .pio/ota-confirm.json
 ```
 
-A pass requires observing the previous version, the new version with a pending
-trial, then its successful confirmation. Confirmation normally needs three
-minutes connected to the pool with mining active (or deliberately paused).
+A pass requires observing the previous confirmed version, the new version with
+a pending trial, then its successful confirmation. Automatic confirmation is
+checked after three minutes since board boot, with the pool connected and mining
+active (or deliberately paused) at that check. The API's `uptime_s` instead starts
+with the mining engine, after initialization; it is not the OTA boot timer.
 
 For a separate controlled bootloader rollback check, start the observer with
-`--expect rollback`. After it observes the new pending trial, perform a physical
-or serial reset **before confirmation**, using the board's proper reset control.
+`--expect rollback`. The observer prints `Pending trial observed` when it actually
+sees the expected firmware in trial. Then perform a physical or serial reset
+**before confirmation**, using the board's proper reset control. On a Gamma,
+briefly disconnecting and reconnecting its 5 V DC supply also performs this
+controlled reset. Do not interrupt the upload or the initial firmware write;
+wait for the pending-trial message after the new firmware has booted.
 A dashboard restart deliberately confirms the firmware first and is not a
 rollback test. The observer must see the previous version return; confirmation,
 missing pending-trial evidence or timeouts never count as a rollback pass.
+The returned previous version must no longer be in a pending trial. Tool version
+3 groups repeated polls with observation counts and first/last UTC timestamps,
+keeping the initial observation and at most 199 recent transitions.
 This needs physical/serial access and is not performed by the read-only script.
+
+### Owner-reported M5 OTA confirmation, 1 November 2026
+
+At 18:32:08 UTC the owner supplied a completed, non-simulated tool-version-2
+report with `observed_result: confirmed`, `saw_pending_trial: true` and
+`passed: true`. It records the confirmed 1.9.13 boot, then a different boot
+running 1.9.14 in a pending trial, and finally that same 1.9.14 boot with
+`firmware_trial: false`. The final sample reports approximately 1.005 MH/s,
+54 C (IMU), full effective power, Stratum V2 connected and no pending shares.
+
+The final `uptime_s` is 175, consistent with the mining-session clock starting
+after board initialization while the three-minute OTA threshold uses board boot
+time. Transient `TimeoutError`/`URLError` entries also occur in the report; it
+does not identify their individual causes. The new boot ID remains unchanged
+through the observed trial and confirmation. This validates the supplied M5
+confirmation sequence, not a physical rollback, Gamma OTA, prolonged stability
+or all settings/statistics surviving an update. The M5 thermal limit is still
+disabled; the 65 C recommendation remains unchanged.
+
+For the Gamma still on 1.9.13, perform the controlled rollback test first while
+that previous image is available. After a verified return to 1.9.13, install
+1.9.14 again under `--expect confirm` to leave the board on the candidate release.
 
 No synthetic result is substituted for these observations. Retain reports
 locally and review them before treating a board/profile as hardware-validated.

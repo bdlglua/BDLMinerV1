@@ -5,6 +5,7 @@ from unittest import mock
 import json
 import tempfile
 import io
+from types import SimpleNamespace
 from pathlib import Path
 spec = importlib.util.spec_from_file_location('hardware_checks', Path(__file__).resolve().parents[2] / 'tools/check_hardware.py')
 checks = importlib.util.module_from_spec(spec)
@@ -30,6 +31,30 @@ class HardwareChecks(unittest.TestCase):
         old={'firmware':'1.9.13','firmware_trial':False}
         self.assertIsNone(checks.ota_result(old,'1.9.14','1.9.13','rollback',False))
         self.assertEqual(checks.ota_result(old,'1.9.14','1.9.13','rollback',True),'rollback')
+        self.assertIsNone(checks.ota_result(dict(old,firmware_trial=True),'1.9.14','1.9.13','rollback',True))
+
+    def test_monitor_preserves_trial_after_hundreds_of_polls_and_prints_reset_cue(self):
+        old={'board':'Gamma','firmware_env':'gamma','firmware':'1.9.13','boot_id':'old','firmware_trial':False}
+        pending=dict(old,firmware='1.9.14',boot_id='new',firmware_trial=True)
+        for mode, outcome in (('rollback','rollback'),('confirm','confirmed')):
+            with self.subTest(mode=mode):
+                final=dict(old,boot_id='returned') if mode=='rollback' else dict(pending,firmware_trial=False)
+                polls=[old]*250+[TimeoutError()]+[pending]*3+[final]
+                args=SimpleNamespace(urls=['http://miner'],previous='1.9.13',expected='1.9.14',expect=mode,timeout=1000)
+                output=io.StringIO()
+                with mock.patch.object(checks,'read_stats',side_effect=polls), \
+                     mock.patch.object(checks.time,'monotonic',side_effect=range(1000)), \
+                     mock.patch.object(checks.time,'sleep'), mock.patch('sys.stdout',new=output):
+                    result=checks.monitor(args)
+                self.assertTrue(result['passed'])
+                self.assertTrue(result['saw_pending_trial'])
+                self.assertEqual(result['observed_result'],outcome)
+                self.assertEqual(len(result['events']),4)
+                self.assertEqual(result['events'][0]['observations'],250)
+                self.assertEqual(result['events'][2]['observations'],3)
+                self.assertTrue(result['events'][2]['trial'])
+                self.assertEqual(output.getvalue().count('Pending trial observed'),1)
+                self.assertEqual('reset now' in output.getvalue(),mode=='rollback')
 
     def test_measurement_retains_pool_power_and_share_context(self):
         first={'board':'test','firmware':'1','boot_id':'a','uptime_s':100,'total_hashes':100000000,

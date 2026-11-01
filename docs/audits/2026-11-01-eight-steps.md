@@ -67,8 +67,8 @@ without replay. Both TCP reads and writes are deliberately fragmented.
 
 Read-only attempts to the two supplied private device endpoints both returned
 HTTP 403 `Domain forbidden`. The selected workspace reports no VPN configuration
-or private TCP grant. No direct cloud hardware measurement, actual OTA or
-bootloader rollback has therefore been claimed. The owner reports a
+or private TCP grant. No direct cloud hardware measurement or remote OTA
+operation has therefore been claimed. The owner reports a
 failed power strip caused the earlier interruption, and the supplies were checked.
 
 The owner subsequently supplied a LAN snapshot recorded at 17:41:09 UTC, with
@@ -103,10 +103,26 @@ or results for the unpublished 1.9.14 firmware.
 The M5 was assigned V2 difficulty 10,000, implying roughly 497 days per pool
 share on average at 1 MH/s. This explains why zero shares in this run do not
 indicate a broken submission path. The thermal limit remained disabled in both
-phases; restoring the default 65 C limit is still recommended. The next physical
-step is observing a 1.9.13 -> pending 1.9.14 -> confirmed OTA sequence, followed
-by a separate controlled rollback check. Optical inspection, controlled fan
-response and NerdNOS hardware validation remain outstanding.
+phases; restoring the default 65 C limit is still recommended.
+
+At 18:32:08 UTC the owner supplied the M5 OTA report: confirmed 1.9.13, a new
+boot on pending 1.9.14, then that same 1.9.14 boot confirmed. The final readings
+are approximately 1.005 MH/s, 54 C (IMU), full effective power and Stratum V2
+connected. The API's 175 seconds of mining-session uptime is consistent with
+the separate three-minute board-boot OTA timer. Transient request errors were
+reported, without an additional new-firmware boot change; their exact causes
+cannot be established from this report. This validates the owner-observed M5
+OTA confirmation sequence, not rollback or long-duration stability.
+
+The next physical step is a controlled Gamma rollback while its confirmed
+1.9.13 image is still available, followed by installation and confirmation of
+1.9.14. Observer version 3 now prints a pending-trial cue for the physical reset,
+groups repeated observations with UTC times and counts, and refuses to count a
+previous version still in trial as a successful rollback. Simulated observer
+tests cover confirmation and rollback after hundreds of baseline polls and
+temporary connection failures; these are separate from the owner's LAN evidence.
+Optical inspection, controlled fan response and NerdNOS hardware validation
+remain outstanding.
 
 ## 7. Candidate release preparation
 
@@ -115,7 +131,7 @@ The next development version is 1.9.14, with English/French notes. A dedicated
 and archive the signed files plus installer preview. Draft preparation does not
 deploy Pages or enter the public automatic-update channel. Publishing the draft
 later triggers the site workflow. The README continues to identify the latest
-published version accurately. Physical checks above remain explicitly pending.
+published version accurately. Uncompleted physical checks above remain pending.
 
 The signed draft at commit `152dec22106c0809a239698c9ee27c349b35debc` contains
 51 assets. Offline verification passed all twelve firmware signatures, binary
