@@ -157,9 +157,9 @@ subprocess.run(['g++','-std=c++17','-O2','-Wall','-Itest/host/stubs/sv2',*common
                 'src/core/work.cpp','src/core/sha256.cpp',*objects,'-l:'+library,'-o',str(session_driver)],cwd=root,check=True)
 
 class Peer:
-    def __init__(self,no_work=False,**options):
+    def __init__(self,no_work=False,driver=session_driver,**options):
         self.sock,child=socket.socketpair();self.sock.settimeout(10)
-        self.proc=subprocess.Popen([str(session_driver),str(child.fileno()),authority.hex()]+(['no-work'] if no_work else []),pass_fds=[child.fileno()],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        self.proc=subprocess.Popen([str(driver),str(child.fileno()),authority.hex()]+(['no-work'] if no_work else []),pass_fds=[child.fileno()],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         child.close();hello=self.read(64)
         current=int(time.time());response,(self.rx_key,self.tx_key)=respond(hello,start=current-60,end=current+60,**options)
         # Fragment the handshake as well as all subsequent frames.
@@ -191,6 +191,7 @@ class Peer:
 
 peer=Peer();extension,kind,payload=peer.receive();assert (extension,kind)==(0,0)
 assert b'ManualMiner/test' in payload
+assert int.from_bytes(payload[5:9],'little')==0 # software miner accepts fixed-version work
 peer.send(1,struct.pack('<HI',2,0));extension,kind,payload=peer.receive();assert kind==0x13
 assert payload[4]==14 and payload[5:19]==b'address.worker'
 share_target=bytes([255])*30+bytes(2) # a genuine 16-leading-zero-bit proof, not an all-accepting target
@@ -246,3 +247,52 @@ peer=Peer();peer.receive();reason=b'unsupported-user-agent';peer.send(2,struct.p
 assert peer.sock.recv(1)==b''
 result=peer.finish();assert result[:4]==['0','0','0','0'] and 'protocol refused' in result[-1],result
 print('Production SV2 session: fragmented TCP, partial writes, Noise, prefix snapshots, group reassignment, independent proofs, share accounting and no unverified/unauthenticated work passed')
+
+# Exercise the same embedded session with both real ASIC build configurations.
+# The peer independently checks the wire requirement and submitted rolled hashes.
+for board in ('BOARD_GAMMA601','BOARD_NERDNOS'):
+    asic_driver=build/('session-'+board.lower())
+    subprocess.run(['g++','-std=c++17','-O2','-Wall','-DBOARD_ASIC','-D'+board,'-Itest/host/stubs/sv2',*common,
+                    'test/host/sv2_session_driver.cpp','src/net_sv2.cpp','src/core/sv2_noise.cpp','src/core/sv2_key.cpp','src/core/sv2_protocol.cpp',
+                    'src/core/work.cpp','src/core/sha256.cpp',*objects,'-l:'+library,'-o',str(asic_driver)],cwd=root,check=True)
+    def asic_peer():
+        peer=Peer(driver=asic_driver)
+        extension,kind,payload=peer.receive()
+        assert (extension,kind)==(0,0) and int.from_bytes(payload[5:9],'little')==4
+        assert b'ManualMiner/test' in payload
+        return peer
+    def asic_open(peer):
+        peer.send(1,struct.pack('<HI',2,2)) # success requires extended channels, not an echo of request bit 2
+        assert peer.receive()[1]==0x13
+        peer.send(0x14,struct.pack('<II',1,7)+share_target+struct.pack('<H',8)+b'\x02\xaa\xbb'+struct.pack('<I',11))
+    def asic_job(peer,job_id,rolling,ntime=None):
+        payload=struct.pack('<IIB',11,job_id,ntime is not None)
+        if ntime is not None:payload+=struct.pack('<I',ntime)
+        payload+=struct.pack('<IBB',0x20000000,rolling,1)+bytes([0x11])*32+struct.pack('<H',2)+b'\x01\x02'+struct.pack('<H',1)+b'\x03'
+        peer.send(0x1f,payload,channel=True)
+    for refusal in ('fixed-version','unsupported-flag','first-job'):
+        peer=asic_peer()
+        if refusal=='fixed-version':peer.send(1,struct.pack('<HI',2,1))
+        elif refusal=='unsupported-flag':
+            reason=b'unsupported-feature-flags';peer.send(2,struct.pack('<I',4)+bytes([len(reason)])+reason)
+        else:
+            asic_open(peer);asic_job(peer,42,False)
+        assert peer.sock.recv(1)==b''
+        result=peer.finish()
+        assert result[1:5]==['0','0','0','0'] and result[-1]=='Pool needs version rolling',result
+    peer=asic_peer();asic_open(peer);asic_job(peer,42,True)
+    current=int(time.time())
+    peer.send(0x20,struct.pack('<II',11,42)+bytes([0x22])*32+struct.pack('<II',current,0x1d00ffff),channel=True)
+    for seq in (0,1):
+        extension,kind,payload=peer.receive();assert (extension,kind)==(0x8000,0x1b)
+        channel_id,sequence,job_id,nonce,ntime,version=struct.unpack('<6I',payload[:24])
+        assert (channel_id,sequence,job_id,ntime,version)==(7,seq,42,current,0x20002000)
+        extra=payload[25:];assert payload[24]==len(extra)==8
+        merkle=sha(sha(b'\x01\x02\xaa\xbb'+extra+b'\x03'));merkle=sha(sha(merkle+bytes([0x11])*32))
+        candidate=struct.pack('<I',version)+bytes([0x22])*32+merkle+struct.pack('<III',ntime,0x1d00ffff,nonce)
+        assert int.from_bytes(sha(sha(candidate)),'little')<=int.from_bytes(share_target,'little')
+    peer.send(0x1c,struct.pack('<IIIQ',7,1,2,2),channel=True)
+    asic_job(peer,43,False,current+1) # late loss of rolling must invalidate the session for failover
+    result=peer.finish()
+    assert result[:5]==['1','2','0','1','0'] and result[-1]=='Pool needs version rolling',result
+    print(board+': production Noise session requires rolling, rejects incompatible work, verifies rolled shares and permits failover')

@@ -22,9 +22,14 @@ double minerHashrate(){return 1000000;}
 void minerPublishJob(const work::Job &job,bool){current=job;++published;remaining=2;}
 bool minerNextShare(stratum::Share &s,uint32_t){
     if(!remaining)return false;
-    work::Work w;work::build(current,++counter,w);--remaining;
+    auto job=current;
+#ifdef BOARD_ASIC
+    assert(job.versionMask&0x2000);
+    job.version^=0x2000; // verify real rolled-version proofs through the production session
+#endif
+    work::Work w;work::build(job,++counter,w);--remaining;
     s={};strcpy(s.jobId,w.jobId.c_str());strcpy(s.extranonce2,w.extranonce2Hex.c_str());
-    s.ntime=w.ntime;s.version=current.version;
+    s.ntime=w.ntime;s.version=job.version;
     for(s.nonce=0;s.nonce<4194304;++s.nonce) {
         if(sha::scan(w.mid,s.nonce,w.quickLimit,s.hash)&&work::meetsTarget(s.hash,w.shareTarget)) {
             s.difficulty=work::hashDifficulty(s.hash);return true;
@@ -42,7 +47,8 @@ int main(int argc,char **argv){
     WiFiClient client(std::atoi(argv[1]));std::atomic<uint8_t> pending{0};
     auto result=sv2::session(client,0,"ManualMiner/test",[](const char *s){state=s;},pending);
     assert(wdt==0);
-    assert(result.hasWork==(published>0));
+    if(state=="Pool needs version rolling") assert(!result.hasWork && result.refusal.empty());
+    else assert(result.hasWork==(published>0));
     if(expectNoWork)assert(result.authorized&&!result.hasWork&&state=="SV2 work timed out"&&published==0);
     if(state=="SV2 protocol refused/invalid") assert(!result.refusal.empty());
     printf("%d %d %d %d %u %s\n",result.authorized,accepted,rejected,published,unsigned(pending.load()),state.c_str());

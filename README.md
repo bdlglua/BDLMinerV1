@@ -18,6 +18,10 @@ Owner-run reports cover M5/Gamma OTA confirmation, controlled Gamma rollback
 and readable physical screens. See the [validation record and limits](docs/hardware/validation.md).
 Earlier versions are described in [docs/releases](docs/releases/).
 
+Development **v1.9.15** corrects the Stratum V2 version-rolling requirement for
+Gamma/NerdNOS ASICs. See the [corrective-build notes](docs/releases/v1.9.15.md).
+The published release linked above remains the automatic-update version.
+
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
 > engine, the Bitcoin network ~10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.

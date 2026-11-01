@@ -36,9 +36,15 @@ bool text(std::vector<uint8_t> &b, const char *s) {
 bool zero(const uint8_t *p, size_t n) { uint8_t x = 0; while (n--) x |= *p++; return x == 0; }
 }
 
-Frame Protocol::setup(const char *host, uint16_t port, const char *agent, const char *firmware) {
+Frame Protocol::setup(const char *host, uint16_t port, const char *agent, const char *firmware,
+                      bool requireVersionRolling) {
+    requireVersionRolling_ = requireVersionRolling;
     Frame f; f.type = 0;
-    auto &b = f.payload; put(b, 0, 1); put(b, 2, 2); put(b, 2, 2); put(b, 0); // mining, version 2, extended jobs
+    auto &b = f.payload; put(b, 0, 1); put(b, 2, 2); put(b, 2, 2);
+    // SetupConnection request bit 2 is REQUIRES_VERSION_ROLLING. A success
+    // commits the pool to allowing rolling in every job; it is not echoed in
+    // the success flags (whose bits have different meanings).
+    put(b, requireVersionRolling_ ? 4u : 0u);
     if (!text(b, host)) return {};
     put(b, port, 2);
     const char *hardware =
@@ -62,6 +68,10 @@ Frame Protocol::open(const char *user, float hashrate) {
     return f;
 }
 Event Protocol::fail(const char *message) { error_ = message; return Event::Error; }
+Event Protocol::failVersionRolling() {
+    versionRollingRefused_ = true;
+    return fail("SV2 pool does not support required version rolling");
+}
 double Protocol::difficulty() const { return work::hashDifficulty(target_); }
 void Protocol::activate(Slot &slot, uint32_t time, bool clean) {
     current_ = slot.job;
@@ -110,13 +120,18 @@ Event Protocol::handle(const Frame &f) {
     if ((f.extension & 0x7fff) || f.payload.size() > kMaxPayload) return fail("Unsupported SV2 frame");
     Reader r{f.payload};
     if (f.type == 0x02) {
-        r.number(4); error_ = r.text();
+        uint32_t unsupported = r.number(4); error_ = r.text();
         if (!r.end()) return fail("Invalid SV2 setup error");
+        if (requireVersionRolling_ && (unsupported & 4u)) return failVersionRolling();
         return Event::Error;
     }
     if (f.type == 0x01) {
         uint32_t version = r.number(2), flags = r.number(4);
         if (!r.end() || version != 2 || state_ != 0 || (flags & ~3u)) return fail("Invalid SV2 setup response");
+        // Success bit 0 is REQUIRES_FIXED_VERSION; bit 1 only requires the
+        // extended channels this client already uses.
+        fixedVersion_ = (flags & 1u) != 0;
+        if (requireVersionRolling_ && fixedVersion_) return failVersionRolling();
         state_ = 1; return Event::Setup;
     }
     if (f.type == 0x12) {
@@ -148,6 +163,8 @@ Event Protocol::handle(const Frame &f) {
         slot.job.coinb1 = r.vector(r.number(2)); slot.job.coinb2 = r.vector(r.number(2));
         if (!r.end() || (channel != channel_ && channel != group_) || (!slot.future && (!havePrevious_ || time < ntime_)))
             return fail("Invalid SV2 mining job");
+        if (requireVersionRolling_ && !rolling) return failVersionRolling();
+        if (fixedVersion_ && rolling) return fail("SV2 job violates fixed-version requirement");
         size_t index = freeSlot();
         slot.order = order_++;
         size_t bytes = slot.job.coinb1.size() + slot.job.coinb2.size();

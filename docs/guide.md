@@ -138,6 +138,19 @@ synchronized clock; invalid signatures, expired certificates and unauthenticated
 messages cause a reconnect. It never silently downgrades the selected endpoint
 to V1. A separately configured backup pool can explicitly use V1 or V2.
 
+Gamma and NerdNOS ASICs require version rolling. Development 1.9.15 explicitly
+requests the V2 `REQUIRES_VERSION_ROLLING` feature: an accepting pool must allow
+rolling in every job. A fixed-version requirement or a job without rolling is
+rejected and counts towards configured backup failover. Software ESP32 miners
+can still accept fixed-version work. No version bits are changed without the
+pool's permission, and the selected V2 endpoint is never silently changed to V1.
+
+In 1.9.14 an ASIC may remain connected at zero hashrate with **Pool needs version
+rolling** because that feature was not requested. To resume on that version,
+explicitly select V1 on a compatible pool/port, such as `public-pool.io:3333`,
+keep the Bitcoin address and save/restart. The V2 port `23330` cannot be used
+with the V1 setting. A retained history graph does not imply current hashing.
+
 For [Public Pool](https://web.public-pool.io/) over V2, set `public-pool.io`, port
 `23330`, Stratum V2 and the published authority key
 `9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6` (pasting

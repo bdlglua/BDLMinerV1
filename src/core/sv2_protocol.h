@@ -12,9 +12,18 @@ struct Frame {
 };
 enum class Event { None, Setup, Opened, Job, Target, Accepted, Rejected, Error };
 
+// A software miner can keep the pool's version unchanged. The ASIC backends
+// need rolling bits to avoid exhausting/repeating their nonce space.
+#ifdef BOARD_ASIC
+constexpr bool kRequireVersionRolling = true;
+#else
+constexpr bool kRequireVersionRolling = false;
+#endif
+
 class Protocol {
 public:
-    Frame setup(const char *host, uint16_t port, const char *agent, const char *firmware);
+    Frame setup(const char *host, uint16_t port, const char *agent, const char *firmware,
+                bool requireVersionRolling = kRequireVersionRolling);
     Frame open(const char *user, float hashrate);
     Frame submit(const stratum::Share &share);
     Event handle(const Frame &frame);
@@ -27,6 +36,7 @@ public:
     const stratum::ShareAck &acknowledgment(size_t i) const { return acknowledgments_[i]; }
     double difficulty() const;
     const std::string &error() const { return error_; }
+    bool versionRollingRefused() const { return versionRollingRefused_; }
 private:
     struct Slot {
         uint32_t id = 0, order = 0;  // order: arrival, to replace the oldest
@@ -43,10 +53,12 @@ private:
     std::vector<uint8_t> prefix_;
     uint16_t extranonceSize_ = 0;
     bool havePrevious_ = false, haveCurrent_ = false;
+    bool requireVersionRolling_ = false, fixedVersion_ = false, versionRollingRefused_ = false;
     uint8_t state_ = 0;
     work::Job current_;
     std::string error_;
     Event fail(const char *message);
+    Event failVersionRolling();
     void activate(Slot &slot, uint32_t ntime, bool clean);
     size_t pendingIndex(uint32_t sequence) const;
     size_t freeSlot() const;

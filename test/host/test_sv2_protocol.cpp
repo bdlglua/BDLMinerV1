@@ -5,7 +5,7 @@
 
 using sv2::Frame; using sv2::Event;
 static void u(std::vector<uint8_t> &v, uint32_t x, int size = 4) { while (size--) { v.push_back(x); x >>= 8; } }
-static Frame success() { return Frame(0, 1, {2,0,0,0,0,0}); }
+static Frame success(uint32_t flags=0) { Frame f(0,1);u(f.payload,2,2);u(f.payload,flags);return f; }
 static Frame channel() {
     Frame f(0, 0x14); auto &v = f.payload; u(v,1); u(v,7); v.insert(v.end(),32,255);
     u(v,8,2); v.push_back(2); v.push_back(0xaa); v.push_back(0xbb); u(v,11); return f;
@@ -169,5 +169,40 @@ int main(int argc, char **) {
     sha::sha256d(rw.header,80,rs.hash);assert(!roll.submit(rs).payload.empty());
     rs.version^=1;assert(roll.submit(rs).payload.empty()); // outside negotiated BIP320 mask
     rs.version=0x20002000;assert(p.submit(rs).payload.empty()); // other job: no rolling permission
+    // Setup request and success flags have different bit assignments. ASICs
+    // require request bit 2; success bit 1 (extended channels) is compatible,
+    // whereas success bit 0 (fixed version) cannot satisfy that requirement.
+    for(uint32_t flags:{0u,2u}) {
+        sv2::Protocol required;
+        auto request=required.setup("p",23330,"a","v",true);
+        assert(request.payload[5]==4 && request.payload[6]==0 && request.payload[7]==0 && request.payload[8]==0);
+        assert(required.handle(success(flags))==Event::Setup && required.handle(channel())==Event::Opened);
+        assert(required.handle(job(1,true,1800000000,true))==Event::None);
+        assert(required.handle(previous(1))==Event::Job && required.job().versionMask==0x1fffe000);
+        for(bool future:{false,true}) {
+            auto invalid=required;
+            assert(invalid.handle(job(2,future,1800000001,false))==Event::Error);
+            assert(invalid.versionRollingRefused() && invalid.job().id=="1"); // no invalid work published/cached
+        }
+    }
+    for(uint32_t flags:{1u,3u}) {
+        sv2::Protocol required;required.setup("p",23330,"a","v",true);
+        assert(required.handle(success(flags))==Event::Error && required.versionRollingRefused());
+    }
+    {
+        sv2::Protocol required;required.setup("p",23330,"a","v",true);
+        Frame refused(0,2);u(refused.payload,4);refused.payload.push_back(0);
+        assert(required.handle(refused)==Event::Error && required.versionRollingRefused());
+        sv2::Protocol wrong;wrong.setup("p",23330,"a","v",true);
+        assert(wrong.handle(success(4))==Event::Error); // request bit 2 is not a valid success flag
+    }
+    {
+        sv2::Protocol fixed;
+        auto request=fixed.setup("p",23330,"a","v",false);
+        assert(request.payload[5]==0 && fixed.handle(success(1))==Event::Setup);
+        assert(fixed.handle(channel())==Event::Opened && fixed.handle(job(1,true))==Event::None);
+        assert(fixed.handle(previous(1))==Event::Job && fixed.job().versionMask==0);
+        assert(fixed.handle(job(2,true,1800000000,true))==Event::Error); // honor server's fixed-version constraint
+    }
     puts("SV2 protocol: exact wire layout, extended jobs, unique extranonces, clean/non-clean jobs, exact targets, batched acknowledgments, duplicate rejection and all truncated frames passed");
 }

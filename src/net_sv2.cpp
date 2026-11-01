@@ -104,6 +104,9 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
     core0WdtResume();
     if (!verified) { status("SV2 server verification failed"); logf("[pool] SV2: %s\n", transport->noise.error()); return result; }
     logf("[pool] Stratum V2 Noise: server authority verified, identity \"%s\"\n", identity);
+#ifdef BOARD_ASIC
+    logf("[pool] SV2: requiring version rolling for ASIC mining\n");
+#endif
     if (!transport->send(client, protocol->setup(netPoolHost().c_str(), netPoolPort(), identity, FW_VERSION))) return result;
     uint32_t start = millis(), lastReply = start; transport->lastRx = start;
     while (client.connected() && WiFi.isConnected()) {
@@ -113,8 +116,16 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
         if (received) {
             Event event = protocol->handle(frame);
             if (event == Event::Error) {
-                if (!result.authorized) result.refusal = protocol->error();
-                status("SV2 protocol refused/invalid"); logf("[pool] SV2: %s\n", protocol->error().c_str()); return result;
+                if (protocol->versionRollingRefused()) {
+                    // A later incompatible job must count as an unusable
+                    // session too, so configured backup failover can proceed.
+                    result.hasWork = false;
+                    status("Pool needs version rolling");
+                } else {
+                    if (!result.authorized) result.refusal = protocol->error();
+                    status("SV2 protocol refused/invalid");
+                }
+                logf("[pool] SV2: %s\n", protocol->error().c_str()); return result;
             }
             if (event == Event::Setup) {
                 double rate = minerHashrate();
