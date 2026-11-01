@@ -5,14 +5,15 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.11](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.11)**
+**Latest release: [v1.9.12](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.12)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.9.11.md)
+· [Release notes](docs/releases/v1.9.12.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.11** keeps the WiFi setup portal steady after a mistyped password. Earlier
+Version **1.9.12** fixes share accounting, idle dashboard connections, MQTT commands
+and web resource leaks. Earlier
 versions are described in [docs/releases](docs/releases/).
 
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
@@ -56,7 +57,7 @@ yourself, see [development.md](docs/development.md).
    **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and enter your **pool**
    (see below), your **Bitcoin address** (optionally `address.worker`) and a **web
-   password** (needed to change settings from the dashboard).
+   password** (optional; protects changes from the dashboard when set).
 3. The board restarts and mines. Its dashboard is at **http://bdlminer-xxxx.local/** or
    the IP shown on the Network screen.
 
@@ -124,7 +125,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.11", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "1.9.12", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
@@ -145,7 +146,7 @@ setting (`sharehr`), which applies at once.
 | Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
 | Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
 | Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](docs/guide.md#pool-shares-and-local-records). |
-| M5StickC Plus2 slows down with the local dashboard open | The dashboard uses live events, with a 10-second polling fallback. Current `main` also closes the stream in hidden tabs. See the [current review](docs/audits/2026-11-01.md) and [dashboard-load review](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
+| M5StickC Plus2 slows down with the local dashboard open | The dashboard uses live events, with a 10-second polling fallback. Since v1.9.12, hidden tabs close their live stream. See the [current review](docs/audits/2026-11-01.md) and [dashboard-load review](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
 | `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. Pasting the pool's `stratum2+tcp://host:port/key` address fills both; an altered or expired server certificate is refused. |
 | `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
 | A manually selected user agent is refused | Enter an identity accepted by that pool or select Automatic. Manual mode preserves your choice rather than replacing it after a refusal. |
