@@ -20,6 +20,7 @@ Earlier versions are described in [docs/releases](docs/releases/).
 
 Development **v1.9.15** corrects the Stratum V2 version-rolling requirement for
 Gamma/NerdNOS ASICs. See the [corrective-build notes](docs/releases/v1.9.15.md).
+The owner confirmed Gamma OTA and accepted shares over V2 with this test build.
 The published release linked above remains the automatic-update version.
 
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA

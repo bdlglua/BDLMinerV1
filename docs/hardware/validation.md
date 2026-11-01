@@ -210,6 +210,20 @@ controlled rollback/reinstallation sequence. It is a short observation, not a
 prolonged stability test or controlled manual fan-response test. Physical M5
 rollback remains untested; no NerdNOS device was available for this review.
 
+### Owner-reported Gamma V2 corrective build, 1 November 2026
+
+At 20:30:17 UTC the owner supplied a confirmed 1.9.14-to-1.9.15 trial report
+for the CI development build correcting the ASIC version-rolling negotiation.
+The same new boot is observed pending then confirmed, explicitly connected
+over Stratum V2 (Noise). Final telemetry shows the BM1370 running at 525 MHz,
+about 1.093 TH/s, ASIC 53 C, regulator 57.5 C, automatic fan 78% at 8,667 RPM,
+9 accepted / 0 rejected shares, no pending submissions, regulator status zero
+and no stock fallback. This supplies real owner-run V2 recovery evidence after
+the earlier 1.9.14 rolling-related stop. The complete
+[corrective-build record](../audits/2026-11-01-sv2-asic-version-rolling.md)
+documents the artifact checks and remaining validation limits. This development
+build has not been published as a signed release at the time of the report.
+
 ### Owner-reported screen inspection
 
 After installing 1.9.14 on both boards, the owner explicitly confirmed that both

@@ -32,15 +32,56 @@ genuine rolled-version SHA-256d proofs, their acknowledgments and a subsequent
 job losing rolling permission. The software session and fixed-version handling
 remain covered. These tests use local sockets, not a public pool or physical ASIC.
 
-The initial hardware probe sent flag 0; the same probe after correction sends
-flag 4. End-to-end loopback tests passed. A real Public Pool trial of this new
-build is still needed: a server may refuse the required feature, in which case
-the firmware must report incompatibility instead of manufacturing rolling bits.
+The initial ASIC-configured native probe sent flag 0; the same probe after
+correction sends flag 4. End-to-end loopback tests passed. Those tests alone
+could not establish live Public Pool compatibility. A server may refuse the
+required feature, in which case the firmware must report incompatibility
+instead of manufacturing rolling bits.
 The documented 1.9.14 workaround is an explicit compatible V1 endpoint such as
 `public-pool.io:3333`, preserving the owner's address and chosen power settings.
 The owner subsequently confirmed that this V1 change restored Gamma mining.
 
 The complete native suite and 24 host-tool tests passed after the correction.
 Both actual ASIC targets compiled successfully (`bitaxe-gamma-601`, `nerdnos`).
-The next development version is 1.9.15; its physical V2 behavior on Public Pool
-is not inferred from the local peer tests or the V1 recovery report.
+The development version is 1.9.15. The complete
+[CI run](https://github.com/bdlglua/BDLMinerV1/actions/runs/41345688410) passed all
+twelve board builds plus native/tool and browser tests. The Gamma development
+artifact was independently checked against its GitHub ZIP digest, binary
+checksums, ESP32-S3 image checksum/appended SHA, version/model markers, matching
+factory app and two fitting OTA slots. It is a manual test build, not a signed
+published release. Source commit: `db67b2123b1e784b93e7f079084a7e4ff8a93043`.
+
+## Owner-reported Gamma V2 confirmation
+
+On 1 November 2026 at 20:30:17 UTC (21:30 Europe/Paris), the owner supplied a
+completed, non-simulated tool-version-3 report. It observes confirmed 1.9.14,
+a new 1.9.15 boot in a pending trial 75 times, then that same 1.9.15 boot
+confirmed. The result is `confirmed`, with `saw_pending_trial` and `passed`
+both true. The final sample explicitly reports **Stratum V2 (Noise)**, not V1.
+
+| Reading | Owner-reported value |
+| --- | --- |
+| ASIC / frequency | BM1370 running, 525 MHz |
+| Rolling / live hashrate | 1.093021 / 1.166250 TH/s |
+| ASIC / regulator temperature | 53 / 57.5 C |
+| Fan | Automatic, 78%, 8,667 RPM; no override |
+| Input / core voltage | 5.242188 / 1.144531 V |
+| Core-side current | 14.04688 A |
+| Regulator status / hardware errors | 0 / 0.039573% |
+| Session shares | 9 accepted, 0 rejected, 0 pending |
+| Effective power / configured limit | 100%, no limitation / 65 C |
+| Stock fallback | None |
+
+This owner-run observation establishes successful OTA confirmation and resumed
+Gamma mining with accepted shares over the intended V2 connection after the
+client correction. Transient timeout/reset errors precede the new boot; their
+individual causes cannot be inferred from the report. The new boot remains
+unchanged through the observed trial. No cloud-to-device measurement is claimed.
+
+The last assigned difficulty is 16,384 and credited work is 81,661.6889. The
+report does not include each share's assigned target; vardiff can change during
+the run, so credited work must not be compared with nine times the final target.
+The short rolling/live rates are observations, not evidence of increased ASIC
+clock speed or a sustained performance gain. Prolonged stability, physical
+NerdNOS validation of this patch and operation on other V2 pools remain outside
+this owner's Gamma trial. The public release is still 1.9.14 at this point.
