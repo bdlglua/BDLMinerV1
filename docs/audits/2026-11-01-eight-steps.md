@@ -67,9 +67,20 @@ without replay. Both TCP reads and writes are deliberately fragmented.
 
 Read-only attempts to the two supplied private device endpoints both returned
 HTTP 403 `Domain forbidden`. The selected workspace reports no VPN configuration
-or private TCP grant. No physical reading, dashboard-load measurement, actual
-OTA or bootloader rollback has therefore been claimed. The owner reports a
+or private TCP grant. No direct cloud hardware measurement, actual OTA or
+bootloader rollback has therefore been claimed. The owner reports a
 failed power strip caused the earlier interruption, and the supplies were checked.
+
+The owner subsequently supplied a LAN snapshot recorded at 17:41:09 UTC, with
+both boards on 1.9.13: M5StickC Plus2 at 1.002 MH/s and 53 C (IMU), Gamma 601 at
+1.058 TH/s, 525 MHz, ASIC 51 C and regulator 57.25 C. The Gamma reported an
+automatic 70% fan at 8,294 RPM and 356 accepted / 1 rejected share. The M5
+reported zero shares and a disabled configured thermal limit. The helper now
+retains the assigned pool difficulty so zero shares can be interpreted, and
+records power/thermal conditions and share deltas during the comparison. The
+default 65 C limit is recommended before both phases; settings must remain
+unchanged between phases. These point-in-time user readings do not validate the
+draft 1.9.14, optical rendering, fan response, dashboard load or OTA rollback.
 
 The LAN-only procedure and portable read-only tool are in
 [hardware validation](../hardware/validation.md). They record actual device
@@ -87,3 +98,20 @@ and archive the signed files plus installer preview. Draft preparation does not
 deploy Pages or enter the public automatic-update channel. Publishing the draft
 later triggers the site workflow. The README continues to identify the latest
 published version accurately. Physical checks above remain explicitly pending.
+
+The signed draft at commit `152dec22106c0809a239698c9ee27c349b35debc` contains
+51 assets. Offline verification passed all twelve firmware signatures, binary
+checksums and image/layout checks, as well as the installer preview. The public
+automatic-update channel remains on 1.9.13.
+
+## 8. Public Pool listing preparation
+
+The owner's existing `public-pool-ui` fork adds five HTML lines linking the
+normalized `BDLMiner` device name to its repository. The actual backend parser
+maps the native `BDLMinerV1/<version>` identity to that name. Dependency install
+and the Angular production build pass; existing Moment/CSS warnings remain.
+
+Creating the upstream draft pull request returned HTTP 403 `Resource not
+accessible by integration`. No pull request was created. The prepared comparison
+is [available on GitHub](https://github.com/benjamin-wilson/public-pool-ui/compare/master...bdlglua:master?expand=1).
+The upstream maintainers still decide acceptance and the open-hardware marker.

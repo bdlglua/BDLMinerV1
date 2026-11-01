@@ -31,6 +31,26 @@ require the physical device; native screenshots alone do not establish these.
 The owner reports the earlier electrical interruption was a failed power strip
 and that the supply/wiring were checked before active tests.
 
+### Owner-reported baseline, 1 November 2026
+
+The owner supplied a LAN snapshot recorded at 17:41:09 UTC. Both boards were
+running **1.9.13**, with pool connections active, no pending firmware trial and
+no reported power limitation. These are point-in-time readings reported by the
+owner, not observations from this cloud workspace or validation of 1.9.14.
+
+| Board | Reported rate | Temperature | Additional readings |
+| --- | --- | --- | --- |
+| M5StickC Plus2 | 1.002 MH/s | 53 C, IMU | 0 accepted / 0 rejected; configured thermal limit disabled |
+| Gamma 601 | 1.058 TH/s | ASIC 51 C; regulator 57.25 C | 525 MHz; automatic fan 70%, 8,294 RPM; 356 accepted / 1 rejected |
+
+The M5's zero-share count cannot be assessed without the assigned pool
+difficulty; the updated tool retains that field. Restoring the M5's default
+65 C thermal limit is recommended before the comparison, with the same setting
+in both phases. On the Gamma, the requested fan percentage is the saved manual
+setting when automatic mode is active. The reported regulator current is on the
+core side and must not be interpreted as the 5 V supply current. Optical screen
+inspection, fan response, dashboard load and real OTA/rollback remain pending.
+
 ## 5. Dashboard closed/open measurement
 
 ```sh
@@ -39,11 +59,17 @@ python3 tools/check_hardware.py measure http://MINER_IP http://SECOND_IP --outpu
 
 The tool asks the operator to close existing dashboards, allows 60 seconds for
 the rolling rate to settle, then samples both miners for three minutes. It then
-opens the dashboards, asks that they remain loaded/visible, and repeats with the
-same sampling cadence. Rates come from actual hash-counter/uptime differences,
+opens the dashboards, asks that each remain visible in a separate window, and
+repeats with the same sampling cadence. Place the windows side by side; hidden
+tabs suspend dashboard updates and would not measure the intended load. Keep
+firmware, frequency, power and temperature-limit settings unchanged between
+phases. Rates come from actual hash-counter/uptime differences,
 not the smoothed display or a guessed pool estimate. Reboots, reset counters,
 changed firmware and zero elapsed device time invalidate the comparison. Maximum
-observed temperature and pool/health conditions accompany each phase.
+observed temperature, share deltas, assigned pool difficulty, effective power
+and pool/health conditions accompany each phase. Changed thermal settings,
+effective power or interrupted pool connections are flagged for review rather
+than silently attributing their effects to dashboard activity.
 
 ## 6. Real OTA trial and rollback
 

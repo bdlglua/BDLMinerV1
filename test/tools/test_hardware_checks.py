@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 import json
 import tempfile
+import io
 from pathlib import Path
 spec = importlib.util.spec_from_file_location('hardware_checks', Path(__file__).resolve().parents[2] / 'tools/check_hardware.py')
 checks = importlib.util.module_from_spec(spec)
@@ -29,6 +30,42 @@ class HardwareChecks(unittest.TestCase):
         old={'firmware':'1.9.13','firmware_trial':False}
         self.assertIsNone(checks.ota_result(old,'1.9.14','1.9.13','rollback',False))
         self.assertEqual(checks.ota_result(old,'1.9.14','1.9.13','rollback',True),'rollback')
+
+    def test_measurement_retains_pool_power_and_share_context(self):
+        first={'board':'test','firmware':'1','boot_id':'a','uptime_s':100,'total_hashes':100000000,
+               'hashrate':1000000,'power_percent':100,'max_temp_c':65,'pool_difficulty':1,
+               'pool_connected':True,'limitation_reason':'full','shares':{'accepted':0,'rejected':0,'work':0}}
+        last=dict(first,uptime_s=280,total_hashes=280000000,power_percent=75,limitation_reason='thermal',
+                  shares={'accepted':2,'rejected':1,'work':2.5})
+        result=checks.summarize([first,last])
+        self.assertEqual(result['power_percent_levels'],[75,100])
+        self.assertEqual(result['limitation_reasons'],['full','thermal'])
+        self.assertEqual(result['pool_difficulty_levels'],[1])
+        self.assertEqual(result['share_delta'],{'accepted':2,'rejected':1,'work':2.5})
+
+    def test_pool_target_is_retained_without_private_identity(self):
+        payload={'board':'M5StickC Plus2','firmware':'1.9.13','uptime_s':100,'total_hashes':100000000,
+                 'hashrate':1000000,'address':'private-wallet','ssid':'private-wifi',
+                 'pool':{'connected':True,'difficulty':1,'status':'Mining','pending_shares':2,
+                         'protocol':'Stratum V1','host':'private-pool-host'}}
+        with mock.patch.object(checks.urllib.request,'urlopen',return_value=io.BytesIO(json.dumps(payload).encode())):
+            sample=checks.read_stats('http://miner')
+        self.assertEqual(sample['pool_difficulty'],1)
+        self.assertEqual(sample['pool_pending_shares'],2)
+        self.assertEqual(sample['pool_protocol'],'Stratum V1')
+        self.assertNotIn('private-',json.dumps(sample))
+
+    def test_comparison_reports_real_loss_and_changed_conditions(self):
+        first={'board':'test','firmware':'1','boot_id':'a','uptime_s':100,'total_hashes':100000000,
+               'hashrate':1000000,'power_percent':100,'max_temp_c':65,'pool_connected':True}
+        closed=checks.summarize([first,dict(first,uptime_s=280,total_hashes=280000000)])
+        opened=checks.summarize([first,dict(first,uptime_s=280,total_hashes=235000000,power_percent=75,pool_connected=False)])
+        result=checks.compare_phases(closed,opened)
+        self.assertEqual(result['open_vs_closed_percent'],-25)
+        self.assertIn('Effective mining power changed',result['conditions_to_review'])
+        self.assertIn('Pool connection was not continuous',result['conditions_to_review'])
+        changed=checks.summarize([dict(first,boot_id='b'),dict(first,boot_id='b',uptime_s=280,total_hashes=280000000)])
+        with self.assertRaises(ValueError): checks.compare_phases(closed,changed)
 
     def test_health_and_urls(self):
         sample={'temp_c':75,'asic':{'running':True,'model':'BM1370','fan_rpm':0,'regulator_temp_c':95}}

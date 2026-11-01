@@ -56,7 +56,12 @@ def read_stats(url):
                'hashrate', 'hashrate_live', 'temp_c', 'temperature_source', 'max_temp_c',
                'power_percent', 'limitation_reason', 'heap', 'heap_max_block', 'firmware_trial', 'shares', 'asic')
     result = {key: data[key] for key in allowed if key in data}
-    result['pool_connected'] = data.get('pool', {}).get('connected')
+    pool = data.get('pool', {})
+    for source, target in (('connected', 'pool_connected'), ('difficulty', 'pool_difficulty'),
+                           ('status', 'pool_status'), ('pending_shares', 'pool_pending_shares'),
+                           ('protocol', 'pool_protocol')):
+        if source in pool:
+            result[target] = pool[source]
     return result
 
 
@@ -92,11 +97,21 @@ def summarize(samples):
     if seconds <= 0:
         raise ValueError('No device uptime elapsed; no rate can be reported')
     temperatures = [s['temp_c'] for s in samples if finite_number(s.get('temp_c'))]
+    share_delta = {}
+    for key in ('accepted', 'rejected', 'work'):
+        before, after = (sample.get('shares', {}).get(key) for sample in (first, last))
+        share_delta[key] = after - before if finite_number(before) and finite_number(after) and after >= before else None
+    # Context makes it possible to distinguish a CPU/load change from thermal
+    # throttling, a pool outage or a change to the requested power setting.
+    context = {}
+    for key in ('power_percent', 'max_temp_c', 'pool_difficulty'):
+        context[key + '_levels'] = sorted({s[key] for s in samples if finite_number(s.get(key))})
+    context['limitation_reasons'] = sorted({s['limitation_reason'] for s in samples if isinstance(s.get('limitation_reason'), str)})
     return {'device_seconds': seconds, 'measured_hashrate_hs': (last['total_hashes'] - first['total_hashes']) / seconds,
             'max_temperature_c': max(temperatures) if temperatures else None,
             'pool_connected_samples': sum(s.get('pool_connected') is True for s in samples),
             'samples': len(samples), 'health_issues': sorted({issue for sample in samples for issue in health(sample)}),
-            'first': first, 'last': last}
+            'share_delta': share_delta, **context, 'first': first, 'last': last}
 
 
 def snapshot(urls):
@@ -110,6 +125,22 @@ def snapshot(urls):
         return dict(zip(urls, executor.map(one, urls)))
 
 
+def compare_phases(closed, opened):
+    if (closed['first'].get('boot_id') != opened['first'].get('boot_id') or
+            closed['first']['firmware'] != opened['first']['firmware']):
+        raise ValueError('Miner restarted or firmware changed between dashboard phases')
+    baseline = closed['measured_hashrate_hs']
+    changed = []
+    if any(phase['pool_connected_samples'] != phase['samples'] for phase in (closed, opened)):
+        changed.append('Pool connection was not continuous')
+    for key, description in (('power_percent_levels', 'Effective mining power changed'),
+                             ('max_temp_c_levels', 'Configured temperature limit changed')):
+        if closed[key] != opened[key] or any(len(phase[key]) > 1 for phase in (closed, opened)):
+            changed.append(description)
+    return {'open_vs_closed_percent': (opened['measured_hashrate_hs'] / baseline - 1) * 100 if baseline else None,
+            'conditions_to_review': changed}
+
+
 def measure(args):
     if args.seconds < 120 or args.warmup < 60 or args.interval < 2:
         raise ValueError('Use at least 120 seconds/phase, 60 seconds warmup and 2 seconds between samples')
@@ -119,8 +150,8 @@ def measure(args):
             input('Close all dashboards for these miners, then press Enter: ')
         else:
             for url in args.urls:
-                webbrowser.open(url)
-            input('Keep these dashboards loaded and visible, then press Enter: ')
+                webbrowser.open(url, new=1)
+            input('Keep every dashboard in a separate visible window (not background tabs), then press Enter: ')
         print(name, '- warming up for', args.warmup, 'seconds', flush=True)
         time.sleep(args.warmup)
         observations = {url: [] for url in args.urls}
@@ -136,11 +167,7 @@ def measure(args):
     comparison = {}
     for url in args.urls:
         closed, opened = (phases[name][url] for name in ('dashboard_closed', 'dashboard_open'))
-        baseline = closed['measured_hashrate_hs']
-        if (closed['first'].get('boot_id') != opened['first'].get('boot_id') or
-                closed['first']['firmware'] != opened['first']['firmware']):
-            raise ValueError('Miner restarted or firmware changed between dashboard phases')
-        comparison[url] = {'open_vs_closed_percent': (opened['measured_hashrate_hs'] / baseline - 1) * 100 if baseline else None}
+        comparison[url] = compare_phases(closed, opened)
     return {'conditions': 'Operator confirmed closed/open; identical API sampling in both phases',
             'rate_source': 'delta total_hashes / delta device uptime_s', 'phases': phases, 'comparison': comparison}
 
@@ -228,7 +255,7 @@ def main():
         passed = not (args.command == 'snapshot' and any(not item['reachable'] or item['health_issues'] for item in result.values()))
         if args.command == 'ota-monitor':
             passed = result['passed']
-        report = {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'kind': args.command,
+        report = {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'tool_version': 2, 'kind': args.command,
                   'status': 'completed' if passed else 'failed', 'simulated': False, 'result': result}
         write_report(args.output, report)
         print('Report:', args.output)
