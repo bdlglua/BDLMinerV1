@@ -9,13 +9,25 @@ each on the same board at 1150 mV: 1.126, 1.225 and 1.267 TH/s, ASIC up to 58 °
 regulator up to 71.5 °C, 16.9 A, hardware errors 0.2 %. Profiles above 625 MHz (the
 highest ESP-Miner offers at this voltage) are still untested.
 
-### OLED preview (v1.6.1)
+### OLED preview (development interface)
 
-The three pages below use the firmware's 128×32 monochrome rendering and font,
+The three pages and candidate alert below use the firmware's 128×32 monochrome rendering and font,
 enlarged for readability. **All values are fictional demo data**, not hardware
 measurements. Press BOOT to switch pages.
 
-![Gamma 601 OLED pages with fictional demo data](../images/gamma601-oled-v1.6.1.png)
+![Gamma 601 OLED pages with fictional demo data](../images/gamma601-oled-layout.png)
+
+The OLED uses four rows of the real 6×8 Font0, with a one-pixel margin at each
+side. Rotations are limited to 0°/180° so the available area remains 128×32.
+`A` is accepted shares and `R` rejected shares; counters from one million use
+SI notation so both remain visible. Long status/setup messages cycle through
+complete text portions every three seconds instead of losing their ending.
+Unknown power readings show `--`. The block candidate alert is centered and
+stays until a button press; it does not claim Bitcoin chain confirmation.
+
+Run `python3 tools/preview_gamma_display.py --check` to exercise the actual Gamma
+renderer with LovyanGFX and a 128×32 one-bit native sprite. Omit `--check` to export
+PNG previews of normal pages, large counters, faults, setup and the block alert.
 
 ## Supported hardware
 

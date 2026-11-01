@@ -76,6 +76,10 @@ jobs:
         if: matrix.env == 'm5stickc-plus2'
         run: python3 tools/preview_display.py --check
 
+      - name: Gamma 601 native 128x32 OLED rendering regressions
+        if: matrix.env == 'bitaxe-gamma-601'
+        run: python3 tools/preview_gamma_display.py --check
+
       - name: Experimental Gamma 601 USB build
         if: matrix.env == 'bitaxe-gamma-601'
         uses: actions/upload-artifact@v7

@@ -13,12 +13,66 @@ lgfx::LovyanGFX *oled = nullptr;
 uint8_t page = 0, brightness = 100;
 uint32_t since = 0, foundHeight = 0;
 bool alertShown = false;
-void lines(const String &a, const String &b, const String &c, const String &d) {
+String longRows[4];
+uint32_t rowStarted[4]{};
+String singleLine(const String &text) {
+    String out;
+    out.reserve(text.length());
+    for (unsigned i = 0; i < text.length(); ++i) {
+        uint8_t c = text[i];
+        out += c < 32 || c == 127 ? ' ' : char(c);
+    }
+    return out;
+}
+unsigned rowEnd(const String &text, unsigned start, int width) {
+    unsigned end = start, space = start;
+    while (end < text.length()) {
+        unsigned next = end + 1;
+        // Never split a UTF-8 character between two display windows.
+        while (next < text.length() && (uint8_t(text[next]) & 0xc0) == 0x80) ++next;
+        if (oled->textWidth(text.substring(start, next).c_str()) > width) break;
+        if (text[end] == ' ') space = next;
+        end = next;
+    }
+    if (end < text.length() && space > start) return space;
+    return end > start ? end : start + 1;
+}
+String rowWindow(const String &text, int width, uint32_t age) {
+    unsigned count = 0;
+    for (unsigned start = 0; start < text.length(); ++count) start = rowEnd(text, start, width);
+    if (!count) return "";
+    unsigned part = (age / 3000) % count, start = 0;
+    while (part) { start = rowEnd(text, start, width); --part; }
+    return text.substring(start, rowEnd(text, start, width));
+}
+String counter(uint32_t count) {
+    return count < 1000000 ? String(count) : String(work::formatSI(count, 2).c_str());
+}
+String reading(float value, unsigned decimals) { return std::isfinite(value) ? String(value, decimals) : String("--"); }
+void lines(const String &a, const String &b, const String &c, const String &d, bool centered = false) {
     if (!oled || !brightness) return;
-    oled->startWrite(); oled->fillScreen(0); oled->setTextColor(0xffffff, 0);
-    oled->setTextSize(1); oled->setTextWrap(false);
+    oled->setTextColor(0xffffff, 0);
+    // SSD1306 is 128x32: Font0 is exactly 6x8, four independent 8px rows.
+    oled->setFont(&lgfx::fonts::Font0); oled->setTextSize(1); oled->setTextWrap(false);
     const String *rows[]{&a, &b, &c, &d};
-    for (int i = 0; i < 4; ++i) { oled->setCursor(0, i * 8); oled->print(rows[i]->substring(0,21)); }
+    String visible[4];
+    uint32_t now = millis();
+    for (int i = 0; i < 4; ++i) {
+        String text = singleLine(*rows[i]);
+        int width = oled->width() - 2;
+        if (oled->textWidth(text.c_str()) > width) {
+            if (longRows[i] != text) { longRows[i] = text; rowStarted[i] = now; }
+            text = rowWindow(text, width, uint32_t(now - rowStarted[i]));
+        } else longRows[i] = "";
+        visible[i] = text;
+    }
+    // Formatting/paging above does not hold the OLED/ASIC's shared I2C bus.
+    oled->startWrite(); oled->fillScreen(0);
+    for (int i = 0; i < 4; ++i) {
+        const String &text = visible[i];
+        int x = centered ? (oled->width() - oled->textWidth(text.c_str())) / 2 : 1;
+        oled->setCursor(x, i * 8); oled->print(text.c_str());
+    }
     oled->endWrite(); oled->display();
 }
 }
@@ -43,16 +97,16 @@ void blockFound(uint32_t height) { foundHeight = height; alertShown = true; rend
 bool dismissAlert() { if (!alertShown) return false; alertShown = false; since = millis(); render(); return true; }
 uint32_t screenAge() { return millis()-since; }
 void render() {
-    if (alertShown) { lines("** BLOCK CANDIDATE **",String("Height ")+foundHeight,"Check pool / chain","Press the button"); return; }
+    if (alertShown) { lines("BLOCK CANDIDATE",String("Height ")+foundHeight,"Check pool / chain","Press the button",true); return; }
     auto s = minerStats(); auto a = gamma601::status();
     // The ASIC diode, or the board's sensor while the ASIC is off.
     float t = gamma601::temperature();
     String temp = std::isfinite(t)?String(t,1):"--";
     if (!a.running) { lines("Gamma 601 / BM1370",a.state,temp+" C  Fan "+String(a.rpm),WiFi.localIP().toString()); return; }
     if (page == 0) lines(a.stockFallback?"BM1370 525M FALLBACK":"BDLMiner / BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
-        temp+" C  Fan "+String(a.rpm),String("Accepted ")+s.accepted+" / "+s.rejected);
-    else if (page == 1) lines("Power / thermal",String(a.inputVoltage,2)+"V in  "+String(a.coreVoltage,3)+"V core",
-        String(a.frequency,0)+" MHz  "+String(a.current,1)+"A",String("VR ")+String(a.regulatorTemperature,1)+" C");
+        temp+" C  Fan "+String(a.rpm),String("A:")+counter(s.accepted)+" R:"+counter(s.rejected));
+    else if (page == 1) lines("Power / thermal",String("Vin ")+reading(a.inputVoltage,2)+"V Vc "+reading(a.coreVoltage,3)+"V",
+        reading(a.frequency,0)+" MHz  "+reading(a.current,1)+"A",String("VR ")+reading(a.regulatorTemperature,1)+" C");
     else lines("Pool / records",s.poolConnected?"Pool connected":"Pool disconnected",String("Best ")+work::formatSI(s.bestDiff,2).c_str(),WiFi.localIP().toString());
 }
 }
