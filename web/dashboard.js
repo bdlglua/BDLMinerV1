@@ -12,7 +12,7 @@ function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*42949
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  if(label===t('Hashrate'))e.classList.add('hero');
  if(label===t('Hashrate history'))e.classList.add('history');
- for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash','Crash history','Integrations'],records:['32-bit shares','64-bit shares','Block chance','Blocks found','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
+ for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash','Crash history','Integrations'],records:['32-bit shares','64-bit shares','Block chance','Block candidates','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
 
 function textAt(id,value){const node=document.getElementById(id);if(node.textContent!==String(value))node.textContent=value}
@@ -72,6 +72,15 @@ function sharesTile(log){
  const lines=log.slice(0,10).map(e=>(e.t?new Date(e.t*1e3).toLocaleTimeString():'--:--:--')+'  '+mark[e.s]+' '+t(label[e.s]||e.s)+' · '+t('diff')+' '+diff(e.d)+(e.b?' · '+t('backup pool'):''));
  const accepted=log.filter(e=>e.s==='accepted').length;
  const e=tile(t('Recent shares'),accepted+' / '+log.length+' '+t('accepted'),lines.join('\n'),true);e.dataset.group='records';return e;
+}
+function blockCandidateTile(j){
+ const labels={queued:'Queued with priority',submitted:'Submitted to pool',share_accepted:'Share accepted by pool',share_rejected:'Share rejected by pool',unanswered:'No pool answer',stale:'Obsolete work',queue_full:'Candidate queue full: not sent'};
+ const c=j.block_candidate,lines=[t('lifetime')+' '+j.lifetime.blocks,t('Local candidates; chain confirmation unknown')];
+ if(c){
+  lines.push(t('Block height')+COLON+(c.height||'-'),t(labels[c.status]||'Unknown submission status'));
+  if(c.hash)lines.push(String(c.hash));
+ }
+ return tile(t('Block candidates'),j.blocks,lines.join('\n'),!!c);
 }
 // Connected time since restart, reconnections and switches to the backup pool.
 function poolUptime(p){
@@ -163,7 +172,7 @@ function show(j){
    tile(t('32-bit shares'),j.over32bits,t('1 every')+' '+(j.hashrate?dur(4294967296/j.hashrate):'-')+' '+t('on average')),
    tile(t('64-bit shares'),j.over64bits??0,t('Since restart')+' · '+t('1 every')+' '+share64Wait(j.hashrate)+' '+t('on average')),
    tile(t('Block chance'),odds(j.hashrate,j.network.difficulty,86400)+' / '+t('day'),odds(j.hashrate,j.network.difficulty,31557600)+' / '+t('year')),
-   tile(t('Blocks found'),j.blocks,t('lifetime')+' '+j.lifetime.blocks),
+   blockCandidateTile(j),
    tile(t('Total hashes'),si(j.total_hashes),t('uptime')+' '+dur(j.uptime_s)),
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];

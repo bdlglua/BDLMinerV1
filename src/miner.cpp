@@ -64,6 +64,16 @@ struct QueuedShare {
 };
 QueueHandle_t shareQueue;
 portMUX_TYPE statsMux = portMUX_INITIALIZER_UNLOCKED;
+// Reserved, bounded storage: ordinary shares must never displace a block
+// candidate. Consumers check this before the regular queue (waits <= 20 ms).
+QueuedShare blockQueue[2];
+unsigned blockQueueCount = 0;
+struct CandidateRecord {
+    BlockCandidate info;
+    uint32_t submissionId;
+};
+CandidateRecord candidates[4];
+unsigned candidateHead = 0, candidateCount = 0;
 bool bestDirty = false;
 BestShare top[TOP_SHARES];  // best first, difficulty 0 = empty
 BlockBest blockBests[BLOCK_BESTS];  // ring, blockHead = the height mined now
@@ -171,12 +181,6 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
     portEXIT_CRITICAL(&statsMux);
 
     bool block = work::meetsTarget(hash, w.networkTarget);
-    if (block) {
-        portENTER_CRITICAL(&statsMux);
-        stats.blocksFound++;
-        portEXIT_CRITICAL(&statsMux);
-        logf("!!!!! BLOCK FOUND !!!!! nonce=%08x job=%s\n", nonce, w.jobId.c_str());
-    }
     if ((w.exactShareTarget ? work::meetsTarget(hash, w.shareTarget) : d >= w.shareDifficulty) || block) {
         stratum::Share s{};
         strlcpy(s.jobId, w.jobId.c_str(), sizeof(s.jobId));
@@ -189,7 +193,43 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
         s.version = uint32_t(w.header[0]) | uint32_t(w.header[1]) << 8 | uint32_t(w.header[2]) << 16 | uint32_t(w.header[3]) << 24;
         memcpy(s.hash, hash, 32);
         QueuedShare queued{s, w.generation};
-        if (xQueueSend(shareQueue, &queued, 0) == pdTRUE) {
+        if (block) {
+            // Serialize the rare block path with clean jobs/disconnects. A
+            // batch finishing on obsolete work must not announce a new block.
+            if (!jobMutex || !shareQueue) return;
+            xSemaphoreTake(jobMutex, portMAX_DELAY);
+            if (!boardValid || w.generation != workGeneration) {
+                xSemaphoreGive(jobMutex);
+                return;
+            }
+            bool duplicate = false, enqueued = false;
+            portENTER_CRITICAL(&statsMux);
+            for (unsigned i = 0; i < candidateCount; ++i)
+                if (!memcmp(candidates[i].info.hash, hash, 32)) duplicate = true;
+            if (!duplicate) {
+                enqueued = blockQueueCount < 2;
+                if (enqueued) blockQueue[blockQueueCount++] = queued;
+                CandidateRecord &record = candidates[candidateHead];
+                record = {};
+                record.info.number = ++stats.blocksFound;
+                record.info.height = w.height;
+                memcpy(record.info.hash, hash, 32);
+                record.info.state = enqueued ? BlockQueued : BlockQueueFull;
+                candidateHead = (candidateHead + 1) % 4;
+                if (candidateCount < 4) ++candidateCount;
+                stats.lifetimeBlocks = baseBlocks + stats.blocksFound;
+                if (enqueued) ++stats.sharesFound;
+            }
+            portEXIT_CRITICAL(&statsMux);
+            xSemaphoreGive(jobMutex);
+            if (!duplicate) {
+                uint8_t id[32];
+                for (unsigned i = 0; i < 32; ++i) id[i] = hash[31 - i];
+                logf("[miner] BLOCK CANDIDATE height=%u hash=%s job=%s %s; chain confirmation unknown\n",
+                     (unsigned)w.height, work::toHex(id, 32).c_str(), w.jobId.c_str(),
+                     enqueued ? "queued with priority" : "NOT QUEUED: candidate queue full");
+            }
+        } else if (shareQueue && xQueueSend(shareQueue, &queued, 0) == pdTRUE) {
             portENTER_CRITICAL(&statsMux);
             stats.sharesFound++;
             portEXIT_CRITICAL(&statsMux);
@@ -376,12 +416,22 @@ void minerTask(void *arg) {
 
 }  // namespace
 
+// Called with jobMutex held, taking locks in the same order as onCandidate.
+void invalidateBlockQueue() {
+    portENTER_CRITICAL(&statsMux);
+    blockQueueCount = 0;
+    for (unsigned i = 0; i < candidateCount; ++i)
+        if (candidates[i].info.state == BlockQueued) candidates[i].info.state = BlockStale;
+    portEXIT_CRITICAL(&statsMux);
+}
+
 void minerPublishJob(const work::Job &job, bool clean) {
     if (!jobMutex || !shareQueue) return;
     xSemaphoreTake(jobMutex, portMAX_DELAY);
     if (clean) {
         workGeneration++;
         xQueueReset(shareQueue);
+        invalidateBlockQueue();
     }
     board = job;
     double networkDiff = work::difficultyFromBits(job.nbits);
@@ -405,14 +455,27 @@ void minerInvalidate() {
     boardValid = false;
     workGeneration++;
     xQueueReset(shareQueue);
+    invalidateBlockQueue();
     xSemaphoreGive(jobMutex);
 }
 
 bool minerNextShare(stratum::Share &share, uint32_t waitMs) {
     if (!shareQueue) return false;
     QueuedShare queued;
-    TickType_t wait = pdMS_TO_TICKS(waitMs);
-    while (xQueueReceive(shareQueue, &queued, wait) == pdTRUE) {
+    TickType_t wait = pdMS_TO_TICKS(min<uint32_t>(waitMs, 20));
+    for (;;) {
+        portENTER_CRITICAL(&statsMux);
+        bool priority = blockQueueCount != 0;
+        if (priority) {
+            queued = blockQueue[0];
+            if (--blockQueueCount) blockQueue[0] = blockQueue[1];
+        }
+        portEXIT_CRITICAL(&statsMux);
+        if (!priority && xQueueReceive(shareQueue, &queued, wait) != pdTRUE) {
+            if (!wait) return false;
+            wait = 0; // check candidates that arrived during the queue wait
+            continue;
+        }
         // A batch already running during a clean job or disconnect can enqueue
         // its result after the queue reset. It must not reach the next session.
         if (queued.generation == workGeneration && boardValid) {
@@ -421,7 +484,6 @@ bool minerNextShare(stratum::Share &share, uint32_t waitMs) {
         }
         wait = 0;
     }
-    return false;
 }
 
 void minerStart() {
@@ -499,18 +561,31 @@ ShareEntry shareLog[kShareLog];
 uint32_t shareLogIds[kShareLog];
 int shareLogHead = 0, shareLogCount = 0;
 
-void minerShareSent(double difficulty, bool backup, uint32_t submissionId) {
+void minerShareSent(double difficulty, bool backup, uint32_t submissionId, const uint8_t *hash) {
     time_t now = time(nullptr);
     portENTER_CRITICAL(&statsMux);
     shareLog[shareLogHead] = ShareEntry{now > 1700000000 ? uint32_t(now) : 0, float(difficulty), SharePending, backup};
     shareLogIds[shareLogHead] = submissionId;
     shareLogHead = (shareLogHead + 1) % kShareLog;
     if (shareLogCount < kShareLog) shareLogCount++;
+    if (hash) for (unsigned i = 0; i < candidateCount; ++i) {
+        CandidateRecord &record = candidates[i];
+        if (record.info.state == BlockQueued && !memcmp(record.info.hash, hash, 32)) {
+            record.submissionId = submissionId;
+            record.info.state = BlockSubmitted;
+        }
+    }
     portEXIT_CRITICAL(&statsMux);
 }
 
 // Called with statsMux held.
 void settleShare(uint32_t submissionId, uint8_t state) {
+    // Track candidates independently of the short ordinary-share log.
+    for (unsigned i = 0; i < candidateCount; ++i) {
+        CandidateRecord &record = candidates[i];
+        if (record.info.state == BlockSubmitted && record.submissionId == submissionId)
+            record.info.state = state == ShareAccepted ? BlockShareAccepted : BlockShareRejected;
+    }
     for (int i = shareLogCount; i > 0; --i) {
         int index = (shareLogHead - i + kShareLog) % kShareLog;
         ShareEntry &e = shareLog[index];
@@ -519,6 +594,14 @@ void settleShare(uint32_t submissionId, uint8_t state) {
             return;
         }
     }
+}
+
+bool minerLastBlockCandidate(BlockCandidate &out) {
+    portENTER_CRITICAL(&statsMux);
+    bool found = candidateCount != 0;
+    if (found) out = candidates[(candidateHead + 3) % 4].info;
+    portEXIT_CRITICAL(&statsMux);
+    return found;
 }
 
 int minerShareLog(ShareEntry *out, int capacity) {
@@ -538,9 +621,12 @@ void minerPoolConnected(bool connected) {
     } else if (!connected && stats.poolConnected) {
         poolConnectedMs += now - poolSince;
     }
-    if (!connected)  // a lost connection takes its pending answers with it
+    if (!connected) { // a lost connection takes its pending answers with it
         for (int i = 0; i < shareLogCount; ++i)
             if (shareLog[i].state == SharePending) shareLog[i].state = ShareUnanswered;
+        for (unsigned i = 0; i < candidateCount; ++i)
+            if (candidates[i].info.state == BlockSubmitted) candidates[i].info.state = BlockUnanswered;
+    }
     stats.poolConnected = connected;
     portEXIT_CRITICAL(&statsMux);
 }

@@ -38,6 +38,11 @@ int main(int argc, char **) {
     assert(open.type==0x13 && open.payload[4]==14 && open.payload[open.payload.size()-2]==8);
     assert(p.handle(channel())==Event::Opened && p.opened());
     assert(p.handle(job(42,true))==Event::None && !p.hasJob());
+    for (uint32_t bits : {0u, 0x1d80ffffu, 0x23000001u}) {
+        auto invalid = p; auto frame = previous(42);
+        for (int i = 0; i < 4; ++i) frame.payload[frame.payload.size()-4+i] = bits >> (8*i);
+        assert(invalid.handle(frame) == Event::Error && !invalid.hasJob());
+    }
     assert(p.handle(previous(42))==Event::Job && p.job().clean);
     work::Work w;work::build(p.job(),10,w);
     assert(w.extranonce2Hex=="000000000000000a" && w.exactShareTarget && w.quickLimit==UINT32_MAX);

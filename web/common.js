@@ -1,6 +1,7 @@
 const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','Hashrate':'Hashrate','Shares':'Shares',
 'rejected':'rejetées','pool diff':'diff pool','Best difficulty':'Meilleure difficulté','best ever':'record','32-bit shares':'Shares 32 bits','64-bit shares':'Shares 64 bits','Since restart':'Depuis le redémarrage','years':'ans',
-'1 every':'1 toutes les','on average':'en moyenne','Block chance':'Chance de bloc','day':'jour','year':'an','Blocks found':'Blocs trouvés',
+'1 every':'1 toutes les','on average':'en moyenne','Block chance':'Chance de bloc','day':'jour','year':'an','Block candidates':'Blocs candidats',
+'Local candidates; chain confirmation unknown':'Candidats locaux ; confirmation sur la chaîne inconnue','Queued with priority':'En file prioritaire','Submitted to pool':'Envoyé à la pool','Share accepted by pool':'Share acceptée par la pool','Share rejected by pool':'Share rejetée par la pool','No pool answer':'Aucune réponse de la pool','Obsolete work':'Travail obsolète','Candidate queue full: not sent':'File de candidats pleine : non envoyé','Unknown submission status':'État de transmission inconnu',
 'lifetime':'depuis le début','Total hashes':'Hashes totaux','uptime':'en marche depuis','Block height':'Hauteur de bloc','net diff':'diff réseau',
 'Lifetime':'Depuis le début','hashes':'hashes','shares':'shares','running':'en marche','Hashrate history':'Historique du hashrate',
 '5-min averages, last':'moyennes sur 5 min, depuis','avg':'moy.','range':'de','first point after':'premier point après','min of mining':'min de minage',

@@ -148,7 +148,8 @@ const Pair kTexts[] = {
     {"Rebooting into setup", "Redemarrage en config"},
     {"Update", "Mise a jour"},
     {"Installing", "Installation"},
-    {"BLOCK FOUND!", "BLOC TROUVE !"},
+    {"BLOCK CANDIDATE", "BLOC CANDIDAT"},
+    {"Check pool / chain", "Verifier pool / chaine"},
     {"Press a button", "Appuyez sur un bouton"},
 };
 

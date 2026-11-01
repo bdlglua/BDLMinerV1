@@ -197,6 +197,16 @@ void buildStats(JsonDocument &j, bool history) {
     j["best"]["session"] = stats.sessionBestDiff;
     j["best"]["ever"] = stats.bestDiff;
     j["blocks"] = stats.blocksFound;
+    BlockCandidate candidate{};
+    if (minerLastBlockCandidate(candidate)) {
+        static const char *const states[] = {"queued", "submitted", "share_accepted", "share_rejected", "unanswered", "stale", "queue_full"};
+        uint8_t id[32];
+        for (unsigned i = 0; i < 32; ++i) id[i] = candidate.hash[31 - i];
+        j["block_candidate"]["height"] = candidate.height;
+        j["block_candidate"]["hash"] = work::toHex(id, 32);
+        j["block_candidate"]["status"] = states[candidate.state];
+        j["block_candidate"]["chain_confirmed"] = nullptr; // unknown: a pool ACK is not chain proof
+    }
     j["over32bits"] = stats.over32bits;
     j["over64bits"] = stats.over64bits;
     BestShare top[TOP_SHARES];
@@ -923,6 +933,7 @@ void handleMetrics() {
     metric("bdlminer_shares_accepted_total", "counter", stats.accepted);
     metric("bdlminer_shares_rejected_total", "counter", stats.rejected);
     metric("bdlminer_blocks_found_total", "counter", stats.blocksFound);
+    metric("bdlminer_block_candidates_total", "counter", stats.blocksFound);
     metric("bdlminer_best_difficulty", "gauge", stats.sessionBestDiff);
     metric("bdlminer_best_difficulty_ever", "gauge", stats.bestDiff);
     metric("bdlminer_shares_32bit_total", "counter", stats.over32bits);

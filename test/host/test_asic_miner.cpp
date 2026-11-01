@@ -53,5 +53,18 @@ int main(){
     minerShareLog(log,20);assert(log[0].state==ShareAccepted&&stats.acceptedWork==0.875);
     double period=minerTakePeriodBest();assert(minerTakePeriodBest()==0&&period>=0);
     puts("Share log: out-of-order IDs, delayed vardiff credit, evicted entries, unanswered after disconnect and 20 newest kept passed");
+    // A real SHA-256d ASIC result at the network target takes the candidate
+    // path, retaining the independently recomputed genesis block identifier.
+    minerPublishJob(job,true); assert(minerAsicWork(w));
+    assert(work::fromHex(genesis,w.header,80)); w.versionMask=0;
+    assert(work::targetFromBits(0x1d00ffff,w.networkTarget));
+    uint32_t found=stats.blocksFound;
+    minerAsicCandidate(w,2083236893,0);
+    assert(stats.blocksFound==found+1 && minerNextShare(share,0));
+    BlockCandidate candidate{}; assert(minerLastBlockCandidate(candidate));
+    assert(candidate.number==found+1 && !memcmp(candidate.hash,share.hash,32));
+    minerAsicCandidate(w,2083236893,0);
+    assert(stats.blocksFound==found+1 && !minerNextShare(share,0));
+    puts("ASIC block candidate: verified genesis proof, full hash, priority submission and duplicate suppression passed");
     puts("Native ASIC mining: unique work/version masks, independent SHA-256d, corrupted/stale results, no software fallback and accurate 1.2 TH/s counters/stop decay passed");
 }

@@ -191,13 +191,16 @@ Screens, in order:
 6. **Hashrate**: graph over the last ~40 minutes (one point every 10 s), min / avg / max;
 7. **Records**: best difficulty ever and this session, 32/64-bit counters,
    lifetime hashes and running time, with block totals and annual block odds in the footer;
-8. **Blocks**: the block being mined, then the last 4 blocks found on the network, with
+8. **Blocks**: the block being mined, then the last 3 blocks found on the network, with
    their pool, age and your best share while each one was being mined.
 
-When the miner finds a block, a full-screen **BLOCK FOUND!** alert with its height
+When a locally verified hash meets the network target, a full-screen
+**BLOCK CANDIDATE** alert with that work's height
 stays until a button is pressed (that press only closes it); it lights the screen
 even in night mode. Accepted shares flash `+1 SHARE` in the header; 32‑bit shares also light the red LED of M5
-devices for a second (not in night mode).
+devices for a second (not in night mode). Check **Block candidates** in the
+dashboard for the latest candidate's hash and pool submission status. A pool
+accepting its share does not establish Bitcoin chain confirmation or payment.
 Web settings add: 5 colour themes, automatic screen change every N seconds, rotation
 following the accelerometer (M5 devices with an IMU: the two landscape ways), and a night
 mode (screen off, no beep, from one hour to another; a button press lights it for 30 s).
@@ -420,7 +423,7 @@ give it a name, enter the address as `address.name`.
 
 Install the [ntfy](https://ntfy.sh) app, subscribe to a topic of your own (a long,
 hard-to-guess name: anyone who knows it can read it) and enter it in the web settings
-(*ntfy topic*; another ntfy server can be set). The miner then sends: block found,
+(*ntfy topic*; another ntfy server can be set). The miner then sends: block candidate,
 new best difficulty ever (from difficulty 1, at most every 10 minutes), offline for
 10 minutes and back online, too hot / cooled down, restarted after a crash or a
 watchdog, a firmware rolled back after a failed trial, and optionally every 32‑bit share.
@@ -580,6 +583,22 @@ crash still leaves a trace; **Erase** clears this history too.
 | 32-bit shares | Locally verified hashes at difficulty 1 or higher. |
 | 64-bit shares | Locally verified hashes with at least 64 leading zero bits. |
 | Best difficulty | The strongest locally verified hash in this session or across saved records. |
+| Block candidates | Locally verified hashes meeting the work's network target; not confirmed blocks or payouts. |
+
+Candidates use reserved priority storage, separate from ordinary queued shares.
+The dashboard shows the latest candidate this boot, its original height, full
+block identifier and submission status: queued, submitted, share accepted,
+share rejected, unanswered, stale or candidate queue full. Candidate records are
+bounded in RAM; only their lifetime count persists across reboots. An unanswered
+submission has an unknown result, including if the connection closed after send.
+The firmware does not verify inclusion in the Bitcoin chain: check the pool and
+a block explorer independently, including confirmations and the payout policy.
+
+For API compatibility, `blocks` and `lifetime.blocks` keep their existing field
+names and represent local candidates. The optional `block_candidate` object in
+`/api/stats` has `height`, `hash`, `status` and `chain_confirmed: null` (unknown).
+Prometheus exposes `bdlminer_block_candidates_total`; the previous
+`bdlminer_blocks_found_total` remains an alias for existing dashboards.
 
 An accepted-share counter at zero does not by itself mean hashing has stopped.
 Pool acceptance depends on the assigned difficulty, a valid connection and a

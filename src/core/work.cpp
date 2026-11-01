@@ -136,15 +136,19 @@ uint32_t quickLimitFor(double difficulty) {
     return (uint32_t)ceil(top);
 }
 
-void targetFromBits(uint32_t nbits, uint8_t target[32]) {
+bool targetFromBits(uint32_t nbits, uint8_t target[32]) {
     memset(target, 0, 32);
     uint32_t exp = nbits >> 24;
     uint32_t mant = nbits & 0x007FFFFF;
+    if (!mant || (nbits & 0x00800000) || exp > 34 ||
+        (mant > 0xff && exp > 33) || (mant > 0xffff && exp > 32)) return false;
     // target = mant * 256^(exp-3); byte i of the LE number.
     for (int i = 0; i < 3; i++) {
         int pos = (int)exp - 3 + i;
         if (pos >= 0 && pos < 32) target[pos] = (uint8_t)(mant >> (8 * i));
     }
+    for (int i = 0; i < 32; ++i) if (target[i]) return true;
+    return false;
 }
 
 double difficultyFromBits(uint32_t nbits) {

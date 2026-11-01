@@ -163,7 +163,9 @@ Event Protocol::handle(const Frame &f) {
     if (f.type == 0x20) {
         uint32_t channel = r.number(4), id = r.number(4); uint8_t prev[32]{}; r.bytes(prev, 32);
         uint32_t time = r.number(4), bits = r.number(4);
-        if (!r.end() || (channel != channel_ && channel != group_) || !time || !bits) return fail("Invalid SV2 previous hash");
+        uint8_t networkTarget[32];
+        if (!r.end() || (channel != channel_ && channel != group_) || !time ||
+            !work::targetFromBits(bits, networkTarget)) return fail("Invalid SV2 previous hash");
         Slot *chosen = nullptr;
         for (auto &s : jobs_) if (s.valid && s.future && s.id == id) chosen = &s;
         if (!chosen) return fail("Unknown SV2 future job");

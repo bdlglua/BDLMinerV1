@@ -58,8 +58,9 @@ double hashDifficulty(const uint8_t hash[32]);
 // Top 32 bits of the target matching `difficulty` (little-endian view).
 uint32_t quickLimitFor(double difficulty);
 
-// nBits -> 256-bit little-endian target.
-void targetFromBits(uint32_t nbits, uint8_t target[32]);
+// nBits -> positive 256-bit little-endian target. Invalid (negative, zero or
+// overflowing) compact values return false and leave an all-zero target.
+bool targetFromBits(uint32_t nbits, uint8_t target[32]);
 double difficultyFromBits(uint32_t nbits);
 
 // true if little-endian 256-bit `hash` <= `target`.

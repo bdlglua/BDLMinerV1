@@ -188,6 +188,8 @@ Event Protocol::handleLine(const char *line) {
             if (!parseHex32(params[5], j.version) || !parseHex32(params[6], j.nbits) ||
                 !parseHex32(params[7], j.ntime))
                 return invalid("invalid block header hex");
+            uint8_t networkTarget[32];
+            if (!work::targetFromBits(j.nbits, networkTarget)) return invalid("invalid network target");
             j.clean = params[8].as<bool>();
             j.versionMask = versionMask_;
 

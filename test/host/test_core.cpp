@@ -126,9 +126,20 @@ static void testSha() {
     CHECK(d > 2536 && d < 2537);
 
     uint8_t target[32];
-    work::targetFromBits(0x1d00ffff, target);
+    CHECK(work::targetFromBits(0x1d00ffff, target));
     CHECK(work::meetsTarget(h2, target));
     CHECK(fabs(work::difficultyFromBits(0x1d00ffff) - 1.0) < 1e-9);
+    // Bitcoin compact targets: sign, truncation to zero and U256 overflow.
+    for (uint32_t bits : {0u, 0x1d80ffffu, 0x01000001u, 0x020000ffu,
+                          0x23000001u, 0x22000100u, 0x21010000u}) {
+        memset(target, 0xff, 32);
+        CHECK(!work::targetFromBits(bits, target));
+        for (uint8_t byte : target) CHECK(byte == 0);
+        CHECK(work::difficultyFromBits(bits) == 0);
+    }
+    CHECK(work::targetFromBits(0x01010000u, target) && target[0] == 1);
+    CHECK(work::targetFromBits(0x220000ffu, target) && target[31] == 0xff);
+    CHECK(work::targetFromBits(0x2100ffffu, target) && target[31] == 0xff && target[30] == 0xff);
 
     auto t0 = std::chrono::steady_clock::now();
     const uint32_t N = 2000000;
@@ -427,6 +438,12 @@ static void testStratumValidation() {
     }
 
     CHECK(p.handleLine(kNotify) == stratum::Event::NewJob);
+    for (const char *bits : {"1d80ffff", "23000001", "00000000"}) {
+        std::string bad = kNotify;
+        bad.replace(bad.find("1a44b9f2"), 8, bits);
+        CHECK(p.handleLine(bad.c_str()) == stratum::Event::Error);
+        CHECK(p.job().nbits == 0x1a44b9f2); // keep the last usable work intact
+    }
     work::Work original;
     work::build(p.job(), 7, original);
     struct BadField { int index; const char *json; } badFields[] = {

@@ -100,16 +100,30 @@ void throttle() {
 void alerts(uint32_t now, const MinerStats &stats);
 void summary(uint32_t now, const MinerStats &stats);
 
+void blockAlert() {
+    static uint32_t lastBlocks = 0; // session count: include candidates before the first watch tick
+    BlockCandidate candidate{};
+    if (!minerLastBlockCandidate(candidate) || candidate.number == lastBlocks) return;
+    lastBlocks = candidate.number;
+    char msg[160];
+    snprintf(msg, sizeof(msg), "Block candidate at height %u by %s. Check pool submission and Bitcoin chain confirmation.",
+             (unsigned)candidate.height, board::modelName());
+    notify("BLOCK CANDIDATE", msg, 5, "tada");
+    logf("[miner] block candidate alert at height %u; chain confirmation unknown\n", (unsigned)candidate.height);
+    watchWake();
+    ui::blockFound(candidate.height);
+    if (settings.beep) board::beep();
+}
+
 void events(uint32_t now) {
     const MinerStats stats = minerStats();
     static bool first = true;
-    static uint32_t lastBlocks, lastOver32, lastAccepted, acceptedAt, lastConnected;
+    static uint32_t lastOver32, lastAccepted, acceptedAt, lastConnected;
     static double lastBest;
     static uint32_t bestAt = 0;
     static bool offlineSent = false, bootSent = false;
     if (first) {
         first = false;
-        lastBlocks = stats.blocksFound;
         lastOver32 = stats.over32bits;
         lastAccepted = stats.accepted;
         acceptedAt = lastConnected = now;
@@ -117,16 +131,7 @@ void events(uint32_t now) {
     }
     char msg[160];
 
-    if (stats.blocksFound != lastBlocks) {
-        lastBlocks = stats.blocksFound;
-        snprintf(msg, sizeof(msg), "Block %u found by %s! Check the pool and your wallet.", (unsigned)stats.blockHeight,
-                 board::modelName());
-        notify("BLOCK FOUND", msg, 5, "tada,moneybag");
-        logf("[miner] BLOCK FOUND at height %u\n", (unsigned)stats.blockHeight);
-        watchWake();  // shown even at night
-        ui::blockFound(stats.blockHeight);
-        if (settings.beep) board::beep();
-    }
+    blockAlert();
 
     // The red LED lights for a second on each 32-bit share (not at night).
     // An ASIC finds several every second (its own filter is above difficulty
@@ -311,7 +316,7 @@ void summary(uint32_t now, const MinerStats &stats) {
         if (ms >= 23 * 3600000UL) snprintf(since, sizeof(since), "24 h");
         else snprintf(since, sizeof(since), "Since start %u h ago", (unsigned)((ms + 1800000) / 3600000));
         snprintf(msg, sizeof(msg), "%s%s: %s average, best %.4g (record %.4g), %u accepted / %u rejected, pool connected %.1f %%",
-                 blocks ? "BLOCK FOUND! " : "", since, rateText(rate).c_str(), best, stats.bestDiff,
+                 blocks ? "BLOCK CANDIDATE! " : "", since, rateText(rate).c_str(), best, stats.bestDiff,
                  (unsigned)(stats.accepted - accepted0), (unsigned)(stats.rejected - rejected0),
                  100.0 * (pool.connectedMs - connected0) / ms);
         logf("[watch] daily summary: %s\n", msg);

@@ -95,6 +95,8 @@ or channel difficulty determines how often accepted shares can appear; see
 * **Web dashboard**: live statistics, what the pool sees, a 24-hour chart, settings
   (most apply without a restart), backups, firmware upload and the log, plus
   `/api/stats` and Prometheus `/metrics`; see [Web dashboard](docs/guide.md#web-dashboard).
+  The **Block candidates** card distinguishes local proofs, pool submission and
+  share acceptance; Bitcoin chain confirmation must be checked independently.
 * **Updates**: new releases install by themselves from GitHub, only with a valid
   signature, and run on trial with automatic rollback; see
   [Updates from GitHub](docs/guide.md#updates-from-github).

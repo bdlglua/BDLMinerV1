@@ -25,7 +25,7 @@ struct MinerStats {
     volatile uint32_t accepted;
     volatile uint32_t rejected;
     double acceptedWork;             // sum of the pool difficulty of accepted shares, this boot
-    volatile uint32_t blocksFound;
+    volatile uint32_t blocksFound;  // locally verified block candidates, not chain confirmations
     volatile uint32_t over32bits;    // hashes with >= 32 leading zero bits (diff >= 1)
     volatile uint32_t over64bits;    // hashes with >= 64 leading zero bits, this boot
     double bestDiff;                 // best share difficulty ever (persisted)
@@ -57,8 +57,20 @@ struct ShareEntry {
     bool backup;        // sent to the backup pool
 };
 enum : uint8_t { SharePending, ShareAccepted, ShareRejected, ShareUnanswered };
-void minerShareSent(double difficulty, bool backup, uint32_t submissionId);
+void minerShareSent(double difficulty, bool backup, uint32_t submissionId, const uint8_t *hash = nullptr);
 int minerShareLog(ShareEntry *out, int capacity);  // newest first
+enum : uint8_t {
+    BlockQueued, BlockSubmitted, BlockShareAccepted, BlockShareRejected,
+    BlockUnanswered, BlockStale, BlockQueueFull
+};
+struct BlockCandidate {
+    uint32_t number; // session sequence, copied together with the proof metadata
+    uint32_t height;
+    uint8_t hash[32];  // digest byte order; reverse for the usual block identifier
+    uint8_t state;
+};
+// Latest candidate this boot. Even an accepted share is not a chain confirmation.
+bool minerLastBlockCandidate(BlockCandidate &out);
 struct PoolUptime {
     uint32_t connectedMs = 0;  // since boot
     uint32_t sessions = 0;     // connections that reached mining

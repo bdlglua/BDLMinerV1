@@ -37,7 +37,7 @@ const Sensor kSensors[] = {
     {"best_ever", "Best difficulty (ever)", nullptr, nullptr, "measurement"},
     {"shares32", "32-bit shares", nullptr, nullptr, "total_increasing"},
     {"shares64", "64-bit shares", nullptr, nullptr, "total_increasing"},
-    {"blocks", "Blocks found", nullptr, nullptr, "total_increasing"},
+    {"blocks", "Block candidates", nullptr, nullptr, "total_increasing"},
     {"uptime", "Uptime", "s", "duration", "measurement"},
     {"status", "Pool status", nullptr, nullptr, nullptr},
 };

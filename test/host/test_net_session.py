@@ -99,7 +99,7 @@ void minerPublishJob(const work::Job &, bool) { ++published; if (!poolConnected)
 double poolDifficulty = 0;
 void minerPoolDifficulty(double value) { poolDifficulty = value; }
 void minerShareResult(bool, const stratum::ShareAck &) {}
-void minerShareSent(double, bool, uint32_t) {}
+void minerShareSent(double, bool, uint32_t, const uint8_t *) {}
 bool minerNextShare(stratum::Share &, uint32_t ms) { ++polled; if (!poolConnected) ++premature; clockMs += ms; return false; }
 namespace sv2 {
 struct SessionResult { bool authorized = false, timedOut = false, hasWork = false; std::string refusal; };

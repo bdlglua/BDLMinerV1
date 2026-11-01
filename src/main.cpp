@@ -41,7 +41,7 @@ static void logStats() {
                         minerEngineRate(i) / 1000.0);
     if (len && len < sizeof(engines)) strlcat(engines, ")", sizeof(engines));
 
-    logf("[stats] %.2f kH/s%s | shares %u ok / %u rejected | best %.6g (ever %.6g) | blocks %u | %s\n",
+    logf("[stats] %.2f kH/s%s | shares %u ok / %u rejected | best %.6g (ever %.6g) | block candidates %u | %s\n",
          minerHashrate() / 1000.0, engines, (unsigned)stats.accepted, (unsigned)stats.rejected,
          stats.sessionBestDiff, stats.bestDiff, (unsigned)stats.blocksFound, netStatus().c_str());
 }

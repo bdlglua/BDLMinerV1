@@ -43,7 +43,7 @@ void blockFound(uint32_t height) { foundHeight = height; alertShown = true; rend
 bool dismissAlert() { if (!alertShown) return false; alertShown = false; since = millis(); render(); return true; }
 uint32_t screenAge() { return millis()-since; }
 void render() {
-    if (alertShown) { lines("*** BLOCK FOUND! ***",String("Height ")+foundHeight,"Check pool and wallet","Press the button"); return; }
+    if (alertShown) { lines("** BLOCK CANDIDATE **",String("Height ")+foundHeight,"Check pool / chain","Press the button"); return; }
     auto s = minerStats(); auto a = gamma601::status();
     // The ASIC diode, or the board's sensor while the ASIC is off.
     float t = gamma601::temperature();

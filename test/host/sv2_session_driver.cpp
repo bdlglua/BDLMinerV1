@@ -17,7 +17,7 @@ bool netOnBackup(){return false;}
 void minerPoolConnected(bool v){connected=v;if(v&&expectNoWork)testClockStep=1000;}
 void minerPoolDifficulty(double){}
 void minerShareResult(bool ok,const stratum::ShareAck &){if(ok)++accepted;else ++rejected;}
-void minerShareSent(double,bool,uint32_t){}
+void minerShareSent(double,bool,uint32_t,const uint8_t *){}
 double minerHashrate(){return 1000000;}
 void minerPublishJob(const work::Job &job,bool){current=job;++published;remaining=2;}
 bool minerNextShare(stratum::Share &s,uint32_t){

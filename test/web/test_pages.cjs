@@ -644,6 +644,24 @@ check('a pool listing no worker is explained by the share interval',()=>run({sta
   assert.match(await f.page.locator('#pool-grid').textContent(),/No worker listed: .* at difficulty 1(\.0+)? this miner sends one every 1h 1[12]m\./);
 }));
 
+check('block candidates retain the proof height and distinguish a pool ACK from chain confirmation',()=>run({mobile:true,stats:{blocks:1,lifetime:{...baseStats.lifetime,blocks:3},network:{height:102,difficulty:1e14},block_candidate:{height:100,hash:'000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f',status:'share_accepted',chain_confirmed:null}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
+  const tile=f.page.locator('#records-grid .t').filter({has:f.page.locator('.l',{hasText:'Block candidates'})});
+  const text=await tile.textContent();
+  assert.match(text,/Block candidates1/);assert.match(text,/lifetime 3/);
+  assert.match(text,/Block height: 100/);assert.match(text,/Share accepted by pool/);
+  assert.match(text,/chain confirmation unknown/);assert.match(text,/000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f/);
+  assert.ok(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+}));
+
+check('block candidate failures and unknown status are translated and safely rendered',()=>run({language:'fr',stats:{blocks:1,block_candidate:{height:100,hash:'<img src=x onerror=alert(1)>',status:'queue_full'}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
+  assert.match(await f.page.locator('#records-grid').textContent(),/File de candidats pleine : non envoyé/);
+  assert.equal(await f.page.locator('#records-grid img').count(),0);
+  await f.page.evaluate(()=>{latestStats.block_candidate.status='unexpected';show(latestStats)});
+  assert.match(await f.page.locator('#records-grid').textContent(),/État de transmission inconnu/);
+}));
+
 check('recent shares list the pool answers, newest first',()=>run({stats:{shares_log:[{t:0,d:1.5,s:'pending'},{t:1793214889,d:0.25,s:'accepted',b:true},{t:1793214800,d:3,s:'rejected'},{t:1793214700,d:2,s:'unanswered'}]}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
   const text=await f.page.locator('#records-grid').textContent();

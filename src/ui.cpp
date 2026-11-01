@@ -269,7 +269,7 @@ void render() {
     }
     if (alertShown) {
         String height = foundHeight ? String(foundHeight) : String("!");
-        view->alert(tr("BLOCK FOUND!"), height.c_str(), tr("Press a button"));
+        view->alert(tr("BLOCK CANDIDATE"), height.c_str(), tr("Check pool / chain"));
         return;
     }
     buildModel(minerStats(), now); view->render(model);
