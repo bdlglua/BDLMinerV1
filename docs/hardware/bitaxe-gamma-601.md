@@ -91,7 +91,7 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   profiles are rejected.
 * Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
   Values 1–9 keep the ASIC off with an explanatory status. Fan speed defaults to
-  **100%**; unreleased fan controls are described below.
+  **100%**; fan controls introduced in v1.9.13 are described below.
   Thermal limiting may reduce the actual frequency below the requested profile.
 * Three consecutive ten-second hardware-error windows at **>=2%**, a missing/stalled
   hash counter, or unavailable hardware-error telemetry trigger a reset/power-off and
@@ -162,13 +162,13 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 * Automatic GitHub installation defaults to **check/offer** on this experimental
   target. Existing published releases do not acquire a Gamma binary retroactively.
 
-## Fan control (unreleased)
+## Fan control (v1.9.13)
 
 In the local **Settings > Safety > Cooling**, select **Manual** (30–100%) or
 **Automatic**. Saving changes applies them without restarting the ASIC. The
 mode and manual percentage are included in settings backups. Existing records
 retain **manual 100%**, so installing this code does not reduce their cooling.
-This feature is in the source tree and is not yet in a published release.
+This feature is included in [v1.9.13](../releases/v1.9.13.md).
 
 The dashboard shows the last verified PWM command, measured RPM, control mode and
 any cooling override. The EMC2101 has 64 duty levels, so a requested 40% becomes

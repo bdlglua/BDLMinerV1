@@ -52,7 +52,7 @@ repository name different header pins, probably another revision.
 - **Updates**: GitHub updates are offered (setting `1`) rather than installed
   automatically, as for the other experimental board.
 
-## Unreleased reliability corrections
+## Reliability corrections in v1.9.13
 
 - The dashboard result counter is published on every verified result, rather
   than waiting for a 50-result error-statistics window.
