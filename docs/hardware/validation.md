@@ -3,9 +3,10 @@
 The cloud workspace has no private-network/VPN route to the owner's devices;
 its read-only attempts received HTTP 403 `Domain forbidden`. That does not
 diagnose the miners themselves. The owner has supplied baseline and dashboard
-measurements for 1.9.13 and a confirmed M5 OTA to 1.9.14 from the LAN, recorded
-below, followed by a controlled Gamma rollback. Physical display appearance,
-controlled thermal/fan response and Gamma confirmation on 1.9.14 remain pending.
+measurements for 1.9.13, confirmed M5/Gamma OTAs to 1.9.14, and a controlled
+Gamma rollback from the LAN, recorded below. The owner also confirmed both
+physical screens are readable. Controlled thermal/fan response and physical M5
+rollback remain pending.
 An unavailable NerdNOS board cannot be validated as physical hardware.
 
 `tools/check_hardware.py` uses Python 3's standard library. It **only reads** the
@@ -50,7 +51,8 @@ difficulty; the updated tool retains that field. Restoring the M5's default
 in both phases. On the Gamma, the requested fan percentage is the saved manual
 setting when automatic mode is active. The reported regulator current is on the
 core side and must not be interpreted as the 5 V supply current. Optical screen
-inspection, controlled fan response and Gamma confirmation on 1.9.14 remain pending.
+inspection is covered by the owner's later readability confirmation below;
+controlled fan response and physical M5 rollback remain pending.
 
 ## 5. Dashboard closed/open measurement
 
@@ -152,7 +154,7 @@ after board initialization while the three-minute OTA threshold uses board boot
 time. Transient `TimeoutError`/`URLError` entries also occur in the report; it
 does not identify their individual causes. The new boot ID remains unchanged
 through the observed trial and confirmation. This validates the supplied M5
-confirmation sequence, not a physical rollback, Gamma OTA, prolonged stability
+confirmation sequence, not a physical M5 rollback, prolonged stability
 or all settings/statistics surviving an update. The M5 thermal limit is still
 disabled; the 65 C recommendation remains unchanged.
 
@@ -177,12 +179,44 @@ powered and none of the unconditional `kStatusFaults` bits. Low core voltage
 and zero RPM at this first stopped sample do not establish a running-state fault.
 They also do not prove that mining or fan rotation resumed after rollback.
 
-The next check is installing the same signed 1.9.14 Gamma image under
-`--expect confirm`, observing the stable 1.9.13 baseline before upload and
-the pending/confirmed 1.9.14 sequence afterward. Review the final ASIC-running,
-pool, hashrate, temperature, voltage, regulator and fan readings before claiming
-recovered mining. Keep the existing 525 MHz profile and fan settings for this
-comparison. Physical M5 rollback remains untested.
+### Owner-reported Gamma OTA confirmation and mining recovery, 1 November 2026
+
+At 18:56:46 UTC the owner supplied a completed, non-simulated tool-version-3
+report with `observed_result: confirmed`, `saw_pending_trial: true` and
+`passed: true`. It records the confirmed 1.9.13 boot restored by the rollback,
+then a new 1.9.14 boot observed in trial 74 times, followed by confirmation on
+that same boot. Two timeout observations occur during the update interval.
+The final sample demonstrates resumed mining after installing the candidate:
+
+| Reading | Owner-reported value |
+| --- | --- |
+| Firmware / trial | 1.9.14 / confirmed |
+| ASIC / profile | BM1370 running, 525 MHz; no stock fallback |
+| Rolling / live hashrate | 1.066315 / 1.068655 TH/s |
+| ASIC / regulator temperature | 54 / 58.75 C |
+| Fan | Automatic, 79%, 8,667 RPM; no override |
+| Input / core voltage | 5.242188 / 1.144531 V |
+| Core-side current | 14.10938 A |
+| Regulator status / hardware errors | 0 / 0.079968% |
+| Pool / session shares | Stratum V2 connected; 14 accepted, 0 rejected, 0 pending |
+| Effective power / configured limit | 100%, no limitation / 65 C |
+
+The saved manual fan preset remains 100% while automatic control applies 79%.
+The work credited for the 14 shares matches the assigned difficulty of
+2328.306427, allowing for displayed rounding. These readings are within the
+firmware's running-state limits; no regulator fault or fallback is reported.
+This supplies both Gamma OTA confirmation and running telemetry after the
+controlled rollback/reinstallation sequence. It is a short observation, not a
+prolonged stability test or controlled manual fan-response test. Physical M5
+rollback remains untested; no NerdNOS device was available for this review.
+
+### Owner-reported screen inspection
+
+After installing 1.9.14 on both boards, the owner explicitly confirmed that both
+physical screens are readable in response to a question about legibility,
+overlap and clipping. This is an owner observation, separate from the native
+renderer tests and from any cloud camera/optical measurement. It covers the
+displayed screens at that time, not every long fault/setup message or board.
 
 No synthetic result is substituted for these observations. Retain reports
 locally and review them before treating a board/profile as hardware-validated.

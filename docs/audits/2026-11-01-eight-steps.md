@@ -132,11 +132,26 @@ time synchronization, the ASIC awaits pool work, startup fan duty is forced to
 100%, and the temperature is the 29 C board sensor. The regulator's `0x0840`
 status has OFF set while the ASIC is unpowered and none of the unconditional
 fault bits. The saved 525 MHz profile and automatic fan setting remain present.
-The sample does not establish resumed hashing or actual fan rotation. Next is
-reinstalling 1.9.14 under confirmation observation and reviewing its running
-ASIC/fan/pool telemetry. The signed draft remains unchanged and unpublished.
-Optical inspection, controlled fan response and NerdNOS hardware validation
-remain outstanding.
+That immediate startup sample did not establish resumed hashing or fan rotation.
+
+At 18:56:46 UTC the owner supplied the Gamma OTA confirmation report: restored
+1.9.13, a new 1.9.14 boot observed pending 74 times, then confirmation on the
+same boot. The final sample reports a running BM1370 at 525 MHz, approximately
+1.066315 TH/s, ASIC 54 C, regulator 58.75 C, automatic fan 79% at 8,667 RPM,
+regulator status 0 and hardware errors 0.079968%. Stratum V2 is connected with
+14 accepted / 0 rejected shares and none pending. Full effective power, the
+65 C limit and the saved automatic fan/profile settings are retained. This
+establishes the owner-observed Gamma confirmation and resumed mining after the
+controlled rollback/reinstallation sequence. M5 confirmation, Gamma controlled
+rollback and Gamma confirmation are now documented separately. Physical M5
+rollback, crash/timeout-triggered rollback and prolonged stability are untested.
+The signed draft remains unchanged and unpublished; the English/French source
+notes now include the completed owner-run checks and their remaining limits.
+The owner subsequently confirmed both physical screens are readable, answering
+the legibility/overlap/clipping question for the M5 and Gamma on 1.9.14. This is
+an owner observation, not a cloud optical measurement or coverage of every fault
+screen. Controlled fan response remains outstanding; no NerdNOS device was
+available for this review.
 
 ## 7. Candidate release preparation
 
