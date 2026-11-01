@@ -18,6 +18,7 @@
 #include "share.h"
 #include "tls.h"
 #include "runtime.h"
+#include "block_status.h"
 
 namespace {
 
@@ -412,6 +413,7 @@ void marketTask(void *) {
         ghUpdatePoll();
         notifyPoll();
         sharePoll();
+        blockStatusPoll();
         bool backup = netOnBackup();
         if (backup != lastPoolBackup) {
             lastPoolBackup = backup;

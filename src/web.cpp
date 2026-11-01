@@ -33,6 +33,7 @@
 #include "runtime.h"
 #include "tls.h"
 #include "trial.h"
+#include "block_status.h"
 #include "notify.h"
 #include "mqtt.h"
 #include "crashlog.h"
@@ -206,7 +207,16 @@ void buildStats(JsonDocument &j, bool history) {
         j["block_candidate"]["hash"] = work::toHex(id, 32);
         j["block_candidate"]["status"] = states[candidate.state];
         j["block_candidate"]["previous_session"] = candidate.previousSession;
-        j["block_candidate"]["chain_confirmed"] = nullptr; // unknown: a pool ACK is not chain proof
+        BlockChainStatus chain{};
+        bool checked = blockStatusGet(candidate.hash, chain);
+        if (checked && chain.known && !chain.error) j["block_candidate"]["chain_confirmed"] = chain.inBestChain;
+        else j["block_candidate"]["chain_confirmed"] = nullptr;
+        j["block_candidate"]["chain_source"] = "mempool.space";
+        j["block_candidate"]["confirmations"] = checked && chain.known && !chain.error ? chain.confirmations : 0;
+        if (checked && chain.checkedMs) j["block_candidate"]["chain_checked_s"] = uint32_t(millis() - chain.checkedMs) / 1000;
+        else j["block_candidate"]["chain_checked_s"] = -1;
+        if (checked && chain.notFound) j["block_candidate"]["chain_not_found"] = true;
+        if (checked && chain.error) j["block_candidate"]["chain_error"] = chain.error;
     }
     j["over32bits"] = stats.over32bits;
     j["over64bits"] = stats.over64bits;

@@ -75,10 +75,16 @@ function sharesTile(log){
 }
 function blockCandidateTile(j){
  const labels={queued:'Queued with priority',submitted:'Submitted to pool',share_accepted:'Share accepted by pool',share_rejected:'Share rejected by pool',unanswered:'No pool answer',stale:'Obsolete work',queue_full:'Candidate queue full: not sent'};
- const c=j.block_candidate,lines=[t('lifetime')+' '+j.lifetime.blocks,t('Local candidates; chain confirmation unknown')];
+ const c=j.block_candidate,lines=[t('lifetime')+' '+j.lifetime.blocks];
+ if(c?.chain_confirmed===true&&!c.chain_error)lines.push(t('Seen in the Bitcoin best chain')+' · '+(c.confirmations??0)+' '+t('confirmations'));
+ else if(c?.chain_confirmed===false&&!c.chain_error)lines.push(t('Outside the explorer best chain'));
+ else lines.push(t('Local candidates; chain confirmation unknown'));
  if(c){
   if(c.previous_session)lines.push(t('Saved from a previous session'));
   lines.push(t('Block height')+COLON+(c.height||'-'),t(labels[c.status]||'Unknown submission status'));
+  if(c.chain_not_found)lines.push(t('Not indexed by the explorer yet'));
+  if(c.chain_error)lines.push(t('Explorer check failed')+' ('+c.chain_error+')');
+  if(c.chain_source)lines.push(t('Reported by')+' '+String(c.chain_source)+(c.chain_checked_s>=0?' · '+t('Last checked')+' '+dur(c.chain_checked_s)+' '+t('ago'):''),t('Pool payout is separate'));
   if(c.hash)lines.push(String(c.hash));
  }
  return tile(t('Block candidates'),j.blocks,lines.join('\n'),!!c);

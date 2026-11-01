@@ -670,6 +670,28 @@ check('block candidate failures and unknown status are translated and safely ren
   assert.match(await f.page.locator('#records-grid').textContent(),/État de transmission inconnu/);
 }));
 
+check('block candidate chain observations identify the source confirmations and separate payout',()=>run({stats:{blocks:1,block_candidate:{height:100,hash:'proof',status:'share_accepted',chain_confirmed:true,confirmations:3,chain_source:'mempool.space',chain_checked_s:30}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
+  let text=await f.page.locator('#records-grid').textContent();
+  assert.match(text,/Seen in the Bitcoin best chain · 3 confirmations/);
+  assert.match(text,/Reported by mempool.space/);assert.match(text,/Pool payout is separate/);
+  assert.doesNotMatch(text,/chain confirmation unknown/);
+  await f.page.evaluate(()=>{latestStats.block_candidate.chain_confirmed=false;latestStats.block_candidate.confirmations=0;show(latestStats)});
+  assert.match(await f.page.locator('#records-grid').textContent(),/Outside the explorer best chain/);
+  await f.page.evaluate(()=>{latestStats.block_candidate.chain_error=503;latestStats.block_candidate.chain_confirmed=true;show(latestStats)});
+  text=await f.page.locator('#records-grid').textContent();
+  assert.match(text,/chain confirmation unknown/);assert.match(text,/Explorer check failed \(503\)/);
+  assert.doesNotMatch(text,/Seen in the Bitcoin best chain/);
+}));
+
+check('unindexed block candidate remains uncertain and explorer text is translated',()=>run({language:'fr',stats:{blocks:1,block_candidate:{height:100,hash:'proof',status:'share_rejected',chain_confirmed:null,chain_not_found:true,chain_error:404,chain_source:'mempool.space',chain_checked_s:-1}}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
+  const text=await f.page.locator('#records-grid').textContent();
+  assert.match(text,/confirmation sur la chaîne inconnue/);
+  assert.match(text,/Pas encore indexé par l’explorateur/);
+  assert.match(text,/Le paiement dépend de la pool/);
+}));
+
 check('recent shares list the pool answers, newest first',()=>run({stats:{shares_log:[{t:0,d:1.5,s:'pending'},{t:1793214889,d:0.25,s:'accepted',b:true},{t:1793214800,d:3,s:'rejected'},{t:1793214700,d:2,s:'unanswered'}]}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#records-grid .t');
   const text=await f.page.locator('#records-grid').textContent();
