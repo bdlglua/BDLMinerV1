@@ -5,23 +5,20 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.14](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.14)**
+**Latest release: [v1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.9.14.md)
+· [Release notes](docs/releases/v1.9.15.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.14** adds durable block-candidate evidence, authenticated explorer
-observations, Gamma OLED fixes and LAN measurement/OTA observation tools.
-Owner-run reports cover M5/Gamma OTA confirmation, controlled Gamma rollback
-and readable physical screens. See the [validation record and limits](docs/hardware/validation.md).
+Version **1.9.15** fixes Stratum V2 ASIC negotiation so Gamma/NerdNOS request the
+version rolling they require. Incompatible jobs are rejected and count towards
+configured backup failover. The owner confirmed Gamma OTA and accepted shares
+over V2 at 525 MHz with the corrective build. See the
+[V2 validation record](docs/audits/2026-11-01-sv2-asic-version-rolling.md)
+and [hardware-validation limits](docs/hardware/validation.md).
 Earlier versions are described in [docs/releases](docs/releases/).
-
-Development **v1.9.15** corrects the Stratum V2 version-rolling requirement for
-Gamma/NerdNOS ASICs. See the [corrective-build notes](docs/releases/v1.9.15.md).
-The owner confirmed Gamma OTA and accepted shares over V2 with this test build.
-The published release linked above remains the automatic-update version.
 
 > For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
 > engine, the Bitcoin network ~10^21 H/s.
@@ -132,7 +129,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.14", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "1.9.15", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service

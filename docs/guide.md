@@ -138,7 +138,7 @@ synchronized clock; invalid signatures, expired certificates and unauthenticated
 messages cause a reconnect. It never silently downgrades the selected endpoint
 to V1. A separately configured backup pool can explicitly use V1 or V2.
 
-Gamma and NerdNOS ASICs require version rolling. Development 1.9.15 explicitly
+Gamma and NerdNOS ASICs require version rolling. Since 1.9.15 the client explicitly
 requests the V2 `REQUIRES_VERSION_ROLLING` feature: an accepting pool must allow
 rolling in every job. A fixed-version requirement or a job without rolling is
 rejected and counts towards configured backup failover. Software ESP32 miners
