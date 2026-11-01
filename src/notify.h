@@ -14,11 +14,12 @@ void notifyPoll();
 // priority: 1 (min) .. 5 (max), tags: ntfy emoji tags ("tada,moneybag").
 void notify(const char *title, const char *message, int priority = 3, const char *tags = "");
 
-// Sends a test notification; false when none is configured (since boot).
-bool notifyTest();
-// The last delivery: {"id":N,"title":...,"ntfy":"OK"|"HTTP 404"|"off"...,"webhook":...};
-// id 0 before the first one.
-String notifyResult();
+// Queues a test; returns its ID, or 0 when unavailable/full.
+uint32_t notifyTest();
+// A completed test (0 = latest), retained among the last eight test results.
+// {"id":N,"title":...,"ntfy":"OK"|"HTTP 404"|"off"...,"webhook":...};
+// id 0 means this test has no retained result yet. Ordinary alerts do not replace it.
+String notifyResult(uint32_t id = 0);
 // For the dashboard: whether notifications are on and the last delivery.
 struct NotifyStatus {
     bool enabled = false;

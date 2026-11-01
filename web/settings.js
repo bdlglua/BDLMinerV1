@@ -1,4 +1,5 @@
-let S=null,busy=false,restarting=false;const $=id=>document.getElementById(id);
+let S=null,busy=false,restarting=false,notificationPending=false,notificationMessage='';const $=id=>document.getElementById(id);
+function showNotificationMessage(text){notificationMessage=text;const out=$('notify-result');if(out)out.textContent=text}
 function poolURLChanged(key){
  const input=$('k_'+key),value=input.value.trim();
  if(!value.startsWith('stratum2+tcp://'))return;
@@ -21,6 +22,7 @@ function sync(){
  if(usb)$('firmware-help').textContent=t('This board requires a USB firmware update.');
  $('retry').disabled=busy||restarting;
  document.querySelectorAll('#f input,#f select,#f button,#fw,#imp').forEach(i=>i.disabled=busy||restarting);
+ if($('notify-test'))$('notify-test').disabled=off||notificationPending;
  if($('k_ua')){$('k_ua').disabled=off||$('k_uaauto')?.value!=='false';$('k_ua').required=$('k_uaauto')?.value==='false';$('k_ua').maxLength=64}
  for(const [protocol,key]of [['proto','sv2key'],['proto2','sv2key2']])if($('k_'+key)){$('k_'+key).disabled=off||$('k_'+protocol)?.value!=='1';$('k_'+key).required=$('k_'+protocol)?.value==='1';$('k_'+key).maxLength=64}
 }
@@ -107,7 +109,7 @@ function render(data){
   if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental, up to 800 MHz. Default: 525 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.')));
   if(k==='power'){const h=document.createElement('div');h.className='field-help';h.textContent=t('At 100%, mining runs at full available speed. Temperature protection can still reduce it.');const presets=document.createElement('div');presets.className='presets';for(const [name,v]of [['Full performance',100],['Balanced',75],['Quiet',50]]){const button=document.createElement('button');button.type='button';button.className='secondary';button.id='preset-'+v;button.textContent=t(name)+' · '+v+' %';button.onclick=()=>{i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}))};presets.appendChild(button)}h.appendChild(presets);row.appendChild(h)}
   if(k==='maxtemp'){const h=help('');const update=()=>{const limit=Number(i.value),stepped=data.capabilities?.thermal_steps!==false;h.textContent=limit>=30?(stepped?t('Throttling starts at')+' '+(limit-10)+' °C. ':'')+t('Mining pauses at')+' '+limit+' °C.'+(stepped?'':' '+t('ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.')):limit===0?t('Thermal protection is disabled.'):''};i.addEventListener('input',update);update();row.appendChild(h)}
-  if(k==='hook'){const h=help(t('Discord: channel settings › Integrations › Webhooks › Copy URL. Telegram: https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>. Save and restart first, then:'));const test=document.createElement('button');test.type='button';test.className='secondary';test.id='notify-test';test.textContent=t('Send a test notification');test.onclick=testNotification;const out=document.createElement('span');out.id='notify-result';out.setAttribute('role','status');out.setAttribute('aria-live','polite');const line=document.createElement('div');line.className='presets';line.append(test,out);h.appendChild(line);row.appendChild(h)}
+  if(k==='hook'){const h=help(t('Discord: channel settings › Integrations › Webhooks › Copy URL. Telegram: https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>. Save and restart first, then:'));const test=document.createElement('button');test.type='button';test.className='secondary';test.id='notify-test';test.textContent=t('Send a test notification');test.onclick=testNotification;const out=document.createElement('span');out.id='notify-result';out.textContent=notificationMessage;out.setAttribute('role','status');out.setAttribute('aria-live','polite');const line=document.createElement('div');line.className='presets';line.append(test,out);h.appendChild(line);row.appendChild(h)}
   section.appendChild(row);
  }
  S=data;$('msg').textContent='';filterSettings();dirtyState();watchSections();
@@ -209,19 +211,19 @@ function filterSettings(){
 $('settings-search').addEventListener('input',filterSettings);
 // The miner sends in the background (with retries): wait for its result.
 async function testNotification(){
- const out=$('notify-result'),button=$('notify-test');if(busy||restarting||button.disabled)return;
- button.disabled=true;out.textContent=t('Sending…');
+ const button=$('notify-test');if(busy||restarting||notificationPending||button.disabled)return;
+ notificationPending=true;button.disabled=true;showNotificationMessage(t('Sending…'));
  try{
-  const before=(await request('/api/notify-test')).id;
-  await request('/api/notify-test',{method:'POST'},'text');
+  const queued=await request('/api/notify-test',{method:'POST'});
+  if(!Number.isInteger(queued?.id)||queued.id<=0)throw Error(t('Invalid response from the miner.'));
   for(let n=0;n<50;n++){
    await new Promise(r=>setTimeout(r,2000));
-   const r=await request('/api/notify-test');
-   if(r.id!==before){out.textContent='ntfy: '+t(r.ntfy)+' · webhook: '+t(r.webhook);return}
+   const r=await request('/api/notify-test?id='+queued.id);
+   if(r.id===queued.id){showNotificationMessage('ntfy: '+t(r.ntfy)+' · webhook: '+t(r.webhook));return}
   }
-  out.textContent=t('No result yet: see the log page.');
- }catch(e){out.textContent=errorText(e)}
- finally{button.disabled=busy||restarting}
+  showNotificationMessage(t('No result yet: see the log page.'));
+ }catch(e){showNotificationMessage(errorText(e))}
+ finally{notificationPending=false;sync()}
 }
 async function restartMiner(){
  if(busy||restarting||!S||!confirm(t('Restart this miner?')))return;

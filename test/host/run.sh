@@ -34,6 +34,8 @@ python3 test/host/test_share.py
 python3 test/host/test_mqtt.py
 python3 test/host/test_open_dashboard.py
 python3 test/host/test_restart_ownership.py
+python3 test/host/test_trial.py
+python3 test/host/test_notify.py
 python3 test/host/test_sv2.py
 python3 test/host/test_hw_resume.py
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_line_buffer.cpp $CORE -o .pio/host/test_line_buffer

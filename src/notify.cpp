@@ -18,14 +18,30 @@ struct Message {
     char text[192];
     char tags[32];
     uint8_t priority;
+    uint32_t testId;
 };
 
 QueueHandle_t queue;
 portMUX_TYPE resultMux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t resultId = 0;
 char resultTitle[64] = "", resultNtfy[24] = "off", resultHook[24] = "off";
+struct TestResult {
+    uint32_t id = 0;
+    char ntfy[24] = "off", webhook[24] = "off";
+};
+constexpr size_t kTestResults = 8;
+TestResult testResults[kTestResults];
+size_t testHead = 0;
+uint32_t nextTestId = 0;  // guarded by resultMux
 
 bool enabled() { return !settings.ntfyTopic.isEmpty() || !settings.webhookUrl.isEmpty(); }
+
+bool enqueue(const Message &m) {
+    if (!queue || !enabled()) return false;
+    if (xQueueSend(queue, &m, 0) == pdTRUE) return true;
+    logf("[notify] queue full, dropped: %s\n", m.title);
+    return false;
+}
 
 // "https://host[:port]/path" -> host, port. False for anything else.
 bool splitUrl(const String &url, String &host, uint16_t &port, bool &secure) {
@@ -132,6 +148,13 @@ void finish(Delivery &d) {
     strlcpy(resultTitle, d.m.title, sizeof(resultTitle));
     strlcpy(resultNtfy, n, sizeof(resultNtfy));
     strlcpy(resultHook, h, sizeof(resultHook));
+    if (d.m.testId) {
+        TestResult &test = testResults[testHead];
+        test.id = d.m.testId;
+        memcpy(test.ntfy, n, sizeof(test.ntfy));
+        memcpy(test.webhook, h, sizeof(test.webhook));
+        testHead = (testHead + 1) % kTestResults;
+    }
     portEXIT_CRITICAL(&resultMux);
     d.active = false;
 }
@@ -181,30 +204,34 @@ void notify(const char *title, const char *message, int priority, const char *ta
     strlcpy(m.text, message, sizeof(m.text));
     strlcpy(m.tags, tags, sizeof(m.tags));
     m.priority = priority;
-    if (xQueueSend(queue, &m, 0) != pdTRUE) logf("[notify] queue full, dropped: %s\n", title);
+    enqueue(m);
 }
 
-bool notifyTest() {
-    if (!queue || !enabled()) return false;
-    char text[96];
-    snprintf(text, sizeof(text), "Test from %s (firmware %s): notifications work.", webHostName().c_str(), FW_VERSION);
-    notify("Test notification", text, 3, "bell");
-    return true;
+uint32_t notifyTest() {
+    if (!queue || !enabled()) return 0;
+    Message m{};
+    strlcpy(m.title, "Test notification", sizeof(m.title));
+    snprintf(m.text, sizeof(m.text), "Test from %s (firmware %s): notifications work.", webHostName().c_str(), FW_VERSION);
+    strlcpy(m.tags, "bell", sizeof(m.tags));
+    m.priority = 3;
+    portENTER_CRITICAL(&resultMux);
+    if (!++nextTestId) ++nextTestId;  // zero means no result, including at wrap
+    m.testId = nextTestId;
+    portEXIT_CRITICAL(&resultMux);
+    return enqueue(m) ? m.testId : 0;
 }
 
-String notifyResult() {
-    char title[64], ntfy[24], hook[24];
+String notifyResult(uint32_t id) {
+    TestResult result;
     portENTER_CRITICAL(&resultMux);  // copies only: no allocation with interrupts off
-    uint32_t id = resultId;
-    memcpy(title, resultTitle, sizeof(title));
-    memcpy(ntfy, resultNtfy, sizeof(ntfy));
-    memcpy(hook, resultHook, sizeof(hook));
+    if (!id) result = testResults[(testHead + kTestResults - 1) % kTestResults];
+    else for (const TestResult &test : testResults) if (test.id == id) { result = test; break; }
     portEXIT_CRITICAL(&resultMux);
     JsonDocument d;
-    d["id"] = id;
-    d["title"] = title;
-    d["ntfy"] = ntfy;
-    d["webhook"] = hook;
+    d["id"] = result.id;
+    d["title"] = result.id ? "Test notification" : "";
+    d["ntfy"] = result.ntfy;
+    d["webhook"] = result.webhook;
     String out;
     serializeJson(d, out);
     return out;

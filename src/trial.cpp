@@ -126,6 +126,7 @@ void trialConfirm(const char *why) {
         logf("[update] firmware %s confirmed (%s)\n", FW_VERSION, why);
         forget();
     } else {
+        pending = true;  // a failed flash write did not confirm the bootloader state
         logf("[update] firmware %s could not be confirmed\n", FW_VERSION);
     }
 }

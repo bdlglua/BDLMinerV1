@@ -147,6 +147,48 @@ check('site voice decoding closes its audio context even for corrupt media',()=>
   assert.deepEqual(result,{closed:1,bars:36,finite:true});
 }));
 
+check('notification test ignores unrelated deliveries and polls its assigned ID',()=>run({},async f=>{
+  f.state.settings.schema.push(['hook','secret','Notifications','Webhook',{}]);f.state.settings.values.hook='';
+  await f.page.addInitScript(()=>{const delay=window.setTimeout.bind(window);window.setTimeout=(fn,ms,...args)=>delay(fn,ms===2000?20:ms,...args)});
+  let posted=false,reads=0;const queries=[];
+  await f.page.route('**/api/notify-test*',route=>{
+    const post=route.request().method()==='POST';if(post)posted=true;
+    const value=post?{id:42}:!posted?{id:0}:++reads===1?{id:99,title:'Miner too hot',ntfy:'HTTP 500',webhook:'off'}:{id:42,title:'Test notification',ntfy:'OK',webhook:'off'};
+    if(!post)queries.push(new URL(route.request().url()).searchParams.get('id'));
+    return route.fulfill({status:post?202:200,contentType:'application/json',body:JSON.stringify(value)});
+  });
+  await loaded(f);await f.page.evaluate(()=>testNotification());
+  assert.equal(await f.page.locator('#notify-result').textContent(),'ntfy: OK · webhook: off');
+  assert.equal(reads,2);assert.deepEqual(queries,['42','42']);
+}));
+check('notification test remains locked while settings controls change',()=>run({},async f=>{
+  f.state.settings.schema.push(['hook','secret','Notifications','Webhook',{}]);f.state.settings.values.hook='';
+  await f.page.addInitScript(()=>{const delay=window.setTimeout.bind(window);window.setTimeout=(fn,ms,...args)=>delay(fn,ms===2000?20:ms,...args)});
+  let release,started,posts=0;const gate=new Promise(r=>release=r),posting=new Promise(r=>started=r);
+  await f.page.route('**/api/notify-test*',async route=>{
+    if(route.request().method()==='POST'){++posts;started();await gate;return route.fulfill({status:202,contentType:'application/json',body:'{"id":7}'})}
+    return route.fulfill({status:200,contentType:'application/json',body:'{"id":7,"ntfy":"OK","webhook":"off"}'});
+  });
+  await loaded(f);await f.page.click('#notify-test');await posting;
+  try{
+    await f.page.selectOption('#k_uaauto','false');assert.equal(await f.page.locator('#notify-test').isDisabled(),true);
+    await f.page.evaluate(()=>testNotification());assert.equal(posts,1);
+    await f.page.click('#discard');assert.equal(await f.page.locator('#notify-test').isDisabled(),true);
+    assert.equal(await f.page.locator('#notify-result').textContent(),'Sending…');
+  }finally{release()}
+  await f.page.waitForFunction(()=>document.querySelector('#notify-result').textContent.includes('ntfy: OK'));
+  assert.equal(await f.page.locator('#notify-test').isEnabled(),true);
+}));
+check('notification test reports a full queue in French and allows retry',()=>run({language:'fr'},async f=>{
+  f.state.settings.schema.push(['hook','secret','Notifications','Webhook',{}]);f.state.settings.values.hook='';
+  await f.page.addInitScript(()=>{const delay=window.setTimeout.bind(window);window.setTimeout=(fn,ms,...args)=>delay(fn,ms===2000?20:ms,...args)});
+  let full=true;
+  await f.page.route('**/api/notify-test*',route=>route.fulfill(full?{status:503,body:'Notifications are busy; try again shortly'}:{status:200,contentType:'application/json',body:'{"id":12,"ntfy":"OK","webhook":"off"}'}));
+  await loaded(f);await f.page.evaluate(()=>testNotification());
+  assert.match(await f.page.locator('#notify-result').textContent(),/occupées/);assert.equal(await f.page.locator('#notify-test').isEnabled(),true);
+  full=false;await f.page.evaluate(()=>testNotification());assert.match(await f.page.locator('#notify-result').textContent(),/ntfy: OK/);
+}));
+
 check('settings cannot submit before load, and failed loads can be retried',()=>run({settingsDelay:150,settingsFailure:true},async f=>{
   await f.page.goto(f.url+'/settings');
   assert.equal(await f.page.locator('#save').isDisabled(),true);

@@ -758,6 +758,34 @@ void handlePostBackup() {
     restartSoon("backup restored from the web page");
 }
 
+void handleNotifyTest() {
+    if (!authorized()) return;
+    if (!notifyStatus().enabled) {
+        server.send(409, "text/plain", "Set an ntfy topic or a webhook URL, save, then try again");
+        return;
+    }
+    uint32_t id = notifyTest();
+    if (!id) {
+        server.send(503, "text/plain", "Notifications are busy; try again shortly");
+        return;
+    }
+    char body[32];
+    snprintf(body, sizeof(body), "{\"id\":%u}", (unsigned)id);
+    server.send(202, "application/json", body);
+}
+
+void handleNotifyResult() {
+    String raw = server.arg("id");
+    char *end;
+    unsigned long long id = strtoull(raw.c_str(), &end, 10);
+    if (raw.length() && (end == raw.c_str() || *end || id > UINT32_MAX)) {
+        server.send(400, "text/plain", "Invalid notification test ID");
+        return;
+    }
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", notifyResult(uint32_t(id)));
+}
+
 // POST /update (multipart): one firmware.bin built for this board.
 bool uploadStarted = false, uploadComplete = false;
 bool updateAllowed = false, updateBusy = false, uploadRejected = false;
@@ -962,18 +990,8 @@ void webStart() {
     server.on("/api/settings", HTTP_POST, handlePostSettings);
     server.on("/api/backup", HTTP_GET, handleGetBackup);
     server.on("/api/backup", HTTP_POST, handlePostBackup);
-    server.on("/api/notify-test", HTTP_POST, []() {
-        if (!authorized()) return;
-        if (!notifyTest()) {
-            server.send(409, "text/plain", "Set an ntfy topic or a webhook URL, save, then try again");
-            return;
-        }
-        server.send(202, "text/plain", "Test notification queued");
-    });
-    server.on("/api/notify-test", HTTP_GET, []() {
-        server.sendHeader("Cache-Control", "no-store");
-        server.send(200, "application/json", notifyResult());
-    });
+    server.on("/api/notify-test", HTTP_POST, handleNotifyTest);
+    server.on("/api/notify-test", HTTP_GET, handleNotifyResult);
     server.on("/api/restart", HTTP_POST, []() {
         if (!authorized()) return;
         if (restartAt || ota::busy()) {
