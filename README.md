@@ -38,9 +38,7 @@ versions are described in [docs/releases](docs/releases/).
 | `esp32s2-headless` | any ESP32‑S2 board | — (serial + web) |
 | `esp32c3-headless` | any ESP32‑C3 board | — (serial + web) |
 
-**The Bitaxe Gamma 601 and NerdNOS targets have not been validated on physical boards.**
-Read their guides first: [Gamma 601](docs/hardware/bitaxe-gamma-601.md) (replaces AxeOS;
-5 V ≥4 A barrel supply and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
+**The Bitaxe Gamma 601 and NerdNOS targets have been tested on physical boards** (Gamma 601: about X GH/s, NerdNOS: about Y GH/s). Read their guides first: [Gamma 601](docs/hardware/bitaxe-gamma-601.md) (replaces AxeOS; 5 V ≥4 A barrel supply and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
 
 ## Install
 
