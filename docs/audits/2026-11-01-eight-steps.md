@@ -114,13 +114,27 @@ reported, without an additional new-firmware boot change; their exact causes
 cannot be established from this report. This validates the owner-observed M5
 OTA confirmation sequence, not rollback or long-duration stability.
 
-The next physical step is a controlled Gamma rollback while its confirmed
-1.9.13 image is still available, followed by installation and confirmation of
-1.9.14. Observer version 3 now prints a pending-trial cue for the physical reset,
+Observer version 3 prints a pending-trial cue for the physical reset,
 groups repeated observations with UTC times and counts, and refuses to count a
 previous version still in trial as a successful rollback. Simulated observer
 tests cover confirmation and rollback after hundreds of baseline polls and
 temporary connection failures; these are separate from the owner's LAN evidence.
+
+At 18:41:20 UTC the owner supplied the controlled Gamma rollback report. It
+records confirmed 1.9.13, a new pending 1.9.14 boot observed six times, then a
+third boot back on confirmed 1.9.13. The result is `rollback`, with the pending
+trial observed and `passed: true`. This establishes the supplied bootloader
+rollback sequence after the requested physical reset; crash/timeout rollback
+and physical M5 rollback are not established by this test.
+
+The last sample arrives at zero seconds of mining-session uptime: SV2 awaits
+time synchronization, the ASIC awaits pool work, startup fan duty is forced to
+100%, and the temperature is the 29 C board sensor. The regulator's `0x0840`
+status has OFF set while the ASIC is unpowered and none of the unconditional
+fault bits. The saved 525 MHz profile and automatic fan setting remain present.
+The sample does not establish resumed hashing or actual fan rotation. Next is
+reinstalling 1.9.14 under confirmation observation and reviewing its running
+ASIC/fan/pool telemetry. The signed draft remains unchanged and unpublished.
 Optical inspection, controlled fan response and NerdNOS hardware validation
 remain outstanding.
 

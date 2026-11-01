@@ -4,8 +4,8 @@ The cloud workspace has no private-network/VPN route to the owner's devices;
 its read-only attempts received HTTP 403 `Domain forbidden`. That does not
 diagnose the miners themselves. The owner has supplied baseline and dashboard
 measurements for 1.9.13 and a confirmed M5 OTA to 1.9.14 from the LAN, recorded
-below. Physical display appearance, controlled thermal/fan response, Gamma OTA
-and actual bootloader rollback remain pending.
+below, followed by a controlled Gamma rollback. Physical display appearance,
+controlled thermal/fan response and Gamma confirmation on 1.9.14 remain pending.
 An unavailable NerdNOS board cannot be validated as physical hardware.
 
 `tools/check_hardware.py` uses Python 3's standard library. It **only reads** the
@@ -50,7 +50,7 @@ difficulty; the updated tool retains that field. Restoring the M5's default
 in both phases. On the Gamma, the requested fan percentage is the saved manual
 setting when automatic mode is active. The reported regulator current is on the
 core side and must not be interpreted as the 5 V supply current. Optical screen
-inspection, controlled fan response, Gamma OTA and real rollback remain pending.
+inspection, controlled fan response and Gamma confirmation on 1.9.14 remain pending.
 
 ## 5. Dashboard closed/open measurement
 
@@ -156,9 +156,33 @@ confirmation sequence, not a physical rollback, Gamma OTA, prolonged stability
 or all settings/statistics surviving an update. The M5 thermal limit is still
 disabled; the 65 C recommendation remains unchanged.
 
-For the Gamma still on 1.9.13, perform the controlled rollback test first while
-that previous image is available. After a verified return to 1.9.13, install
-1.9.14 again under `--expect confirm` to leave the board on the candidate release.
+### Owner-reported Gamma rollback, 1 November 2026
+
+At 18:41:20 UTC the owner supplied a completed, non-simulated tool-version-3
+report with `observed_result: rollback`, `saw_pending_trial: true` and
+`passed: true`. The sequence contains a confirmed 1.9.13 boot, a different
+1.9.14 boot with a pending trial observed six times from 18:40:56 to 18:41:07,
+then a third boot back on confirmed 1.9.13 at 18:41:20 after the requested
+controlled physical reset. This is owner-reported evidence of bootloader
+rollback on the Gamma; it does not establish a crash-triggered or timeout rollback.
+
+The final sample is from `uptime_s: 0`: the ASIC is stopped and waiting for
+pool work, and SV2 is waiting for synchronized time. Hashrate and fan tachometer
+are zero, while startup fan duty is forced to 100%. The temperature source is
+`board` at 29 C, not the ASIC diode. The saved 525 MHz profile, automatic fan
+setting, manual 100% preset and 65 C limit are still present in that sample.
+The 5.336 V input is below the firmware's 5.5 V upper limit. The regulator
+status is `2112` (`0x0840`), which contains the OFF bit while the ASIC is not
+powered and none of the unconditional `kStatusFaults` bits. Low core voltage
+and zero RPM at this first stopped sample do not establish a running-state fault.
+They also do not prove that mining or fan rotation resumed after rollback.
+
+The next check is installing the same signed 1.9.14 Gamma image under
+`--expect confirm`, observing the stable 1.9.13 baseline before upload and
+the pending/confirmed 1.9.14 sequence afterward. Review the final ASIC-running,
+pool, hashrate, temperature, voltage, regulator and fan readings before claiming
+recovered mining. Keep the existing 525 MHz profile and fan settings for this
+comparison. Physical M5 rollback remains untested.
 
 No synthetic result is substituted for these observations. Retain reports
 locally and review them before treating a board/profile as hardware-validated.
