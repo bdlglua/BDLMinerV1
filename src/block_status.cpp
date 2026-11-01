@@ -8,6 +8,7 @@
 #include "miner.h"
 #include "notify.h"
 #include "tls.h"
+#include "explorer_roots.h"
 
 namespace {
 constexpr const char *kHost = "mempool.space";
@@ -38,7 +39,7 @@ public:
 int get(WiFiClientSecure &tls, HTTPClient &http, const char *path, Body &body) {
     String url = String("https://mempool.space/api") + path;
     if (!http.begin(tls, url)) return -1;
-    if (!tls.connected() && !tlsConnect(tls, kHost)) { http.end(); return -2; }
+    if (!tls.connected() && !tlsConnectVerified(tls, kHost, kExplorerRootCA)) { http.end(); return -2; }
     int code = http.GET();
     if (code == 200) {
         if (http.getSize() > 512) code = 413;

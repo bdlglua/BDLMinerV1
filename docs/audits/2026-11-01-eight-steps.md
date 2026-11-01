@@ -29,7 +29,10 @@ The background market task checks the latest candidate hash through mempool.spac
 Esplora `/block/:hash/status` endpoint, then verifies the reported height against
 the work and reads `/blocks/tip/height` for the confirmation count. An explorer
 report is identified as such; the firmware does not verify a full Bitcoin chain
-or promise a pool payout. Existing public-data TLS transport is retained.
+or promise a pool payout. Explorer checks authenticate the server certificate
+and hostname with bundled public ISRG X1, GTS R4 and DigiCert Global G2 roots,
+using the existing mining/watchdog/heap safeguards. A certificate/time/trust
+failure remains an unknown observation; there is no insecure fallback.
 
 There is no request without a local/saved candidate. New hashes wait 15 seconds
 for pool submission. Successful observations refresh every two minutes (ten
@@ -59,3 +62,28 @@ the ACK all pass. The last case delivers a stale ASIC result and asserts it is
 ignored. A full ordinary-share queue cannot displace the candidate, duplicate
 ASIC results do not double-submit, and the observed pool outcome survives reboot
 without replay. Both TCP reads and writes are deliberately fragmented.
+
+## 4–6. Physical checks and local measurement preparation
+
+Read-only attempts to the two supplied private device endpoints both returned
+HTTP 403 `Domain forbidden`. The selected workspace reports no VPN configuration
+or private TCP grant. No physical reading, dashboard-load measurement, actual
+OTA or bootloader rollback has therefore been claimed. The owner reports a
+failed power strip caused the earlier interruption, and the supplies were checked.
+
+The LAN-only procedure and portable read-only tool are in
+[hardware validation](../hardware/validation.md). They record actual device
+statistics, compare dashboard conditions using hash/uptime deltas with equal
+sampling, and observe OTA version/trial transitions. The tool never writes
+settings, flashes or restarts devices; a real rollback requires controlled
+physical/serial reset during the unconfirmed trial. Unit cases reject counter
+resets and OTA results without the required observed trial/previous version.
+
+## 7. Candidate release preparation
+
+The next development version is 1.9.14, with English/French notes. A dedicated
+`release/prepare-1.9.14` branch uses the signing workflow to create a GitHub draft
+and archive the signed files plus installer preview. Draft preparation does not
+deploy Pages or enter the public automatic-update channel. Publishing the draft
+later triggers the site workflow. The README continues to identify the latest
+published version accurately. Physical checks above remain explicitly pending.

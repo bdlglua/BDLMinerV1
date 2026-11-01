@@ -84,7 +84,7 @@ function blockCandidateTile(j){
   lines.push(t('Block height')+COLON+(c.height||'-'),t(labels[c.status]||'Unknown submission status'));
   if(c.chain_not_found)lines.push(t('Not indexed by the explorer yet'));
   if(c.chain_error)lines.push(t('Explorer check failed')+' ('+c.chain_error+')');
-  if(c.chain_source)lines.push(t('Reported by')+' '+String(c.chain_source)+(c.chain_checked_s>=0?' · '+t('Last checked')+' '+dur(c.chain_checked_s)+' '+t('ago'):''),t('Pool payout is separate'));
+  if(c.chain_source)lines.push(t(c.chain_checked_s>=0?'Reported by':'Explorer')+' '+String(c.chain_source)+(c.chain_checked_s>=0?' · '+t('Last checked')+' '+dur(c.chain_checked_s)+' '+t('ago'):''),t('Pool payout is separate'));
   if(c.hash)lines.push(String(c.hash));
  }
  return tile(t('Block candidates'),j.blocks,lines.join('\n'),!!c);

@@ -1,4 +1,5 @@
 const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','Hashrate':'Hashrate','Shares':'Shares',
+'Explorer':'Explorateur',
 'Seen in the Bitcoin best chain':'Vu dans la chaîne principale Bitcoin','confirmations':'confirmations','Outside the explorer best chain':'Hors de la chaîne principale selon l’explorateur','Not indexed by the explorer yet':'Pas encore indexé par l’explorateur','Explorer check failed':'Échec de la vérification sur l’explorateur','Reported by':'Rapporté par','Last checked':'Dernière vérification','Pool payout is separate':'Le paiement dépend de la pool',
 'rejected':'rejetées','pool diff':'diff pool','Best difficulty':'Meilleure difficulté','best ever':'record','32-bit shares':'Shares 32 bits','64-bit shares':'Shares 64 bits','Since restart':'Depuis le redémarrage','years':'ans',
 '1 every':'1 toutes les','on average':'en moyenne','Block chance':'Chance de bloc','day':'jour','year':'an','Block candidates':'Blocs candidats',

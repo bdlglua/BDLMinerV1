@@ -8,6 +8,10 @@
 // notifications sent). Then use it with HTTPClient, which reuses the connection.
 // A short `timeoutSeconds` suits probes of servers that may not speak TLS.
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port = 443, uint8_t timeoutSeconds = 12);
+// Same miner/watchdog/heap safeguards, with CA and hostname verification.
+// Missing trust data or a certificate failure never falls back to insecure TLS.
+bool tlsConnectVerified(WiFiClientSecure &tls, const char *host, const char *rootCA,
+                        uint16_t port = 443, uint8_t timeoutSeconds = 12);
 
 // Enough free memory for one session: two 16 KB record buffers and the
 // handshake, with some left for the other tasks. Below it, wait.

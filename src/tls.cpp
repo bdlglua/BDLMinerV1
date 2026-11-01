@@ -58,8 +58,9 @@ void core0WdtResume() {
 
 bool tlsMemoryOk() { return ESP.getFreeHeap() >= kTlsMinFree && ESP.getMaxAllocHeap() >= kTlsMinBlock; }
 
-bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds) {
-    tls.setInsecure();
+static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds, const char *rootCA) {
+    if (rootCA) tls.setCACert(rootCA);
+    else tls.setInsecure();
     tls.setHandshakeTimeout(timeoutSeconds);
     if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);  // the TCP connect too
     if (!lock || xSemaphoreTake(lock, portMAX_DELAY) != pdTRUE) {
@@ -100,4 +101,11 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t 
     hwsha::release();
     xSemaphoreGive(lock);
     return ok;
+}
+
+bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds) {
+    return tlsConnectImpl(tls, host, port, timeoutSeconds, nullptr);
+}
+bool tlsConnectVerified(WiFiClientSecure &tls, const char *host, const char *rootCA, uint16_t port, uint8_t timeoutSeconds) {
+    return rootCA && *rootCA && tlsConnectImpl(tls, host, port, timeoutSeconds, rootCA);
 }

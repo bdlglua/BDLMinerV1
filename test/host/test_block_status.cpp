@@ -6,7 +6,7 @@ BlockCandidate current{};
 std::vector<std::string> notifications;
 bool minerLastBlockCandidate(BlockCandidate &out) { out = current; return candidatePresent; }
 bool tlsMemoryOk() { return memoryReady; }
-bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t, uint8_t) { assert(!strcmp(host,"mempool.space")); tls.open = true; return true; }
+bool tlsConnectVerified(WiFiClientSecure &tls, const char *host, const char *root, uint16_t, uint8_t) { assert(!strcmp(host,"mempool.space") && strstr(root,"BEGIN CERTIFICATE")); tls.open = true; return true; }
 void notify(const char *title, const char *, int, const char *) { notifications.push_back(title); }
 int main() {
     blockStatusPoll(); assert(urls.empty());

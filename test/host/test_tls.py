@@ -38,12 +38,15 @@ void logf(const char *,...) {}
 struct { unsigned getFreeHeap(){return 1;} unsigned getMaxAllocHeap(){return 1;} } ESP;
 struct WiFiClientSecure {
  bool succeeds=true;
- void setInsecure() {} void setHandshakeTimeout(int) {} void setTimeout(int) {}
- bool connect(const char *,uint16_t) { ++connects;return succeeds; }
+ bool insecure=false;const char *ca=nullptr;
+ void setInsecure() {insecure=true;ca=nullptr;} void setCACert(const char *root){ca=root;insecure=false;}
+ void setHandshakeTimeout(int) {} void setTimeout(int) {}
+ bool connect(const char *,uint16_t) { ++connects;return succeeds&&(insecure||(ca&&!strcmp(ca,"valid-root"))); }
  void lastError(char *out,size_t n) { if(n)*out=0; }
 };
 constexpr uint32_t kTlsMinFree=54*1024,kTlsMinBlock=24*1024;
 bool tlsConnect(WiFiClientSecure &tls,const char *host,uint16_t port,uint8_t timeoutSeconds=12);
+bool tlsConnectVerified(WiFiClientSecure &tls,const char *host,const char *root,uint16_t port=443,uint8_t timeoutSeconds=12);
 '''
 tests=r'''
 int main() {
@@ -56,7 +59,11 @@ int main() {
   tls.succeeds=false; assert(!tlsConnect(tls,"example",443));
   assert(connects==2 && holds==0 && pauses==0 && locks==-1);
   assert(tlsProfile().handshakes==2 && tlsProfile().failures==1);
-  failTake=true; assert(!tlsConnect(tls,"example",443));assert(connects==2 && holds==0 && pauses==0);
+  tls.succeeds=true;assert(tlsConnectVerified(tls,"example","valid-root")&&!tls.insecure);
+  assert(!tlsConnectVerified(tls,"example","wrong-root")&&!tls.insecure);
+  assert(!tlsConnectVerified(tls,"example",nullptr)&&connects==4);
+  assert(holds==0&&pauses==0&&locks==-1);
+  failTake=true; assert(!tlsConnect(tls,"example",443));assert(connects==4 && holds==0 && pauses==0);
   auto p=tlsCalloc(2,4);assert(p);heap_caps_free(p);
   allocations=0;assert(!tlsCalloc(std::numeric_limits<size_t>::max(),2));assert(allocations==0);
  }
