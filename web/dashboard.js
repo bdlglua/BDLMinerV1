@@ -1,5 +1,5 @@
 let cachedHistory={hashrate:[],interval_s:300},historyRevision=null,historyRetryAt=0,lastUptime=-1,lastBootId=null,latestStats=null;
-let statsOnline=false,statsSession=0;
+let statsOnline=false,statsSession=0,statsVersion=0;
 let historyRange=21600,historySelected=null,plotViews=[],historyWidth=0,historySignature='',lastChartLimit=null;
 let historyPointerFrame=0,peerCacheKey='',peerCache=[],peerCacheAt=0;
 try{const saved=Number(localStorage.getItem('bdl-history-range'));if([3600,21600,86400].includes(saved))historyRange=saved}catch(e){}
@@ -138,6 +138,7 @@ function show(j){
   // A poll started before a newer live event can arrive afterwards. With
   // the same boot ID this is an older snapshot, not a device restart.
   if(lastBootId&&j.boot_id===lastBootId&&j.uptime_s<lastUptime)return;
+  ++statsVersion;
   statsOnline=true;
   if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){++statsSession;historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;textAt('history-status','');renderHistory()}
   lastUptime=j.uptime_s;lastBootId=j.boot_id||null;latestStats=j;
@@ -203,8 +204,11 @@ function show(j){
 }
 async function tick(){
  if(Date.now()-streamAt<12000)return;  // the live stream is delivering
- try{show(await request('/api/stats?history=0'));peersPoll.refresh()}
- catch(e){statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
+ // A live event received during this request supersedes its body and errors,
+ // including across a reboot where uptime alone cannot establish ordering.
+ const version=statsVersion;
+ try{const j=await request('/api/stats?history=0');if(version!==statsVersion)return;show(j);peersPoll.refresh()}
+ catch(e){if(version!==statsVersion)return;statsOnline=false;if(benchmark)benchmark.gap=true;benchmarkControls();renderUpdate(latestUpdate);const st=document.getElementById('st');textAt('st',t('NO CONNECTION'));st.style.color='var(--bad)';st.dataset.state='disconnected';textAt('f',errorText(e))}
 }
 // The live rate already averages ten seconds. Poll at that cadence to avoid
 // making an open dashboard compete continuously with the ESP32 miners.
@@ -407,12 +411,13 @@ function benchmarkControls(){document.getElementById('start-benchmark').disabled
 async function startBenchmark(){
  if(!statsOnline||!latestStats||benchmark||benchmarkBusy)return;
  benchmarkBusy=true;benchmarkCancelled=false;benchmarkControls();benchmarkStatus.textContent=t('Preparing measurement…');
- const start=measurementSample(latestStats),firmware=latestStats.firmware,bootId=latestStats.boot_id;
+ const start=measurementSample(latestStats),firmware=latestStats.firmware,bootId=latestStats.boot_id,session=statsSession;
  try{
   const profile=await request('/api/diagnostics');
   if(!statsOnline)throw Error(t('Connection failed. Please try again.'));
   if(!profile?.tls||!Array.isArray(profile.engines)||!Number.isFinite(profile.uptime_s))throw Error(t('Invalid response from the miner.'));
-  if(benchmarkCancelled||document.hidden||!latestStats||latestStats.uptime_s<start.uptime_s||(bootId&&profile.boot_id&&bootId!==profile.boot_id)){benchmarkStatus.textContent=t('Measurement cancelled. Keep this tab visible.');return}
+  if(benchmarkCancelled||document.hidden){benchmarkStatus.textContent=t('Measurement cancelled. Keep this tab visible.');return}
+  if(session!==statsSession||!latestStats||latestStats.firmware!==firmware||latestStats.uptime_s<start.uptime_s||(bootId&&profile.boot_id&&bootId!==profile.boot_id)){benchmarkStatus.textContent=t('Miner restarted. Start a new measurement.');return}
   benchmark={start,firmware,bootId,board:latestStats.board,profileStart:profile,samples:[start],gap:false,startedAt:new Date().toISOString()};benchmarkReport=null;
   benchmarkStatus.textContent=t('Measurement running…');
  }catch(e){benchmarkStatus.textContent=errorText(e)}finally{benchmarkBusy=false;benchmarkControls()}

@@ -21,7 +21,7 @@ constexpr uint32_t kHandshakeTimeoutMs = 30000;
 constexpr uint32_t kShareAckTimeoutMs = 60000;
 constexpr size_t kMaxLine = 16 * 1024;
 // Failover: after this many sessions in a row without a successful
-// authorization the backup pool is used, and the main pool is retried
+// authorization and usable work the backup pool is used, and the main pool is retried
 // once the backup has been mined on for kBackupSessionMs.
 constexpr int kFailoverAfter = 3;
 constexpr uint32_t kBackupSessionMs = 30 * 60 * 1000;
@@ -152,8 +152,8 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
             }
         }
 
-        if (!proto.authorized() && millis() - start > kHandshakeTimeoutMs) {
-            setStatus("Pool handshake timed out");
+        if ((!proto.authorized() || !proto.hasJob()) && millis() - start > kHandshakeTimeoutMs) {
+            setStatus(proto.authorized() ? "Pool work timed out" : "Pool handshake timed out");
             return;
         }
         if (millis() - lastRx > kPoolSilenceTimeoutMs) {
@@ -224,7 +224,7 @@ void netTask(void *) {
         char msg[48];
         snprintf(msg, sizeof(msg), "Connecting %s", netPoolHost().c_str());
         setStatus(msg);
-        bool authorized = false;
+        bool hadWork = false;
         sessionTimedOut = false;
         retryAgent = false;
         if (client.connect(netPoolHost().c_str(), netPoolPort(), 10000)) {
@@ -239,14 +239,14 @@ void netTask(void *) {
                 const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
                 activeAgent = identity;
                 sv2::SessionResult result = sv2::session(client, maxMs, identity, setStatus, pendingShares);
-                authorized = result.authorized; sessionTimedOut = result.timedOut;
+                hadWork = result.authorized && result.hasWork; sessionTimedOut = result.timedOut;
                 if (settings.userAgentAuto && !result.refusal.empty() && agent.refused(result.refusal.c_str())) {
                     retryAgent = true;
                     logf("[pool] retrying this V2 pool with identity \"%s\"\n", agent.select(kNativeAgent));
                 }
             } else {
                 session(client, proto, maxMs, agents[onBackup ? 1 : 0]);
-                authorized = proto.authorized();
+                hadWork = proto.authorized() && proto.hasJob();
             }
             client.stop();
             if (millis() - t0 > 60000) backoffMs = 2000;  // session was healthy
@@ -262,7 +262,7 @@ void netTask(void *) {
         // An explicit identity retry is part of the same connection attempt:
         // do not count it towards failover or wait for exponential backoff.
         if (retryAgent) { backoffMs = 2000; continue; }
-        failures = authorized ? 0 : failures + 1;
+        failures = hadWork ? 0 : failures + 1;
         if (rotate && sessionTimedOut) {
             onBackup = !onBackup;
             if (onBackup) failovers++;

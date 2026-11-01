@@ -130,6 +130,7 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
                 minerPoolDifficulty(protocol->difficulty());
             }
             if (event == Event::Job || (event == Event::Target && protocol->hasJob())) {
+                result.hasWork = true;
                 minerPoolDifficulty(protocol->job().difficulty);
                 minerPublishJob(protocol->job(), protocol->job().clean);
                 static uint32_t loggedHeight = 0;
@@ -149,7 +150,9 @@ SessionResult session(WiFiClient &client, uint32_t maxMs, const char *identity,
             }
         }
         pending = protocol->pending();
-        if (!result.authorized && millis() - start > 30000) { status("SV2 setup/channel timed out"); return result; }
+        if ((!result.authorized || !result.hasWork) && millis() - start > 30000) {
+            status(result.authorized ? "SV2 work timed out" : "SV2 setup/channel timed out"); return result;
+        }
         if (millis() - transport->lastRx > 300000) { status("Pool silent, reconnecting"); return result; }
         if (protocol->pending() && millis() - lastReply > 60000) { status("Share acknowledgments timed out"); return result; }
         if (maxMs && millis() - start > maxMs) { result.timedOut = true; status("Switching pool"); return result; }

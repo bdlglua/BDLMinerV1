@@ -8,6 +8,7 @@ root = Path(__file__).resolve().parents[2]
 source = (root / 'src/net.cpp').read_text()
 send = source[source.index('bool sendLine('):source.index('bool sessionTimedOut')]
 session = source[source.index('bool sessionTimedOut'):source.index('void netTask(')]
+network_task = source[source.index('void netTask('):source.index('}  // namespace')]
 prefix = r'''
 #include <atomic>
 #include <cassert>
@@ -19,23 +20,50 @@ prefix = r'''
 #include "core/stratum.h"
 #include "core/line_buffer.h"
 #include "core/pool_agent.h"
+using std::min;
 #define FW_VERSION "test"
 #define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
 #define pdMS_TO_TICKS(x) (x)
-using String = std::string;
-struct { double suggestedDifficulty = 0.001; bool userAgentAuto = true; String userAgent = DEFAULT_USER_AGENT; } settings;
-struct { bool isConnected() { return true; } } WiFi;
+struct String : std::string {
+    using std::string::string;
+    String(const std::string &s) : std::string(s) {}
+    bool isEmpty() const { return empty(); }
+    bool startsWith(const char *s) const { return find(s) == 0; }
+};
+struct {
+    double suggestedDifficulty = 0.001;
+    bool userAgentAuto = true;
+    String userAgent = DEFAULT_USER_AGENT, poolHost = "main.pool", backupHost = "backup.pool";
+    String btcAddress = "address.worker", poolPassword = "x";
+    uint16_t backupPort = 3333;
+    uint8_t rotateHours = 0, poolProtocol = 0, backupProtocol = 0;
+} settings;
+struct { bool isConnected() { return true; } void reconnect() {} } WiFi;
+struct EndNetworkTest {};
+std::vector<std::string> attemptedHosts;
+std::string scriptedFrames;
+bool scriptedWork = false, runningNetworkTask = false;
 struct WiFiClient {
     std::string input;
     std::vector<std::string> sent;
     size_t maxWrite = SIZE_MAX, readFrames = SIZE_MAX;
     bool failWrite = false;
     bool closed = false, yieldRead = false;
+    bool stayOpen = false;
+    WiFiClient() = default;
     explicit WiFiClient(const char *frames) : input(frames) {}
+    bool connect(const char *host, uint16_t, uint32_t) {
+        attemptedHosts.emplace_back(host);
+        if (attemptedHosts.size() == 4) throw EndNetworkTest{};
+        input = scriptedFrames; closed = false; stayOpen = !scriptedWork;
+        return true;
+    }
+    void setNoDelay(bool) {}
+    void stop() { closed = true; }
     bool connected() { return !closed; }
     int read(uint8_t *out, size_t size) {
         if (yieldRead) { yieldRead = false; return 0; }
-        if (input.empty()) { closed = true; return 0; }
+        if (input.empty()) { closed = !stayOpen; return 0; }
         size_t n = std::min(size, input.size());
         if (readFrames == 1) { n = std::min(n, input.find('\n') + 1); yieldRead = true; }
         std::memcpy(out, input.data(), n); input.erase(0, n); return n;
@@ -47,15 +75,22 @@ struct WiFiClient {
 };
 constexpr size_t kMaxLine = 16384;
 constexpr uint32_t kHandshakeTimeoutMs = 30000, kPoolSilenceTimeoutMs = 300000, kShareAckTimeoutMs = 60000;
-uint32_t millis() { return 1000; }
-void vTaskDelay(uint32_t) {}
+constexpr int kFailoverAfter = 3;
+constexpr uint32_t kBackupSessionMs = 1800000;
+uint32_t clockMs = 1000;
+uint32_t millis() { return clockMs; }
+void vTaskDelay(uint32_t ms) { clockMs += ms; }
 void logf(const char *, ...) {}
 std::string status;
 void setStatus(const char *s) { status = s; }
 std::atomic<bool> onBackup{false};
 std::atomic<uint8_t> pendingShares{0};
+std::atomic<uint32_t> failovers{0};
+String netStatus() { return status; }
+bool wifiTryFallbacks() { return true; }
+void minerInvalidate() {}
 String host;
-const String &netPoolHost() { return host; }
+const String &netPoolHost() { return runningNetworkTask ? (onBackup ? settings.backupHost : settings.poolHost) : host; }
 uint16_t netPoolPort() { return 3333; }
 bool poolConnected = false;
 int published = 0, premature = 0, polled = 0;
@@ -65,7 +100,13 @@ double poolDifficulty = 0;
 void minerPoolDifficulty(double value) { poolDifficulty = value; }
 void minerShareResult(bool, const stratum::ShareAck &) {}
 void minerShareSent(double, bool, uint32_t) {}
-bool minerNextShare(stratum::Share &, uint32_t) { ++polled; if (!poolConnected) ++premature; return false; }
+bool minerNextShare(stratum::Share &, uint32_t ms) { ++polled; if (!poolConnected) ++premature; clockMs += ms; return false; }
+namespace sv2 {
+struct SessionResult { bool authorized = false, timedOut = false, hasWork = false; std::string refusal; };
+SessionResult session(WiFiClient &, uint32_t, const char *, void (*)(const char *), std::atomic<uint8_t> &) {
+    return {true, false, scriptedWork, {}};
+}
+}
 '''
 tests = r'''
 int main() {
@@ -138,13 +179,48 @@ int main() {
     WiFiClient changing(changingFrames.c_str());session(changing,protocol,0,main);
     assert(protocol.hasJob() && protocol.difficulty()==2 && protocol.job().difficulty==1);
     assert(poolDifficulty==protocol.job().difficulty); // active job, not the next-job difficulty
-    puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, automatic/manual identity, retry bounds and backup isolation passed");
+    // Authorization without usable work must not leave a miner stuck at zero
+    // hashrate. The simulated socket stays connected but sends no initial job.
+    protocol.reset(); poolConnected = false; clockMs = 1000;
+    WiFiClient noWork(ok); noWork.stayOpen = true;
+    session(noWork, protocol, 0, main);
+    assert(protocol.authorized() && !protocol.hasJob());
+    assert(clockMs <= 1000 + kHandshakeTimeoutMs + 20);
+    assert(status == "Pool work timed out");
+    protocol.reset(); clockMs = UINT32_MAX - 1000;
+    uint32_t wrapStart = clockMs;
+    WiFiClient wrapped(ok); wrapped.stayOpen = true;
+    session(wrapped, protocol, 0, main);
+    assert(clockMs - wrapStart <= kHandshakeTimeoutMs + 20 && status == "Pool work timed out");
+    // Exercise the real reconnect/failover loop too: authorization alone is
+    // not a successful mining session, on either protocol.
+    runningNetworkTask = true;
+    for (unsigned version : {0u, 1u}) {
+        settings.poolProtocol = version;
+        scriptedFrames = ok; scriptedWork = false;
+        attemptedHosts.clear(); onBackup = false;
+        try { netTask(nullptr); } catch (const EndNetworkTest &) {}
+        assert((attemptedHosts == std::vector<std::string>{"main.pool", "main.pool", "main.pool", "backup.pool"}));
+    }
+    // Pools that do send work retain the original successful-session policy.
+    settings.poolProtocol = 0; scriptedWork = true;
+    scriptedFrames = ok;
+    scriptedFrames += "{\"method\":\"mining.notify\",\"params\":[\"work\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0102\",\"03\",[],\"20000000\",\"1d00ffff\",\"6b49d200\",true]}\n";
+    protocol.reset(); clockMs = 1000; sessionTimedOut = false;
+    WiFiClient mining(scriptedFrames.c_str()); mining.stayOpen = true;
+    session(mining, protocol, 40000, main);
+    assert(protocol.hasJob() && sessionTimedOut && clockMs > 41000);
+    assert(status == "Switching pool"); // valid work needs no refresh within 30 s
+    attemptedHosts.clear(); onBackup = false;
+    try { netTask(nullptr); } catch (const EndNetworkTest &) {}
+    assert((attemptedHosts == std::vector<std::string>{"main.pool", "main.pool", "main.pool", "main.pool"}));
+    puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, automatic/manual identity, no-work timeout, V1/V2 failover and backup isolation passed");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-session-') as temp:
     cpp = Path(temp) / 'test.cpp'
     exe = Path(temp) / 'test'
-    cpp.write_text(prefix + send + session + tests)
+    cpp.write_text(prefix + send + session + network_task + tests)
     subprocess.run(['g++', '-std=c++17', '-O2', '-Wall', '-Isrc',
                     '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp),
                     'src/core/stratum.cpp', 'src/core/work.cpp', 'src/core/sha256.cpp',

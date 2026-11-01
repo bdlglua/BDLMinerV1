@@ -10,11 +10,11 @@
 WiFiClass WiFi; Settings settings;
 String state;work::Job current;
 int accepted=0,rejected=0,published=0,remaining=0,wdt=0;uint64_t counter=0;
-bool connected=false;
+bool connected=false, expectNoWork=false;
 const String &netPoolHost(){return settings.poolHost;}
 uint16_t netPoolPort(){return settings.poolPort;}
 bool netOnBackup(){return false;}
-void minerPoolConnected(bool v){connected=v;}
+void minerPoolConnected(bool v){connected=v;if(v&&expectNoWork)testClockStep=1000;}
 void minerPoolDifficulty(double){}
 void minerShareResult(bool ok,const stratum::ShareAck &){if(ok)++accepted;else ++rejected;}
 void minerShareSent(double,bool,uint32_t){}
@@ -36,11 +36,14 @@ void core0WdtPause(){++wdt;}void core0WdtResume(){assert(--wdt>=0);}
 void esp_fill_random(void *out,size_t size){randombytes_buf(out,size);}
 void logf(const char *,...){}
 int main(int argc,char **argv){
-    if(argc!=3)return 2;
+    if(argc!=3&&argc!=4)return 2;
+    expectNoWork=argc==4&&!strcmp(argv[3],"no-work");
     settings.poolHost="test.pool";settings.poolPort=23330;settings.poolAuthority=argv[2];settings.btcAddress="address.worker";
     WiFiClient client(std::atoi(argv[1]));std::atomic<uint8_t> pending{0};
     auto result=sv2::session(client,0,"ManualMiner/test",[](const char *s){state=s;},pending);
     assert(wdt==0);
+    assert(result.hasWork==(published>0));
+    if(expectNoWork)assert(result.authorized&&!result.hasWork&&state=="SV2 work timed out"&&published==0);
     if(state=="SV2 protocol refused/invalid") assert(!result.refusal.empty());
     printf("%d %d %d %d %u %s\n",result.authorized,accepted,rejected,published,unsigned(pending.load()),state.c_str());
 }

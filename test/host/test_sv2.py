@@ -157,9 +157,9 @@ subprocess.run(['g++','-std=c++17','-O2','-Wall','-Itest/host/stubs/sv2',*common
                 'src/core/work.cpp','src/core/sha256.cpp',*objects,'-l:'+library,'-o',str(session_driver)],cwd=root,check=True)
 
 class Peer:
-    def __init__(self,**options):
+    def __init__(self,no_work=False,**options):
         self.sock,child=socket.socketpair();self.sock.settimeout(10)
-        self.proc=subprocess.Popen([str(session_driver),str(child.fileno()),authority.hex()],pass_fds=[child.fileno()],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        self.proc=subprocess.Popen([str(session_driver),str(child.fileno()),authority.hex()]+(['no-work'] if no_work else []),pass_fds=[child.fileno()],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         child.close();hello=self.read(64)
         current=int(time.time());response,(self.rx_key,self.tx_key)=respond(hello,start=current-60,end=current+60,**options)
         # Fragment the handshake as well as all subsequent frames.
@@ -229,6 +229,12 @@ for seq in (2,3):
 peer.send(0x1c,struct.pack('<IIIQ',7,3,2,2),channel=True)
 # Closing the write side leaves queued frames readable before EOF.
 result=peer.finish();assert result[:5]==['1','3','1','2','0'],result
+
+# An authenticated/open channel that sends no usable work must time out too.
+peer=Peer(no_work=True);peer.receive();peer.send(1,struct.pack('<HI',2,0));peer.receive()
+peer.send(0x14,struct.pack('<II',1,7)+share_target+struct.pack('<H',8)+b'\x02\xaa\xbb'+struct.pack('<I',11))
+assert peer.sock.recv(1)==b''
+result=peer.finish();assert result[:5]==['1','0','0','0','0'] and result[-1]=='SV2 work timed out',result
 
 peer=Peer(signer=(4).to_bytes(32,'big'))
 assert peer.sock.recv(1)==b''

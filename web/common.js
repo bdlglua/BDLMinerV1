@@ -81,6 +81,8 @@ Object.assign(FR,{
  'SV2 invalid or unauthenticated frame':'Message V2 invalide ou non authentifié',
  'SV2 protocol refused/invalid':'Protocole V2 refusé ou invalide',
  'SV2 setup/channel timed out':'Délai dépassé pour l’ouverture du canal V2',
+ 'Pool work timed out':'Délai dépassé pour recevoir le travail de la pool',
+ 'SV2 work timed out':'Délai dépassé pour recevoir le travail V2 de la pool',
  'The Stratum user agent is selected automatically for each pool.':'Le user agent Stratum est choisi automatiquement pour chaque pool.'
 });
 

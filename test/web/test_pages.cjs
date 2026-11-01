@@ -709,6 +709,35 @@ check('measurement is cancelled by a restart or a hidden tab',()=>run({},async f
   assert.match(await f.page.locator('#benchmark-status').textContent(),/cancelled/);assert.equal(await f.page.locator('#stop-benchmark').isDisabled(),true);
 }));
 
+check('pending dashboard poll cannot replace newer live data from another boot',()=>run({realPolling:true,stats:{boot_id:'old',uptime_s:100,total_hashes:100000000}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>latestStats?.boot_id==='old');
+  const stale=clone(f.state.stats);
+  await f.page.route('**/api/stats?history=0',async route=>{
+    await f.page.evaluate(()=>show({...latestStats,boot_id:'new',uptime_s:2,total_hashes:2000000}));
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(stale)});
+  });
+  const current=await f.page.evaluate(async()=>{streamAt=0;await tick();return {boot:latestStats.boot_id,uptime:latestStats.uptime_s,session:statsSession}});
+  assert.deepEqual(current,{boot:'new',uptime:2,session:1});
+}));
+check('pending dashboard poll failure cannot mark newer live data offline',()=>run({realPolling:true},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>statsOnline);
+  await f.page.route('**/api/stats?history=0',async route=>{
+    await f.page.evaluate(()=>show({...latestStats,uptime_s:100,total_hashes:100000000}));
+    await route.fulfill({status:503,body:'Old request failed'});
+  });
+  const current=await f.page.evaluate(async()=>{streamAt=0;await tick();return {online:statsOnline,status:document.querySelector('#st').textContent}});
+  assert.deepEqual(current,{online:true,status:'ONLINE'});
+}));
+check('measurement preparation rejects a reboot while old diagnostics are in flight',()=>run({realPolling:true,stats:{boot_id:'old',uptime_s:100,total_hashes:100000000}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForFunction(()=>statsOnline);
+  await f.page.route('**/api/diagnostics',async route=>{
+    await f.page.evaluate(()=>show({...latestStats,boot_id:'new',uptime_s:200,total_hashes:200000000}));
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({...f.state.diagnostics,boot_id:'old',uptime_s:101})});
+  });
+  const result=await f.page.evaluate(async()=>{await startBenchmark();return {active:!!benchmark,status:benchmarkStatus.textContent}});
+  assert.equal(result.active,false);assert.match(result.status,/restarted/);
+}));
+
 
 check('measurement automatically finishes after ten minutes of device uptime',()=>run({},async f=>{
   f.state.stats.uptime_s=100;f.state.stats.total_hashes=100000000;
