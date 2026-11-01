@@ -145,8 +145,9 @@ establishes the owner-observed Gamma confirmation and resumed mining after the
 controlled rollback/reinstallation sequence. M5 confirmation, Gamma controlled
 rollback and Gamma confirmation are now documented separately. Physical M5
 rollback, crash/timeout-triggered rollback and prolonged stability are untested.
-The signed draft remains unchanged and unpublished; the English/French source
-notes now include the completed owner-run checks and their remaining limits.
+At that point the signed release was still a draft; publication is recorded
+below. The English/French source notes include the completed owner-run checks
+and their remaining limits.
 The owner subsequently confirmed both physical screens are readable, answering
 the legibility/overlap/clipping question for the M5 and Gamma on 1.9.14. This is
 an owner observation, not a cloud optical measurement or coverage of every fault
@@ -165,7 +166,31 @@ published version accurately. Uncompleted physical checks above remain pending.
 The signed draft at commit `152dec22106c0809a239698c9ee27c349b35debc` contains
 51 assets. Offline verification passed all twelve firmware signatures, binary
 checksums and image/layout checks, as well as the installer preview. The public
-automatic-update channel remains on 1.9.13.
+automatic-update channel remained on 1.9.13 while this draft was being reviewed.
+
+### Publication completed
+
+Following the owner's explicit publication request, annotated tag `v1.9.14`
+was pushed at commit `00707a58ab2ae3988b775c21ae8c51ebb8df2655`. The firmware and
+build inputs match the owner-tested draft; subsequent changes were confined to
+documentation and the host-only LAN observer/tests. The normal tag workflow
+rebuilt and signed all twelve variants, updated the existing draft's notes and
+files, then published it on 1 November 2026 at 20:22:33 Europe/Paris.
+
+[Release v1.9.14](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.14)
+contains 51 assets. Independent downloads verified all 51 GitHub asset digests
+and sizes, twelve firmware signatures with the bundled public key, 24 binary
+checksums, image checksums/chip IDs, both OTA slots, factory app identity and
+the tested web/font assets. The public latest-release endpoint and latest
+`update.json` both advertise v1.9.14. All twelve installer layouts were checked.
+
+The [release workflow](https://github.com/bdlglua/BDLMinerV1/actions/runs/41340099997)
+passed web tests, native/tool tests, signed packaging and Pages deployment.
+The [main CI](https://github.com/bdlglua/BDLMinerV1/actions/runs/41340086093)
+also passed every board build plus native/tool and browser checks. The
+[web flasher](https://bdlglua.github.io/BDLMinerV1/) was deployed with 1.9.14.
+The hardware-validation limits above remain explicit; publication does not
+turn the short owner-run checks into long-duration or all-board validation.
 
 ## 8. Public Pool listing preparation
 
