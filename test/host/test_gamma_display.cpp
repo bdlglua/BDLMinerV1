@@ -17,6 +17,7 @@ float temperature() { return demoTemperature; }
 }
 MinerStats minerStats() { return demoStats; }
 double minerHashrateLive() { return demoRate; }
+uint32_t minerUptimeSeconds() { return 175; }
 uint8_t settingsBrightness() { return settings.brightness; }
 void settingsSetBrightness(uint8_t b) { settings.brightness = b; }
 std::vector<uint32_t> pixels() {
@@ -120,5 +121,16 @@ int main(int argc, char **argv) {
     ui::showMessage("WiFi", "Connecting...", "Open local dashboard"); save(out, "message");
     ui::blockFound(UINT32_MAX); first = pixels(); ui::nextScreen();
     assert(pixels() == first); assert(ui::dismissAlert() && !ui::dismissAlert());
+    settings.customScreen=true;settings.screenWidget0=8;settings.screenWidget1=7;
+    settings.screenWidget2=3;settings.screenWidget3=1;ui::page=0;ui::render();
+    auto custom=pixels();save(out,"custom-mining");
+    ui::lines("FAN 4800 RPM","FREQUENCY 600 MHz","TEMP 52.1 C","HASHRATE 1.20 TH/s");assert(pixels()==custom);
+    settings.language=1;ui::render();custom=pixels();
+    ui::lines("VENTILO 4800 RPM","FREQUENCE 600 MHz","TEMP 52.1 C","HASHRATE 1.20 TH/s");assert(pixels()==custom);
+    settings.screenPages=5;ui::page=0;ui::nextScreen();assert(ui::page==2);ui::nextScreen();assert(ui::page==0);
+    ui::page=1;ui::applySettings();assert(ui::page==0);
+    ui::blockFound(123);auto alert=pixels();assert(alert!=custom);ui::nextScreen();assert(pixels()==alert);assert(ui::dismissAlert());
+    demoAsic.running=false;demoAsic.state="Fan stopped";ui::render();auto fault=pixels();
+    ui::lines("Gamma 601 / BM1370","Fan stopped","52.1 C  Fan 4800",WiFi.localIP().toString());assert(pixels()==fault);
     std::cout << "Gamma layout: native 128x32/1-bit, four bounded rows, 0/180 rotation, font reset, large counters, full error/SSID paging, UTF-8, newline isolation, timer wrap and missing sensors passed\n";
 }

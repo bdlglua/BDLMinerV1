@@ -298,6 +298,7 @@ Event Protocol::handleLine(const char *line) {
     if (id >= 10) {
         if (!result.is<bool>() && error.isNull()) return invalid("invalid share response");
         acknowledgment_ = pending_[pending];
+        if(!ok)acknowledgment_.reason=rejectReason(error.is<JsonArray>()?(error[0]|0):0,lastError_.c_str());
         pending_[pending] = pending_[--pendingCount_];
         return ok ? Event::ShareAccepted : Event::ShareRejected;
     }

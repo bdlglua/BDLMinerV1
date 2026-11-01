@@ -33,6 +33,7 @@
 #include "runtime.h"
 #include "tls.h"
 #include "trial.h"
+#include "core/pool_diagnostics.h"
 #include "block_status.h"
 #include "notify.h"
 #include "mqtt.h"
@@ -175,10 +176,42 @@ const char *accentCss() {
     return kAccent[settings.theme % 5];
 }
 
+void buildPoolDiagnostics(JsonObject out,const MinerStats &stats) {
+    pool_diagnostics::Input input;
+    input.connected=stats.poolConnected;input.work=stats.workAvailable;input.mask=stats.versionMask;
+#ifdef BOARD_GAMMA601
+    input.requiredBits=8;
+#elif defined(BOARD_NERDNOS)
+    input.requiredBits=2;
+#endif
+    input.difficulty=stats.poolDiff;input.hashrate=minerHashrate();input.acceptedWork=stats.acceptedWork;
+    input.accepted=stats.accepted;input.seconds=minerUptimeSeconds();
+    String status=netStatus();input.status=status.c_str();
+    auto report=pool_diagnostics::diagnose(input);
+    out["code"]=pool_diagnostics::code(report.issue);out["compatible"]=report.compatible;
+    out["connected"]=input.connected;out["work_available"]=input.work;
+    out["protocol"]=netProtocol();out["status"]=status;
+    out["version_rolling_bits"]=report.rollingBits;out["required_rolling_bits"]=input.requiredBits;
+    out["difficulty"]=input.difficulty;
+    if(std::isfinite(report.expectedShareSeconds))out["expected_share_seconds"]=report.expectedShareSeconds;
+    else out["expected_share_seconds"]=nullptr;
+    if(std::isfinite(report.shareBasedHashrate))out["share_based_hashrate"]=report.shareBasedHashrate;
+    else out["share_based_hashrate"]=nullptr;
+    out["accepted_samples"]=input.accepted;out["estimate_window_s"]=uint32_t(input.seconds);
+    out["checked_ms"]=millis();
+}
+
+void handlePoolDiagnostics() {
+    JsonDocument j;buildPoolDiagnostics(j.to<JsonObject>(),minerStats());
+    server.sendHeader("Cache-Control","no-store");
+    String body;serializeJson(j,body);server.send(200,"application/json",body);
+}
+
 // What the dashboard shows; `history` adds the 24-hour chart.
 void buildStats(JsonDocument &j, bool history) {
     const MinerStats stats = minerStats();
     j["board"] = board::modelName();
+    j["api_version"] = 2;
     j["firmware"] = FW_VERSION;
     j["boot_id"] = String(bootSession, HEX);
     j["uptime_s"] = minerUptimeSeconds();
@@ -195,6 +228,9 @@ void buildStats(JsonDocument &j, bool history) {
     j["shares"]["accepted"] = stats.accepted;
     j["shares"]["rejected"] = stats.rejected;
     j["shares"]["work"] = stats.acceptedWork;
+    for(unsigned i=0;i<unsigned(stratum::RejectReason::Count);++i)
+        j["shares"]["rejected_reasons"][stratum::reasonName(stratum::RejectReason(i))]=stats.rejectedReasons[i];
+    buildPoolDiagnostics(j["pool_diagnostics"].to<JsonObject>(),stats);
     j["best"]["session"] = stats.sessionBestDiff;
     j["best"]["ever"] = stats.bestDiff;
     j["blocks"] = stats.blocksFound;
@@ -403,6 +439,7 @@ void buildStats(JsonDocument &j, bool history) {
     JsonObject up = j["github_update"].to<JsonObject>();
     up["available"] = gu.available;
     up["mode"] = settings.githubUpdate;
+    up["channel"] = settings.updateChannel == 1 ? "beta" : "stable";
     up["checked"] = gu.checked;
     up["checking"] = gu.checking;
     up["request_id"] = gu.installRequest;
@@ -600,9 +637,17 @@ void handleGetSettings() {
     j["capabilities"]["ota"] = esp_ota_get_next_update_partition(nullptr) != nullptr;
     j["capabilities"]["firmware_env"] = FW_ENV;
 #ifdef BOARD_GAMMA601
+    j["capabilities"]["display_pages"]=3;
+#elif defined(HAS_DISPLAY)
+    j["capabilities"]["display_pages"]=8;
+#else
+    j["capabilities"]["display_pages"]=0;
+#endif
+#ifdef BOARD_GAMMA601
     j["capabilities"]["fan_control"] = true;
 #endif
 #ifdef BOARD_ASIC
+    j["capabilities"]["asic"] = true;
     j["capabilities"]["thermal_steps"] = false;
 #else
     j["capabilities"]["thermal_steps"] = true;
@@ -1014,6 +1059,7 @@ void webStart() {
     server.on("/api/events", HTTP_GET, handleEvents);
     server.on("/api/history", HTTP_GET, handleHistory);
     server.on("/api/diagnostics", HTTP_GET, handleDiagnostics);
+    server.on("/api/pool/diagnostics", HTTP_GET, handlePoolDiagnostics);
     server.on("/api/log", HTTP_GET, []() {
         server.sendHeader("Cache-Control", "no-store");
         server.send(200, "text/plain", logText());

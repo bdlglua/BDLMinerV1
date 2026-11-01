@@ -1,0 +1,8 @@
+{
+  "poll_interval_s": 10,
+  "retention_days": 7,
+  "miners": [
+    {"id": "m5", "name": "M5StickC Plus2", "url": "http://192.168.1.40"},
+    {"id": "gamma", "name": "Gamma 601", "url": "http://192.168.1.135"}
+  ]
+}

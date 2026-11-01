@@ -12,6 +12,7 @@
 #endif
 #include "core/sv2_noise.h"
 #include "core/pool_identity.h"
+#include "core/display_config.h"
 
 struct SettingLimits { long minimum, maximum; };
 inline SettingLimits settingLimits(const SettingInfo &s) {
@@ -24,6 +25,9 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "theme")) limits.maximum = 4;
     if (!strcmp(s.key, "proto") || !strcmp(s.key, "proto2")) limits.maximum = 1;
     if (!strcmp(s.key, "update")) limits.maximum = 2;
+    if(!strcmp(s.key,"channel"))limits.maximum=1;
+    if(!strncmp(s.key,"screen",6)&&strlen(s.key)==7){limits.minimum=1;limits.maximum=display_config::kWidgets;}
+    if(!strcmp(s.key,"pages"))limits.minimum=1;
 #ifdef BOARD_GAMMA601
     if (!strcmp(s.key, "asicmhz")) { limits.minimum=bm1370::kStockMHz; limits.maximum=bm1370::kMaxMHz; }
     if (!strcmp(s.key, "fanpct")) { limits.minimum = 30; limits.maximum = 100; }
@@ -61,6 +65,7 @@ inline const char *settingsError(JsonObjectConst values) {
                 if (!v.is<long>() || v.as<long>() < limits.minimum || v.as<long>() > limits.maximum)
                     return "Setting outside its allowed range";
                 long n = v.as<long>();
+                if(!strcmp(s.key,"pages")&&!(n&1))return "The mining screen must remain enabled";
 #ifdef BOARD_GAMMA601
                 if (!strcmp(s.key, "asicmhz") && !bm1370::validProfile(unsigned(n)))
                     return "Gamma frequency must be 525-800 MHz in 25 MHz steps";
@@ -134,7 +139,7 @@ inline bool settingIsLive(const char *key) {
     static const char *const kLive[] = {"bright", "rot",      "autorot",  "lang",     "theme",  "cycle",
                                         "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin", "summary",
                                         "maxtemp", "power",    "rebooth",  "saver",    "update", "count", "sharehr",
-                                        "fanauto", "fanpct"};
+                                        "fanauto", "fanpct", "customscreen", "screen0", "screen1", "screen2", "screen3", "pages", "channel"};
     for (const char *k : kLive)
         if (!strcmp(k, key)) return true;
     return false;

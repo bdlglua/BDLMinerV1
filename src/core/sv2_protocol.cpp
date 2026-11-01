@@ -225,6 +225,7 @@ Event Protocol::handle(const Frame &f) {
         if (!r.end() || channel != channel_) return fail("Invalid SV2 share rejection");
         size_t index = pendingIndex(sequence); if (index == pendingCount_) return Event::None;
         acknowledgments_[0] = pending_[index];
+        acknowledgments_[0].reason=stratum::rejectReason(0,error.c_str());
         for (size_t i = index + 1; i < pendingCount_; ++i) pending_[i - 1] = pending_[i];
         --pendingCount_; acknowledged_ = 1; error_ = error; return Event::Rejected;
     }

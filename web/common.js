@@ -37,6 +37,24 @@ mqtt:'Serveur MQTT pour Home Assistant (vide = non)',mqttport:'Port MQTT',mqttus
 peers:'Autres miners du tableau de bord (IP ou noms, séparés par des virgules)',webpass:'Mot de passe web (réglages et mise à jour depuis le tableau de bord)',
 update:'Mises à jour depuis GitHub : 0 non, 1 vérifier et proposer, 2 installer automatiquement',
 count:'Compteur anonyme d\'utilisation : une fois par jour, télécharge un fichier de 2 octets de la release de cette version (rien n\'est envoyé)'};
+Object.assign(FR,{
+ 'Update channel':'Canal de mise à jour','Stable':'Stable','Beta':'Bêta',
+ 'Beta versions receive the same signature checks and rollback protection.':'Les versions bêta conservent la vérification des signatures et le retour arrière.',
+ 'Custom mining screen':'Écran de minage personnalisé','Choose the four metrics and their order on the mining screen.':'Choisis les quatre mesures et leur ordre sur l’écran de minage.',
+ 'First screen metric':'Première mesure','Second screen metric':'Deuxième mesure','Third screen metric':'Troisième mesure','Fourth screen metric':'Quatrième mesure',
+ 'Enabled screens':'Écrans activés','The mining screen remains available.':'L’écran de minage reste disponible.',
+ 'The mining screen must remain enabled':'L’écran de minage doit rester activé','Mining':'Minage','Clock':'Horloge','Bitcoin':'Bitcoin','Network':'Réseau','Device':'Appareil','Records':'Records','Blocks':'Blocs','Power / thermal':'Puissance et température','Pool / records':'Pool et records','ASIC frequency':'Fréquence ASIC','Fan RPM':'Ventilateur (tr/min)',
+ 'beta channel unavailable: %s':'canal bêta indisponible : %s','beta release requires the beta channel':'cette version exige le canal bêta',
+ 'Pool diagnostics':'Diagnostic du pool','Check pool':'Vérifier le pool','Checking pool…':'Vérification du pool…',
+ 'Pool ready':'Pool compatible','Waiting for mining work':'En attente de travail de minage',
+ 'Version rolling is required by this ASIC':'Cet ASIC exige le version rolling',
+ 'Mining with infrequent pool shares':'Minage avec des shares peu fréquentes',
+ 'Invalid pool difficulty':'Difficulté du pool invalide','Expected share interval':'Intervalle moyen des shares',
+ 'Share-based rate':'Débit estimé par les shares','At least 3 accepted shares and 60 seconds are needed':'Il faut au moins 3 shares acceptées et 60 secondes',
+ 'Accepted samples':'Shares utilisées','Rejected share causes':'Causes des rejets','stale':'obsolète','duplicate':'doublon',
+ 'low_difficulty':'difficulté insuffisante','authorization':'authentification','invalid':'invalide','unknown':'inconnue',
+ 'Share intervals are statistical means, not deadlines. Share-based rates fluctuate with luck and pool difficulty.':'Les intervalles sont des moyennes statistiques, sans échéance garantie. Le débit estimé varie avec la chance et la difficulté du pool.'
+});
 function t(s){return LANG=='fr'&&FR[s]||s}
 FR['ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.']='Le minage ASIC reste en pause au moins 2 minutes, puis reprend une fois la température abaissée de 5 °C.';
 // Numbers and labels as the page's language writes them: « 1,00 MH/s », « Pool : … ».

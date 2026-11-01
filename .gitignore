@@ -7,3 +7,7 @@ keys/
 __pycache__/
 test/web/node_modules/
 src/web_assets.generated.h
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+bdlhub.local.json

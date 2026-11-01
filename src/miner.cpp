@@ -450,6 +450,8 @@ void minerPublishJob(const work::Job &job, bool clean) {
     }
     stats.networkDiff = networkDiff;
     stats.poolDiff = job.difficulty;
+    stats.workAvailable=true;
+    stats.versionMask=job.versionMask;
     portEXIT_CRITICAL(&statsMux);
     boardValid = true;
     boardSeq++;
@@ -460,6 +462,10 @@ void minerInvalidate() {
     if (!jobMutex || !shareQueue) return;
     xSemaphoreTake(jobMutex, portMAX_DELAY);
     boardValid = false;
+    portENTER_CRITICAL(&statsMux);
+    stats.workAvailable=false;
+    stats.versionMask=0;
+    portEXIT_CRITICAL(&statsMux);
     workGeneration++;
     xQueueReset(shareQueue);
     invalidateBlockQueue();
@@ -669,7 +675,11 @@ void minerShareResult(bool accepted, const stratum::ShareAck &ack) {
         // A delayed reply may arrive after vardiff or a new job. Credit the
         // submitted target, never the candidate's luck or the latest target.
         stats.acceptedWork += ack.difficulty;
-    } else stats.rejected++;
+    } else {
+        stats.rejected++;
+        unsigned reason=unsigned(ack.reason);
+        stats.rejectedReasons[reason<unsigned(stratum::RejectReason::Count)?reason:0]++;
+    }
     portEXIT_CRITICAL(&statsMux);
 }
 

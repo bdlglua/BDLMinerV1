@@ -164,6 +164,7 @@ function show(j){
   statsOnline=true;
   if(j.uptime_s<lastUptime||(lastBootId&&j.boot_id&&j.boot_id!==lastBootId)){++statsSession;historyRevision=null;cachedHistory={hashrate:[],interval_s:300};historyRetryAt=0;historySignature='';historySelected=null;textAt('history-status','');renderHistory()}
   lastUptime=j.uptime_s;lastBootId=j.boot_id||null;latestStats=j;
+  if(j.pool_diagnostics)showPoolReport(j.pool_diagnostics,j.shares?.rejected_reasons);
   if(j.history){
    try{const signature=JSON.stringify(j.history);if(signature!==historySignature){cachedHistory=normalizeHistory(j.history);historySignature=signature;renderHistory()}textAt('history-status','')}
    catch(e){textAt('history-status',errorText(e))}
@@ -466,6 +467,27 @@ async function finishBenchmark(){
  benchmarkReport=report;benchmarkBusy=false;benchmarkFinishing=false;benchmarkControls();benchmarkStatus.textContent=t('Measured hashrate')+COLON+si(report.hashrate_hps,'H/s')+' · '+dur(elapsed)+(b.gap?' · '+t('Temperature samples contain gaps.'):'');
 }
 document.getElementById('start-benchmark').onclick=startBenchmark;
+function shareInterval(seconds){
+ if(!Number.isFinite(seconds)||seconds<0)return '—';
+ return seconds>=86400?fix(seconds/86400,1)+' '+t('day'):dur(seconds);
+}
+function showPoolReport(d,reasons){
+ const labels={ready:'Pool ready',disconnected:'Waiting for a pool connection.',waiting_work:'Waiting for mining work',version_rolling_required:'Version rolling is required by this ASIC',infrequent_shares:'Mining with infrequent pool shares',invalid_difficulty:'Invalid pool difficulty'};
+ const status=document.getElementById('pool-diagnostic-status');if(!status)return;
+ status.textContent=t(labels[d.code]||d.code)+(d.status?' · '+t(d.status):'');
+ const tiles=[tile(t('Protocol'),d.protocol||'—',(d.required_rolling_bits||0)?d.version_rolling_bits+'/'+d.required_rolling_bits+' bits':'') ,
+  tile(t('Expected share interval'),shareInterval(d.expected_share_seconds)),
+  tile(t('Share-based rate'),Number.isFinite(d.share_based_hashrate)?si(d.share_based_hashrate,'H/s'):'—',
+   Number.isFinite(d.share_based_hashrate)?d.accepted_samples+' '+t('Accepted samples')+' · '+dur(d.estimate_window_s):t('At least 3 accepted shares and 60 seconds are needed'))];
+ if(reasons)tiles.push(tile(t('Rejected share causes'),Object.entries(reasons).filter(([,n])=>n>0).map(([k,n])=>t(k)+': '+n).join(' · ')||'0'));
+ document.getElementById('pool-diagnostic-values').replaceChildren(...tiles);
+}
+async function checkPool(){
+ const button=document.getElementById('check-pool');button.disabled=true;
+ document.getElementById('pool-diagnostic-status').textContent=t('Checking pool…');
+ try{showPoolReport(await request('/api/pool/diagnostics'))}catch(e){document.getElementById('pool-diagnostic-status').textContent=errorText(e)}
+ finally{button.disabled=false}
+}
 document.getElementById('stop-benchmark').onclick=finishBenchmark;
 document.getElementById('download-benchmark').onclick=()=>{if(benchmarkReport)downloadText('bdlminer-measurement.json',JSON.stringify(benchmarkReport,null,2),'application/json')};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(benchmark||benchmarkBusy&&!benchmarkFinishing))cancelBenchmark(t('Measurement cancelled. Keep this tab visible.'))});

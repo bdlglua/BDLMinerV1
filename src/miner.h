@@ -25,6 +25,9 @@ struct MinerStats {
     volatile uint32_t accepted;
     volatile uint32_t rejected;
     double acceptedWork;             // sum of the pool difficulty of accepted shares, this boot
+    uint32_t rejectedReasons[unsigned(stratum::RejectReason::Count)]{};
+    bool workAvailable=false;
+    uint32_t versionMask=0;
     volatile uint32_t blocksFound;  // locally verified block candidates, not chain confirmations
     volatile uint32_t over32bits;    // hashes with >= 32 leading zero bits (diff >= 1)
     volatile uint32_t over64bits;    // hashes with >= 64 leading zero bits, this boot

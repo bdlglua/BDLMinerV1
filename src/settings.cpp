@@ -15,6 +15,7 @@
 #endif
 #include "settings_store.h"
 #include "core/pool_identity.h"
+#include "core/display_config.h"
 
 Settings settings;
 static std::atomic<uint8_t> liveBrightness{80};
@@ -47,6 +48,12 @@ const SettingInfo kSettings[] = {
     N("lang", language, "Display", "Language: 0 English, 1 French"),
     N("theme", theme, "Display", "Colour theme (0 orange, 1 green, 2 blue, 3 purple, 4 pink)"),
     N("cycle", cycleSeconds, "Display", "Next screen every N seconds (0 = off)"),
+    S("customscreen", Bool, customScreen, "Display", "Custom mining screen"),
+    N("screen0", screenWidget0, "Display", "First screen metric"),
+    N("screen1", screenWidget1, "Display", "Second screen metric"),
+    N("screen2", screenWidget2, "Display", "Third screen metric"),
+    N("screen3", screenWidget3, "Display", "Fourth screen metric"),
+    N("pages", screenPages, "Display", "Enabled screens"),
     N("nightfrom", nightFrom, "Display", "Night mode from hour (0-23, 255 = off)"),
     N("nightto", nightTo, "Display", "Night mode until hour (0-23)"),
     S("beep", Bool, beep, "Display", "Beep on a 32-bit share"),
@@ -81,6 +88,7 @@ const SettingInfo kSettings[] = {
     S("peers", Text, peers, "Network", "Other miners on the dashboard (comma separated IPs or names)"),
     S("webpass", Secret, webPassword, "Network", "Web password (optional: protects settings and firmware update; empty = open)"),
     N("update", githubUpdate, "Network", "Updates from GitHub: 0 off, 1 check and offer, 2 install automatically"),
+    N("channel", updateChannel, "Network", "Update channel"),
     S("count", Bool, usageCount, "Network",
       "Anonymous usage count: once a day, download a 2-byte file of this version's release (nothing is sent)"),
     S("sharehr", Bool, shareHashrate, "Network",
@@ -147,6 +155,12 @@ void settingsSanitize(Settings &settings) {
     settings.rotation &= 3;
     if (settings.language > 1) settings.language = 0;
     if (settings.githubUpdate > 2) settings.githubUpdate = 2;
+    if(settings.updateChannel>1)settings.updateChannel=0;
+    if(!display_config::validWidget(settings.screenWidget0))settings.screenWidget0=1;
+    if(!display_config::validWidget(settings.screenWidget1))settings.screenWidget1=2;
+    if(!display_config::validWidget(settings.screenWidget2))settings.screenWidget2=4;
+    if(!display_config::validWidget(settings.screenWidget3))settings.screenWidget3=3;
+    settings.screenPages|=1;
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
 #ifdef BOARD_GAMMA601
     if (!bm1370::validProfile(settings.asicFrequency)) settings.asicFrequency = bm1370::kStockMHz;

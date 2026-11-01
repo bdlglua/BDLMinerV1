@@ -21,7 +21,7 @@ function sync(){
  $('upload').disabled=off||usb||!$('fw').files.length;
  if(usb)$('firmware-help').textContent=t('This board requires a USB firmware update.');
  $('retry').disabled=busy||restarting;
- document.querySelectorAll('#f input,#f select,#f button,#fw,#imp').forEach(i=>i.disabled=busy||restarting);
+ document.querySelectorAll('#f input,#f select,#f button,#fw,#imp').forEach(i=>i.disabled=busy||restarting||i.dataset.fixed==='true');
  if($('notify-test'))$('notify-test').disabled=off||notificationPending;
  if($('k_fanpct'))$('k_fanpct').disabled=off||$('k_fanauto')?.value==='true';
  if($('k_ua')){$('k_ua').disabled=off||$('k_uaauto')?.value!=='false';$('k_ua').required=$('k_uaauto')?.value==='false';$('k_ua').maxLength=64}
@@ -64,6 +64,11 @@ const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Str
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
 const THEMES=['#f7931a','#38d07a','#3b9cf6','#a66bf5','#ec5aa0'];
+Object.assign(FIELDS,{channel:['Update channel','Beta versions receive the same signature checks and rollback protection.'],
+ customscreen:['Custom mining screen','Choose the four metrics and their order on the mining screen.'],
+ screen0:['First screen metric'],screen1:['Second screen metric'],screen2:['Third screen metric'],screen3:['Fourth screen metric'],pages:['Enabled screens','The mining screen remains available.']});
+CHOICES.channel=[[0,'Stable'],[1,'Beta']];
+for(const key of ['screen0','screen1','screen2','screen3'])CHOICES[key]=[[1,'Hashrate'],[2,'Accepted shares'],[3,'Temperature'],[4,'Best difficulty'],[5,'uptime'],[6,'Pool'],[7,'ASIC frequency'],[8,'Fan RPM']];
 function help(text){const p=document.createElement('p');p.className='field-help';p.textContent=text;return p}
 function render(data){
  const f=$('f');f.replaceChildren();$('settings-nav').replaceChildren();const groups=new Map();let section=null;
@@ -121,7 +126,22 @@ function render(data){
   if(k==='hook'){const h=help(t('Discord: channel settings › Integrations › Webhooks › Copy URL. Telegram: https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>. Save and restart first, then:'));const test=document.createElement('button');test.type='button';test.className='secondary';test.id='notify-test';test.textContent=t('Send a test notification');test.onclick=testNotification;const out=document.createElement('span');out.id='notify-result';out.textContent=notificationMessage;out.setAttribute('role','status');out.setAttribute('aria-live','polite');const line=document.createElement('div');line.className='presets';line.append(test,out);h.appendChild(line);row.appendChild(h)}
   section.appendChild(row);
  }
- S=data;$('msg').textContent='';filterSettings();dirtyState();watchSections();
+ S=data;screenControls(data);$('msg').textContent='';filterSettings();dirtyState();watchSections();
+}
+function screenControls(data){
+ const count=data.capabilities?.display_pages??8;
+ for(const key of ['customscreen','screen0','screen1','screen2','screen3','pages']){
+  const input=$('k_'+key);if(input){input.closest('.field').dataset.unsupported=count?'false':'true';input.closest('.field').hidden=!count;}
+ }
+ for(const key of ['screen0','screen1','screen2','screen3'])for(const option of $('k_'+key)?.options||[]){if(option.value==='7')option.disabled=!data.capabilities?.asic;if(option.value==='8')option.disabled=!data.capabilities?.fan_control;}
+ const input=$('k_pages');if(!input||!count)return;
+ input.type='hidden';const row=input.closest('.field'),label=row.querySelector('label');
+ label.removeAttribute('for');label.id='screen-pages-label';
+ const group=document.createElement('div');group.className='presets';group.setAttribute('role','group');group.setAttribute('aria-labelledby',label.id);
+ const names=count===3?['Mining','Power / thermal','Pool / records']:['Mining','Clock','Bitcoin','Network','Device','Hashrate','Records','Blocks'];
+ names.forEach((name,n)=>{const l=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.checked=n===0||!!(Number(input.value)&(1<<n));box.disabled=n===0;box.dataset.fixed=String(n===0);
+  box.onchange=()=>{input.value=Number(input.value)^(1<<n);input.dispatchEvent(new Event('input',{bubbles:true}))};l.append(box,' '+t(name));group.appendChild(l)});
+ input.parentNode.appendChild(group);
 }
 async function load(){
  if(busy||restarting)return;
@@ -214,7 +234,7 @@ function dirtyState(){
 }
 function filterSettings(){
  const query=$('settings-search').value.trim().toLocaleLowerCase();let visible=0;
- document.querySelectorAll('#f fieldset').forEach(fs=>{let found=0;fs.querySelectorAll('.subsection').forEach(sub=>{let inside=0;sub.querySelectorAll('.field').forEach(row=>{row.hidden=!row.dataset.search.includes(query);if(!row.hidden)inside++});sub.hidden=!inside;found+=inside});fs.hidden=!found;visible+=found});
+ document.querySelectorAll('#f fieldset').forEach(fs=>{let found=0;fs.querySelectorAll('.subsection').forEach(sub=>{let inside=0;sub.querySelectorAll('.field').forEach(row=>{row.hidden=row.dataset.unsupported==='true'||!row.dataset.search.includes(query);if(!row.hidden)inside++});sub.hidden=!inside;found+=inside});fs.hidden=!found;visible+=found});
  $('settings-empty').hidden=!!visible||!S;
 }
 $('settings-search').addEventListener('input',filterSettings);

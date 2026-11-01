@@ -17,6 +17,7 @@
 #include "tls.h"
 #include "trial.h"
 #include "update_key.h"
+#include "core/release_version.h"
 
 #ifndef FW_ENV
 #define FW_ENV "dev"
@@ -54,32 +55,14 @@ void setError(const char *fmt, const char *arg = "") {
     logf("[update] %s\n", state.error);
 }
 
-// "1.2.10" > "1.2.9", "1.0.1" > "1.0".
+// "1.2.10" > "1.2.9", "1.0.1" > "1.0"; stable > beta > alpha.
 int compareVersions(const char *a, const char *b) {
-    for (;;) {
-        long x = strtol(a, (char **)&a, 10), y = strtol(b, (char **)&b, 10);
-        if (x != y) return x < y ? -1 : 1;
-        bool moreA = *a == '.', moreB = *b == '.';
-        if (!moreA && !moreB) return 0;
-        if (moreA) a++;
-        if (moreB) b++;
-    }
+    return release_version::compare(a,b);
 }
 
 // The first "1.2" or "1.2.3" in a release tag or name ("v1.0.1", "V1.0.0").
 bool findVersion(const char *s, char *out, size_t size) {
-    for (; s && *s; s++) {
-        if (!isdigit((unsigned char)*s)) continue;
-        const char *e = s;
-        int dots = 0;
-        while (isdigit((unsigned char)*e) || (*e == '.' && isdigit((unsigned char)e[1]) && ++dots)) e++;
-        if (dots) {
-            snprintf(out, size, "%.*s", (int)(e - s), s);
-            return true;
-        }
-        s = e - 1;
-    }
-    return false;
+    return release_version::find(s,out,size);
 }
 
 // GET `url` over HTTPS, following redirects (GitHub sends release files to
@@ -144,8 +127,14 @@ bool fetchRelease(const char *url, JsonDocument &doc, String &error) {
 // Unreadable or incomplete newer releases are retried sooner.
 bool check() {
     JsonDocument doc;
+    const uint8_t channel=settings.updateChannel;
     String manifestError, apiError;
-    if (!fetchRelease("https://github.com/" GITHUB_REPO "/releases/latest/download/update.json", doc, manifestError)) {
+    if(channel){
+        const char *repo=GITHUB_REPO,*slash=strchr(repo,'/');char url[240];
+        if(!slash){setError("invalid update repository");return false;}
+        snprintf(url,sizeof(url),"https://%.*s.github.io/%s/updates/beta.json",int(slash-repo),repo,slash+1);
+        if(!fetchRelease(url,doc,manifestError)){setError("beta channel unavailable: %s",manifestError.c_str());return false;}
+    }else if (!fetchRelease("https://github.com/" GITHUB_REPO "/releases/latest/download/update.json", doc, manifestError)) {
         doc.clear();
         if (!fetchRelease("https://api.github.com/repos/" GITHUB_REPO "/releases/latest", doc, apiError)) {
             setError("release unavailable: %s", ("manifest " + manifestError + "; API " + apiError).c_str());
@@ -159,6 +148,11 @@ bool check() {
         return false;
     }
     String fw, sig;
+    release_version::Version parsed;
+    if(!release_version::parse(version,parsed)||(!channel&&parsed.pre[0])){
+        setError("beta release requires the beta channel");return false;
+    }
+    if(channel!=settings.updateChannel)return false; // a live channel change invalidates the response
     for (JsonObject a : doc["assets"].as<JsonArray>()) {
         String name = a["name"] | "";
         if (name == FW_ENV "-firmware.bin") fw = a["browser_download_url"] | "";
@@ -337,6 +331,14 @@ void ping() {
 
 void ghUpdatePoll() {
     if (ota::busy()) return;
+    static uint8_t activeChannel=0;
+    if(activeChannel!=settings.updateChannel){
+        activeChannel=settings.updateChannel;installRequested=false;retryInstall=false;installFailures=0;
+        firmwareUrl="";signatureUrl="";nextCheck=millis();installRetryAt=0;
+        portENTER_CRITICAL(&stateMux);
+        state.checked=false;state.available=false;state.version[0]=0;state.error[0]=0;
+        portEXIT_CRITICAL(&stateMux);
+    }
     bool due = settings.githubUpdate && (installRequested || checkRequested || (int32_t)(millis() - nextCheck) >= 0);
     if (due) {
         if (!WiFi.isConnected() || ESP.getFreeHeap() < kMinHeap) {

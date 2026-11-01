@@ -7,12 +7,12 @@ name: Site
 on:
   push:
     branches: [main]
-    paths: ["installer/**", "tools/make_installer.py", ".github/workflows/site.yml"]
+    paths: ["installer/**", "tools/make_installer.py", "tools/make_channels.py", "tools/release_version.py", ".github/workflows/site.yml"]
   workflow_dispatch:
   release:
     types: [published]
   workflow_run:
-    workflows: [Release]
+    workflows: [Release V2]
     types: [completed]
 
 permissions:
@@ -32,16 +32,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main
-      - name: Latest release
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Stable installer and opt-in beta
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
-          VERSION="${TAG#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "release/$VERSION" \
-            --pattern '*-factory.bin' --pattern boards.json
-      - run: python3 tools/make_installer.py "release/$VERSION" site
+        run: python3 tools/make_channels.py --repository "$GITHUB_REPOSITORY" --output site
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

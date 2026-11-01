@@ -23,6 +23,7 @@ using std::min;
 #include <string>
 #include <vector>
 #include "ghupdate.h"
+#include "core/release_version.h"
 #include "ota.h"
 #define FW_VERSION "1.0.10"
 #define FW_ENV "test"
@@ -51,7 +52,7 @@ uint32_t nowMs=0;
 uint32_t millis() { return nowMs; }
 struct { bool connected=true; bool isConnected() const { return connected; } } WiFi;
 struct { uint32_t heap=100000; uint32_t getFreeHeap() const { return heap; } } ESP;
-struct { int githubUpdate=1; bool usageCount=false; } settings;
+struct { int githubUpdate=1; bool usageCount=false; uint8_t updateChannel=0; } settings;
 struct WiFiClientSecure {};
 struct HTTPClient {
     std::string body;
@@ -66,7 +67,7 @@ struct Response { int code=200; std::string body; bool chunked=false; } manifest
 std::vector<std::string> requests;
 bool httpsGet(String url, WiFiClientSecure &, HTTPClient &http, int *code) {
     requests.push_back(url);
-    const auto &r=url.find("update.json")!=std::string::npos?manifest:api;
+    const auto &r=(url.find("update.json")!=std::string::npos || url.find("beta.json")!=std::string::npos)?manifest:api;
     http.body=r.body; http.chunked=r.chunked; *code=r.code; return *code==200;
 }
 int installs=0, pings=0;
@@ -83,7 +84,7 @@ void reset() {
     state=GithubUpdate(); firmwareUrl=""; signatureUrl="";
     installRequested=false; checkRequested=false; retryInstall=false; installFailures=0; installRetryAt=0; installResult=GithubInstallResult::Done; nextCheck=kFirstCheckMs; nextPing=kFirstPingMs;
     refusedVersion[0]=refusedError[0]=0;
-    nowMs=0; settings.githubUpdate=1; settings.usageCount=false; WiFi.connected=true; ESP.heap=100000;
+    nowMs=0; settings.githubUpdate=1; settings.updateChannel=0; settings.usageCount=false; WiFi.connected=true; ESP.heap=100000;
     installs=pings=0; requests.clear(); manifest={200,valid,false}; api={403,"",false};
     ota::release(ota::Owner::Web); ota::release(ota::Owner::Github);
 }
@@ -147,7 +148,16 @@ int main() {
     reset(); settings.githubUpdate=2; installResult=GithubInstallResult::Retry;
     nowMs=kFirstCheckMs; ghUpdatePoll(); manifest.code=404; api.code=403;
     nowMs=nextCheck; ghUpdatePoll(); assert(installs==1 && retryInstall && ghUpdateState().retrySeconds==300);
-    puts("GitHub discovery and scheduling: manifest, API fallback, retries, status and OTA isolation passed");
+    reset(); manifest.body=R"({"tag_name":"v2.0.0-beta.1","assets":[{"name":"test-firmware.bin","browser_download_url":"firmware"},{"name":"test-firmware.bin.sig","browser_download_url":"signature"}]})";
+    assert(!check() && !state.available && strstr(state.error,"beta channel"));
+    settings.updateChannel=1; assert(check() && state.available);
+    assert(requests.back()=="https://bdlglua.github.io/BDLMinerV1/updates/beta.json");
+    manifest.code=404; requests.clear(); assert(!check() && requests.size()==1);
+    assert(strstr(state.error,"beta channel unavailable"));
+    manifest={200,valid,false}; nowMs=0; ghUpdatePoll(); // synchronize scheduler channel
+    assert(ghUpdateInstall()); settings.updateChannel=0; ESP.heap=1000; ghUpdatePoll();
+    assert(!installRequested && !retryInstall && !state.available && firmwareUrl.empty());
+    puts("GitHub discovery and scheduling: SemVer stable/beta isolation, manifest, API fallback, retries, status and OTA isolation passed");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-ghupdate-') as temp:

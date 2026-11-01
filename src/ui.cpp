@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "board.h"
+#include "core/display_config.h"
 
 #if defined(HAS_DISPLAY) && !defined(BOARD_GAMMA601)
 #include <WiFi.h>
@@ -15,6 +16,9 @@
 #include "settings.h"
 #include "ui_view.h"
 #include "watch.h"
+#ifdef BOARD_NERDNOS
+#include "nerdnos.h"
+#endif
 
 namespace ui {
 namespace {
@@ -111,6 +115,18 @@ void buildModel(const MinerStats &stats, uint32_t now) {
     model.footer = "";
     for (auto &m : model.metrics) m = Metric();
     MarketData market = marketGet();
+    if(screen==0&&settings.customScreen){
+        model.title=tr("MINING");display_config::Snapshot s;
+        s.hashrate=minerHashrateLive();s.best=stats.sessionBestDiff;s.accepted=stats.accepted;
+        s.temperature=board::temperature();s.uptime=minerUptimeSeconds();s.connected=stats.poolConnected;
+#ifdef BOARD_NERDNOS
+        s.frequency=nerdnos::status().frequency;
+#endif
+        const uint8_t widgets[]={settings.screenWidget0,settings.screenWidget1,settings.screenWidget2,settings.screenWidget3};
+        for(unsigned i=0;i<4;++i){char value[32];display_config::value(widgets[i],s,value,sizeof(value),settings.language);
+            metric(i,display_config::label(widgets[i],settings.language),value,String(),i?kText:accent());}
+        return;
+    }
     switch (screen) {
         case 0: {
             model.title = tr("MINING");
@@ -211,7 +227,7 @@ void begin() {
 void showSplash() {
     if (!view) return;
     String info = String("v" FW_VERSION) + " / " + tr("Hold A at boot: setup");
-    view->message("BDLMiner V1", board::modelName(), info.c_str());
+    view->message("BDLMiner V2", board::modelName(), info.c_str());
 }
 void showPortal(const String &apName, const char *password) {
     if (!view) return;
@@ -221,7 +237,7 @@ void showPortal(const String &apName, const char *password) {
 void showMessage(const char *title, const char *line1, const char *line2) { if (view) view->message(tr(title), tr(line1), tr(line2)); }
 void nextScreen() {
     if (alertShown) return;  // the alert stays until a button is pressed
-    screen = (screen + 1) % ui_view::kPages; screenSince = millis();
+    screen = display_config::nextPage(screen,ui_view::kPages,settings.screenPages); screenSince = millis();
     if (view) view->invalidate(); render();
 }
 void cycleBrightness() {
@@ -236,6 +252,7 @@ void setBacklight(uint8_t percent) {
 }
 void applySettings() {
     if (!lcd) return;
+    if(!(settings.screenPages&(1u<<screen)))screen=0;
     if (lcd->getRotation() != settings.rotation) lcd->setRotation(settings.rotation);
     screenSince = millis();
     if (view) view->invalidate();

@@ -45,10 +45,17 @@ async function fixture(options={}){
   state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
   if(options.capabilities)state.settings.capabilities=options.capabilities;
   if(options.live)state.settings.live=['power','maxtemp','nightfrom','saver'];
+  if(options.v2){
+    for(const key of ['channel','screen0','screen1','screen2','screen3','pages'])state.settings.schema.push([key,'number',key==='channel'?'Network':'Display',key,{min:0,max:255}]);
+    state.settings.schema.push(['customscreen','bool','Display','Custom screen',{}]);
+    Object.assign(state.settings.values,{channel:0,customscreen:false,screen0:1,screen1:2,screen2:4,screen3:3,pages:255});
+    state.settings.live=[...(state.settings.live||[]),'channel','customscreen','screen0','screen1','screen2','screen3','pages'];
+    state.settings.capabilities={display_pages:8,...state.settings.capabilities};
+  }
   if(options.gamma){
     state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}],['fanauto','bool','Safety','Fan control',{}],['fanpct','number','Safety','Manual fan speed (%)',{min:30,max:100}]);
     Object.assign(state.settings.values,{asicmhz:525,fanauto:false,fanpct:100});state.settings.live=[...(state.settings.live||[]),'fanauto','fanpct'];
-    state.settings.capabilities={...state.settings.capabilities,fan_control:true,thermal_steps:false};
+    state.settings.capabilities={...state.settings.capabilities,fan_control:true,asic:true,thermal_steps:false,...(options.v2?{display_pages:3}:{})};
   }
   const server=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
@@ -88,6 +95,7 @@ async function fixture(options={}){
       state.inflight--;
       return json(res,state.stats,state.statsStatus);
     }
+    if(req.url==='/api/pool/diagnostics')return json(res,state.stats.pool_diagnostics||{code:'ready',compatible:true});
     if(req.url==='/api/history'){state.historyCalls++;if(options.historyFailure){res.writeHead(503);return res.end('History unavailable')}return json(res,state.history)}
     if(req.url==='/api/diagnostics'){return json(res,{...state.diagnostics,uptime_s:state.stats.uptime_s})}
     if(req.url==='/api/log'){
@@ -676,8 +684,10 @@ check('block candidate chain observations identify the source confirmations and 
   assert.match(text,/Seen in the Bitcoin best chain · 3 confirmations/);
   assert.match(text,/Reported by mempool.space/);assert.match(text,/Pool payout is separate/);
   assert.doesNotMatch(text,/chain confirmation unknown/);
+  f.state.stats.block_candidate.chain_confirmed=false;f.state.stats.block_candidate.confirmations=0;
   await f.page.evaluate(()=>{latestStats.block_candidate.chain_confirmed=false;latestStats.block_candidate.confirmations=0;show(latestStats)});
   assert.match(await f.page.locator('#records-grid').textContent(),/Outside the explorer best chain/);
+  f.state.stats.block_candidate.chain_error=503;f.state.stats.block_candidate.chain_confirmed=true;
   await f.page.evaluate(()=>{latestStats.block_candidate.chain_error=503;latestStats.block_candidate.chain_confirmed=true;show(latestStats)});
   text=await f.page.locator('#records-grid').textContent();
   assert.match(text,/chain confirmation unknown/);assert.match(text,/Explorer check failed \(503\)/);
@@ -983,6 +993,37 @@ if(process.env.BDL_SCREENSHOT_DIR){
   }));
  }
 }
+
+check('V2 diagnostics distinguish rare shares from incompatible ASIC jobs',()=>run({realPolling:true,stats:{pool_diagnostics:{code:'infrequent_shares',compatible:true,protocol:'Stratum V2 (Noise)',expected_share_seconds:42949672.96,accepted_samples:0,share_based_hashrate:null,version_rolling_bits:0,required_rolling_bits:0}}},async f=>{
+ await f.page.goto(f.url);await f.page.waitForSelector('#pool-diagnostic-values .t');
+ assert.match(await f.page.locator('#pool-diagnostic-status').textContent(),/infrequent|rare|difficulty/i);
+ await f.page.click('#check-pool');await f.page.waitForFunction(()=>!document.querySelector('#check-pool').disabled);
+ assert.ok(f.state.requests.includes('GET /api/pool/diagnostics'));
+ f.state.stats.pool_diagnostics.code='version_rolling_required';
+ await f.page.click('#check-pool');await f.page.waitForFunction(()=>document.querySelector('#pool-diagnostic-status').textContent.toLowerCase().includes('version rolling'));
+ assert.match(await f.page.locator('#pool-diagnostic-status').textContent(),/version rolling/i);
+}));
+
+check('V2 custom screen preserves mining page and saves a live metric order',()=>run({v2:true,postText:'{"restart":false,"changed":4}'},async f=>{
+ await loaded(f);const pages=f.page.locator('[data-key=pages] .presets input');assert.equal(await pages.count(),8);
+ assert.equal(await pages.first().isDisabled(),true);assert.equal(await pages.first().isChecked(),true);
+ await pages.nth(1).uncheck();await f.page.selectOption('#k_screen0','3');await f.page.check('#k_customscreen');await f.page.selectOption('#k_channel','1');
+ assert.equal(await f.page.locator('#save').textContent(),'Save');await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('applied'));
+ const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.pages,253);assert.equal(saved.screen0,3);assert.equal(saved.channel,1);assert.equal(saved.customscreen,true);
+}));
+
+check('V2 headless search cannot reveal unsupported physical screen fields',()=>run({v2:true,capabilities:{display_pages:0}},async f=>{
+ await loaded(f);await f.page.fill('#settings-search','screen');assert.equal(await f.page.locator('[data-key=customscreen]').isVisible(),false);
+ await f.page.fill('#settings-search','');assert.equal(await f.page.locator('[data-key=pages]').isVisible(),false);
+ assert.equal(await f.page.locator('#k_channel').isVisible(),true);
+}));
+
+check('V2 Gamma exposes three native pages and discards unsaved page/metric changes',()=>run({v2:true,gamma:true,language:'fr'},async f=>{
+ await loaded(f);let pages=f.page.locator('[data-key=pages] .presets input');assert.equal(await pages.count(),3);
+ await pages.nth(2).uncheck();await f.page.selectOption('#k_screen0','8');await f.page.click('#discard');
+ assert.equal(await f.page.locator('#k_screen0').inputValue(),'1');assert.equal(await f.page.locator('[data-key=pages] .presets input').nth(2).isChecked(),true);
+ assert.match(await f.page.locator('[data-key=channel]').textContent(),/Canal/);
+}));
 
 (async()=>{
   const executablePath=process.env.BDL_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined);

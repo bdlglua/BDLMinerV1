@@ -4,6 +4,10 @@
 
 Settings settings;
 const SettingInfo kSettings[] = {
+    {"channel", SettingType::Number, &settings.updateChannel, 8, "", ""},
+    {"customscreen", SettingType::Bool, &settings.customScreen, 0, "", ""},
+    {"screen0", SettingType::Number, &settings.screenWidget0, 8, "", ""},
+    {"pages", SettingType::Number, &settings.screenPages, 8, "", ""},
 #ifdef BOARD_GAMMA601
     {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
     {"fanauto", SettingType::Bool, &settings.fanAuto, 0, "", ""},
@@ -28,6 +32,18 @@ const SettingInfo kSettings[] = {
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
 int main() {
+    assert(settings.updateChannel == 0 && !settings.customScreen && settings.screenPages == 255);
+    for(const char *raw:{R"({"channel":2})",R"({"screen0":0})",R"({"screen0":9})",R"({"pages":2})",R"({"pages":0})",R"({"customscreen":"true"})"}){
+        JsonDocument invalid;assert(!deserializeJson(invalid,raw));assert(settingsError(invalid.as<JsonObjectConst>()));
+    }
+    {
+        Settings staged=settings;JsonDocument choices;
+        assert(!deserializeJson(choices,R"({"channel":1,"customscreen":true,"screen0":8,"pages":5})"));
+        assert(!settingsError(choices.as<JsonObjectConst>()));settingsApply(staged,choices.as<JsonObjectConst>());
+        assert(settingsCompare(staged,settings).live);settingsCopyLive(settings,staged);
+        assert(settings.updateChannel==1&&settings.customScreen&&settings.screenWidget0==8&&settings.screenPages==5);
+        settings=Settings();
+    }
     assert(settings.userAgent == DEFAULT_USER_AGENT);
     Settings identity;
     identity.userAgent = "NerdMinerV2";

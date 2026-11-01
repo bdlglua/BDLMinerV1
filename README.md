@@ -1,4 +1,11 @@
-# BDLMiner V1
+# BDLMiner V2 development
+
+The `v2/development` branch adds a Linux/Raspberry Pi fleet dashboard, pool
+diagnostics, supervised Gamma calibration, clearer share statistics, configurable
+physical screens, signed stable/beta channels and a hardware bench with parallel
+release builds. See the [V2 setup and validation guide](docs/v2/README.md).
+Firmware `2.0.0-beta.1` is under development and has not been published.
+The latest published stable release remains **1.9.15**.
 
 Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
 It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or native
@@ -16,7 +23,7 @@ Version **1.9.15** fixes Stratum V2 ASIC negotiation so Gamma/NerdNOS request th
 version rolling they require. Incompatible jobs are rejected and count towards
 configured backup failover. The owner confirmed Gamma OTA and accepted shares
 over V2 at 525 MHz with the corrective build. See the
-[V2 validation record](docs/audits/2026-11-01-sv2-asic-version-rolling.md)
+[Stratum V2 validation record](docs/audits/2026-11-01-sv2-asic-version-rolling.md)
 and [hardware-validation limits](docs/hardware/validation.md).
 Earlier versions are described in [docs/releases](docs/releases/).
 

@@ -48,6 +48,7 @@ struct Settings {
     bool userAgentAuto = true;
     String userAgent = DEFAULT_USER_AGENT;
     uint8_t poolProtocol = 0, backupProtocol = 0; // 0 Stratum V1, 1 Stratum V2 + Noise
+    uint8_t updateChannel=0; // 0 stable, including migrated settings; 1 beta
     String poolAuthority, backupAuthority; // SV2 Base58Check authority keys, or 32-byte hex
     // Display and sound
     uint8_t brightness = 80;  // percent
@@ -56,6 +57,9 @@ struct Settings {
     uint8_t theme = 0;        // accent colour, see ui.cpp
     uint8_t language = 0;     // 0 English, 1 French (screen and dashboard)
     uint8_t cycleSeconds = 0; // > 0: next screen every N seconds
+    bool customScreen=false;
+    uint8_t screenWidget0=1,screenWidget1=2,screenWidget2=4,screenWidget3=3;
+    uint8_t screenPages=255;
     uint8_t nightFrom = HOUR_OFF, nightTo = HOUR_OFF;  // screen off and no beep
     bool beep = true;  // beep when a 32-bit share (difficulty >= 1) is found
     String timezone = DEFAULT_TIMEZONE;

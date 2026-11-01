@@ -6,6 +6,7 @@
 #include "miner.h"
 #include "settings.h"
 #include "core/work.h"
+#include "core/display_config.h"
 #include <cmath>
 namespace ui {
 namespace {
@@ -84,14 +85,14 @@ void begin() {
 void showSplash() { lines("BDLMiner " FW_VERSION,"Bitaxe Gamma 601","Native BM1370 driver","EXPERIMENTAL"); }
 void showPortal(const String &ap, const char *password) { lines("WiFi setup: connect to",ap,String("Key: ")+password,"Open 192.168.4.1"); }
 void showMessage(const char *title, const char *line1, const char *line2) { lines(title,line1?line1:"",line2?line2:"",""); }
-void nextScreen() { if (alertShown) return; page = (page + 1) % 3; since = millis(); render(); }
+void nextScreen() { if (alertShown) return; page = display_config::nextPage(page,3,settings.screenPages); since = millis(); render(); }
 void cycleBrightness() { settingsSetBrightness(settingsBrightness()?0:80); setBacklight(settingsBrightness()); }
 void setBacklight(uint8_t value) {
     brightness = value;
     if (oled) { if (value) static_cast<lgfx::LGFX_Device *>(oled)->wakeup(); else static_cast<lgfx::LGFX_Device *>(oled)->sleep(); }
 }
 void setRotation(uint8_t rotation) { if (oled) oled->setRotation(rotation >= 2 ? 2 : 0); }
-void applySettings() { setRotation(settings.rotation); render(); }
+void applySettings() { if(!(settings.screenPages&(1u<<page)))page=0;setRotation(settings.rotation); render(); }
 void flashShare() {} // Do not flash the OLED on each difficulty-1 ASIC result.
 void blockFound(uint32_t height) { foundHeight = height; alertShown = true; render(); }
 bool dismissAlert() { if (!alertShown) return false; alertShown = false; since = millis(); render(); return true; }
@@ -103,6 +104,15 @@ void render() {
     float t = gamma601::temperature();
     String temp = std::isfinite(t)?String(t,1):"--";
     if (!a.running) { lines("Gamma 601 / BM1370",a.state,temp+" C  Fan "+String(a.rpm),WiFi.localIP().toString()); return; }
+    if(page==0&&settings.customScreen){
+        display_config::Snapshot data;data.hashrate=minerHashrateLive();data.best=s.sessionBestDiff;
+        data.accepted=s.accepted;data.temperature=t;data.uptime=minerUptimeSeconds();data.connected=s.poolConnected;
+        data.frequency=a.frequency;data.fanRpm=a.rpm;
+        const uint8_t widgets[]={settings.screenWidget0,settings.screenWidget1,settings.screenWidget2,settings.screenWidget3};
+        String rows[4];for(unsigned i=0;i<4;++i){char value[32];display_config::value(widgets[i],data,value,sizeof(value),settings.language);
+            rows[i]=String(display_config::label(widgets[i],settings.language))+" "+value;}
+        lines(rows[0],rows[1],rows[2],rows[3]);return;
+    }
     if (page == 0) lines(a.stockFallback?"BM1370 525M FALLBACK":"BDLMiner / BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
         temp+" C  Fan "+String(a.rpm),String("A:")+counter(s.accepted)+" R:"+counter(s.rejected));
     else if (page == 1) lines("Power / thermal",String("Vin ")+reading(a.inputVoltage,2)+"V Vc "+reading(a.coreVoltage,3)+"V",

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "work.h"
+#include "share_reason.h"
 
 namespace stratum {
 
@@ -38,6 +39,7 @@ struct Share {
 struct ShareAck {
     uint32_t id;
     double difficulty;  // assigned target when submitted
+    RejectReason reason=RejectReason::Unknown;
     ShareAck(uint32_t submission = 0, double assigned = 0) : id(submission), difficulty(assigned) {}
 };
 

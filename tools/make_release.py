@@ -30,6 +30,7 @@ import sys
 import tempfile
 from urllib.parse import quote
 from build_output import staged_directory
+from release_version import Version
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PIO_HOME = os.path.expanduser(os.environ.get("PLATFORMIO_CORE_DIR", "~/.platformio"))
@@ -135,8 +136,7 @@ def sign(key, path):
 
 
 def set_version(v):
-    if not re.fullmatch(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?", v):
-        raise ValueError("version must be X.Y or X.Y.Z")
+    v = Version(v).text
     path = os.path.join(ROOT, "platformio.ini")
     text = Path(path).read_text(encoding="utf-8")
     new = re.sub(r'(-DFW_VERSION=\\")[^"\\]+(\\")', lambda m: m.group(1) + v + m.group(2), text)
@@ -222,6 +222,7 @@ def build_release(targets, out, release_version, key):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version")
+    parser.add_argument("--unsigned", action="store_true", help="Never read a signing key; for isolated build workers")
     parser.add_argument("targets", nargs="*")
     args = parser.parse_args()
     known = envs()
@@ -237,7 +238,7 @@ def main():
     release_version = version()
     out = os.path.join(ROOT, "release", release_version)
     with staged_directory(out, preserve=True) as staged:
-        build_release(targets, staged, release_version, signing_key())
+        build_release(targets, staged, release_version, None if args.unsigned else signing_key())
     print(f"written to {out}")
 
 
