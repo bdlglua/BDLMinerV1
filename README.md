@@ -30,6 +30,24 @@ Earlier versions are described in [docs/releases](docs/releases/).
 > for every supported board. The Bitcoin network does about 10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
+## Preview
+
+The [local web dashboard](docs/guide.md#web-dashboard) shows live mining statistics,
+hashrate history, temperature and effective power in your browser.
+
+![BDLMiner V2 local dashboard with mining statistics and six-hour hashrate, temperature and power charts](docs/images/dashboard-v2.png)
+
+On-device screens, shown here in landscape orientation:
+
+| Mining | Clock |
+| :---: | :---: |
+| ![Mining screen with hashrate, shares, best difficulty and temperature](installer/assets/screen-mining.png) | ![Clock screen with time, date, Bitcoin price and block height](installer/assets/screen-clock.png) |
+| **Bitcoin network** | **Hashrate history** |
+| ![Bitcoin screen with price, transaction fees, difficulty adjustment and network hashrate](installer/assets/screen-global.png) | ![On-device hashrate chart with minimum and maximum rates](installer/assets/screen-graph.png) |
+
+All previews use demo data. For measured results, see the
+[hardware validation record](docs/v2/hardware-validation.md).
+
 ## Supported boards
 
 | PlatformIO environment | Boards | Display |
