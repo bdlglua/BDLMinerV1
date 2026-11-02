@@ -1,26 +1,35 @@
 # BDLMiner V2
 
-Version 2.0.0 adds a Linux/Raspberry Pi fleet dashboard, pool
-diagnostics, supervised Gamma calibration, clearer share statistics, configurable
-physical screens, signed stable/beta channels and a hardware bench with parallel
-release builds. See the [V2 setup and validation guide](docs/v2/README.md).
+BDLMiner V2 includes a Linux/Raspberry Pi fleet dashboard, pool diagnostics,
+supervised Gamma calibration, configurable physical screens and signed stable/beta
+updates with automatic rollback. See the
+[V2 setup and validation guide](docs/v2/README.md).
 
 Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
 It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or native
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v2.0.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.0.1)**
-· [Site and web flasher](https://bdlglua.github.io/)
-· [Release notes](docs/releases/v2.0.1.md) · [Français](docs/releases/v2.0.1.fr.md)
+**Latest stable release: [v2.0.3](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.0.3)**
+· [Website](https://bdlglua.github.io/)
+· [Flash / Flasher](https://bdlglua.github.io/flash.html)
+· [Release notes](docs/releases/v2.0.3.md) · [Français](docs/releases/v2.0.3.fr.md)
 · [User guide](docs/guide.md)
-· [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
+· [Statistics](https://bdlglua.github.io/stats.html)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
 On the website: [interactive dashboard and fleet demos](https://bdlglua.github.io/demo.html),
 [measured board comparison](https://bdlglua.github.io/boards.html),
-[installation paths and troubleshooting](https://bdlglua.github.io/start.html), and
+[first installation and updates](https://bdlglua.github.io/start.html),
+[troubleshooting FAQ](https://bdlglua.github.io/faq.html), and
 [support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
+
+**New in 2.0.3:** public pool sharing is enabled by default and can be disabled in
+the miner's Network settings; saved disabled choices are preserved. The
+[statistics page](https://bdlglua.github.io/stats.html) shows miner counts and total
+hashrate by pool, with clickable official website URLs. Private/custom pools stay
+masked and have no link. See [anonymous hashrate sharing](#anonymous-hashrate-sharing)
+for the data sent and the controls.
 
 The V2 release candidate was tested on the owner's M5StickC Plus2 and Gamma 601:
 manual OTA confirmation on both, M5 physical rollback/network recovery and a
@@ -80,8 +89,9 @@ and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
 ## Install
 
 Open **https://bdlglua.github.io/flash.html** in Chrome or Edge on a computer, plug the
-board in with a data USB cable, pick it in the list and click *Install* (it flashes the
-latest release; the first install erases the board). Each
+board in with a data USB cable, pick it in the list and click **Flash** (**Flasher**
+in French). The flasher installs the latest stable release; the first installation
+erases the board. Each
 [release](https://github.com/bdlglua/BDLMinerV2/releases) also has a
 `<board>-factory.bin` (first install, at 0x0) and a `<board>-firmware.bin` (update): see
 [Install a release](docs/guide.md#install-a-release-no-build-tools). To build it
@@ -163,7 +173,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "2.0.1", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "2.0.3", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2", "pool": "public-pool.io"}
 ```
 
 **Share my pool anonymously** (`sharepool`) adds the public pool group. It is
