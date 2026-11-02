@@ -9,10 +9,16 @@ hashrate caps, report intervals and anonymity are preserved.
 
 The patch passed all 19 service tests with Node 24, including parser and Worker
 HTTP cases for M5 and Gamma reports. Applying it to a clean base was checked.
-It is not a miner firmware update and has not been deployed: the workspace's Git
-access returned HTTP 403 when pushing to `bdlglua/BDLMiner-stats`.
+The workspace's Git access initially returned HTTP 403 when pushing to
+`bdlglua/BDLMiner-stats`. The owner applied and published the fix from their PC
+as `009fa2da830d6a5a80e56263f2dd44ad2bf5831c`. All 19 tests and the actual Cloudflare
+deployment passed in [workflow 41414353158](https://github.com/bdlglua/BDLMiner-stats/actions/runs/41414353158)
+on 2 November 2026, deploying Worker version `d8c4fff5-57ad-46c6-a009-35b27e34eea4`.
+Current `BDLMiner-stats/main` already contains this fix. No miner firmware update
+is needed for the server correction.
 
-From a clean clone of **BDLMiner-stats**, with Node 22 or newer:
+For an older deployment still based on `126ec1c`, from a clean clone of
+**BDLMiner-stats**, with Node 22 or newer (do not reapply to current `main`):
 
 ```sh
 curl -fL 'https://raw.githubusercontent.com/bdlglua/BDLMinerV1/v2/development/docs/patches/BDLMiner-stats-v2-semver.patch' -o /tmp/BDLMiner-stats-v2-semver.patch

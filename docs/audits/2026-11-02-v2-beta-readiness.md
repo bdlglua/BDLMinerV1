@@ -192,7 +192,13 @@ stable versions and rejects `2.0.0-beta.1`. A bounded SemVer compatibility fix
 passed all 19 service tests and is provided as a
 [patch](../patches/BDLMiner-stats-v2-semver.patch) with
 [application instructions](../patches/README.md). Pushing that separate repository
-returned HTTP 403, so its live deployment remains unchanged. This HTTP 400 does
+returned HTTP 403; the owner then applied and pushed the fix from their own PC
+as `009fa2da830d6a5a80e56263f2dd44ad2bf5831c`. The
+[service workflow](https://github.com/bdlglua/BDLMiner-stats/actions/runs/41414353158)
+passed all 19 tests and its actual (non-skipped) Cloudflare deployment step
+succeeded at 09:37 Europe/Paris (08:37 UTC). Deployment logs identify Worker
+version `d8c4fff5-57ad-46c6-a009-35b27e34eea4`. The fix is now deployed; acceptance
+of the next real miner report has not yet been observed here. This HTTP 400 does
 not establish the cause of the earlier local statistics-read interruption.
 
 V2 OTA trial/confirmation transitions, rollback, physical visual acceptance,
