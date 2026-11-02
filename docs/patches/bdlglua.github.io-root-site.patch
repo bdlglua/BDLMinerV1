@@ -1,0 +1,344 @@
+diff --git a/.github/workflows/pages.yml b/.github/workflows/pages.yml
+new file mode 100644
+index 0000000..4045ef0
+--- /dev/null
++++ b/.github/workflows/pages.yml
+@@ -0,0 +1,92 @@
++name: Publish BDLMiner
++
++on:
++  push:
++    branches: [main]
++    paths: [".github/workflows/pages.yml", "bdlxs/**"]
++  workflow_dispatch:
++  schedule:
++    - cron: "23 * * * *"
++
++permissions:
++  contents: read
++
++concurrency:
++  group: pages
++  cancel-in-progress: false
++
++jobs:
++  build:
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    steps:
++      - uses: actions/checkout@v7
++        with:
++          path: website
++      - uses: actions/checkout@v7
++        with:
++          repository: bdlglua/BDLMinerV2
++          ref: main
++          path: source
++      - uses: actions/setup-python@v7
++        with:
++          python-version: "3.12"
++      - name: Build the stable and beta USB installers
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: python3 source/tools/make_channels.py --repository bdlglua/BDLMinerV2 --output site
++      - name: Preserve the BDLXS website
++        run: |
++          cp -R website/bdlxs site/bdlxs
++          touch site/.nojekyll
++      - uses: actions/upload-pages-artifact@v5
++        with:
++          path: site
++
++  deploy:
++    needs: build
++    runs-on: ubuntu-latest
++    permissions:
++      pages: write
++      id-token: write
++    environment:
++      name: github-pages
++      url: ${{ steps.deploy.outputs.page_url }}
++    steps:
++      - name: Use the Actions publishing source for the existing Pages site
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: gh api --method PUT "repos/$GITHUB_REPOSITORY/pages" -f build_type=workflow
++      - uses: actions/deploy-pages@v5
++        id: deploy
++      - name: Verify the published root, beta and BDLXS pages
++        env:
++          PAGE_URL: ${{ steps.deploy.outputs.page_url }}
++        run: |
++          python3 - <<'PY'
++          import json, os, time
++          from urllib.request import Request, urlopen
++          base = os.environ['PAGE_URL'].rstrip('/') + '/'
++          def read(path):
++              request = Request(base + path, headers={'Cache-Control': 'no-cache'})
++              with urlopen(request, timeout=30) as response:
++                  assert response.url.startswith(base)
++                  return response.read().decode()
++          for attempt in range(30):
++              try:
++                  for prefix in ('', 'beta/'):
++                      page = read(prefix)
++                      assert '<title>BDLMiner V2:' in page
++                      assert 'http-equiv="refresh"' not in page
++                      manifest = json.loads(read(prefix + 'manifest-m5stickc-plus2.json'))
++                      assert manifest['name'].startswith('BDLMiner V2')
++                  assert 'NovaFlow' in read('bdlxs/')
++                  assert 'BDLXS' in read('bdlxs/')
++                  print('PASS: full BDLMiner site at root and beta, USB manifests, original BDLXS page')
++                  break
++              except Exception as error:
++                  if attempt == 29:
++                      raise
++                  print('Waiting for Pages propagation:', type(error).__name__, flush=True)
++                  time.sleep(5)
++          PY
+diff --git a/README.md b/README.md
+index 9f0338f..628d098 100644
+--- a/README.md
++++ b/README.md
+@@ -1,15 +1,24 @@
+-# BDLXS Fiverr Template
++# bdlglua.github.io
+ 
+-Responsive HTML/CSS/JavaScript template.
++The public [BDLMiner V2 website and USB installer](https://bdlglua.github.io/)
++is published at the account's root address. The original BDLXS / NovaFlow
++template is preserved at [bdlglua.github.io/bdlxs/](https://bdlglua.github.io/bdlxs/).
+ 
+-## Files
+-- `index.html`
+-- `style.css`
+-- `script.js`
++## Publishing
+ 
+-## GitHub Pages
+-Upload the folder contents to a public GitHub repository, then enable Pages from:
+-Settings → Pages → Deploy from a branch → main → /(root)
++The **Publish BDLMiner** workflow builds the website using the current `main`
++branch and published releases of [BDLMinerV2](https://github.com/bdlglua/BDLMinerV2).
++It uses that project's existing channel builder, so the default installer stays
++on the latest stable release and `/beta/` remains opt-in. Factory images and
++installer manifests are hosted on this site alongside the page.
+ 
+-## Customization
+-Replace text, colors, email address and sections with your own content.
++The workflow runs on relevant changes here, once an hour, or manually from the
++Actions tab. It publishes the generated files using GitHub Pages Actions;
++generated firmware binaries are not committed to this repository.
++
++The existing project website at `/BDLMinerV2/` remains published separately.
++Existing firmware update links continue to use it.
++
++`index.html` is a fallback link to the project website for the initial migration
++from branch-based Pages. The Actions deployment replaces it with the full site.
++The original template's files and customization notes are in `bdlxs/`.
+diff --git a/bdlxs/README.md b/bdlxs/README.md
+new file mode 100644
+index 0000000..9f0338f
+--- /dev/null
++++ b/bdlxs/README.md
+@@ -0,0 +1,15 @@
++# BDLXS Fiverr Template
++
++Responsive HTML/CSS/JavaScript template.
++
++## Files
++- `index.html`
++- `style.css`
++- `script.js`
++
++## GitHub Pages
++Upload the folder contents to a public GitHub repository, then enable Pages from:
++Settings → Pages → Deploy from a branch → main → /(root)
++
++## Customization
++Replace text, colors, email address and sections with your own content.
+diff --git a/bdlxs/index.html b/bdlxs/index.html
+new file mode 100644
+index 0000000..283445e
+--- /dev/null
++++ b/bdlxs/index.html
+@@ -0,0 +1,79 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <meta name="description" content="A modern SaaS landing page for startups, tools and digital products." />
++  <title>NovaFlow — SaaS Landing Page</title>
++  <link rel="stylesheet" href="style.css" />
++</head>
++<body>
++  <header class="navbar">
++    <a class="logo" href="#">BDLXS<span>.</span></a>
++    <nav id="nav">
++      <a href="#features">Features</a>
++      <a href="#about">About</a>
++      <a href="#contact">Contact</a>
++    </nav>
++    <button class="menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
++  </header>
++
++  <main>
++    <section class="hero">
++      <div class="hero-content reveal">
++        <p class="eyebrow">PREMIUM HTML TEMPLATE</p>
++        <h1>Build faster. Launch smarter.</h1>
++        <p class="subtitle">A modern SaaS landing page for startups, tools and digital products.</p>
++        <div class="actions">
++          <a class="btn primary" href="#contact">Start a project</a>
++          <a class="btn secondary" href="#features">Explore template</a>
++        </div>
++      </div>
++      <div class="hero-card reveal">
++        <div class="card-top">
++          <span></span><span></span><span></span>
++        </div>
++        <div class="mock-line wide"></div>
++        <div class="mock-line"></div>
++        <div class="mock-grid">
++          <div></div><div></div><div></div>
++        </div>
++      </div>
++    </section>
++
++    <section id="features" class="section reveal">
++      <p class="eyebrow">FEATURES</p>
++      <h2>Everything you need to stand out online.</h2>
++      <div class="cards">
++        <article class="card"><h3>Fast setup</h3><p>Professional, polished and easy to customize for any project.</p></article>
++<article class="card"><h3>Responsive design</h3><p>Professional, polished and easy to customize for any project.</p></article>
++<article class="card"><h3>Clean code</h3><p>Professional, polished and easy to customize for any project.</p></article>
++      </div>
++    </section>
++
++    <section id="about" class="section alt reveal">
++      <p class="eyebrow">WHY CHOOSE US</p>
++      <h2>Designed for clarity, speed and conversion.</h2>
++      <div class="cards">
++        <article class="card"><h3>Modern interface</h3><p>Built with a modern layout and a strong focus on user experience.</p></article>
++<article class="card"><h3>Smooth animations</h3><p>Built with a modern layout and a strong focus on user experience.</p></article>
++<article class="card"><h3>Easy customization</h3><p>Built with a modern layout and a strong focus on user experience.</p></article>
++      </div>
++    </section>
++
++    <section id="contact" class="cta reveal">
++      <div>
++        <p class="eyebrow">LET'S WORK TOGETHER</p>
++        <h2>Ready to create something great?</h2>
++      </div>
++      <a class="btn primary" href="mailto:hello@example.com">Contact now</a>
++    </section>
++  </main>
++
++  <footer>
++    <p>© <span id="year"></span> BDLXS. All rights reserved.</p>
++  </footer>
++
++  <script src="script.js"></script>
++</body>
++</html>
+diff --git a/script.js b/bdlxs/script.js
+similarity index 100%
+rename from script.js
+rename to bdlxs/script.js
+diff --git a/style.css b/bdlxs/style.css
+similarity index 100%
+rename from style.css
+rename to bdlxs/style.css
+diff --git a/index.html b/index.html
+index 283445e..904e947 100644
+--- a/index.html
++++ b/index.html
+@@ -1,79 +1,14 @@
+-<!DOCTYPE html>
++<!doctype html>
+ <html lang="en">
+ <head>
+-  <meta charset="UTF-8" />
+-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+-  <meta name="description" content="A modern SaaS landing page for startups, tools and digital products." />
+-  <title>NovaFlow — SaaS Landing Page</title>
+-  <link rel="stylesheet" href="style.css" />
++  <meta charset="utf-8">
++  <meta name="viewport" content="width=device-width,initial-scale=1">
++  <title>BDLMiner V2</title>
++  <meta http-equiv="refresh" content="0;url=/BDLMinerV2/">
++  <script>location.replace('/BDLMinerV2/' + location.search + location.hash);</script>
+ </head>
+ <body>
+-  <header class="navbar">
+-    <a class="logo" href="#">BDLXS<span>.</span></a>
+-    <nav id="nav">
+-      <a href="#features">Features</a>
+-      <a href="#about">About</a>
+-      <a href="#contact">Contact</a>
+-    </nav>
+-    <button class="menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+-  </header>
+-
+-  <main>
+-    <section class="hero">
+-      <div class="hero-content reveal">
+-        <p class="eyebrow">PREMIUM HTML TEMPLATE</p>
+-        <h1>Build faster. Launch smarter.</h1>
+-        <p class="subtitle">A modern SaaS landing page for startups, tools and digital products.</p>
+-        <div class="actions">
+-          <a class="btn primary" href="#contact">Start a project</a>
+-          <a class="btn secondary" href="#features">Explore template</a>
+-        </div>
+-      </div>
+-      <div class="hero-card reveal">
+-        <div class="card-top">
+-          <span></span><span></span><span></span>
+-        </div>
+-        <div class="mock-line wide"></div>
+-        <div class="mock-line"></div>
+-        <div class="mock-grid">
+-          <div></div><div></div><div></div>
+-        </div>
+-      </div>
+-    </section>
+-
+-    <section id="features" class="section reveal">
+-      <p class="eyebrow">FEATURES</p>
+-      <h2>Everything you need to stand out online.</h2>
+-      <div class="cards">
+-        <article class="card"><h3>Fast setup</h3><p>Professional, polished and easy to customize for any project.</p></article>
+-<article class="card"><h3>Responsive design</h3><p>Professional, polished and easy to customize for any project.</p></article>
+-<article class="card"><h3>Clean code</h3><p>Professional, polished and easy to customize for any project.</p></article>
+-      </div>
+-    </section>
+-
+-    <section id="about" class="section alt reveal">
+-      <p class="eyebrow">WHY CHOOSE US</p>
+-      <h2>Designed for clarity, speed and conversion.</h2>
+-      <div class="cards">
+-        <article class="card"><h3>Modern interface</h3><p>Built with a modern layout and a strong focus on user experience.</p></article>
+-<article class="card"><h3>Smooth animations</h3><p>Built with a modern layout and a strong focus on user experience.</p></article>
+-<article class="card"><h3>Easy customization</h3><p>Built with a modern layout and a strong focus on user experience.</p></article>
+-      </div>
+-    </section>
+-
+-    <section id="contact" class="cta reveal">
+-      <div>
+-        <p class="eyebrow">LET'S WORK TOGETHER</p>
+-        <h2>Ready to create something great?</h2>
+-      </div>
+-      <a class="btn primary" href="mailto:hello@example.com">Contact now</a>
+-    </section>
+-  </main>
+-
+-  <footer>
+-    <p>© <span id="year"></span> BDLXS. All rights reserved.</p>
+-  </footer>
+-
+-  <script src="script.js"></script>
++  <p><a href="/BDLMinerV2/">Open BDLMiner V2 / Ouvrir BDLMiner V2</a></p>
++  <p><a href="/bdlxs/">BDLXS / NovaFlow</a></p>
+ </body>
+ </html>
