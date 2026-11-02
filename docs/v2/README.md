@@ -104,6 +104,11 @@ python3 tools/benchmark_sha256d.py --baseline 3eb9b5a --output native-sha-benchm
 
 This measures portable SHA-256d on the computer running the tool. It does not
 establish ESP32 hardware MH/s, ASIC silicon TH/s or a temperature reduction.
+Development after the original beta.3 kit also adds an S2/S3/C3 transfer kernel:
+boot checks full digests and keeps it only when a local comparison is faster.
+The classic ESP32 loop remains intact. No physical S2/S3/C3 is available for this
+change, so no measured gain or 1 MH/s claim is made; see the
+[board SHA review](../audits/2026-11-02-resumable-sha.md).
 The [beta readiness record](../audits/2026-11-02-v2-beta-readiness.md) separates
 software evidence, owner-operated M5/Gamma dashboard-load measurements and the
 remaining board tests. The M5 held 1 MH/s with its local page open; Gamma's

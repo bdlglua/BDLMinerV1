@@ -27,8 +27,9 @@ over V2 at 525 MHz with the corrective build. See the
 and [hardware-validation limits](docs/hardware/validation.md).
 Earlier versions are described in [docs/releases](docs/releases/).
 
-> For scale: an ESP32 does ~50 kH/s in software and up to ~1 MH/s with its hardware SHA
-> engine, the Bitcoin network ~10^21 H/s.
+> For scale: the classic ESP32 revision 3+ reaches about 1 MH/s with its dedicated
+> hardware SHA loop. S2/S3/C3 use a different hardware path; 1 MH/s is not a rating
+> for every supported board. The Bitcoin network does about 10^21 H/s.
 > This is a lottery ticket and an educational gadget, not a source of income.
 
 ## Supported boards
@@ -48,7 +49,12 @@ Earlier versions are described in [docs/releases](docs/releases/).
 | `esp32s2-headless` | any ESP32‑S2 board | — (serial + web) |
 | `esp32c3-headless` | any ESP32‑C3 board | — (serial + web) |
 
-**The Bitaxe Gamma 601 and NerdNOS targets have been tested on physical boards** (Gamma 601: about X GH/s, NerdNOS: about Y GH/s). Read their guides first: [Gamma 601](docs/hardware/bitaxe-gamma-601.md) (replaces AxeOS; 5 V ≥4 A barrel supply and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
+The [board SHA review](docs/audits/2026-11-02-resumable-sha.md) distinguishes chip
+families, the classic ESP32 revision requirement and pending S2/S3/C3 measurements.
+Gamma 601 has owner-operated V2 measurements around 1.07 TH/s; NerdNOS has no
+physical validation recorded here. Both use an ASIC. Read their guides first:
+[Gamma 601](docs/hardware/bitaxe-gamma-601.md) (replaces AxeOS; 5 V ≥4 A barrel supply
+and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
 
 ## Install
 

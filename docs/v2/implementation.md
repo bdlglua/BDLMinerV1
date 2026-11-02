@@ -23,7 +23,10 @@ the published V1 release and user settings. Branch: `v2/development`.
 
 ## Design constraints
 
-Per-nonce mining loops, CPU clocks and electrical/thermal/fan interlocks stay intact.
+Classic ESP32 assembly mining loops, CPU clocks and electrical/thermal/fan
+interlocks stay intact. The later [S2/S3/C3 SHA transfer review](../audits/2026-11-02-resumable-sha.md)
+adds a boot-checked kernel with correctness and performance fallbacks; its physical
+hashrate remains unmeasured.
 Heavy fleet/history/calibration operations run on the optional host, not on the
 ESP32 mining cores. Credentials stay on the host and never enter dashboard JSON,
 logs or public reports. New NVS settings have defaults and do not change the

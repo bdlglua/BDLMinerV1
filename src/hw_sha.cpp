@@ -13,6 +13,7 @@
 
 #if SOC_SHA_SUPPORT_RESUME
 
+#include "esp_timer.h"
 #include "hal/sha_ll.h"
 #include "sha/sha_dma.h"
 
@@ -27,6 +28,7 @@ uint32_t nonceAt(uint32_t position) { return position; }
 static std::atomic<bool> held{false};
 static int holds = 0;  // hold() nests (an update download around tlsConnect())
 static bool sparseTextWrites = true;  // selected by selfTest(), before workers start
+static bool directTransfers = true;   // correctness and speed checked before workers start
 
 void hold() {
     holds++;
@@ -65,11 +67,30 @@ void prepare(Job &job, const uint8_t header[80]) {
 bool fillAvailable() { return false; }
 void prepareFill(Fill &, const uint8_t *) {}
 
-template<bool sparse>
-static uint32_t scanWithPadding(Job &job, uint32_t first, uint32_t count, uint32_t limit,
-                               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
+// S2/S3/C3 expose digest and TEXT in the same byte order. Unlike the classic
+// ESP32 these targets do not need the DPORT read workaround. Keep the SDK's
+// volatile register accesses, but avoid an intermediate RAM digest and the
+// out-of-line read-buffer call on S2/S3. Fixed-size transfers also avoid a
+// pointer/count loop for every midstate and header tail.
+template<unsigned words>
+static inline __attribute__((always_inline)) void writeWords(volatile uint32_t *dest, const uint32_t *src) {
+#pragma GCC unroll 16
+    for (unsigned i = 0; i < words; ++i) REG_WRITE(dest + i, src[i]);
+}
+
+static inline __attribute__((always_inline)) void digestToText(volatile uint32_t *text,
+                                                             volatile uint32_t *digest) {
+#pragma GCC unroll 8
+    for (unsigned i = 0; i < 8; ++i) REG_WRITE(text + i, REG_READ(digest + i));
+}
+
+template<bool sparse, bool direct = false>
+static __attribute__((noinline)) uint32_t scanWithPadding(
+    Job &job, uint32_t first, uint32_t count, uint32_t limit,
+    void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
     uint32_t second[8];  // only the first digest changes; padding stays in the peripheral
     volatile uint32_t *text = (volatile uint32_t *)SHA_TEXT_BASE;
+    volatile uint32_t *digest = (volatile uint32_t *)SHA_H_BASE;
     volatile uint32_t *h7 = (volatile uint32_t *)(SHA_H_BASE + 28);
 
     if (held) return 0;
@@ -81,14 +102,22 @@ static uint32_t scanWithPadding(Job &job, uint32_t first, uint32_t count, uint32
     uint32_t nonce = first;
     for (uint32_t i = 0; i < count; i++, nonce++) {
         job.tail[3] = nonce;
-        sha_ll_write_digest(SHA2_256, job.mid, 8);
-        sha_ll_fill_text_block(job.tail, sparse ? 9 : 16);
+        if (direct) {
+            writeWords<8>(digest, job.mid);
+            writeWords<9>(text, job.tail);
+        } else {
+            sha_ll_write_digest(SHA2_256, job.mid, 8);
+            sha_ll_fill_text_block(job.tail, sparse ? 9 : 16);
+        }
         if (sparse) REG_WRITE(text + 15, job.tail[15]);
         sha_ll_continue_block(SHA2_256);
         waitIdle();
-        sha_ll_read_digest(SHA2_256, second, 8);
-
-        sha_ll_fill_text_block(second, 8);
+        if (direct) {
+            digestToText(text, digest);
+        } else {
+            sha_ll_read_digest(SHA2_256, second, 8);
+            sha_ll_fill_text_block(second, 8);
+        }
         REG_WRITE(text + 8, 0x00000080);   // padding byte 0x80
         if (!sparse) for (int i = 9; i < 15; ++i) REG_WRITE(text + i, 0);
         REG_WRITE(text + 15, 0x00010000);  // 256 bits, big-endian length
@@ -108,9 +137,71 @@ static uint32_t scanWithPadding(Job &job, uint32_t first, uint32_t count, uint32
 
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *) {
-    // Specialize outside the nonce loop: no per-nonce mode checks.
+    // Specialize outside the nonce loop: no per-nonce mode checks. The old
+    // sparse and complete-block paths remain available for boot fallback.
+    if (directTransfers && sparseTextWrites)
+        return scanWithPadding<true, true>(job, first, count, limit, hit, ctx);
     return sparseTextWrites ? scanWithPadding<true>(job, first, count, limit, hit, ctx)
                             : scanWithPadding<false>(job, first, count, limit, hit, ctx);
+}
+
+// A compiler/SDK/chip combination may make the buffered path faster. Compare
+// both on the actual peripheral, including locks and busy waits, at boot only.
+// Alternate order and use the best of three to reduce interrupt/cache noise.
+// These short local scans are not pool work and never enter mining counters.
+static bool preferDirectTransfers(Job &job) {
+    constexpr uint32_t count = 4096;
+    int64_t best[2] = {INT64_MAX, INT64_MAX};
+    for (int run = 0; run < 3; ++run) {
+        for (int turn = 0; turn < 2; ++turn) {
+            int direct = (run + turn) & 1;
+            int64_t start = esp_timer_get_time();
+            auto discard = [](uint32_t, const uint8_t *, void *) {};
+            uint32_t done = direct
+                ? scanWithPadding<true, true>(job, 0, count, 0, discard, nullptr)
+                : scanWithPadding<true>(job, 0, count, 0, discard, nullptr);
+            int64_t elapsed = esp_timer_get_time() - start;
+            if (done != count || elapsed <= 0) return false;
+            if (elapsed < best[direct]) best[direct] = elapsed;
+        }
+    }
+    bool faster = best[1] * 100 < best[0] * 99;  // require at least 1% improvement
+    logf("[miner] resumable SHA transfers: %s (buffered %.1f, direct %.1f kH/s, boot scan)\n",
+         faster ? "direct" : "buffered", count * 1000.0 / best[0], count * 1000.0 / best[1]);
+    return faster;
+}
+
+// A single rare genesis candidate cannot detect every missed/misordered
+// transfer. Also compare complete digests at easy targets, nonce carries and
+// wrap, across different midstates, before timing either kernel.
+static bool verifyResumeTransfers() {
+    struct Check {
+        alignas(4) uint8_t header[80];
+        uint32_t next, hits;
+        bool correct;
+    } check{};
+    static constexpr uint32_t starts[] = {0, 0xfffc, UINT32_MAX - 3};
+    uint32_t seed = 0xa5b6c7d8;
+    for (uint32_t first : starts) {
+        for (auto &byte : check.header) byte = (seed = seed * 1664525u + 1013904223u) >> 24;
+        check.next = first;
+        check.hits = 0;
+        check.correct = true;
+        Job job;
+        prepare(job, check.header);
+        uint32_t done = scan(job, first, 8, UINT32_MAX,
+            [](uint32_t nonce, const uint8_t *digest, void *ctx) {
+                Check &check = *(Check *)ctx;
+                uint8_t ref[32];
+                memcpy(check.header + 76, &nonce, 4);
+                sha::sha256d(check.header, 80, ref);
+                if (nonce != check.next || memcmp(ref, digest, 32)) check.correct = false;
+                ++check.next;
+                ++check.hits;
+            }, &check);
+        if (done != 8 || check.hits != 8 || !check.correct) return false;
+    }
+    return true;
 }
 
 }  // namespace hwsha
@@ -658,12 +749,22 @@ bool selfTest() {
     sha::sha256d(header, 80, ref);
     bool correct = t.hits == 1 && t.nonce == kNonce && memcmp(ref, t.hash, 32) == 0;
 #if SOC_SHA_SUPPORT_RESUME
+    if (correct) correct = verifyResumeTransfers();
+    if (!correct && directTransfers) {
+        directTransfers = false;
+        logf("[miner] direct SHA transfers failed their self-test; retrying buffered transfers\n");
+        return selfTest();
+    }
     if (!correct && sparseTextWrites) {
         // A chip/SDK which does not retain TEXT padding keeps its working
         // hardware path: retry the known answer with complete block writes.
         sparseTextWrites = false;
         logf("[miner] SHA padding reuse failed its self-test; retrying full block writes\n");
         return selfTest();
+    }
+    if (correct && directTransfers && !preferDirectTransfers(job)) {
+        directTransfers = false;
+        return selfTest();  // validate the selected buffered path as well
     }
 #endif
     return correct;

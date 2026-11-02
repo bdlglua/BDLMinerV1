@@ -19,36 +19,63 @@ prefix = r'''
 #include "core/work.h"
 #define SOC_SHA_SUPPORT_RESUME 1
 uint32_t textRegisters[16], digestRegisters[8];
-size_t textWrites = 0;
+size_t textWrites = 0, digestWrites = 0, directReads = 0, bufferedReads = 0;
 int locks = 0;
-bool clobberText = false;
+int busyPolls = 0;
+bool clobberText = false, badDirectRead = false, badEngine = false, frozenTimer = false;
+bool badDirectAtFive = false;
 int fallbacks = 0;
-void logf(const char *, ...) { ++fallbacks; }
+int64_t ticks = 0;
+int directReadCost = 1, bufferedOverhead = 40;
+int64_t esp_timer_get_time() { return frozenTimer ? 0 : ticks; }
+void logf(const char *format, ...) { if (strstr(format, "failed")) ++fallbacks; }
 constexpr int SHA2_256 = 0;
 #define SHA_TEXT_BASE (uintptr_t(textRegisters))
 #define SHA_H_BASE (uintptr_t(digestRegisters))
 void writeRegister(volatile uint32_t *address, uint32_t value) {
-    assert(locks > 0);
-    assert(address >= textRegisters && address < textRegisters + 16);
+    assert(locks > 0 && busyPolls == 0);
+    uintptr_t addr = uintptr_t(address);
+    if (addr >= uintptr_t(textRegisters) && addr < uintptr_t(textRegisters + 16)) ++textWrites;
+    else {
+        assert(addr >= uintptr_t(digestRegisters) && addr < uintptr_t(digestRegisters + 8));
+        ++digestWrites;
+    }
     *address = value;
-    ++textWrites;
+    ++ticks;
 }
 #define REG_WRITE(address, value) writeRegister(address, value)
+uint32_t readRegister(volatile uint32_t *address) {
+    assert(locks > 0 && busyPolls == 0);
+    assert(address >= digestRegisters && address < digestRegisters + 8);
+    ++directReads;
+    ticks += directReadCost;
+    return *address ^ uint32_t(badDirectRead || (badDirectAtFive && textRegisters[3] == 5));
+}
+#define REG_READ(address) readRegister(address)
 void esp_sha_acquire_hardware() { ++locks; }
 void esp_sha_release_hardware() { assert(locks > 0); --locks; }
-bool sha_ll_busy() { return false; }
+bool sha_ll_busy() { if (busyPolls) { --busyPolls; return true; } return false; }
 void sha_ll_fill_text_block(const void *data, size_t words) {
     for (size_t i = 0; i < words; ++i) writeRegister(textRegisters + i, ((const uint32_t *)data)[i]);
 }
-void sha_ll_read_digest(int, void *out, size_t words) { memcpy(out, digestRegisters, words * 4); }
-void sha_ll_write_digest(int, void *data, size_t words) { memcpy(digestRegisters, data, words * 4); }
+void sha_ll_read_digest(int, void *out, size_t words) {
+    assert(locks > 0 && busyPolls == 0);
+    ++bufferedReads;
+    ticks += words + bufferedOverhead;  // controllable clock fixture, not a hardware speed model
+    memcpy(out, digestRegisters, words * 4);
+}
+void sha_ll_write_digest(int, void *data, size_t words) {
+    for (size_t i = 0; i < words; ++i) writeRegister(digestRegisters + i, ((uint32_t *)data)[i]);
+}
 void compress(bool start) {
-    assert(locks > 0);
+    assert(locks > 0 && busyPolls == 0);
     uint32_t state[8];
     for (int i = 0; i < 8; ++i) state[i] = start ? sha::IV[i] : __builtin_bswap32(digestRegisters[i]);
     sha::transform(state, (const uint8_t *)textRegisters);
+    if (badEngine) state[0] ^= 1;
     for (int i = 0; i < 8; ++i) digestRegisters[i] = __builtin_bswap32(state[i]);
     if (clobberText) for (int i = 9; i < 15; ++i) textRegisters[i] = 0xdeadbeef;
+    busyPolls = 1;
 }
 void sha_ll_start_block(int) { compress(true); }
 void sha_ll_continue_block(int) { compress(false); }
@@ -67,15 +94,20 @@ int main() {
         hwsha::Job job;
         hwsha::prepare(job, header);
         assert(locks == 0);
-        for (uint32_t limit : {UINT32_MAX, 0x7fffffffu, 0xffffu, 0u}) {
+        for (int mode = 0; mode < 3; ++mode) {
+          hwsha::directTransfers = mode == 0;
+          hwsha::sparseTextWrites = mode != 2;
+          for (uint32_t limit : {UINT32_MAX, 0x7fffffffu, 0xffffu, 0u}) {
             uint32_t first = k % 2 ? UINT32_MAX - 5 : 100;
             constexpr uint32_t count = 19;
             // A different SHA user may leave nonzero padding between batches.
             for (auto &word : textRegisters) word = 0xa5a5a5a5;
-            textWrites = 0;
+            textWrites = digestWrites = directReads = bufferedReads = 0;
             std::vector<Hit> hits;
             assert(hwsha::scan(job, first, count, limit, hit, &hits) == count);
-            assert(textWrites == 6 + 20 * count && locks == 0);
+            assert(textWrites == (mode == 2 ? 32 * count : 6 + 20 * count) && locks == 0);
+            assert(digestWrites == 8 * count && directReads == (mode == 0 ? 8 * count : 0));
+            assert(bufferedReads == hits.size() + (mode == 0 ? 0 : count));
             size_t found = 0;
             for (uint32_t i = 0; i < count; ++i) {
                 uint32_t nonce = first + i;
@@ -89,21 +121,50 @@ int main() {
                 }
             }
             assert(found == hits.size());
+          }
         }
         hwsha::hold();
+        hwsha::hold();  // nested TLS/update reservation
         size_t writesBefore = textWrites;
         std::vector<Hit> hits;
         assert(hwsha::scan(job, 0, 19, UINT32_MAX, hit, &hits) == 0);
         assert(hits.empty() && textWrites == writesBefore);
+        hwsha::release();
+        assert(hwsha::scan(job, 0, 19, UINT32_MAX, hit, &hits) == 0);
         hwsha::release(); assert(locks == 0);
     }
-    assert(hwsha::selfTest() && hwsha::sparseTextWrites && fallbacks == 0);
+    auto boot = [] {
+        hwsha::directTransfers = hwsha::sparseTextWrites = true;
+        fallbacks = 0;
+        return hwsha::selfTest();
+    };
+    assert(boot() && hwsha::directTransfers && hwsha::sparseTextWrites && fallbacks == 0);
+    // Timing fixtures check selection, without asserting a real-world speedup.
+    directReadCost = 10;
+    bufferedOverhead = 0;
+    assert(boot() && !hwsha::directTransfers && hwsha::sparseTextWrites && fallbacks == 0);
+    directReadCost = 1;  // equal modeled duration: stay buffered without >1% gain
+    assert(boot() && !hwsha::directTransfers && hwsha::sparseTextWrites);
+    bufferedOverhead = 40;
+    frozenTimer = true;
+    assert(boot() && !hwsha::directTransfers);
+    frozenTimer = false;
+    badDirectRead = true;
+    assert(boot() && !hwsha::directTransfers && hwsha::sparseTextWrites && fallbacks == 1);
+    badDirectRead = false;
+    // A nonce-specific defect outside the genesis scan must also fall back.
+    badDirectAtFive = true;
+    assert(boot() && !hwsha::directTransfers && hwsha::sparseTextWrites && fallbacks == 1);
+    badDirectAtFive = false;
     // Model a peripheral which overwrites its TEXT registers during hashing.
     // The real boot self-test must recover the existing hardware mode.
     clobberText = true;
-    assert(hwsha::selfTest() && !hwsha::sparseTextWrites && fallbacks == 1);
-    assert(hwsha::selfTest() && locks == 0 && fallbacks == 1);
-    puts("Resumable SHA: reference digests, nonce wrap, filtering, dirty padding, 20 writes/nonce and boot fallback passed");
+    assert(boot() && !hwsha::directTransfers && !hwsha::sparseTextWrites && fallbacks == 2);
+    assert(hwsha::selfTest() && locks == 0 && fallbacks == 2);
+    clobberText = false;
+    badEngine = true;
+    assert(!boot() && !hwsha::directTransfers && !hwsha::sparseTextWrites && locks == 0);
+    puts("Resumable SHA: three kernels, exact digests/filters, nonce wrap, busy/lock ownership, boot speed selection and correctness fallbacks passed");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-sha-resume-') as temp:
