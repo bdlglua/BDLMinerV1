@@ -150,6 +150,14 @@ M5/Gamma now have owner-observed beta.4 OTA confirmations. The M5 short counter
 window and M5-only Internet block/recovery reports are still pending; ordinary
 S2/S3/C3/NerdNOS hardware remains unavailable.
 
+The M5 beta.4 short check subsequently passes over 122 s at 1.004854918033 MH/s,
+with 25 readings, the same boot and no reported read error. Its first network
+attempt in pool mode fails to observe pool disconnection: 189 successful readings
+then three late HTTP timeouts. After the owner removes the router blacklist,
+a new snapshot shows restored mining on the same boot. The failed report is
+retained. A matching Wi-Fi/local-connectivity observation is pending; the operator
+must restore access while the observer runs so recovery can be measured.
+
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 
 The next development step combines a first Linux test kit, the embedded dashboard

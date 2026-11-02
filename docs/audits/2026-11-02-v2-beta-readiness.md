@@ -378,3 +378,33 @@ This establishes owner-observed normal beta.4 OTA confirmation after the physica
 rollback test. The requested M5 short counter/health check and M5-only Internet
 block/recovery still need their own reports. Both boards currently report
 confirmed beta.4; ordinary S2/S3/C3/NerdNOS hardware remains unavailable.
+
+### M5 beta.4 short check and first network attempt
+
+The owner supplied `m5-beta4-smoke.json`, recorded at 11:26:52.091554 UTC.
+Counters/health and pool diagnostics pass on 25 readings: boot `ab2a323b`, uptime
+341 -> 463 s and hashes 338,493,400 -> 461,085,700 yield
+**1.004854918033 MH/s over 122 device seconds**. Both endpoints show 47 C IMU,
+100% power, confirmed beta.4, connected Noise Stratum V2 and no shares/rejections.
+No read error is reported. Diagnostics are `infrequent_shares` but compatible:
+difficulty 1 implies a mean share interval around 4,275 seconds, so zero shares
+in this short check do not establish a failure.
+
+The first manual network report starts at 11:27:09.335646 UTC in `pool` mode and
+fails after 423.66 host seconds with `No matching outage observed before timeout`.
+Its 189 successful readings retain boot `ab2a323b`; first/last uptime is 481 ->
+874 s and both retained pool states are connected. Three HTTP timeouts occur at
++403.643, +413.652 and +423.66 seconds. No reachable disconnected-pool state was
+observed, so the restoration and operator-confirmation phases were not reached.
+Their false fields do not prove that the operator performed no action, nor
+independently describe the miner's later state.
+
+The owner initially had not restored access after timeout; restoration was
+requested. A snapshot at 11:37:45.824567 UTC then shows the same boot at uptime
+1,117 s, pool connected, 1.004638159 MH/s reported, 46 C IMU and no health issue.
+The owner identifies the action as adding/removing the M5 in the router blacklist.
+The observed local HTTP loss did not match the requested pool-only test. The
+first report remains failed; no network recovery pass is retroactively assigned.
+A matching `wifi`/local-connectivity observation with a distinct filename and
+explicit restoration during the running observer has been requested. No firmware
+timeouts, health interlocks or pass criteria were weakened.

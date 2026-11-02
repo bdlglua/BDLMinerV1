@@ -61,7 +61,11 @@ at 1.073214 TH/s, with +3 accepted shares, no new rejection or reported read err
 and an unchanged stored-fault timestamp. M5 USB reset on `/dev/ttyACM0` is verified.
 M5 physical beta.4 rollback followed by normal beta.4 reinstallation/confirmation
 is also observed, ending at 1.003914 MH/s / 47 C IMU on boot `ab2a323b`.
-Its short counter check and dedicated Internet cut/recovery remain pending.
+Its short check passes over 122 s at 1.004855 MH/s, with no reported read error.
+A first pool-mode network attempt failed to observe pool disconnection and ended
+with local-API timeouts. The owner used a router blacklist; a later snapshot shows
+restored mining on the same boot. A matching Wi-Fi/local-connectivity observation
+is pending; the first failed report is retained.
 **For reproduction, test M5 rollback before normal confirmation.** S2/S3/C3/NerdNOS measurements remain
 pending actual board availability.
 

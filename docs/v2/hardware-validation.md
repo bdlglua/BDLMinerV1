@@ -12,7 +12,7 @@ confirmed that dashboard gaps and settings icons are fixed on both boards.
 |---|---|
 | Local dashboard | Owner accepts gap/icon corrections on both beta.3 devices. |
 | Gamma OTA/stability | Beta.3 hour completed: 3,604 s, 1.071274 TH/s, +141 accepted / no new rejected shares, `review` after one recovered timeout. Beta.4 OTA and 122-second post-OTA check at 1.073214 TH/s passed. |
-| Rollback/network recovery | M5 USB reset, beta.4 -> beta.3 rollback and normal beta.4 reinstallation/confirmation observed; network check pending. |
+| Rollback/network recovery | M5 USB reset, rollback, normal beta.4 confirmation and short check passed. First pool-mode network attempt unvalidated; matching blacklist/Wi-Fi observation requested. |
 | S2/S3/C3 and NerdNOS | No ordinary test boards available to the owner; physical measurements pending. |
 
 ## Gamma hour result
@@ -73,6 +73,10 @@ Normal reinstallation subsequently confirmed at 11:22:04 UTC: beta.3 on
 that same boot. At uptime 175 s the M5 reports 1.003914 MH/s, 47 C IMU and a
 connected pool. Its short counter window and dedicated Internet cut remain pending.
 
+The short check has now passed on 25 readings over 122 s at **1.004855 MH/s**,
+with 47 C IMU at both endpoints and no reported read error. Infrequent shares
+at difficulty 1 do not make the connected pool incompatible.
+
 The Linux helper
 `tools/reset_serial.py --port <M5-port>` uses only DTR/RTS, sends no serial data
 or firmware and erases nothing. Verify it on confirmed beta.3 before any upload,
@@ -113,7 +117,7 @@ connect the computer by Ethernet, then briefly interrupt the Wi-Fi access point.
 Do not power off the miner or save deliberately invalid Wi-Fi credentials.
 
 ```sh
-python3 tools/monitor_network.py --config bdlhub.local.json --miner m5 --kind wifi --output network-m5-beta4.json
+python3 tools/monitor_network.py --config bdlhub.local.json --miner m5 --kind wifi --timeout 420 --output network-m5-beta4-blacklist.json
 ```
 
 Wait for `Observer armed`, interrupt the connection, then restore it as soon as
@@ -136,6 +140,15 @@ python3 tools/monitor_network.py --config bdlhub.local.json --miner m5 --kind po
 V1/V2 detect a silent pool after five minutes. Keep the block until restoration
 is requested; the explicit 420-second timeout allows observing that transition.
 This verifies pool recovery after an Internet block, not loss of Wi-Fi association.
+
+A router blacklist which also removes local API access requires the
+`wifi`/local-connectivity-loss mode, while the observer computer remains connected.
+The owner's first `pool` attempt retained 189 successful connected-pool samples,
+then three late HTTP timeouts, and is not validated. After removal from the
+blacklist the M5 resumes mining on the same boot. The matching retry uses a
+separate report filename. **Remove the M5 from the blacklist when restoration
+is requested while the observer is still running**, so recovery can be measured.
+Also remove the block after an error/timeout.
 
 ## Gamma OTA after its hour
 

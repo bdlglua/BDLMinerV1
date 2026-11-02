@@ -11,7 +11,7 @@ vides et les icônes des réglages sont corrigés **sur les deux cartes**.
 |---|---|
 | 1. Affichage local | Espaces vides et icônes validés par le propriétaire sur M5 et Gamma en bêta 3. |
 | 2. Gamma : OTA et stabilité | Heure bêta 3 terminée : 3 604 s, 1,071274 TH/s, +141 acceptées, aucun nouveau rejet ; `review` après un timeout récupéré. OTA bêta 4 confirmée et contrôle de 122 s réussi à 1,073214 TH/s. |
-| 3. Rollback et réseau | Reset USB, rollback bêta 4 → bêta 3, puis réinstallation/confirmation bêta 4 du M5 observés. Coupure réseau à terminer. |
+| 3. Rollback et réseau | Reset USB, rollback, réinstallation/confirmation bêta 4 et contrôle court du M5 validés. Premier essai réseau `pool` non validé ; nouvel essai avec blacklist en mode `wifi` demandé. |
 | 4. S3/S2/C3 et NerdNOS | Aucun de ces matériels de test disponible chez le propriétaire ; mesures physiques en attente. |
 
 ## Heure du Gamma : résultat reçu
@@ -82,6 +82,10 @@ puis 83 observations en essai bêta 4 sur `ab2a323b`, enfin confirmation sur ce
 même boot. À 175 s, le M5 indique 1,003914 MH/s, 47 °C IMU et un pool connecté.
 Le contrôle court des compteurs et la coupure Internet dédiée restent à terminer.
 
+Le contrôle court est maintenant réussi : 25 lectures sur 122 s, à
+**1,004855 MH/s**, avec 47 °C IMU aux deux extrémités et aucune erreur de lecture
+signalée. Le pool reste compatible malgré les shares rares attendues à difficulté 1.
+
 Le helper Linux `tools/reset_serial.py --port <port-M5>`
 utilise seulement DTR/RTS : aucun octet série, firmware ou effacement n'est envoyé.
 Vérifier ce reset sur le M5 encore en bêta 3 confirmée, avant tout upload, puis
@@ -140,7 +144,7 @@ relier le PC par Ethernet, puis tester une courte coupure de l'accès Wi-Fi.
 Ne pas débrancher l'alimentation du mineur ni enregistrer un faux SSID/mot de passe.
 
 ```bash
-python3 tools/monitor_network.py --config bdlhub.local.json --miner m5 --kind wifi --output network-m5-beta4.json
+python3 tools/monitor_network.py --config bdlhub.local.json --miner m5 --kind wifi --timeout 420 --output network-m5-beta4-blacklist.json
 ```
 
 Attendre `Observer armed`, effectuer la coupure, puis **rétablir dès le message
@@ -166,6 +170,15 @@ Le détecteur de silence du pool est de cinq minutes en V1/V2. Garder le blocage
 jusqu'au message demandant la restauration ; `--timeout 420` laisse le temps
 d'observer cette déconnexion. Ce test valide une reprise du pool après blocage
 Internet, pas une perte de la liaison Wi-Fi.
+
+Une blacklist de box qui rend aussi l'API locale inaccessible nécessite le mode
+`wifi`/perte de connectivité locale, avec le PC toujours connecté. Le premier
+essai du propriétaire, lancé en mode `pool`, a conservé 189 lectures où le pool
+restait connecté, puis trois timeouts HTTP en fin de fenêtre ; il n'est pas validé.
+Après retrait de la blacklist, le M5 est revenu en minage sur le même boot.
+Le nouvel essai conserve un nom de fichier distinct. **Retirer le M5 de la
+blacklist dès le message de restauration, pendant que le script tourne encore**,
+pour qu'il puisse mesurer la reprise. Le retirer aussi si le test expire/échoue.
 
 ## OTA du Gamma après son heure de stabilité
 
