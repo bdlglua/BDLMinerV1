@@ -12,6 +12,8 @@ const FR={'Dashboard':'Tableau de bord','Settings':'Réglages','Log':'Journal','
 'Network hashrate':'Hashrate du réseau','tx in mempool':'tx dans la mempool','Next retarget':'Prochain ajustement','in':'dans','blocks':'blocs','done':'fait',
 'Pool (backup)':'Pool (secours)','Pool':'Pool','Payout address':'Adresse de paiement','not a valid Bitcoin address':'adresse Bitcoin invalide',
 'Device':'Appareil','night mode':'mode nuit','last reset':'dernier redémarrage','WiFi':'WiFi','Miners':'Miners','All miners':'Tous les miners',
+'Share my pool anonymously':'Partager ma pool anonymement',
+'Off by default. With hashrate sharing, adds the connected public pool group. Other pools are grouped as private/other. Never sends the hostname, port, Bitcoin address or worker.':'Désactivé par défaut. Avec le partage du hashrate, ajoute le groupe de la pool publique connectée. Les autres pools sont regroupées dans « Autre / pool privée ». Aucun nom d’hôte, port, adresse Bitcoin ni worker n’est envoyé.',
 'miners':'miners','no answer':'pas de réponse','online':'en ligne','ONLINE':'EN LIGNE','OFFLINE':'HORS LIGNE','NO CONNECTION':'PAS DE CONNEXION',
 'Updated':'Mis à jour','market data':'données marché','min old':'min','mining paused':'minage en pause','power limited':'puissance limitée','battery saver: half speed':'économie de batterie : mi-régime',
 'Recent blocks':'Derniers blocs','mining now':'en cours de minage','your best':'ta meilleure','ago':'il y a','Firmware update':'Mise à jour du firmware',

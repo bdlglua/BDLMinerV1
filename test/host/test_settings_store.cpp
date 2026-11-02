@@ -4,6 +4,7 @@
 #include "settings_store.h"
 Settings settings;
 const SettingInfo kSettings[] = {
+    {"sharepool", SettingType::Bool, &settings.sharePool, 0, "", ""},
 #ifdef BOARD_GAMMA601
     {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
     {"fanauto", SettingType::Bool, &settings.fanAuto, 0, "", ""},
@@ -39,6 +40,17 @@ struct Storage {
     }
 };
 int main() {
+    Settings legacy;
+    const char *beforePoolSharing = R"({"power":75})";
+    assert(!legacy.sharePool);
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(beforePoolSharing), strlen(beforePoolSharing), legacy));
+    assert(!legacy.sharePool); // updates never opt an existing miner into pool sharing
+    legacy.sharePool = true;
+    std::string consent;
+    assert(settingsstore::encode(legacy, consent));
+    Settings restoredConsent;
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(consent.data()), consent.size(), restoredConsent));
+    assert(restoredConsent.sharePool);
 #ifdef BOARD_GAMMA601
     Settings oldGammaSettings;const char *old=R"({"power":100})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(old),strlen(old),oldGammaSettings));

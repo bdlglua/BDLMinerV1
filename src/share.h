@@ -1,7 +1,8 @@
 // Anonymous hashrate sharing (settings.shareHashrate, on by default): every 5
 // minutes, the firmware version, the board and the hashrate are posted to the
 // BDLMiner statistics Worker, which adds up the reports of every miner.
-// Nothing else is sent: no address, worker, pool, name or identifier.
+// Optional pool sharing (off by default) adds a public pool group. No Bitcoin
+// address, worker, configured hostname, port, name or identifier is sent.
 #pragma once
 
 #include <stddef.h>
@@ -18,8 +19,10 @@ void sharePoll();
 // "model":"M5Stack Core2"} with the hashrate rounded to 3 significant digits,
 // "every" the seconds until the next report, and "model" only when the board
 // tells more than its firmware (the M5Stack firmware serves several models).
-// Length written, 0 if `size` is too small.
-size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr);
+// An optional pool host is reduced to a fixed public group or "other";
+// nullptr omits the field entirely. Length written, 0 if `size` is too small.
+size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr,
+                 const char *poolHost = nullptr);
 
 // True for names equal but for case, spaces and punctuation.
 bool sameName(const char *a, const char *b);

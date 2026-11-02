@@ -486,6 +486,21 @@ back to the previous power), *Power* (0–100 %) and *Brightness* (0–100 %) nu
 *Restart* button, on `bdlminer/<name>/set/<mining|power|brightness|restart>`. Power is
 saved like the web setting; brightness works like the button.
 
+## Anonymous pool statistics
+
+From 2.0.2, **Settings → Network → Anonymous statistics → Share my pool anonymously**
+adds the connected pool's public group to anonymous hashrate reports. This option
+is off by default, including after an update, and applies without a restart.
+**Share my hashrate anonymously** must also be enabled. When a backup pool is
+active, its group is used instead of the main pool's.
+
+Only Public Pool, Nerdminers.org, NerdMiner.io, CKPool, OCEAN, Braiins Pool, ViaBTC,
+F2Pool and AntPool are named. Other hosts become **Other / private pool** before
+leaving the board. No configured hostname, port, Bitcoin address or worker is sent.
+Older firmware, a disabled sharing option or a disconnected pool appears as
+**Not shared**. The public tables show miner counts and combined hashrate per
+group; they cannot diagnose an individual board or reveal its settings.
+
 ## Updates from GitHub
 
 Thirty seconds after boot and then every hour (5 minutes after a failed check), the

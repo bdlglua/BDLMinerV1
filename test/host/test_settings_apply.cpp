@@ -4,6 +4,7 @@
 
 Settings settings;
 const SettingInfo kSettings[] = {
+    {"sharepool", SettingType::Bool, &settings.sharePool, 0, "", ""},
     {"channel", SettingType::Number, &settings.updateChannel, 8, "", ""},
     {"customscreen", SettingType::Bool, &settings.customScreen, 0, "", ""},
     {"screen0", SettingType::Number, &settings.screenWidget0, 8, "", ""},
@@ -32,6 +33,14 @@ const SettingInfo kSettings[] = {
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
 int main() {
+    assert(!settings.sharePool);
+    Settings sharing = settings; JsonDocument sharingValues;
+    assert(!deserializeJson(sharingValues, R"({"sharepool":true})"));
+    assert(!settingsError(sharingValues.as<JsonObjectConst>()));
+    settingsApply(sharing, sharingValues.as<JsonObjectConst>());
+    assert(sharing.sharePool && settingsCompare(sharing, settings).live);
+    settingsCopyLive(settings, sharing); assert(settings.sharePool);
+    settings = Settings();
     assert(settings.updateChannel == 0 && !settings.customScreen && settings.screenPages == 255);
     for(const char *raw:{R"({"channel":2})",R"({"screen0":0})",R"({"screen0":9})",R"({"pages":2})",R"({"pages":0})",R"({"customscreen":"true"})"}){
         JsonDocument invalid;assert(!deserializeJson(invalid,raw));assert(settingsError(invalid.as<JsonObjectConst>()));

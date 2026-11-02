@@ -13,6 +13,9 @@ async function main(){
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   if(process.env.BDL_VERBOSE)page.on('console',message=>{if(message.type()==='error')console.error('BROWSER:',message.text())});
   await page.route('https://**/*',route=>route.fulfill({status:200,contentType:'text/javascript',body:''}));
+  let communityStats={at:Date.now(),miners:3,hashrate:2.5e6,boards:[],versions:[],fleet:[],history:[],recent:[],record:null,
+   pools:[{name:'public-pool.io',miners:1,hashrate:1e6},{name:'other',miners:1,hashrate:1e6},{name:'unknown',miners:1,hashrate:5e5}]};
+  await page.route('https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(communityStats)}));
   await page.addInitScript(()=>{window.WebSocket=class{constructor(){this.readyState=1;setTimeout(()=>this.onopen?.(),0)}send(){}close(){}}});
   await page.goto(url);await page.locator('[data-t="ctaInstall"]').waitFor();
   assert.equal(await page.locator('[data-t="ctaInstall"]').textContent(),'Flash');
@@ -82,6 +85,9 @@ async function main(){
     const html=await response.text();assert.ok(html.includes('data-page="'+key+'"'));assert.ok(!html.includes('__PAGE_CONTENT__'));
     assert.equal(html.includes('src="https://unpkg.com/esp-web-tools@'),key==='flash','load the USB tool only on its own page');
    }
+   await page.goto(base+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
+   assert.match(await page.locator('#st-pools').textContent(),/Public Pool.*Autre \/ pool privée.*Pool non renseignée/s);
+   assert.match(await page.locator('[data-t="poolsHelp"]').textContent(),/désactivé par défaut/);
    await page.goto(base+'/#support');await page.waitForURL(base+'/support.html');await page.locator('.support-panel').waitFor();
    assert.equal(await page.locator('main h1').count(),1);
    await page.goto(base+'/releases.html');await page.locator('.release-card').first().waitFor();
@@ -93,6 +99,15 @@ async function main(){
    await page.goto(base+'/#demo');await page.waitForURL(base+'/demo.html');await page.frameLocator('#demo-frame').locator('#m .hero').waitFor();
    assert.ok(page.frames().some(frame=>frame.url().startsWith(base+'/demo/miner/')));
   }
+  delete communityStats.pools;await page.goto(url+'/stats.html');
+  await page.locator('#st-pools tbody tr').first().waitFor();
+  assert.equal(await page.locator('#st-pools tbody tr').count(),1);
+  assert.match(await page.locator('#st-pools').textContent(),/Pool non renseignée.*3.*2,5 MH\/s/s);
+  await page.locator('#lang').click();assert.match(await page.locator('#st-pools').textContent(),/Not shared/);
+  communityStats.pools=[{name:'<img src=x onerror=alert(1)>',miners:3,hashrate:2.5e6}];
+  await page.goto(url+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
+  assert.match(await page.locator('#st-pools').textContent(),/Other \/ private pool/);
+  assert.equal(await page.locator('#st-pools img').count(),0);
   for(const name of Object.values(pages)){
    await page.setViewportSize({width:375,height:812});await page.goto(url+'/'+name);
    await page.locator('main h1').first().waitFor();

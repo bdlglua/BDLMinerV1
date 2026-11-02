@@ -1,7 +1,7 @@
 <section id="stats">
  <div class="wrap">
   <h1 data-t="statsTitle">BDLMiner right now</h1>
-  <p class="lead" data-t="statsLead">The total of the miners that share their hashrate anonymously, live: every 5 minutes, the version, the board and the hashrate, nothing else.</p>
+  <p class="lead" data-t="statsLead">Live totals from anonymous hashrate reports: firmware version, board, hashrate and optional public pool group. No Bitcoin address, worker or private endpoint.</p>
   <div class="tiles" aria-live="polite">
    <div class="tile"><div class="label" data-t="tHashrate">Total hashrate</div><div class="value accent" id="st-hashrate">–</div></div>
    <div class="tile"><div class="label" data-t="tMiners">Miners</div><div class="value" id="st-miners">–</div></div>
@@ -30,6 +30,7 @@
    <div class="card"><h3 data-t="byBoard">By board</h3><table class="by" id="st-boards"></table></div>
    <div class="card"><h3 data-t="byVersion">By version</h3><table class="by" id="st-versions"></table></div>
   </div>
+  <div class="card"><h3 data-t="byPool">By pool</h3><table class="by" id="st-pools"></table><p class="s" data-t="poolsHelp">Pool sharing is optional and off by default, from firmware 2.0.2. Enable Share my pool anonymously in the miner's Network settings. Other pools are hidden. Not shared includes older firmware, sharing disabled and disconnected pools.</p></div>
   <p class="s" id="st-status" data-h="statsMore">Raw data: <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary">JSON</a> · <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">statistics page</a>.</p>
  </div>
 </section>

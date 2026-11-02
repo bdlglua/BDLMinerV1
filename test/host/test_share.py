@@ -15,6 +15,7 @@ prefix = r'''
 #include <cstring>
 #include <string>
 #include <vector>
+#include "core/public_pool.h"
 #define FW_VERSION "1.9.0"
 #define BOARD_NAME "M5StickC-Plus2"
 namespace board { const char *model = "M5StickC-Plus2"; const char *modelName() { return model; } }
@@ -38,7 +39,10 @@ bool memoryOk = true;
 bool tlsMemoryOk() { return memoryOk; }
 double rate = 1.0234e6;
 double minerHashrate() { return rate; }
-struct { bool shareHashrate = true; } settings;
+struct { bool shareHashrate = true, sharePool = false; } settings;
+struct { bool poolConnected = true; } stats;
+String activePool = "public-pool.io";
+const String &netPoolHost() { return activePool; }
 struct WiFiClientSecure {};
 std::vector<std::string> posted, hosts;
 int answer = 204;
@@ -52,13 +56,13 @@ struct HTTPClient {
     int POST(uint8_t *data, size_t n) { posted.emplace_back((char *)data, n); return answer; }
     void end() {}
 };
-size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr);
+size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr, const char *poolHost = nullptr);
 bool sameName(const char *a, const char *b);
 void sharePoll();
 '''
 tests = r'''
 int main() {
-    char out[128];
+    char out[256];
     assert(shareBody(out, sizeof(out), 1.0234e6));
     assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300})"));
     shareBody(out, sizeof(out), 987654321.0); assert(strstr(out, "\"hashrate\":9.88e+08,"));
@@ -70,6 +74,25 @@ int main() {
     shareBody(out, sizeof(out), 1e6, "M5Stack Core2");
     assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"model":"M5Stack Core2"})"));
     shareBody(out, sizeof(out), 1e6, "Bad\"name\\x"); assert(strstr(out, "\"model\":\"Badnamex\"}"));
+
+    // A finite public group leaves the device, never the raw endpoint.
+    for (const char *host : {"public-pool.io", "PUBLIC-POOL.IO.", "regional.public-pool.io"})
+        assert(!strcmp(publicPoolGroup(host), "public-pool.io"));
+    assert(!strcmp(publicPoolGroup("pool.nerdminers.org"), "nerdminers.org"));
+    assert(!strcmp(publicPoolGroup("pool.nerdminer.io"), "nerdminer.io"));
+    for (const char *domain : {"ckpool.org", "ocean.xyz", "braiins.com", "viabtc.com", "f2pool.com", "antpool.com"})
+        assert(!strcmp(publicPoolGroup(domain), domain));
+    for (const char *host : {"", "192.168.1.40", "miner.local", "pool.home.example", "notpublic-pool.io",
+                             "public-pool.io.evil.test", "https://secret@public-pool.io", "public-pool.io:3333",
+                             ".public-pool.io", "x..public-pool.io", "x/public-pool.io", "[fd00::1]"}) {
+        assert(!strcmp(publicPoolGroup(host), "other"));
+        shareBody(out, sizeof(out), 1e6, nullptr, host);
+        assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"pool":"other"})"));
+    }
+    shareBody(out, sizeof(out), 1e6, "M5Stack Core2", "my-worker.public-pool.io");
+    assert(strstr(out, "\"model\":\"M5Stack Core2\",\"pool\":\"public-pool.io\"}"));
+    assert(!strstr(out, "my-worker"));
+    assert(!shareBody(out, 25, 1e6, "M5Stack Core2", "public-pool.io"));
 
     sharePoll(); assert(posted.empty());                       // not before 3 minutes
     nowMs = kFirstMs; sharePoll(); assert(posted.size() == 1);
@@ -88,6 +111,20 @@ int main() {
     assert(posted.size() == 4 && posted[3].find("model") == std::string::npos);
     board::model = "M5Stack Core2"; nowMs += kEveryMs; sharePoll();
     assert(posted.size() == 5 && posted[4].find(R"("model":"M5Stack Core2")") != std::string::npos);
+    assert(posted.back().find("pool") == std::string::npos); // existing users have not opted in
+    settings.sharePool = true; nowMs += kEveryMs; sharePoll();
+    assert(posted.size() == 6 && posted.back().find(R"("pool":"public-pool.io")") != std::string::npos);
+    activePool = "pool.nerdminers.org"; nowMs += kEveryMs; sharePoll();
+    assert(posted.size() == 7 && posted.back().find(R"("pool":"nerdminers.org")") != std::string::npos); // current backup
+    activePool = "192.168.1.40"; nowMs += kEveryMs; sharePoll();
+    assert(posted.size() == 8 && posted.back().find(R"("pool":"other")") != std::string::npos);
+    assert(posted.back().find("192.168") == std::string::npos);
+    stats.poolConnected = false; nowMs += kEveryMs; sharePoll();
+    assert(posted.size() == 9 && posted.back().find("pool") == std::string::npos);
+    settings.shareHashrate = false; nowMs += kEveryMs; sharePoll();
+    assert(posted.size() == 9); // pool sharing cannot bypass the main opt-out
+    settings.shareHashrate = true; settings.sharePool = false; stats.poolConnected = true; sharePoll();
+    assert(posted.size() == 10 && posted.back().find("pool") == std::string::npos);
     puts("share: OK");
 }
 '''
@@ -95,5 +132,5 @@ with tempfile.TemporaryDirectory() as tmp:
     src = Path(tmp) / 'share_test.cpp'
     src.write_text(prefix + body + tests)
     exe = Path(tmp) / 'share_test'
-    subprocess.run(['g++', '-std=c++17', '-Wall', '-Wno-unused-function', str(src), '-o', str(exe)], check=True)
+    subprocess.run(['g++', '-std=c++17', '-Wall', '-Wno-unused-function', '-I'+str(root/'src'), str(src), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
