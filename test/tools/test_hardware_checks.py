@@ -5,8 +5,10 @@ from unittest import mock
 import json
 import tempfile
 import io
+import sys
 from types import SimpleNamespace
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
 spec = importlib.util.spec_from_file_location('hardware_checks', Path(__file__).resolve().parents[2] / 'tools/check_hardware.py')
 checks = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checks)
@@ -67,6 +69,52 @@ class HardwareChecks(unittest.TestCase):
         self.assertEqual(result['limitation_reasons'],['full','thermal'])
         self.assertEqual(result['pool_difficulty_levels'],[1])
         self.assertEqual(result['share_delta'],{'accepted':2,'rejected':1,'work':2.5})
+
+    def test_ota_observer_rejects_cached_boots_and_confirmation_after_restart(self):
+        old={'board':'M5','firmware_env':'m5','firmware':'2.0.0-beta.3','boot_id':'old','firmware_trial':False}
+        trial=dict(old,firmware='2.0.0-beta.4',boot_id='trial',firmware_trial=True)
+        cases=(('confirm',[old,dict(trial,boot_id='old')],'invalid_trial_boot'),
+               ('confirm',[old,trial,dict(trial,boot_id='again')],'invalid_trial_boot'),
+               ('confirm',[old,trial,dict(trial,boot_id='again',firmware_trial=False)],'invalid_result_boot'),
+               ('rollback',[old,trial,old],'invalid_result_boot'),
+               ('rollback',[old,trial,dict(old,boot_id='trial')],'invalid_result_boot'),
+               ('confirm',[dict(old,boot_id='')],'missing_boot_id'))
+        for mode,polls,reason in cases:
+            with self.subTest(reason=reason,mode=mode):
+                args=SimpleNamespace(urls=['http://miner'],previous=old['firmware'],expected=trial['firmware'],expect=mode,timeout=100)
+                with mock.patch.object(checks,'read_stats',side_effect=polls), \
+                     mock.patch.object(checks.time,'monotonic',side_effect=range(100)), \
+                     mock.patch.object(checks.time,'sleep'), mock.patch('sys.stdout',new=io.StringIO()):
+                    result=checks.monitor(args)
+                self.assertFalse(result['passed'])
+                self.assertEqual(result['observed_result'],reason)
+
+    def test_explicit_rollback_reset_runs_once_and_failed_commands_are_not_retried(self):
+        old={'board':'M5','firmware_env':'m5','firmware':'2.0.0-beta.3','boot_id':'old','firmware_trial':False}
+        trial=dict(old,firmware='2.0.0-beta.4',boot_id='trial',firmware_trial=True)
+        args=SimpleNamespace(urls=['http://miner'],previous=old['firmware'],expected=trial['firmware'],
+                             expect='rollback',timeout=100,reset_command='operator-reset --port selected')
+        for failure in (None,TimeoutError('DO_NOT_LEAK_COMMAND')):
+            with self.subTest(failure=failure):
+                polls=[old]+[trial]*5+[dict(old,boot_id='returned')]
+                with mock.patch.object(checks,'read_stats',side_effect=polls), \
+                     mock.patch.object(checks.time,'monotonic',side_effect=range(100)), \
+                     mock.patch.object(checks.time,'sleep'), mock.patch('sys.stdout',new=io.StringIO()), \
+                     mock.patch('hardware_suite.command',side_effect=failure) as reset:
+                    result=checks.monitor(args)
+                reset.assert_called_once_with(args.reset_command)
+                self.assertTrue(result['reset_requested'])
+                self.assertEqual(result['passed'],failure is None)
+                self.assertNotIn('DO_NOT_LEAK',json.dumps(result))
+                if failure:self.assertEqual(result['observed_result'],'reset_command_failed')
+        with mock.patch.object(checks,'read_stats',return_value=old), \
+             mock.patch.object(checks.time,'monotonic',side_effect=range(200)), \
+             mock.patch.object(checks.time,'sleep'), mock.patch('sys.stdout',new=io.StringIO()), \
+             mock.patch('hardware_suite.command') as reset:
+            self.assertFalse(checks.monitor(args)['passed'])
+        reset.assert_not_called()  # a supplied command alone never authorizes an early pulse
+        args.expect='confirm'
+        with self.assertRaises(ValueError):checks.monitor(args)
 
     def test_pool_target_is_retained_without_private_identity(self):
         payload={'board':'M5StickC Plus2','firmware':'1.9.13','uptime_s':100,'total_hashes':100000000,

@@ -229,7 +229,32 @@ gap between occupied panels. Bounds were checked at eight widths (320-1667 px),
 with SVG navigation and retained Gamma fan controls. These are software layout
 checks; beta.3 has not yet been observed on the owner's cards.
 
-Beta.3 OTA, Gamma V2 OTA, V2 rollback, physical/local-dashboard visual acceptance,
-Gamma hour-long stability and longer-duration V2 operation remain unestablished.
-NerdNOS and other physical boards remain unvalidated for V2. Earlier V1 hardware
-results and loopback software fixtures are not counted as V2 hardware acceptance.
+### Confirmed beta.3 snapshot and owner visual acceptance
+
+At 2026-11-02 09:48:37 UTC, the owner supplied a `snapshot` report with both devices
+reachable and `firmware_trial: false` on `2.0.0-beta.3`:
+
+| Device | Boot / uptime | Reported rate | Temperature | Shares accepted/rejected |
+|---|---|---:|---|---:|
+| M5StickC Plus2 | `2f867bc` / 1,683 s | 1.005929 MH/s | 48 C IMU | 0 / 0 |
+| Gamma 601 | `6a012c1` / 1,684 s | 1.069368 TH/s | 49 C ASIC | 70 / 1 stale |
+
+Both show 100% effective power and connected Stratum V2 (Noise). Gamma remains
+at 525 MHz, with 7,427 RPM automatic fan at 65%, 55.5 C regulator, status 0,
+5.25 V input and 1.144531 V core. Reported hardware errors are 0.041894%.
+The stale share is already present before the next tests; its cause and any
+rejection-rate trend cannot be inferred from this snapshot.
+
+The owner separately answered yes when asked whether the large gaps were gone
+and settings icons correct on both local dashboards. This is owner-operated
+visual acceptance of those corrections, not a physical-screen or full UI audit.
+The snapshot establishes confirmed beta.3 running on both cards, not an observed
+complete OTA transition, sustained rate or hour-long stability.
+
+Beta.4 is a distinct unsigned development build for the
+[four-check hardware protocol](../v2/hardware-validation.md), with the S2/S3/C3
+transfer kernel and improved host observers. Beta.4 OTA, V2 rollback, actual
+network interruption/recovery, Gamma hour-long stability and longer-duration V2
+operation remain pending physical reports. NerdNOS and ordinary S2/S3/C3 boards
+are unavailable to the owner and remain unvalidated. Earlier V1 results and
+loopback software fixtures are not counted as V2 hardware acceptance.

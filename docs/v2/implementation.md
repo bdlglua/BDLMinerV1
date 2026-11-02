@@ -101,8 +101,19 @@ beta.2 rates remain pending; see the readiness audit for the report's scope.
 The owner then supplied screenshots of the remaining beta.2 dashboard gap and
 settings glyphs. Beta.3 uses a full-width section flow and font-independent SVG
 settings/maintenance icons. Software layout checks cover populated sections,
-eight viewport widths and retained Gamma fan controls; beta.3 OTA/visual results
-remain pending on the actual cards.
+eight viewport widths and retained Gamma fan controls. A later owner snapshot at
+09:48:37 UTC shows both devices on confirmed beta.3: M5 1.005929 MH/s / 48 C IMU,
+Gamma 1.069368 TH/s / 49 C ASIC, 70 accepted and one stale share already present.
+The owner explicitly accepts gap/icon corrections on both local dashboards.
+The full beta.3 OTA transition was not observed by the supplied snapshot.
+
+Beta.4 packages the S2/S3/C3 transfer kernel, stricter OTA boot-identity observation
+and a read-only manual-network observer. The [ordered hardware protocol](hardware-validation.md)
+starts Gamma's hour on beta.3, tests M5 rollback before normal confirmation, then
+M5 network recovery and Gamma beta.4 OTA after its hour. Transport loss alone
+cannot establish a Wi-Fi cut; operator attribution, the same boot and real
+healthy counter progress are required. S2/S3/C3/NerdNOS physical work is explicitly
+pending board availability. None of these pending tests is counted as passed.
 
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Read-only hardware checks to run on the same LAN as the miners.
+"""LAN hardware observations with an explicitly configured optional rollback reset.
 
 snapshot: record actual readings. measure: compare dashboard closed/open.
-ota-monitor: observe a real pending trial and confirmation/rollback; does not
-upload firmware, restart a miner or change settings. Web password, if needed,
+ota-monitor: observe a real pending trial and confirmation/rollback; never uploads
+firmware. An explicit --reset-command can trigger one physical reset during a
+rollback trial; otherwise it only reads. Web password, if needed,
 comes from BDLMINER_WEB_PASSWORD and is never included in reports.
 """
 import argparse
@@ -20,7 +21,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 
-TOOL_VERSION = 3
+TOOL_VERSION = 4
 
 
 def device_url(value):
@@ -205,16 +206,26 @@ def record_ota_event(events, event):
 def monitor(args):
     if args.expected == args.previous:
         raise ValueError('Previous and expected versions must differ')
-    print('Monitoring only. Apply the matching firmware through the local dashboard.', flush=True)
+    reset_command = getattr(args, 'reset_command', None)
+    if reset_command and args.expect != 'rollback':
+        raise ValueError('A reset command is only valid for a rollback observation')
+    print('Apply the matching firmware through the local dashboard; this observer does not upload it.', flush=True)
     if args.expect == 'rollback':
-        print('This requires a controlled physical/serial reset during the unconfirmed trial; this script cannot perform it.', flush=True)
+        if reset_command:
+            print('The explicitly configured hardware reset will run once during the observed pending trial.', flush=True)
+        else:
+            print('This requires a controlled physical/serial reset during the unconfirmed trial; no reset command is configured.', flush=True)
     until = time.monotonic() + args.timeout
     pending = False
     baseline = None
+    trial_boot = None
+    reset_requested = False
     events = []
     while time.monotonic() < until:
         try:
             sample = read_stats(args.urls[0])
+            if not sample.get('boot_id'):
+                return {'passed': False, 'observed_result': 'missing_boot_id', 'events': events, 'last': sample}
             if baseline is None and sample['firmware'] == args.previous and sample.get('firmware_trial') is False:
                 baseline = sample
             if baseline and (sample.get('board') != baseline.get('board') or
@@ -222,17 +233,35 @@ def monitor(args):
                 return {'passed': False, 'observed_result': 'different_device', 'events': events}
             result = ota_result(sample, args.expected, args.previous, args.expect, pending, baseline is not None)
             if result == 'pending':
+                if sample['boot_id'] == baseline['boot_id'] or (trial_boot and sample['boot_id'] != trial_boot):
+                    return {'passed': False, 'observed_result': 'invalid_trial_boot', 'events': events, 'last': sample}
+                trial_boot = sample['boot_id']
                 if not pending:
                     print('Pending trial observed for firmware ' + args.expected + '.', flush=True)
-                    if args.expect == 'rollback':
+                    if args.expect == 'rollback' and not reset_command:
                         print('Perform the controlled physical/serial reset now, before automatic confirmation.', flush=True)
                 pending = True
+                if reset_command and not reset_requested:
+                    reset_requested = True  # never retry an active hardware operation
+                    print('Requesting the explicitly configured hardware reset.', flush=True)
+                    try:
+                        from hardware_suite import command
+                        command(reset_command)
+                    except Exception as error:
+                        return {'passed': False, 'observed_result': 'reset_command_failed',
+                                'reset_requested': True, 'error_type': type(error).__name__,
+                                'saw_pending_trial': True, 'events': events, 'last': sample}
             event = {'firmware': sample['firmware'], 'boot_id': sample.get('boot_id'), 'trial': sample.get('firmware_trial')}
             if record_ota_event(events, event):
                 print('Observed firmware ' + sample['firmware'] + '; pending trial: ' + str(sample.get('firmware_trial')), flush=True)
             if result and result != 'pending':
+                if ((result == 'confirmed' and sample['boot_id'] != trial_boot) or
+                        (result == 'rollback' and sample['boot_id'] in (baseline['boot_id'], trial_boot))):
+                    return {'passed': False, 'observed_result': 'invalid_result_boot', 'events': events, 'last': sample}
                 print('OTA result: ' + result, flush=True)
                 return {'observed_result': result, 'saw_pending_trial': pending, 'events': events, 'last': sample,
+                        'previous_boot_id': baseline['boot_id'], 'trial_boot_id': trial_boot,
+                        'reset_requested': reset_requested,
                         'passed': result in ('confirmed', 'rollback')}
         except Exception as error:
             if record_ota_event(events, {'offline_or_error': type(error).__name__}):
@@ -271,6 +300,7 @@ def main():
             p.add_argument('--previous', required=True)
             p.add_argument('--expect', choices=('confirm', 'rollback'), required=True)
             p.add_argument('--timeout', type=int, default=600)
+            p.add_argument('--reset-command', help='Optional physical reset argument vector, only with --expect rollback')
     args = parser.parse_args()
     try:
         result = snapshot(args.urls) if args.command == 'snapshot' else measure(args) if args.command == 'measure' else monitor(args)

@@ -45,6 +45,9 @@ class BetaKitTests(unittest.TestCase):
             self.assertFalse(metadata['automatic_install'])
             self.assertFalse(metadata['boards']['m5stickc-plus2']['signed'])
             self.assertTrue((out/'src/update_key.h').is_file())
+            self.assertTrue((out/'tools/monitor_network.py').is_file())
+            self.assertTrue((out/'tools/reset_serial.py').is_file())
+            self.assertTrue((out/'docs/v2/hardware-validation.fr.md').is_file())
             for line in (out/'SHA256SUMS.txt').read_text().splitlines():
                 digest,name=line.split('  ')
                 self.assertEqual(hashlib.sha256((out/name).read_bytes()).hexdigest(),digest)
@@ -54,6 +57,10 @@ class BetaKitTests(unittest.TestCase):
             # a different working directory. --help must not contact a miner.
             for launcher in ('start-hub.sh','check-miners.sh'):
                 result=subprocess.run(['sh',str(out/launcher),'--help'],cwd=root,capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stderr)
+            for tool in ('monitor_network.py','reset_serial.py'):
+                result=subprocess.run([sys.executable,str(out/'tools'/tool),'--help'],
+                                      cwd=root,capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)
             archive=root/'kit.zip';archive_kit(out,archive)
             first=archive.read_bytes();archive_kit(out,archive);self.assertEqual(archive.read_bytes(),first)

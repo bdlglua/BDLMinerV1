@@ -18,14 +18,16 @@ from release_version import Version
 ROOT=Path(__file__).resolve().parents[1]
 DEFAULT_BOARDS=('m5stickc-plus2','bitaxe-gamma-601')
 TOOLS=('bdlhub.py','calibrate_gamma.py','check_fleet.py','check_hardware.py',
-       'hardware_suite.py','firmware_image.py','release_version.py')
+       'hardware_suite.py','monitor_network.py','reset_serial.py','firmware_image.py','release_version.py')
 PACKAGE=('__init__.py','client.py','hub.py','calibration.py','example.json',
          'web/index.html','web/app.js','web/style.css')
 DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness.md',
+      'v2/hardware-validation.md','v2/hardware-validation.fr.md',
       'audits/2026-11-02-resumable-sha.md',
       'benchmarks/v2-native-sha256d-2026-11-02.json',
       'releases/v2.0.0-beta.2.md','releases/v2.0.0-beta.2.fr.md',
       'releases/v2.0.0-beta.3.md','releases/v2.0.0-beta.3.fr.md',
+      'releases/v2.0.0-beta.4.md','releases/v2.0.0-beta.4.fr.md',
       'patches/README.md','patches/BDLMiner-stats-v2-semver.patch')
 
 
@@ -99,6 +101,10 @@ The source commit in kit.json describes the host tools. Firmware version,
 board, hashes, chip, factory application and OTA capacity are independently
 checked when this kit is built. Real hashrate/cooling/OTA remain hardware tests.
 See docs/v2/README.md for passwords, calibration, rollback and hardware testing.
+The four hardware checks, including rollback BEFORE confirming the M5 update,
+are described in docs/v2/hardware-validation.md (French: .fr.md).
+reset_serial.py is an active hardware reset helper for an identified USB-UART
+port. ota-monitor only invokes it when --reset-command is explicitly supplied.
 ''')
     (output/'LIRE-MOI.txt').write_text(f'''BDLMiner {version} — kit de test Linux
 
@@ -121,6 +127,10 @@ Les images de développement non signées ne passent pas par l'OTA GitHub
 automatique ; la présence d'une signature est indiquée dans kit.json.
 Conserve ton firmware fonctionnel et une sauvegarde privée des réglages.
 Les essais réels de débit, de chauffe et d'OTA restent à faire sur les cartes.
+Pour les quatre validations, commence par docs/v2/hardware-validation.fr.md :
+le test de rollback du M5 précède la confirmation de sa mise à jour.
+reset_serial.py provoque un reset matériel du port USB-UART choisi explicitement.
+L'observateur OTA ne le lance que si --reset-command est fourni.
 ''')
     checks=[]
     for path in sorted(output.rglob('*')):

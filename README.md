@@ -4,7 +4,7 @@ The `v2/development` branch adds a Linux/Raspberry Pi fleet dashboard, pool
 diagnostics, supervised Gamma calibration, clearer share statistics, configurable
 physical screens, signed stable/beta channels and a hardware bench with parallel
 release builds. See the [V2 setup and validation guide](docs/v2/README.md).
-Firmware `2.0.0-beta.3` is under development and has not been published.
+Firmware `2.0.0-beta.4` is under development and has not been published.
 The latest published stable release remains **1.9.15**.
 
 Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.

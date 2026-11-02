@@ -1,7 +1,7 @@
 # BDLMiner V2 development
 
 The seven V2 features are implemented on `v2/development`. The firmware version
-is `2.0.0-beta.3`; this branch is not a published release. Stable V1 remains
+is `2.0.0-beta.4`; this branch is not a published release. Stable V1 remains
 [1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15).
 
 ## M5 / Gamma test kit
@@ -41,42 +41,30 @@ The builder checks chip/target/version, binary hashes, factory application and
 both OTA slots. The ZIP contains only checksum-listed distribution files;
 runtime databases/caches, private keys and local reports are excluded.
 
-## Manual OTA on the owner's cards
+## Four hardware checks on the owner's cards
 
-Beta.3 fixes the remaining gap under pool diagnostics by placing the chart,
-pool and Bitcoin panels in one full-width flow. Settings use consistent SVG
-icons instead of font symbols. It includes the earlier logo, V2 titles,
-full-width detail panels and host-collector fixes. See the
-[changes and validation limits](../releases/v2.0.0-beta.3.md).
+The owner's 2026-11-02 09:48:37 UTC snapshot shows **both devices on confirmed
+beta.3**, mining at 1.005929 MH/s on the M5 and 1.069368 TH/s on Gamma. The owner
+also confirmed the gap/icon corrections on both local dashboards. This snapshot
+does not observe the full beta.3 OTA transition or establish hour-long stability.
 
-Extract the new kit into a separate directory. Keep the existing hub configuration
-and private settings backup. Stop the old hub with Ctrl+C before starting the
-new one; both use port 8787. The kit's readiness launcher expects beta.3, so an
-older card correctly reports `review` until its manual update completes.
+Beta.4 includes the boot-selected S2/S3/C3 transfer optimization and host observers
+for the remaining tests. See [beta.4 changes](../releases/v2.0.0-beta.4.md) and
+the ordered protocol in [English](hardware-validation.md) or
+[French](hardware-validation.fr.md). Start Gamma's hour on its current beta.3
+while preparing the M5. **Test M5 rollback before its normal beta.4 confirmation.**
+Do not interrupt Gamma's network or update it during the hour. The protocol then
+covers M5 reconnection and Gamma beta.4 OTA. S2/S3/C3/NerdNOS measurements remain
+pending actual board availability.
 
-To observe the M5 update, start this in the new kit **before** uploading the image:
-
-```bash
-python3 tools/check_hardware.py ota-monitor http://192.168.1.40 --previous 2.0.0-beta.2 --expected 2.0.0-beta.3 --expect confirm --timeout 900 --output ota-m5-beta3.json
-```
-
-Then open the M5's local Settings page and upload
-`firmware/m5stickc-plus2-firmware.bin`. Leave the observer running through the
-trial and automatic confirmation; it observes only and does not upload/reboot.
-The owner's Gamma remains on beta.1. Start its observer before uploading
-`firmware/bitaxe-gamma-601-firmware.bin` through that card's Settings page:
-
-```bash
-python3 tools/check_hardware.py ota-monitor http://192.168.1.135 --previous 2.0.0-beta.1 --expected 2.0.0-beta.3 --expect confirm --timeout 900 --output ota-gamma-beta3.json
-```
-
-Use `*-firmware.bin` for OTA, not `*-factory.bin`. Adjust `--previous` if the
-card actually runs another confirmed version; do not bypass the baseline check.
-After confirmation, run `sh check-miners.sh` and check the V2 tab titles, official
-logo and full-width panels. The owner observed the M5 beta.1-to-beta.2 trial and
-confirmation at 1.004112 MH/s / 48 C IMU, then reported the remaining web gap and
-settings pictograms. Beta.3 fixes those in software; its hardware/visual checks,
-Gamma OTA, V2 rollback and longer-duration checks remain pending.
+Extract the new kit into a separate directory, retaining configuration/settings
+backups. Its readiness launcher expects beta.4, so a beta.3 card correctly reports
+`review` until its update completes. Stop the old hub before starting the new one
+on port 8787. Use only `*-firmware.bin` through the local dashboard; factory images
+are for USB. Observers do not upload firmware or change settings; an OTA observer
+only requests a physical reset when `--reset-command` is explicitly supplied.
+The network observer records manual operator actions and requires attribution. Signed active
+bench operations remain separate and require explicit arguments.
 
 ## Local dashboard and mining work
 
@@ -325,6 +313,16 @@ operator's router or hardware fixture. Restoration runs even if the interruption
 fails. A pass requires observing the actual outage and healthy resumed mining;
 missing commands produce a skip. The bench never saves an invalid Wi-Fi network
 or changes pool credentials to manufacture a disconnect.
+
+For manual interruptions without router automation, the new read-only observer
+is available as `python3 tools/monitor_network.py --config bdlhub.local.json
+--miner m5 --kind wifi --output network-m5.json`. It first requires confirmed,
+healthy mining. Transport loss alone does not prove Wi-Fi loss: a pass also needs
+operator attribution, unchanged identity/boot and ten seconds of advancing
+healthy reconnected counters. Without attribution the outcome is `review`/exit 2.
+Keep the observer computer connected and restore the connection as instructed;
+this observer cannot operate or restore a router. The ordered hardware protocol
+explains how to avoid interrupting Gamma's simultaneous hour-long test.
 
 V2 has automated loopback/browser/rendering tests, owner-operated M5/Gamma
 readiness and short dashboard-load measurements, and a passed one-hour M5
