@@ -468,3 +468,39 @@ All 83 host-tool tests pass locally, including seven tracing regressions and the
 extracted-kit CLI/import check. Adding only this new script to the unchanged
 local beta.4 kit also passes `--help`. Those checks are software evidence; no
 new physical Gamma hour or other-board measurement is claimed.
+
+### Gamma beta.4 instrumented hour passes
+
+The owner supplied the complete displayed JSON from `gamma-beta4-hour-trace.json`,
+recorded at **2026-11-02 13:23:53.091316 UTC**. It reports `simulated: false`,
+`read_only: true`, tool version 1 and `passed` for the counter/health window on
+confirmed `2.0.0-beta.4`, Gamma 601 / BM1370. This is owner-operated physical
+evidence transcribed from the supplied report, not an independent LAN read by
+this workspace. The tracing tool is from commit `a31fef8`; its
+[CI run](https://github.com/bdlglua/BDLMinerV1/actions/runs/41444120904) passed.
+
+All 715 successful samples keep boot `93c65b31`. Uptime 5,038 -> 8,642 s gives
+3,604 device seconds (3,604.475 host seconds). Counter difference
+9,244,286,000,000,000 - 5,386,598,000,000,000 = 3,857,688,000,000,000 hashes yields
+**1.070390677026 TH/s**, matching the report. Accepted shares rise 182 -> 301
+(+119); rejected shares stay at one, the existing stale. Both endpoints have
+connected Noise Stratum V2, 525 MHz, 100% power, 51 C ASIC and 57 C regulator.
+These endpoint temperatures do not establish whole-hour maxima. The bench
+reports no health fault; the accumulated non-trip regulator warning `0x0002`
+is retained, with endpoint status 0 -> 2.
+
+HTTP timing records 715 requests, all stats reads, **zero request exceptions**,
+47.898 ms mean and 987.599 ms maximum. No request reaches the one-second slow
+threshold; detailed slow/failed events and post-recovery contexts are empty.
+There is no recovered-read error in the bench, so this is a clean hour under
+the original eight-second timeout, retry and health criteria.
+
+Operator-declared conditions are dashboard closed and hub stopped. This closes
+the pending beta.4 isolated hour; the beta.3 hour remains `review` in its own
+record. No claim is made that a firmware fix eliminated its timeout, that the
+parser hypothesis caused it, or that dashboard/hub load has been validated for
+an hour. No firmware/settings change or further physical run is needed to record
+this result. Current four-check scope: local layout accepted, Gamma OTA and
+isolated hour passed, M5 rollback/OTA/short check/blacklist recovery passed;
+external board research complete, own S2/S3/C3/NerdNOS measurements still pending
+hardware availability.

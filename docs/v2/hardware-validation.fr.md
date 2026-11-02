@@ -10,19 +10,19 @@ vides et les icônes des réglages sont corrigés **sur les deux cartes**.
 | Point | État actuel |
 |---|---|
 | 1. Affichage local | Espaces vides et icônes validés par le propriétaire sur M5 et Gamma en bêta 3. |
-| 2. Gamma : OTA et stabilité | Heure bêta 3 terminée : 3 604 s, 1,071274 TH/s, +141 acceptées, aucun nouveau rejet ; `review` après un timeout récupéré. OTA bêta 4 et contrôle de 122 s réussis. Nouvelle [heure avec trace HTTP](#nouvelle-heure-du-gamma-avec-trace-http) prête à exécuter. |
+| 2. Gamma : OTA et stabilité | OTA bêta 4 confirmée et [heure avec trace HTTP](#nouvelle-heure-du-gamma-avec-trace-http) réussie : 3 604 s, 1,070391 TH/s, +119 acceptées, aucun nouveau rejet, 715 lectures sans erreur. Dashboard fermé, hub arrêté selon l'opérateur. Ancienne heure bêta 3 conservée en `review`. |
 | 3. Rollback et réseau | Reset USB, rollback, réinstallation/confirmation bêta 4 et contrôle court du M5 validés. Reprise après blacklist validée sur le même boot à 1,0052 MH/s sur 10 s ; premier essai `pool` conservé non validé. |
 | 4. S3/S2/C3 et NerdNOS | Recherche de mesures externes terminée et [sourcée](../audits/2026-11-02-board-hashrate-research.md). Aucun de ces matériels disponible chez le propriétaire ; mesures BDLMiner physiques en attente. |
 
 ## Heure du Gamma : résultat reçu
 
-Le rapport reçu à 10:55:03 UTC contient 713 lectures réussies, le même boot
+Le rapport initial bêta 3 reçu à 10:55:03 UTC contient 713 lectures réussies, le même boot
 `6a012c1`, et une fenêtre de 3 604 secondes. Il reste `review` : un timeout HTTP
 à +805,063 s a été récupéré, mais la santé pendant cet intervalle est inconnue.
 Les températures au début et à la fin sont de 50 °C ASIC ; ce ne sont pas les
 maxima de toute l'heure. Le statut régulateur `0x0002` est un avertissement hors
 bits de coupure, conservé dans le rapport. La stale présente au départ n'a pas
-augmenté. L'heure est terminée : l'OTA du Gamma peut maintenant être observée.
+augmenté. L'OTA et les contrôles bêta 4 décrits ci-dessous ont ensuite eu lieu.
 
 Commande utilisée, conservée pour reproductibilité :
 
@@ -39,8 +39,29 @@ indique sa version : un résultat bêta 3 ne devient pas un résultat bêta 4.
 
 ## Nouvelle heure du Gamma avec trace HTTP
 
-L'ancien rapport reste `review`. Pour obtenir une mesure bêta 4 et comprendre
-une éventuelle récidive, `tools/trace_hardware.py` reprend exactement le contrôle
+Le propriétaire a fourni `gamma-beta4-hour-trace.json`, enregistré le
+2 novembre 2026 à **13:23:53.091316 UTC** : résultat **`passed`** en
+`2.0.0-beta.4` confirmée. Les 715 lectures réussies gardent le boot `93c65b31`.
+L'uptime passe de 5 038 à 8 642 s, soit **3 604 secondes** ; les compteurs passent
+de 5 386 598 000 000 000 à 9 244 286 000 000 000 hashes, donnant
+**1,070390677026 TH/s**. Les shares acceptées passent de 182 à 301 (**+119**) et
+les rejets restent à un, la stale déjà présente au départ.
+
+Les 715 requêtes HTTP sont toutes des lectures de statistiques : **aucune
+exception, aucun timeout ni récupération**, moyenne **47,898 ms**, maximum
+**987,599 ms**. Aucune requête n'atteint le seuil lent d'une seconde ; aucun
+diagnostic de récupération n'a donc été déclenché. Les températures au début
+et à la fin sont de 51 °C ASIC / 57 °C régulateur, à 525 MHz et 100 % de puissance.
+Ce ne sont pas des maxima sur toute l'heure. L'avertissement régulateur `0x0002`
+reste enregistré hors bits de coupure ; aucun défaut de santé n'a été observé.
+
+Cette fenêtre valide l'heure bêta 4 sous les conditions déclarées : **dashboard
+fermé, hub arrêté**. Elle ne détermine pas la cause du timeout initial et ne
+valide pas une heure avec dashboard/hub actifs. L'ancien rapport reste `review`.
+Le protocole utilisé est conservé ci-dessous pour reproduction.
+
+Pour obtenir une mesure et comprendre une éventuelle récidive,
+`tools/trace_hardware.py` reprend exactement le contrôle
 compteurs/santé existant : délai HTTP de huit secondes, deux nouvelles tentatives
 au maximum et statut `review` dès qu'une erreur de lecture a été récupérée.
 Aucun réglage, redémarrage ou firmware n'est envoyé.
@@ -74,8 +95,8 @@ conditions. `review` (code 2) conserve l'incident et fournit les traces à exami
 `failed` (code 1) indique un défaut observé ou une lecture non récupérée. Un
 nouveau succès ne prouve pas la cause du timeout bêta 3. Le serveur HTTP peut
 attendre des en-têtes incomplets dans son parseur synchrone ; c'est une piste
-issue du code, sans lien démontré avec l'incident réel. Le contrôle de 122 s
-bêta 4 réussi ne remplace pas cette heure.
+issue du code, sans lien démontré avec l'incident réel. Le contrôle de 122 s et
+cette heure bêta 4 sont conservés comme deux observations distinctes.
 
 ## Préparer le nouveau kit bêta 4
 

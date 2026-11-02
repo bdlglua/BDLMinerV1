@@ -11,18 +11,18 @@ confirmed that dashboard gaps and settings icons are fixed on both boards.
 | Check | Current evidence / remaining work |
 |---|---|
 | Local dashboard | Owner accepts gap/icon corrections on both beta.3 devices. |
-| Gamma OTA/stability | Beta.3 hour completed: 3,604 s, 1.071274 TH/s, +141 accepted / no new rejected shares, `review` after one recovered timeout. Beta.4 OTA/122-second check passed. New [instrumented hour](#instrumented-gamma-hour) ready for owner execution. |
+| Gamma OTA/stability | Beta.4 OTA confirmed and [instrumented hour](#instrumented-gamma-hour) passed: 3,604 s, 1.070391 TH/s, +119 accepted, no new rejection, 715 error-free readings. Dashboard closed/hub stopped as declared by the operator. Old beta.3 hour retained as `review`. |
 | Rollback/network recovery | M5 USB reset, rollback, normal beta.4 confirmation, short check and same-boot blacklist recovery passed (1.0052 MH/s over 10 s after recovery). First pool-mode failure retained. |
 | S2/S3/C3 and NerdNOS | [External benchmark research](../audits/2026-11-02-board-hashrate-research.md) complete; no test boards available to the owner, so physical BDLMiner measurements remain pending. |
 
 ## Gamma hour result
 
-The owner report recorded at 10:55:03 UTC contains 713 successful readings and
+The owner's initial beta.3 report recorded at 10:55:03 UTC contains 713 successful readings and
 the same boot `6a012c1` over 3,604 device seconds. It remains `review`: one HTTP
 timeout at +805.063 s recovered, with health unobserved during the gap. ASIC
 temperature is 50 C at both endpoints, not an observed whole-hour maximum.
 Regulator status `0x0002` is retained as a non-trip warning. The existing stale
-share did not increase. The hour has ended; Gamma OTA observation can now proceed.
+share did not increase. The beta.4 OTA and subsequent checks below followed.
 
 The command used is retained for reproducibility:
 
@@ -38,7 +38,26 @@ independently. A beta.3 result is not a beta.4 stability measurement.
 
 ## Instrumented Gamma hour
 
-The old result remains `review`. `tools/trace_hardware.py` runs the existing
+The owner supplied `gamma-beta4-hour-trace.json`, recorded at
+**2026-11-02 13:23:53.091316 UTC**, with **`passed`** on confirmed beta.4.
+All 715 successful readings retain boot `93c65b31`. Uptime 5,038 -> 8,642 s gives
+**3,604 device seconds**; hashes 5,386,598,000,000,000 -> 9,244,286,000,000,000 give
+**1.070390677026 TH/s**. Accepted shares increase 182 -> 301 (**+119**), while
+the one pre-existing stale rejection remains unchanged.
+
+All 715 HTTP requests are stats reads: **zero exceptions, timeouts or read
+recoveries**, mean **47.898 ms**, maximum **987.599 ms**. No request reaches the
+one-second slow threshold; no recovery diagnostic request was triggered.
+Endpoints show 51 C ASIC / 57 C regulator, 525 MHz and 100% power; these are not
+whole-hour maximum temperatures. Regulator non-trip warning `0x0002` is retained;
+no health fault was observed by the bench.
+
+This passes the beta.4 hour under the operator-declared conditions: **dashboard
+closed, hub stopped**. It neither identifies the old timeout's cause nor
+establishes an hour with dashboard/hub active. The old result remains `review`.
+The protocol used is retained below for reproduction.
+
+`tools/trace_hardware.py` runs the existing
 counter/health check with the same eight-second request timeout, at most two
 additional attempts and unchanged pass/review/fail rules. Close Gamma dashboard
 tabs and stop the hub, if running, for an isolated beta.4 measurement. Keep power,
@@ -64,7 +83,8 @@ stats error still yields `review`/exit 2. An unrecovered error, health fault,
 reboot or counter reset fails; a clean window passes/exit 0. A subsequent pass
 does not explain the old incident. Inspection shows the HTTP server can wait on
 incomplete headers in its synchronous parser; that is a hypothesis, not a proven
-cause of this device's timeout. The passed beta.4 short check is not an hour test.
+cause of this device's timeout. The passed short check and this hour remain
+separate beta.4 observations.
 
 ## Extract the beta.4 kit
 

@@ -58,7 +58,13 @@ that gap is unobserved. A subsequent complete beta.3-to-beta.4 OTA observation
 shows a new boot, pending trial and confirmation on that boot, at 1.073901 TH/s
 with six accepted shares and no rejection. The post-OTA check passed over 122 s
 at 1.073214 TH/s, with +3 accepted shares, no new rejection or reported read error
-and an unchanged stored-fault timestamp. M5 USB reset on `/dev/ttyACM0` is verified.
+and an unchanged stored-fault timestamp. The subsequent beta.4 instrumented hour,
+reported at 13:23:53 UTC, **passes** over 3,604 device seconds at 1.070391 TH/s:
+715 error-free stats reads, unchanged boot `93c65b31`, +119 accepted shares and
+no new rejection. HTTP latency averages 47.898 ms, maximum 987.599 ms, under
+operator-declared dashboard-closed/hub-stopped conditions. It does not establish
+the cause of the old beta.3 timeout; that original report stays `review`.
+M5 USB reset on `/dev/ttyACM0` is verified.
 M5 physical beta.4 rollback followed by normal beta.4 reinstallation/confirmation
 is also observed, ending at 1.003914 MH/s / 47 C IMU on boot `ab2a323b`.
 Its short check passes over 122 s at 1.004855 MH/s, with no reported read error.
@@ -317,8 +323,8 @@ skipped physical/OTA/fault cases remain skipped. Update both
 For the owner's recovered Gamma timeout, the read-only
 [`trace_hardware.py` protocol](hardware-validation.md#instrumented-gamma-hour)
 adds HTTP phase timings and bounded diagnostic context after a recovered error,
-while retaining these exact timeout/review criteria. A clean beta.4 hour remains
-to be observed. [Published board research](../audits/2026-11-02-board-hashrate-research.md)
+while retaining these exact timeout/review criteria. The owner's beta.4 hour now
+passes under its declared isolated conditions. [Published board research](../audits/2026-11-02-board-hashrate-research.md)
 documents external S3/C3/NerdNOS figures and their limits; it does not substitute
 for our pending S2/S3/C3/NerdNOS hardware measurements.
 
