@@ -22,6 +22,26 @@ T-Display number must not be assigned to those boards solely because they use S3
 The separate WarpAxe plain-S3 and NerdNOS observations are author reports under
 that project's firmware, not a test performed here.
 
+## Checking the StickS3/Cardputer 1 MH/s claim
+
+The owner supplied product pages and two community posts as possible evidence
+for 995–1015 kH/s on StickS3 and 950–1050 kH/s on Cardputer. The product pages
+confirm StickS3's ESP32-S3-PICO-1-N8R8, 240 MHz dual-core CPU, 135×240 display and
+250 mAh battery; they do not provide a mining benchmark [11, 12].
+
+The cited Reddit post explicitly assigns 995–1015 kH/s to **M5StickC Plus2** [13].
+Discussion #839 likewise assigns about 1 MH/s to **M5StickC Plus2**, while listing
+other supported boards separately [14]. M5Stack specifies ESP32-PICO-V3-02 for
+Plus2, distinct from the StickS3's ESP32-S3 [15]. Support for a board does not
+establish the same rate on every supported chip.
+
+NMMiner's own README lists up to 1,035 kH/s for ESP32-D0 and up to 398 kH/s for
+ESP32-S3; its individual S3 table entries reach about 400 kH/s [16]. None of these
+references establishes a 1 MH/s StickS3 or Cardputer result. Equal CPU clocks and
+core counts do not establish equal SHA accelerator throughput. Future S3
+optimization claims need their own measured-counter and hash-validity evidence.
+BDLMiner's own sustained measurements on those boards remain pending.
+
 ## A high displayed rate can be wrong
 
 SparkMiner provides a useful counterexample. Its current `v2.9.6-pre` README
@@ -77,3 +97,9 @@ ASIC test. The existing beta.4 binaries need no change to preserve that distinct
 8. [SparkMiner corrected README, commit 16a69a4](https://github.com/SneezeGUI/SparkMiner/blob/16a69a430fd00ff1e8243fc0c68314828b06f52a/README.md).
 9. [Older BitzyLabs SparkMiner README, v2.9.1](https://github.com/BitzyLabs/sparkminer/blob/main/README.md), consulted 2026-11-02; not accepted as a validated rate.
 10. [WarpAxe S3 peripheral measurements and 30-minute runs](https://git.warppool.org/dvb-projekt/dvb-WarpAxe/src/branch/main/docs/06-Devkit-S3-SHA-Peripheral.md). Document revision `ecbcdca3b5`, dated 2026-10-15; measured C loop `50f6a11`.
+11. [M5Stack official StickS3 specifications](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit).
+12. [Bastelgarage StickS3 product description](https://www.bastelgarage.ch/m5sticks3-esp32s3-mini-iot-development-kit).
+13. [Reddit: M5StickC Plus2 supported in NerdMiner Modded](https://www.reddit.com/r/NerdMiner/comments/1xcdb6a/m5stickc_plus2_now_supported_in_nerdminer_modded/).
+14. [NerdMiner discussion #839, BDLMiner announcement](https://github.com/BitMaker-hub/NerdMiner_v2/discussions/839).
+15. [M5Stack official StickC Plus2 specifications](https://shop.m5stack.com/products/m5stickc-plus2-esp32-mini-iot-development-kit).
+16. [NMMiner README and per-chip/per-board rates](https://github.com/NMminer1024/NMMiner/blob/main/README.md), consulted 2026-11-02.
