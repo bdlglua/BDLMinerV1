@@ -98,7 +98,7 @@ that reports can focus on what goes beyond them:
   people can install their own builds: only the web password, when set, protects it.
 - **MQTT is plain TCP**; its user and password travel unencrypted to the broker.
 - **Hashrate sharing is on by default**: every 5 minutes the version, the board (with
-  the exact model on M5Stack boards) and the hashrate go to the BDLMiner statistics service (nothing else; see the README). Turn it
+  the exact model on M5Stack boards) and the hashrate go to the BDLMiner statistics service. Optional pool sharing (`sharepool`, off by default from 2.0.2) adds only a fixed public pool group or `other`, never the configured host, port, Bitcoin address or worker (see the README). Turn it
   off with the *Share my hashrate anonymously* setting.
 - **Crash reports are memory images** and may contain secrets: downloading or erasing
   them requires the web password when one is set.

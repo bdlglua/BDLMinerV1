@@ -45,6 +45,11 @@ async function fixture(options={}){
   state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
   if(options.capabilities)state.settings.capabilities=options.capabilities;
   if(options.live)state.settings.live=['power','maxtemp','nightfrom','saver'];
+  if(options.poolSharing){
+    state.settings.schema.push(['sharehr','bool','Network','Share my hashrate anonymously',{}],['sharepool','bool','Network','Share my pool anonymously',{}]);
+    Object.assign(state.settings.values,{sharehr:true,sharepool:false});
+    state.settings.live=[...(state.settings.live||[]),'sharehr','sharepool'];
+  }
   if(options.v2){
     for(const key of ['channel','screen0','screen1','screen2','screen3','pages'])state.settings.schema.push([key,'number',key==='channel'?'Network':'Display',key,{min:0,max:255}]);
     state.settings.schema.push(['customscreen','bool','Display','Custom screen',{}]);
@@ -728,6 +733,17 @@ check('live settings save without a restart and keep the page usable',()=>run({l
   assert.equal(JSON.parse(f.state.posts[0].body).power,60);
   await f.page.fill('#k_pool','other.pool');assert.equal(await f.page.locator('#save').textContent(),'Save and restart');
   assert.match(await f.page.locator('#dirty').textContent(),/needs a restart/);
+}));
+
+check('pool sharing stays off until explicitly enabled and saves live in French',()=>run({poolSharing:true,language:'fr',postText:'{"restart":false,"changed":1}'},async f=>{
+  await loaded(f);
+  assert.equal(await f.page.locator('#k_sharepool').isChecked(),false);
+  assert.match(await f.page.locator('.field').filter({has:f.page.locator('#k_sharepool')}).textContent(),/Partager ma pool anonymement.*Désactivé par défaut/s);
+  await f.page.check('#k_sharepool');
+  assert.equal(await f.page.locator('#save').textContent(),'Enregistrer');
+  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('appliqu'));
+  assert.equal(JSON.parse(f.state.posts[0].body).sharepool,true);
+  assert.equal(f.state.requests.some(r=>r.includes('/report')),false);
 }));
 
 check('choice controls save numbers and discarding restores the saved values',()=>run({},async f=>{

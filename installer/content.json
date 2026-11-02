@@ -1,7 +1,12 @@
 {
   "support": {"links": [{"label":{"en":"Support BDLMiner","fr":"Soutenir BDLMiner"},"url":"https://github.com/sponsors/bdlglua"}], "bitcoin": "", "lightning": ""},
   "gallery": [],
+  "pool_names": {"public-pool.io":"Public Pool","nerdminers.org":"Nerdminers.org","nerdminer.io":"NerdMiner.io","ckpool.org":"CKPool","ocean.xyz":"OCEAN","braiins.com":"Braiins Pool","viabtc.com":"ViaBTC","f2pool.com":"F2Pool","antpool.com":"AntPool"},
   "release_notes": {
+    "2.0.2": {
+      "en": ["Pool statistics show miner counts and total hashrate by public pool.", "Optional pool sharing is off by default; private endpoints, Bitcoin addresses and workers are never sent.", "Older firmware and miners without pool sharing remain counted as Not shared."],
+      "fr": ["Statistiques par pool publique : nombre de mineurs et hashrate total.", "Partage de la pool facultatif, désactivé par défaut ; aucun nom d’hôte privé, adresse Bitcoin ni worker n’est envoyé.", "Les anciennes versions et les mineurs sans partage de pool restent comptés dans Pool non renseignée."]
+    },
     "2.0.1": {
       "en": ["BDLMiner V2 naming across setup, screens and project links.", "Saved settings, signed updates and automatic rollback are preserved.", "The stable channel remains the default; beta is opt-in."],
       "fr": ["Le nom BDLMiner V2 dans la configuration, les écrans et les liens du projet.", "Réglages enregistrés, mises à jour signées et retour arrière conservés.", "Le canal stable reste proposé par défaut ; la bêta est un choix explicite."]

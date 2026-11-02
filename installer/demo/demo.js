@@ -6,7 +6,7 @@
  window.confirm=()=>true;
  const storageKey='bdl-demo-values-'+(gammaView?'gamma':'m5');
  const saved=()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'{}')}catch{return{}}};
- const values={pool:'public-pool.io',port:23330,addr:'YOUR_BTC_ADDRESS.demo',diff:1,proto:1,sv2key:'0'.repeat(64),uaauto:true,ua:'BDLMinerV2/'+config.version,pool2:'',port2:3333,proto2:0,sv2key2:'',power:100,maxtemp:65,bright:80,cycle:10,nightfrom:255,saver:false,update:1,channel:0,count:false,customscreen:false,screen0:1,screen1:2,screen2:4,screen3:3,pages:255,...saved()};
+ const values={pool:'public-pool.io',port:23330,addr:'YOUR_BTC_ADDRESS.demo',diff:1,proto:1,sv2key:'0'.repeat(64),uaauto:true,ua:'BDLMinerV2/'+config.version,pool2:'',port2:3333,proto2:0,sv2key2:'',power:100,maxtemp:65,bright:80,cycle:10,nightfrom:255,saver:false,update:1,channel:0,count:false,sharehr:false,sharepool:false,customscreen:false,screen0:1,screen1:2,screen2:4,screen3:3,pages:255,...saved()};
  const state={scene:'mining',powers:{m5:100,gamma:100},channels:{m5:'stable',gamma:'stable'}};
  const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
  const elapsed=()=>Math.floor((performance.now()-started)/1000);
@@ -30,7 +30,7 @@
  function settings(){
   const schema=[['pool','text','Pool','Pool host',{}],['port','number','Pool','Pool port',{min:1,max:65535}],['addr','text','Pool','Bitcoin address',{}],['diff','decimal','Pool','Suggested difficulty',{min:0}],['proto','number','Pool','Protocol',{min:0,max:1}],['sv2key','text','Pool','Authority key',{}],['uaauto','bool','Pool','User agent',{}],['ua','text','Pool','Manual user agent',{}],['pool2','text','Pool','Backup pool host',{}],['port2','number','Pool','Backup pool port',{min:1,max:65535}],['proto2','number','Pool','Backup protocol',{min:0,max:1}],['sv2key2','text','Pool','Backup authority key',{}],['bright','number','Display','Brightness',{min:0,max:100}],['cycle','number','Display','Next screen every',{min:0,max:255}],['power','number','Safety','Mining power',{min:0,max:100}],['maxtemp','number','Safety','Temperature limit',{min:0,max:255}],['saver','bool','Safety','Battery saver',{}],['update','number','Network','Updates',{min:0,max:2}],['channel','number','Network','Update channel',{min:0,max:1}],['count','bool','Network','Usage count',{}]];
   for(const key of ['screen0','screen1','screen2','screen3','pages'])schema.push([key,'number','Display',key,{min:0,max:255}]);
-  schema.push(['customscreen','bool','Display','Custom screen',{}]);
+  schema.push(['customscreen','bool','Display','Custom screen',{}],['sharehr','bool','Network','Share my hashrate anonymously',{}],['sharepool','bool','Network','Share my pool anonymously',{}]);
   return {schema,values,live:Object.keys(values),capabilities:{firmware_env:'m5stickc-plus2',display_pages:8,ota:false}};
  }
  function fleet(){

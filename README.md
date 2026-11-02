@@ -166,11 +166,19 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 {"v": "2.0.1", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
-Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
+From 2.0.2, **Share my pool anonymously** (`sharepool`) optionally adds the public
+pool group. It is **off by default**, requires hashrate sharing and applies without
+a restart in *Settings → Network → Anonymous statistics*. Only the connected pool
+is reported, including the backup when active. Recognised public hosts are mapped
+to a fixed group; every other host becomes *Other / private pool* on the device.
+The configured hostname, port, Bitcoin address and worker are never sent. Older
+versions, disabled pool sharing and disconnected pools appear as *Not shared*.
+
+No Bitcoin address, worker, private hostname, name or identifier is sent. The service
 adds the reports up live and keeps a 5-minute sample of the total 35 days; the sender's network
 address only limits the number of reports and is never stored. The totals are public:
 **<https://bdlminer-stats.bdlminer-bot.workers.dev/>** (total hashrate, miners, 7-day
-chart, by board and version). A paused miner sends
+chart, by board, version and pool). A paused miner sends
 nothing. It is on by default; turn it off with the *Share my hashrate anonymously*
 setting (`sharehr`), which applies at once.
 
