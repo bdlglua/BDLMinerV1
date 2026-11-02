@@ -10,9 +10,9 @@ vides et les icônes des réglages sont corrigés **sur les deux cartes**.
 | Point | État actuel |
 |---|---|
 | 1. Affichage local | Espaces vides et icônes validés par le propriétaire sur M5 et Gamma en bêta 3. |
-| 2. Gamma : OTA et stabilité | Heure bêta 3 terminée : 3 604 s, 1,071274 TH/s, +141 acceptées, aucun nouveau rejet ; `review` après un timeout récupéré. OTA bêta 4 confirmée et contrôle de 122 s réussi à 1,073214 TH/s. |
+| 2. Gamma : OTA et stabilité | Heure bêta 3 terminée : 3 604 s, 1,071274 TH/s, +141 acceptées, aucun nouveau rejet ; `review` après un timeout récupéré. OTA bêta 4 et contrôle de 122 s réussis. Nouvelle [heure avec trace HTTP](#nouvelle-heure-du-gamma-avec-trace-http) prête à exécuter. |
 | 3. Rollback et réseau | Reset USB, rollback, réinstallation/confirmation bêta 4 et contrôle court du M5 validés. Reprise après blacklist validée sur le même boot à 1,0052 MH/s sur 10 s ; premier essai `pool` conservé non validé. |
-| 4. S3/S2/C3 et NerdNOS | Aucun de ces matériels de test disponible chez le propriétaire ; mesures physiques en attente. |
+| 4. S3/S2/C3 et NerdNOS | Recherche de mesures externes terminée et [sourcée](../audits/2026-11-02-board-hashrate-research.md). Aucun de ces matériels disponible chez le propriétaire ; mesures BDLMiner physiques en attente. |
 
 ## Heure du Gamma : résultat reçu
 
@@ -36,6 +36,46 @@ Garder le Gamma sous tension, sur la même version et connecté pendant ce test.
 Ne pas faire son OTA ni couper son réseau avant la fin. Le M5 peut être testé
 en parallèle si ses manipulations n'affectent pas le Gamma. Le rapport réel
 indique sa version : un résultat bêta 3 ne devient pas un résultat bêta 4.
+
+## Nouvelle heure du Gamma avec trace HTTP
+
+L'ancien rapport reste `review`. Pour obtenir une mesure bêta 4 et comprendre
+une éventuelle récidive, `tools/trace_hardware.py` reprend exactement le contrôle
+compteurs/santé existant : délai HTTP de huit secondes, deux nouvelles tentatives
+au maximum et statut `review` dès qu'une erreur de lecture a été récupérée.
+Aucun réglage, redémarrage ou firmware n'est envoyé.
+
+Sur le PC du réseau local, arrêter le hub s'il tourne et fermer les onglets du
+dashboard Gamma pour cette mesure isolée. Garder le Gamma allumé, connecté,
+avec ses réglages actuels ; ne pas faire d'OTA ou de coupure réseau pendant
+l'heure. Depuis le kit bêta 4 contenant le nouveau script :
+
+```bash
+python3 tools/trace_hardware.py --config bdlhub.local.json --miner gamma --seconds 3600 --dashboard closed --hub stopped --output gamma-beta4-hour-trace.json
+cat gamma-beta4-hour-trace.json
+```
+
+Le script peut rester silencieux jusqu'à la fin. Il mesure chaque requête sans
+ajouter d'appel au fonctionnement normal. Les options `--dashboard` et `--hub`
+enregistrent les conditions déclarées par l'opérateur ; elles ne ferment rien.
+Les durées séparent l'ouverture/réception des en-têtes (`open_headers`, incluant
+DNS/TCP/proxy éventuels) de la lecture du corps (`read_body`). Ce découpage ne
+localise pas à lui seul le problème entre PC, Wi-Fi et serveur du mineur.
+
+Après une erreur de transport récupérée seulement, jusqu'à trois fois, il lit
+les compteurs de diagnostic et le journal. Il conserve uniquement des nombres
+autorisés et les durées des messages `[loop] stalled` ; ni journal brut, ni
+en-têtes, ni texte d'exception réseau ne sont enregistrés. Ces deux appels
+supplémentaires sont eux aussi chronométrés. Les 32 premières requêtes lentes
+(au moins une seconde) ou en erreur sont détaillées ; les suivantes sont comptées.
+
+`passed` (code 0) valide cette nouvelle fenêtre sans erreur observée, sous ces
+conditions. `review` (code 2) conserve l'incident et fournit les traces à examiner.
+`failed` (code 1) indique un défaut observé ou une lecture non récupérée. Un
+nouveau succès ne prouve pas la cause du timeout bêta 3. Le serveur HTTP peut
+attendre des en-têtes incomplets dans son parseur synchrone ; c'est une piste
+issue du code, sans lien démontré avec l'incident réel. Le contrôle de 122 s
+bêta 4 réussi ne remplace pas cette heure.
 
 ## Préparer le nouveau kit bêta 4
 
@@ -246,3 +286,11 @@ python3 tools/hardware_suite.py --config bdlhub.local.json --miner s3 --seconds 
 ```
 
 Aucun chiffre de gain ni 1 MH/s sur ces familles n'est validé à ce stade.
+
+La [recherche publiée](../audits/2026-11-02-board-hashrate-research.md) donne des
+repères : environ 0,34 à 0,40 MH/s pour des S3 sous d'autres firmwares, jusqu'à
+0,402 MH/s annoncé pour le C3, aucun chiffre S2 de minage assez documenté retenu.
+NerdNOS utilise un BM1397 : les références sont en GH/s, avec un essai externe
+d'une heure autour de 190 GH/s à 300 MHz. Ces résultats ne valident pas nos
+binaires. Les anciens chiffres élevés du S3 dans SparkMiner ont d'ailleurs été
+retirés par le projet à cause de shares invalides : le compteur seul ne suffit pas.

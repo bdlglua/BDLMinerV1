@@ -47,6 +47,7 @@ class BetaKitTests(unittest.TestCase):
             self.assertTrue((out/'src/update_key.h').is_file())
             self.assertTrue((out/'tools/monitor_network.py').is_file())
             self.assertTrue((out/'tools/reset_serial.py').is_file())
+            self.assertTrue((out/'tools/trace_hardware.py').is_file())
             self.assertTrue((out/'docs/v2/hardware-validation.fr.md').is_file())
             for line in (out/'SHA256SUMS.txt').read_text().splitlines():
                 digest,name=line.split('  ')
@@ -58,7 +59,7 @@ class BetaKitTests(unittest.TestCase):
             for launcher in ('start-hub.sh','check-miners.sh'):
                 result=subprocess.run(['sh',str(out/launcher),'--help'],cwd=root,capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)
-            for tool in ('monitor_network.py','reset_serial.py'):
+            for tool in ('monitor_network.py','reset_serial.py','trace_hardware.py'):
                 result=subprocess.run([sys.executable,str(out/'tools'/tool),'--help'],
                                       cwd=root,capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)

@@ -18,12 +18,13 @@ from release_version import Version
 ROOT=Path(__file__).resolve().parents[1]
 DEFAULT_BOARDS=('m5stickc-plus2','bitaxe-gamma-601')
 TOOLS=('bdlhub.py','calibrate_gamma.py','check_fleet.py','check_hardware.py',
-       'hardware_suite.py','monitor_network.py','reset_serial.py','firmware_image.py','release_version.py')
+       'hardware_suite.py','trace_hardware.py','monitor_network.py','reset_serial.py','firmware_image.py','release_version.py')
 PACKAGE=('__init__.py','client.py','hub.py','calibration.py','example.json',
          'web/index.html','web/app.js','web/style.css')
 DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness.md',
       'v2/hardware-validation.md','v2/hardware-validation.fr.md',
       'audits/2026-11-02-resumable-sha.md',
+      'audits/2026-11-02-board-hashrate-research.md',
       'benchmarks/v2-native-sha256d-2026-11-02.json',
       'releases/v2.0.0-beta.2.md','releases/v2.0.0-beta.2.fr.md',
       'releases/v2.0.0-beta.3.md','releases/v2.0.0-beta.3.fr.md',

@@ -11,9 +11,9 @@ confirmed that dashboard gaps and settings icons are fixed on both boards.
 | Check | Current evidence / remaining work |
 |---|---|
 | Local dashboard | Owner accepts gap/icon corrections on both beta.3 devices. |
-| Gamma OTA/stability | Beta.3 hour completed: 3,604 s, 1.071274 TH/s, +141 accepted / no new rejected shares, `review` after one recovered timeout. Beta.4 OTA and 122-second post-OTA check at 1.073214 TH/s passed. |
+| Gamma OTA/stability | Beta.3 hour completed: 3,604 s, 1.071274 TH/s, +141 accepted / no new rejected shares, `review` after one recovered timeout. Beta.4 OTA/122-second check passed. New [instrumented hour](#instrumented-gamma-hour) ready for owner execution. |
 | Rollback/network recovery | M5 USB reset, rollback, normal beta.4 confirmation, short check and same-boot blacklist recovery passed (1.0052 MH/s over 10 s after recovery). First pool-mode failure retained. |
-| S2/S3/C3 and NerdNOS | No ordinary test boards available to the owner; physical measurements pending. |
+| S2/S3/C3 and NerdNOS | [External benchmark research](../audits/2026-11-02-board-hashrate-research.md) complete; no test boards available to the owner, so physical BDLMiner measurements remain pending. |
 
 ## Gamma hour result
 
@@ -35,6 +35,36 @@ python3 tools/hardware_suite.py --config bdlhub.local.json --miner gamma --secon
 Keep Gamma powered, connected and on this version until it finishes. Do not run
 Gamma OTA or a shared-network interruption during this hour. M5 work can proceed
 independently. A beta.3 result is not a beta.4 stability measurement.
+
+## Instrumented Gamma hour
+
+The old result remains `review`. `tools/trace_hardware.py` runs the existing
+counter/health check with the same eight-second request timeout, at most two
+additional attempts and unchanged pass/review/fail rules. Close Gamma dashboard
+tabs and stop the hub, if running, for an isolated beta.4 measurement. Keep power,
+pool, network and settings unchanged; do not perform OTA or network-fault tests
+during the hour. Run from the beta.4 kit containing the new host script:
+
+```sh
+python3 tools/trace_hardware.py --config bdlhub.local.json --miner gamma --seconds 3600 --dashboard closed --hub stopped --output gamma-beta4-hour-trace.json
+cat gamma-beta4-hour-trace.json
+```
+
+The script may remain quiet until completion. It changes no device settings.
+Dashboard/hub flags only record operator-declared conditions. The normal request
+count is unchanged. Timings separate opening/response headers (including any
+proxy/DNS/TCP time) from reading the body; they cannot alone identify PC, Wi-Fi or
+device-server causes. Up to 32 requests taking at least one second, or raising an
+exception, have detailed timing; additional such events are counted.
+
+Only after a recovered transport error, up to three times, two extra timed GETs
+capture allowlisted diagnostic numbers and numeric `[loop] stalled` durations.
+Raw logs, network exception contents and HTTP headers are not saved. A recovered
+stats error still yields `review`/exit 2. An unrecovered error, health fault,
+reboot or counter reset fails; a clean window passes/exit 0. A subsequent pass
+does not explain the old incident. Inspection shows the HTTP server can wait on
+incomplete headers in its synchronous parser; that is a hypothesis, not a proven
+cause of this device's timeout. The passed beta.4 short check is not an hour test.
 
 ## Extract the beta.4 kit
 
@@ -201,3 +231,8 @@ python3 tools/hardware_suite.py --config bdlhub.local.json --miner s3 --seconds 
 ```
 
 No physical gain or 1 MH/s result is established for these families yet.
+
+The [source-backed research](../audits/2026-11-02-board-hashrate-research.md)
+records external S3 examples around 0.34–0.40 MH/s, a C3 advertised peak of
+0.402 MH/s, no sufficiently documented comparable S2 mining rate, and NerdNOS
+BM1397 results in GH/s. These do not validate this firmware's board profiles.

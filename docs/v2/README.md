@@ -314,6 +314,14 @@ Exit 0 means the requested cases completed without a failed/review case; explici
 skipped physical/OTA/fault cases remain skipped. Update both
 `tools/hardware_suite.py` and `tools/bdlhost/client.py` when updating an older kit.
 
+For the owner's recovered Gamma timeout, the read-only
+[`trace_hardware.py` protocol](hardware-validation.md#instrumented-gamma-hour)
+adds HTTP phase timings and bounded diagnostic context after a recovered error,
+while retaining these exact timeout/review criteria. A clean beta.4 hour remains
+to be observed. [Published board research](../audits/2026-11-02-board-hashrate-research.md)
+documents external S3/C3/NerdNOS figures and their limits; it does not substitute
+for our pending S2/S3/C3/NerdNOS hardware measurements.
+
 Optional OTA needs `--firmware <env>-firmware.bin --signature <file>.sig --version
 <version>`. The bench independently checks the release signature, ESP digest,
 target and version before uploading, then requires observing a pending trial and

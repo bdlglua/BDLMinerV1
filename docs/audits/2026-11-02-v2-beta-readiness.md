@@ -437,3 +437,34 @@ M5 physical rollback, both short counter windows and matched M5 network recovery
 are observed. Gamma's beta.3 hour remains `review` after one recovered HTTP timeout.
 Ordinary S2/S3/C3 and NerdNOS hardware are still unavailable, so no physical gain
 or 1 MH/s claim for those chip families is added.
+
+### External board research and instrumented Gamma rerun prepared
+
+The owner requests published S3/S2/C3/NerdNOS research and resolution of the
+Gamma hour's recovered HTTP timeout. The [research record](2026-11-02-board-hashrate-research.md)
+separates maintainer claims, a documented external S3 run, an external NerdNOS
+pool-counted hour and missing S2 evidence. It also records SparkMiner's withdrawal
+of invalid high S3 figures. No external rate is assigned to BDLMiner's profiles;
+ordinary board hardware is still unavailable.
+
+`tools/trace_hardware.py` adds host-side HTTP phase timings to the existing
+counter/health bench. It retains the standard eight-second timeout, retry limit
+and `review` after any recovered stats error. Normal sampling adds no requests;
+after a recovered timeout/connection error it makes two bounded diagnostic GETs,
+at most three times, retaining only allowlisted numbers and loop-stall durations.
+Tests distinguish header/body timeouts, preserve the original review result and
+check that raw logs, URLs, credentials and network exception text are not emitted.
+Kit tests exercise the distributed CLI imports after extraction.
+
+The server selects a waiting client once bytes are available, before establishing
+that its complete request headers have arrived. The Arduino synchronous header
+parser can then block while waiting for more bytes. This is a code-inspection
+hypothesis only; no evidence ties it to the physical +805.063 s timeout. No
+firmware parser, timeout, health interlock or rate counter is changed. A new
+owner-operated beta.4 hour with dashboard closed and hub stopped remains to run;
+the old beta.3 `review` and all other original reports retain their status.
+
+All 83 host-tool tests pass locally, including seven tracing regressions and the
+extracted-kit CLI/import check. Adding only this new script to the unchanged
+local beta.4 kit also passes `--help`. Those checks are software evidence; no
+new physical Gamma hour or other-board measurement is claimed.
