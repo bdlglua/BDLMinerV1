@@ -23,15 +23,17 @@
    <p class="message" id="history-status" role="status"></p>
   </section>
   <details class="panel pool-details" id="pool-diagnostic-panel"><summary><span data-t="Pool diagnostics">Pool diagnostics</span><span class="pool-summary" id="pool-diagnostic-summary"></span></summary><div class="pool-diagnostic-body"><div class="section-title"><h2 data-t="Pool diagnostics">Pool diagnostics</h2><button type="button" class="secondary" id="check-pool" onclick="checkPool()" data-t="Check pool">Check pool</button></div><p id="pool-diagnostic-status" class="message" role="status"></p><div id="pool-diagnostic-values" class="metric-grid"></div><p class="s" data-t="Share intervals are statistical means, not deadlines. Share-based rates fluctuate with luck and pool difficulty.">Share intervals are statistical means, not deadlines. Share-based rates fluctuate with luck and pool difficulty.</p></div></details>
-  <section class="panel records-section"><div class="section-title"><h2 data-t="Mining records">Mining records</h2></div><div class="metric-grid" id="records-grid"></div></section>
  </div>
  <aside class="console-side">
   <section class="panel"><div class="section-title"><h2 data-t="Pool & wallet">Pool &amp; wallet</h2></div><div class="metric-grid" id="pool-grid"></div></section>
   <section class="panel"><div class="section-title"><h2 data-t="Bitcoin network">Bitcoin network</h2></div><div class="metric-grid" id="market-grid"></div><p class="muted" id="market-note"></p></section>
-  <section class="panel"><div class="section-title"><h2 data-t="Device health">Device health</h2></div><div class="metric-grid" id="device-grid"></div></section>
-  <section class="panel"><div class="section-title"><h2 data-t="GitHub updates">GitHub updates</h2></div><div id="updates" class="metric-grid"></div></section>
-  <section class="panel" id="peers-section" hidden><div class="section-title"><h2 id="ph" hidden data-t="Miners">Miners</h2></div><div class="metric-grid" id="p"></div></section>
  </aside>
+</div>
+<div class="dashboard-lower">
+ <section class="panel records-section"><div class="section-title"><h2 data-t="Mining records">Mining records</h2></div><div class="metric-grid" id="records-grid"></div></section>
+ <section class="panel"><div class="section-title"><h2 data-t="Device health">Device health</h2></div><div class="metric-grid" id="device-grid"></div></section>
+ <section class="panel"><div class="section-title"><h2 data-t="GitHub updates">GitHub updates</h2></div><div id="updates" class="metric-grid"></div></section>
+ <section class="panel" id="peers-section" hidden><div class="section-title"><h2 id="ph" hidden data-t="Miners">Miners</h2></div><div class="metric-grid" id="p"></div></section>
 </div>
 <details class="diagnostic-details panel" id="diagnostics"><summary><span data-t="Diagnostics & measurements">Diagnostics &amp; measurements</span><span class="s" data-t="TLS, mining workers and ten-minute report">TLS, mining workers and ten-minute report</span></summary><div class="diagnostic-body"><div class="metric-grid" id="profile-grid"></div><p class="s" data-t="Batch times are elapsed worker time, not CPU usage. TLS handshakes do not pause hardware mining on classic ESP32.">Batch times are elapsed worker time, not CPU usage. TLS handshakes do not pause hardware mining on classic ESP32.</p><p class="message" id="profile-status" role="status"></p><fieldset class="benchmark"><legend data-t="Ten-minute measurement">Ten-minute measurement</legend><p class="s" data-t="Measure actual hashes over device uptime, with temperature and effective power samples. Keep this tab visible.">Measure actual hashes over device uptime, with temperature and effective power samples. Keep this tab visible.</p><div class="actions"><button type="button" id="start-benchmark" disabled data-t="Start measurement">Start measurement</button><button type="button" id="stop-benchmark" class="secondary" disabled data-t="Finish now">Finish now</button><button type="button" id="download-benchmark" class="secondary" disabled data-t="Download report">Download report</button></div><p class="message" id="benchmark-status" role="status" aria-live="polite"></p></fieldset></div></details>
 <footer id="f"></footer>
