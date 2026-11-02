@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BDLMiner V1: solo Bitcoin mining on ESP32</title>
+<title>BDLMiner V2: solo Bitcoin mining on ESP32</title>
 <meta name="description" content="Free, open-source solo &quot;lottery&quot; Bitcoin miner for the M5StickC Plus2 and other ESP32 boards. Install it from your browser in two minutes.">
-<meta property="og:title" content="BDLMiner V1">
+<meta property="og:title" content="BDLMiner V2">
 <meta property="og:description" content="Free, open-source solo Bitcoin lottery miner for ESP32 boards. Install it from your browser.">
 <meta property="og:image" content="assets/screen-mining.png">
 <meta name="theme-color" content="#0b0d12">
@@ -223,9 +223,9 @@ footer a{display:inline-block;padding:6px 2px}
 <a class="skip" href="#main" data-t="skip">Skip to content</a>
 <nav aria-label="Main">
  <div class="wrap">
-  <a class="brand" href="#top" aria-label="BDLMiner V1">
+  <a class="brand" href="#top" aria-label="BDLMiner V2">
    <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><g fill="#f7931a"><rect x="24" y="24" width="52" height="52" rx="10"/><g id="pins"><rect x="31" y="8" width="6" height="12" rx="2"/><rect x="47" y="8" width="6" height="12" rx="2"/><rect x="63" y="8" width="6" height="12" rx="2"/></g><use href="#pins" transform="translate(0 72)"/><use href="#pins" transform="rotate(90 50 50)"/><use href="#pins" transform="rotate(90 50 50) translate(0 72)"/></g><text x="50" y="64" text-anchor="middle" font-size="42" font-weight="900" font-family="system-ui,sans-serif" fill="#15100a">B</text></svg>
-   <span>BDLMiner <b>V1</b></span>
+   <span>BDLMiner <b>V2</b></span>
   </a>
   <div class="links" id="site-links">
    <a href="#features" data-t="navFeatures">Features</a>
@@ -243,13 +243,13 @@ footer a{display:inline-block;padding:6px 2px}
 <div class="wrap hero" id="top">
  <div>
   <h1 data-h="title">Solo Bitcoin mining on a <b>pocket-sized</b> ESP32</h1>
-  <p data-t="tagline">BDLMiner V1 is free, open-source firmware that turns an M5StickC Plus2 or another ESP32 board into a solo "lottery" Bitcoin miner, with a live screen, a web dashboard and automatic signed updates.</p>
+  <p data-t="tagline">BDLMiner V2 is free, open-source firmware that turns an M5StickC Plus2 or another ESP32 board into a solo "lottery" Bitcoin miner, with a live screen, a web dashboard and automatic signed updates.</p>
   <div class="buttons">
    <a class="btn" href="#install" data-t="ctaInstall">Install in 2 minutes</a>
    <a class="btn ghost" href="https://github.com/bdlglua/BDLMinerV1">GitHub</a>
    <a class="btn ghost" href="https://discord.gg/S8kSgD6Xe9">Discord</a>
   </div>
-  <p class="s" data-t="version">Latest version: __VERSION__.</p>
+  <p class="s" data-t="version">Firmware available: __VERSION__.</p>
  </div>
  <div class="device">
   <img id="screen" src="assets/screen-mining.png" width="320" height="170" alt="The miner's screen: 1.005 MH/s, 10827 shares, best difficulty 7.82, 52.1 °C" data-alt="altMining">
@@ -371,7 +371,7 @@ footer a{display:inline-block;padding:6px 2px}
 
 <footer>
  <div class="wrap">
-  <span data-t="license">BDLMiner V1 is free software under the GNU GPL v3.0.</span>
+  <span data-t="license">BDLMiner V2 is free software under the GNU GPL v3.0.</span>
   <span><a href="https://github.com/bdlglua/BDLMinerV1/blob/main/SECURITY.md" data-t="security">Security</a> · <a href="https://github.com/bdlglua/BDLMinerV1/blob/main/ACCESSIBILITY.md" data-t="accessibility">Accessibility</a> · <a href="https://github.com/bdlglua/BDLMinerV1/releases" data-t="releases">Releases</a></span>
  </div>
 </footer>
@@ -436,8 +436,8 @@ const BOARDS=__BOARDS__;
 const STATS='https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary';
 const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Installer',navStats:'Statistiques',navCommunity:'Communauté',
 title:'Le minage Bitcoin solo sur un ESP32 <b>de poche</b>',
-tagline:'BDLMiner V1 est un firmware libre et gratuit qui transforme un M5StickC Plus2 ou une autre carte ESP32 en mineur Bitcoin solo « loterie », avec un écran en direct, un tableau de bord web et des mises à jour signées automatiques.',
-ctaInstall:'Installer en 2 minutes',version:'Dernière version : __VERSION__.',
+tagline:'BDLMiner V2 est un firmware libre et gratuit qui transforme un M5StickC Plus2 ou une autre carte ESP32 en mineur Bitcoin solo « loterie », avec un écran en direct, un tableau de bord web et des mises à jour signées automatiques.',
+ctaInstall:'Installer en 2 minutes',version:'Firmware proposé : __VERSION__.',
 featTitle:'Ce qu\'il fait',featLead:'Tout tourne sur la carte : elle se connecte à une pool par WiFi, calcule des en-têtes de bloc et montre ce qui se passe.',
 f1t:'SHA-256 matériel',f1:'Utilise le moteur SHA de l\'ESP32 : environ 1 MH/s sur un M5StickC Plus2, avec le minage logiciel en secours.',
 f2t:'Stratum V1 et V2',f2:'N\'importe quelle pool solo, Stratum V2 natif chiffré avec Noise, une pool de secours et la bascule automatique.',
@@ -483,7 +483,7 @@ lottery:'Un bloc rapporte 3,125 BTC plus les frais sur ta propre adresse, mais �
 communityTitle:'Communauté',communityLead:'Questions, installations, meilleures shares et idées : viens dire bonjour.',
 cDiscord:'Aide en direct, annonces et tickets de support.',cReddit:'r/bdlminer : montre ton installation et partage tes records.',
 cGithub:'Code source, documentation, versions, signalement de bugs et idées.',
-license:'BDLMiner V1 est un logiciel libre sous licence GNU GPL v3.0.',security:'Sécurité',accessibility:'Accessibilité',releases:'Versions',
+license:'BDLMiner V2 est un logiciel libre sous licence GNU GPL v3.0.',security:'Sécurité',accessibility:'Accessibilité',releases:'Versions',
 altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 7,82, 52,1 °C',altGraph:'Écran du graphique du hashrate',
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
