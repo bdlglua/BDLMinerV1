@@ -155,6 +155,28 @@ the owner's Gamma without clearing its status or changing firmware protections.
 It is a short check, not the still-pending hour-long Gamma measurement. Raw
 intermediate readings and physical/OTA/network-fault tests were not supplied.
 
+The owner next attempted the 3,600-second Gamma run. Its report, recorded at
+09:08:30 Europe/Paris (08:08:30 UTC), failed after 1,271.254 host seconds on a
+statistics read (`DeviceError`, `failure_stage: sample_read`, 230 successful
+readings). The available counter window covers 1,257 device seconds at a
+recalculated 1.072458 TH/s. Boot identity and firmware stayed unchanged at the
+boundaries, shares increased from 850 to 896 with no rejection, and boundary
+ASIC readings were 50 C at 525 MHz / 100% power. The regulator warning remained
+`0x0002`. The pool diagnostic responded after the failed read, but the report
+cannot distinguish a host/network issue from delayed firmware HTTP service or
+establish mining/health during the missing read. This remains a failed,
+incomplete hour-long test; it is not retrospectively converted to a pass.
+
+The host client now classifies redacted timeout, connection, HTTP and TLS errors.
+Only statistics GET reads may receive up to two additional attempts, two seconds
+apart. An observed health fault, reboot, counter reset, authentication error or
+malformed response still fails. A full counter window with recovered read errors
+is `review` (exit 2), never a clean pass; exhausted retries still fail. Reports
+retain error counts, up to 32 error events, recovery counts and the available
+partial counter window after a read failure. Adjacent counter checks also catch
+a decrease that remains above the initial baseline. These collection changes do
+not identify or fix the unknown cause of the owner's interrupted HTTP read.
+
 V2 OTA trial/confirmation transitions, rollback, physical visual acceptance,
 Gamma hour-long stability and longer-duration operation remain unestablished.
 NerdNOS and other physical boards remain unvalidated for V2. Earlier V1 hardware

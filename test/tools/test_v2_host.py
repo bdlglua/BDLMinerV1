@@ -11,7 +11,8 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
-from unittest.mock import patch
+import ssl
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
 from bdlhost.client import Client, Device, DeviceError, sanitize
@@ -295,6 +296,25 @@ class HostTests(unittest.TestCase):
         finally:
             server.shutdown(); server.server_close(); thread.join()
 
+    def test_client_transport_errors_are_classified_without_disclosing_details(self):
+        for error, code, retryable in (
+                (TimeoutError('HIDDEN'), 'timeout', True),
+                (urllib.error.URLError(TimeoutError('HIDDEN')), 'timeout', True),
+                (ConnectionResetError('HIDDEN'), 'connection', True),
+                (urllib.error.URLError(OSError('HIDDEN')), 'connection', True),
+                (urllib.error.URLError(ssl.SSLCertVerificationError('HIDDEN')), 'tls', False),
+                (urllib.error.HTTPError('http://miner/HIDDEN', 403, 'HIDDEN', {}, None), 'http_403', False)):
+            with self.subTest(code=code, error=type(error).__name__):
+                client = Client(Device('gamma', 'Gamma', 'http://miner'))
+                client.opener = Mock()
+                client.opener.open.side_effect = error
+                with self.assertRaises(DeviceError) as failure:
+                    client.stats()
+                self.assertEqual(failure.exception.code, code)
+                self.assertEqual(failure.exception.retryable, retryable)
+                self.assertNotIn('HIDDEN', str(failure.exception))
+                self.assertEqual(client.opener.open.call_count, 1)
+
     def test_bench_detects_counter_reset_and_invalid_gamma_sensor(self):
         a = sanitize(reading())
         b = copy.deepcopy(a)
@@ -433,6 +453,113 @@ class HostTests(unittest.TestCase):
         self.assertEqual(report['device_seconds'], 60)
         self.assertEqual(report['hashrate_hs'], 1e12)
         self.assertNotIn('error', report)
+
+    def test_bench_recovers_a_transient_read_but_marks_the_completed_window_for_review(self):
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        original = gamma.stats
+        failures = []
+        def sample():
+            if clock.value >= 10 and not failures:
+                failures.append(True)
+                raise DeviceError('Miner request timed out', code='timeout', retryable=True)
+            return sanitize(original())
+        gamma.stats = sample
+        with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+            report = hardware_suite.measure_counters(gamma, 60)
+        self.assertEqual(report['status'], 'review')
+        self.assertGreaterEqual(report['device_seconds'], 60)
+        self.assertEqual(report['hashrate_hs'], 1e12)
+        self.assertEqual(report['read_error_count'], 1)
+        self.assertEqual(report['read_recoveries'], 1)
+        self.assertEqual(report['read_errors'][0]['code'], 'timeout')
+        self.assertEqual(gamma.writes, [])
+
+    def test_bench_bounds_read_retries_and_preserves_partial_progress_on_failure(self):
+        for retries in (0, 2):
+            with self.subTest(retries=retries):
+                clock = Clock()
+                gamma = FakeGamma(clock)
+                original = gamma.stats
+                def sample():
+                    if clock.value >= 10:
+                        raise DeviceError('Miner connection failed', code='connection', retryable=True)
+                    return sanitize(original())
+                gamma.stats = sample
+                with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+                    report = hardware_suite.measure_counters(gamma, 3600, retries)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['failure_stage'], 'sample_read')
+                self.assertEqual(report['read_error_count'], retries + 1)
+                self.assertEqual(report['elapsed_s'], 10 + retries * 2)
+                self.assertEqual(report['last']['uptime_s'], 505)
+                self.assertEqual(report['observed_counter_window']['device_seconds'], 5)
+                self.assertEqual(report['observed_counter_window']['hashrate_hs'], 1e12)
+
+    def test_bench_recovery_never_hides_a_reboot_or_health_fault(self):
+        for problem in ('reboot', 'counter_reset', 'fan'):
+            with self.subTest(problem=problem):
+                clock = Clock()
+                gamma = FakeGamma(clock)
+                original = gamma.stats
+                failed = []
+                def sample():
+                    if clock.value >= 10 and not failed:
+                        failed.append(True)
+                        raise DeviceError('Miner request timed out', code='timeout', retryable=True)
+                    data = sanitize(original())
+                    if clock.value >= 12:
+                        if problem == 'reboot':
+                            data['boot_id'] = 'rebooted'
+                        elif problem == 'counter_reset':
+                            data['total_hashes'] = 503e12  # above baseline, below the previous reading
+                        else:
+                            data['asic']['fan_rpm'] = 0
+                    return data
+                gamma.stats = sample
+                with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+                    report = hardware_suite.measure_counters(gamma, 60)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['failure_stage'], 'sample_health' if problem == 'fan' else 'counter_check')
+                self.assertEqual(report['read_error_count'], 1)
+
+    def test_bench_does_not_retry_http_authentication_errors(self):
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        gamma.stats = Mock(side_effect=DeviceError('Miner returned HTTP 401', code='http_401'))
+        with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+            report = hardware_suite.measure_counters(gamma, 60)
+        self.assertEqual(report['status'], 'failed')
+        self.assertEqual(report['error_code'], 'http_401')
+        self.assertEqual(gamma.stats.call_count, 1)
+
+    def test_bench_cli_exits_two_when_a_counter_window_has_read_gaps(self):
+        import contextlib
+        import io
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        original = gamma.stats
+        failed = []
+        def sample():
+            if clock.value >= 10 and not failed:
+                failed.append(True)
+                raise DeviceError('Miner request timed out', code='timeout', retryable=True)
+            return sanitize(original())
+        gamma.stats = sample
+        gamma.diagnostic = lambda: {'compatible': True, 'code': 'ready'}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = root / 'config.json'
+            config.write_text(json.dumps({'miners': [{'id': 'gamma', 'name': 'Gamma', 'url': 'http://miner'}]}))
+            output = root / 'report.json'
+            args = ['hardware_suite.py', '--config', str(config), '--miner', 'gamma', '--seconds', '60', '--output', str(output)]
+            with patch.object(sys, 'argv', args), patch.object(hardware_suite, 'Client', return_value=gamma), \
+                    patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(SystemExit) as ended:
+                    hardware_suite.main()
+            self.assertEqual(ended.exception.code, 2)
+            self.assertEqual(json.loads(output.read_text())['status'], 'review')
 
     def test_network_fault_always_runs_the_restore_command(self):
         clock=Clock();gamma=FakeGamma(clock)

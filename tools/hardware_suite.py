@@ -65,10 +65,12 @@ def counter_measure(first, last):
     return {'device_seconds': seconds, 'hashrate_hs': (last['total_hashes'] - first['total_hashes']) / seconds}
 
 
-def measure_counters(client, seconds):
+def measure_counters(client, seconds, read_retries=2):
     # A failed hour-long check must retain the offending reading. A transport
     # failure keeps the last successful sample without claiming it was unhealthy.
-    report = {'status': 'failed', 'requested_seconds': seconds, 'samples': 0,
+    if type(read_retries) is not int or not 0 <= read_retries <= 2:
+        raise ValueError('Use 0 to 2 additional read attempts')
+    report = {'status': 'failed', 'requested_seconds': seconds, 'read_retries': read_retries, 'samples': 0,
               'first': None, 'last': None}
     def remember(sample):
         report.update(last=sample, samples=report['samples'] + 1)
@@ -81,8 +83,32 @@ def measure_counters(client, seconds):
                 report['warnings'] = ['Gamma regulator STATUS_WORD contains non-trip bits; inspect regulator_warning_bits']
     started = time.monotonic()
     stage = 'initial_read'
+    def read_sample():
+        failed = False
+        for attempt in range(read_retries + 1):
+            try:
+                sample = client.stats()
+            except DeviceError as error:
+                failed = True
+                report['read_error_count'] = report.get('read_error_count', 0) + 1
+                events = report.setdefault('read_errors', [])
+                if len(events) < 32:
+                    events.append({'elapsed_s': round(time.monotonic() - started, 3),
+                                   'stage': stage, 'attempt': attempt + 1,
+                                   'code': getattr(error, 'code', 'device'), 'error': str(error)})
+                else:
+                    report['read_error_events_omitted'] = report.get('read_error_events_omitted', 0) + 1
+                # GET statistics only: never retry settings, updates, TLS/auth
+                # failures or malformed data. An observed health fault still stops.
+                if not getattr(error, 'retryable', False) or attempt == read_retries:
+                    raise
+                time.sleep(2)
+            else:
+                if failed:
+                    report['read_recoveries'] = report.get('read_recoveries', 0) + 1
+                return sample
     try:
-        first = client.stats()
+        first = read_sample()
         report['first'] = first
         remember(first)
         stage = 'initial_health'
@@ -94,14 +120,15 @@ def measure_counters(client, seconds):
         if issues:
             report['issues'] = issues
             raise ValueError('Establish healthy active mining before measuring the hardware')
+        previous = first
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             time.sleep(5)
             stage = 'sample_read'
-            last = client.stats()
+            last = read_sample()
             remember(last)
             stage = 'counter_check'
-            counter_measure(first, last)
+            counter_measure(previous, last)
             stage = 'sample_health'
             issues = health_issues(last)
             if not last.get('pool', {}).get('connected'):
@@ -109,11 +136,21 @@ def measure_counters(client, seconds):
             if issues:
                 report['issues'] = issues
                 raise ValueError('Hardware health check failed')
+            previous = last
         measured = counter_measure(first, report['last'])
         report.update(measured, status='passed' if measured['hashrate_hs'] > 0 else 'failed')
+        if report['status'] == 'passed' and report.get('read_error_count'):
+            report.update(status='review', review_reason='Counter window completed after read errors; health during gaps is unobserved')
     except Exception as error:
         report.update(error=str(error) if isinstance(error, (ValueError, DeviceError)) else type(error).__name__,
                       error_type=type(error).__name__, failure_stage=stage)
+        if isinstance(error, DeviceError):
+            report['error_code'] = getattr(error, 'code', 'device')
+        if stage != 'counter_check' and report['first'] is not None and report['last'] is not None:
+            try:
+                report['observed_counter_window'] = counter_measure(report['first'], report['last'])
+            except ValueError:
+                pass
     report['elapsed_s'] = round(time.monotonic() - started, 3)
     return report
 
@@ -220,6 +257,8 @@ def main():
     p.add_argument('--config', type=Path, required=True)
     p.add_argument('--miner', required=True)
     p.add_argument('--seconds', type=int, default=120)
+    p.add_argument('--read-retries', type=int, choices=(0, 1, 2), default=2,
+                   help='Additional attempts for transient GET statistics failures (default: 2; gaps require review)')
     p.add_argument('--output', type=Path, default=Path('bdlminer-suite.json'))
     p.add_argument('--firmware', type=Path)
     p.add_argument('--signature', type=Path)
@@ -248,7 +287,7 @@ def main():
         except Exception as error:
             results[name] = {'status': 'failed', 'error': str(error) if isinstance(error, (ValueError, DeviceError)) else type(error).__name__}
         print(name + ': ' + results[name]['status'], flush=True)
-    case('counters_and_health', lambda: measure_counters(client, args.seconds))
+    case('counters_and_health', lambda: measure_counters(client, args.seconds, args.read_retries))
     def diagnostics():
         if client.stats().get('api_version', 0) < 2:
             return {'status': 'skipped', 'reason': 'Pool diagnostics require V2 firmware; counter/health checks remain available'}
@@ -264,15 +303,17 @@ def main():
     else:
         results['ota'] = {'status': 'skipped', 'reason': 'No signed firmware supplied; no update attempted'}
     results['physical_display'] = {'status': 'skipped', 'reason': 'Requires visual inspection on the physical board'}
+    status = ('failed' if any(r['status'] == 'failed' for r in results.values()) else
+              'review' if any(r['status'] == 'review' for r in results.values()) else 'completed')
     report = {'recorded_utc': datetime.now(timezone.utc).isoformat(), 'kind': 'hardware-suite',
               'simulated': False, 'miner_id': device.id, 'cases': results,
-              'status': 'failed' if any(r['status'] == 'failed' for r in results.values()) else 'completed'}
+              'status': status}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(mode='w', dir=args.output.parent, delete=False) as output:
         json.dump(report, output, indent=2, allow_nan=False)
     os.replace(output.name, args.output)
     print('Report: ' + str(args.output))
-    raise SystemExit(report['status'] == 'failed')
+    raise SystemExit({'completed': 0, 'failed': 1, 'review': 2}[report['status']])
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -11,7 +12,10 @@ from dataclasses import dataclass
 
 
 class DeviceError(RuntimeError):
-    pass
+    def __init__(self, message, *, code='device', retryable=False):
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -73,9 +77,20 @@ class Client:
                 data = response.read(131073)
         except urllib.error.HTTPError as error:
             # Device response text can echo settings/passwords: do not expose it.
-            raise DeviceError('Miner returned HTTP ' + str(error.code)) from None
-        except (OSError, urllib.error.URLError, TimeoutError):
-            raise DeviceError('Miner is unreachable or timed out') from None
+            raise DeviceError('Miner returned HTTP ' + str(error.code), code='http_' + str(error.code)) from None
+        except urllib.error.URLError as error:
+            reason = error.reason
+            if isinstance(reason, ssl.SSLError):
+                raise DeviceError('Miner TLS connection failed', code='tls') from None
+            timeout = isinstance(reason, TimeoutError)
+            raise DeviceError('Miner request timed out' if timeout else 'Miner connection failed',
+                              code='timeout' if timeout else 'connection', retryable=True) from None
+        except TimeoutError:
+            raise DeviceError('Miner request timed out', code='timeout', retryable=True) from None
+        except ssl.SSLError:
+            raise DeviceError('Miner TLS connection failed', code='tls') from None
+        except OSError:
+            raise DeviceError('Miner connection failed', code='connection', retryable=True) from None
         if len(data) > 131072:
             raise DeviceError('Miner response exceeds 128 KiB')
         if raw:

@@ -81,6 +81,14 @@ The owner's subsequent corrected Gamma check passed over 61 device seconds at
 shares with no rejection. This confirms the host fix on that card; it is not an
 hour-long Gamma stability result.
 
+The next owner-operated Gamma run reached 230 successful readings before an HTTP
+read failed after about 21 minutes. Its available 1,257-device-second window
+measured 1.072458 TH/s with 46 additional accepted shares and no rejection. The
+hour-long check remains incomplete; the source of the read failure is unknown.
+The collector now classifies read errors and uses bounded retries for transient
+statistics GET failures. A completed window containing such gaps is `review`,
+not `passed`; reboot/counter/health faults and exhausted retries still fail.
+
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 
 The next development step combines a first Linux test kit, the embedded dashboard

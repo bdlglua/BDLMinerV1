@@ -76,7 +76,10 @@ check passed for 3,604 seconds at 1.004141 MH/s; the Gamma hour-long measurement
 did not start because its initial bench health prerequisite failed. After the
 host bench-status correction, the owner's Gamma passed a 61-second check at
 1.076066 TH/s while retaining status `0x0002` as a warning. Its hour-long check
-remains pending.
+remains incomplete: the next run stopped on an HTTP read error after about 21
+minutes, with 1.072458 TH/s across the available counter window and 46 additional
+accepted shares / no rejection. The failure does not locate the cause of the
+interrupted read.
 
 ## Fleet dashboard on Linux / Raspberry Pi
 
@@ -252,6 +255,19 @@ retained in `regulator_warning_bits` and `warnings`; a nonzero word alone does
 not fail the bench. Missing/malformed status and actual shutdown faults still
 fail, as do the existing temperature, voltage, fan and pool checks. The active
 frequency-calibration supervisor keeps its stricter preconditions.
+
+Statistics GET reads retry transient timeout/connection errors at most twice,
+with two seconds between attempts. Use `--read-retries 0` for immediate failure
+on a read error. No setting/update request is retried; authentication/TLS errors,
+invalid responses, observed health faults, reboots and counter resets still fail.
+Recovered read errors remain visible in `read_error_count`, `read_errors` (up to
+32 events) and `read_recoveries`. A completed counter window with read gaps has
+status **`review`**, exit code **2**, and unobserved health during those gaps. It
+does not count as a clean stability pass. Persistent read failure produces
+`failed`, exit 1, retaining the available `observed_counter_window` when valid.
+Exit 0 means the requested cases completed without a failed/review case; explicitly
+skipped physical/OTA/fault cases remain skipped. Update both
+`tools/hardware_suite.py` and `tools/bdlhost/client.py` when updating an older kit.
 
 Optional OTA needs `--firmware <env>-firmware.bin --signature <file>.sig --version
 <version>`. The bench independently checks the release signature, ESP digest,
