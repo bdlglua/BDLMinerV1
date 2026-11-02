@@ -1,7 +1,7 @@
 # BDLMiner V2 development
 
 The seven V2 features are implemented on `v2/development`. The firmware version
-is `2.0.0-beta.2`; this branch is not a published release. Stable V1 remains
+is `2.0.0-beta.3`; this branch is not a published release. Stable V1 remains
 [1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15).
 
 ## M5 / Gamma test kit
@@ -41,32 +41,42 @@ The builder checks chip/target/version, binary hashes, factory application and
 both OTA slots. The ZIP contains only checksum-listed distribution files;
 runtime databases/caches, private keys and local reports are excluded.
 
-## Beta.1 to beta.2 on the owner's cards
+## Manual OTA on the owner's cards
 
-Beta.2 includes the official dashboard logo, V2 browser/app titles, full-width
-device/record/update panels and the improved host collector. See the
-[changes and validation limits](../releases/v2.0.0-beta.2.md).
+Beta.3 fixes the remaining gap under pool diagnostics by placing the chart,
+pool and Bitcoin panels in one full-width flow. Settings use consistent SVG
+icons instead of font symbols. It includes the earlier logo, V2 titles,
+full-width detail panels and host-collector fixes. See the
+[changes and validation limits](../releases/v2.0.0-beta.3.md).
 
 Extract the new kit into a separate directory. Keep the existing hub configuration
 and private settings backup. Stop the old hub with Ctrl+C before starting the
-new one; both use port 8787. The kit's readiness launcher expects beta.2, so a
-card still on beta.1 correctly reports `review` until its manual update completes.
+new one; both use port 8787. The kit's readiness launcher expects beta.3, so an
+older card correctly reports `review` until its manual update completes.
 
 To observe the M5 update, start this in the new kit **before** uploading the image:
 
 ```bash
-python3 tools/check_hardware.py ota-monitor http://192.168.1.40 --previous 2.0.0-beta.1 --expected 2.0.0-beta.2 --expect confirm --timeout 900 --output ota-m5-beta2.json
+python3 tools/check_hardware.py ota-monitor http://192.168.1.40 --previous 2.0.0-beta.2 --expected 2.0.0-beta.3 --expect confirm --timeout 900 --output ota-m5-beta3.json
 ```
 
 Then open the M5's local Settings page and upload
 `firmware/m5stickc-plus2-firmware.bin`. Leave the observer running through the
 trial and automatic confirmation; it observes only and does not upload/reboot.
-For Gamma, use the same observer command with `192.168.1.135`, output
-`ota-gamma-beta2.json`, and upload `firmware/bitaxe-gamma-601-firmware.bin` through
-that card's Settings page. Use `*-firmware.bin` for OTA, not `*-factory.bin`.
+The owner's Gamma remains on beta.1. Start its observer before uploading
+`firmware/bitaxe-gamma-601-firmware.bin` through that card's Settings page:
+
+```bash
+python3 tools/check_hardware.py ota-monitor http://192.168.1.135 --previous 2.0.0-beta.1 --expected 2.0.0-beta.3 --expect confirm --timeout 900 --output ota-gamma-beta3.json
+```
+
+Use `*-firmware.bin` for OTA, not `*-factory.bin`. Adjust `--previous` if the
+card actually runs another confirmed version; do not bypass the baseline check.
 After confirmation, run `sh check-miners.sh` and check the V2 tab titles, official
-logo and full-width detail panels. These are pending beta.2 hardware checks;
-the earlier beta.1 reports do not establish their outcome.
+logo and full-width panels. The owner observed the M5 beta.1-to-beta.2 trial and
+confirmation at 1.004112 MH/s / 48 C IMU, then reported the remaining web gap and
+settings pictograms. Beta.3 fixes those in software; its hardware/visual checks,
+Gamma OTA, V2 rollback and longer-duration checks remain pending.
 
 ## Local dashboard and mining work
 

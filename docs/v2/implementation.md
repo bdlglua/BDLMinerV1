@@ -89,6 +89,18 @@ The collector now classifies read errors and uses bounded retries for transient
 statistics GET failures. A completed window containing such gaps is `review`,
 not `passed`; reboot/counter/health faults and exhausted retries still fail.
 
+The owner then observed a confirmed beta.1-to-beta.2 manual OTA on the M5:
+changed boot identity, pending trial, then confirmation on the same new boot.
+The final snapshot reports 1.004112 MH/s, 48 C IMU and connected Stratum V2 at
+100% effective power. Gamma beta.2 OTA, V2 rollback, visual checks and sustained
+beta.2 rates remain pending; see the readiness audit for the report's scope.
+
+The owner then supplied screenshots of the remaining beta.2 dashboard gap and
+settings glyphs. Beta.3 uses a full-width section flow and font-independent SVG
+settings/maintenance icons. Software layout checks cover populated sections,
+eight viewport widths and retained Gamma fan controls; beta.3 OTA/visual results
+remain pending on the actual cards.
+
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 
 The next development step combines a first Linux test kit, the embedded dashboard

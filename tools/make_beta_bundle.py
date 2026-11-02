@@ -24,6 +24,7 @@ PACKAGE=('__init__.py','client.py','hub.py','calibration.py','example.json',
 DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness.md',
       'benchmarks/v2-native-sha256d-2026-11-02.json',
       'releases/v2.0.0-beta.2.md','releases/v2.0.0-beta.2.fr.md',
+      'releases/v2.0.0-beta.3.md','releases/v2.0.0-beta.3.fr.md',
       'patches/README.md','patches/BDLMiner-stats-v2-semver.patch')
 
 

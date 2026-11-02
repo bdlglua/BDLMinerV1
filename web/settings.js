@@ -29,7 +29,27 @@ function sync(){
 }
 // Presentation only: titles, hints, units and choices for the settings the
 // miner describes in /api/settings. Unknown keys keep the miner's own label.
-const GROUPS={Pool:['◎','Where your miner sends its work and how it introduces itself.'],Display:['▣','The miner\'s screen: brightness, colours, night mode and clock.'],Notifications:['◉','Phone notifications, webhook and alerts.'],Safety:['◇','Temperature, power and automatic restarts.'],Network:['⌁','Fallback WiFi, Home Assistant, other miners, password and updates.']};
+const GROUPS={Pool:['pool','Where your miner sends its work and how it introduces itself.'],Display:['display','The miner\'s screen: brightness, colours, night mode and clock.'],Notifications:['notifications','Phone notifications, webhook and alerts.'],Safety:['safety','Temperature, power and automatic restarts.'],Network:['network','Fallback WiFi, Home Assistant, other miners, password and updates.']};
+const SETTINGS_ICONS={
+ pool:'<circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="m6.5 6.5 3.4 3.4m4.2 4.2 3.4 3.4m0-11-3.4 3.4m-4.2 4.2-3.4 3.4"/>',
+ display:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>',
+ notifications:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/>',
+ safety:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/>',
+ network:'<path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0m-11 4a6 6 0 0 1 8 0"/><circle cx="12" cy="20" r="1"/>',
+ maintenance:'<path d="m14 6 4 4 3-3a7 7 0 0 1-9 9l-6 6-4-4 6-6a7 7 0 0 1 9-9l-3 3Z"/>',
+ backup:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+ firmware:'<path d="M12 16V4m-5 5 5-5 5 5M4 16v5h16v-5"/>',
+ restart:'<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/>',
+ settings:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2"/>'
+};
+function settingsIcon(name){
+ const mark=document.createElement('span');mark.className='group-icon';mark.setAttribute('aria-hidden','true');
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ for(const[key,value]of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.7','stroke-linecap':'round','stroke-linejoin':'round',focusable:'false'}))svg.setAttribute(key,value);
+ svg.innerHTML=Object.hasOwn(SETTINGS_ICONS,name)?SETTINGS_ICONS[name]:SETTINGS_ICONS.settings;
+ mark.appendChild(svg);return mark;
+}
+document.querySelectorAll('[data-icon]').forEach(node=>node.replaceWith(settingsIcon(node.dataset.icon)));
 const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 const FIELDS={
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
@@ -76,8 +96,8 @@ function render(data){
   let fs=groups.get(group);
   if(!fs){
    groups.set(group,fs=document.createElement('fieldset'));fs.id=group==='Safety'?'performance':'group-'+group.toLowerCase();
-   const [icon,about]=GROUPS[group]||['•',''],lg=document.createElement('legend'),mark=document.createElement('span');
-   mark.className='group-icon';mark.setAttribute('aria-hidden','true');mark.textContent=icon;lg.append(mark,t(group));fs.appendChild(lg);
+   const [icon,about]=Object.hasOwn(GROUPS,group)?GROUPS[group]:['settings',''],lg=document.createElement('legend'),mark=settingsIcon(icon);
+   lg.append(mark,t(group));fs.appendChild(lg);
    if(about){const p=document.createElement('p');p.className='group-about';p.textContent=t(about);fs.appendChild(p)}
    f.appendChild(fs);section=null;
    const link=document.createElement('a');link.href='#'+fs.id;link.dataset.group=fs.id;

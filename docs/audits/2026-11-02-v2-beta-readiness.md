@@ -201,7 +201,35 @@ version `d8c4fff5-57ad-46c6-a009-35b27e34eea4`. The fix is now deployed; accepta
 of the next real miner report has not yet been observed here. This HTTP 400 does
 not establish the cause of the earlier local statistics-read interruption.
 
-V2 OTA trial/confirmation transitions, rollback, physical visual acceptance,
-Gamma hour-long stability and longer-duration operation remain unestablished.
+### Beta.2 M5 manual OTA confirmation
+
+The owner supplied `ota-m5-beta2.json`, recorded at 09:54:44 Europe/Paris
+(08:54:44 UTC). It observes a confirmed beta.1 baseline, a changed boot identity
+running beta.2 on trial, then `firmware_trial: false` on that same new boot.
+The monitor reports `confirmed`, `saw_pending_trial: true` and `passed: true`.
+One timed-out read occurred during the upload/reboot transition; subsequent
+observations resumed and captured the trial and its confirmation.
+
+The final snapshot at 175 seconds mining uptime reports 1.004112 MH/s (1.001015
+MH/s live), 48 C IMU, 100% effective power, a connected Stratum V2 pool and
+70,708 bytes free heap / 55,284-byte largest block. New-session shares are zero
+at difficulty 1; this short snapshot is not a share-acceptance or sustained-rate
+test. Firmware version alone does not attest the exact installed source commit.
+This establishes an owner-operated M5 beta.1-to-beta.2 OTA trial/confirmation,
+not rollback or physical/local-dashboard visual acceptance.
+
+The owner subsequently reported a remaining display problem and supplied two
+screenshots: font-symbol settings navigation and a gap beneath pool diagnostics.
+Beta.2 still kept a narrow Bitcoin column beside the chart. Beta.3 removes that
+two-column dependency and lays chart, diagnostics, pool and Bitcoin sections in
+one full-width flow. Settings/maintenance icons are inline SVGs with text labels.
+Loopback rendering with populated pool, block and share fixtures reproduced a
+248.7 px left-column tail in beta.2; the revised flow has only the ordinary 20 px
+gap between occupied panels. Bounds were checked at eight widths (320-1667 px),
+with SVG navigation and retained Gamma fan controls. These are software layout
+checks; beta.3 has not yet been observed on the owner's cards.
+
+Beta.3 OTA, Gamma V2 OTA, V2 rollback, physical/local-dashboard visual acceptance,
+Gamma hour-long stability and longer-duration V2 operation remain unestablished.
 NerdNOS and other physical boards remain unvalidated for V2. Earlier V1 hardware
 results and loopback software fixtures are not counted as V2 hardware acceptance.
