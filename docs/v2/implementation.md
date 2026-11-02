@@ -61,9 +61,19 @@ Software verification on 2026-11-01 (UTC):
   aggregate artifacts without signing secrets. Release signing/publication remains
   reserved for an explicitly triggered release workflow.
 
-Physical V2 validation remains pending on M5, Gamma, NerdNOS and the other boards.
-The owner's earlier V1 measurements and OTA reports are not counted as V2 tests.
-No release/tag was published and no owner's miner was flashed by this work.
+Owner-operated M5/Gamma V2 readiness and dashboard-load measurements are recorded
+in the [beta readiness audit](../audits/2026-11-02-v2-beta-readiness.md#owner-operated-m5gamma-measurements).
+The M5 held 1 MH/s; Gamma's open/closed difference was -0.74% in one approximately
+five-minute comparison. A subsequent M5 counter/health check passed over 3,604
+seconds at 1.004141 MH/s. Gamma's timed check was rejected at its initial health
+prerequisite; a later snapshot exposed the bench's overly broad rejection of
+nonzero regulator status. Host checks now distinguish firmware shutdown bits
+from warnings and retain failure telemetry. These reports do not establish V2
+OTA transitions, rollback, physical visual acceptance, Gamma timed stability or
+longer-duration operation. NerdNOS and the other physical boards remain
+unvalidated. Earlier V1 measurements and OTA reports
+are not counted as V2 tests. The owner installed the V2 firmware; this workspace
+did not flash the boards. No V2 release/tag was published.
 Setup and real test commands are in [the V2 guide](README.md).
 
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)

@@ -68,7 +68,12 @@ python3 tools/benchmark_sha256d.py --baseline 3eb9b5a --output native-sha-benchm
 This measures portable SHA-256d on the computer running the tool. It does not
 establish ESP32 hardware MH/s, ASIC silicon TH/s or a temperature reduction.
 The [beta readiness record](../audits/2026-11-02-v2-beta-readiness.md) separates
-software evidence from the remaining board tests.
+software evidence, owner-operated M5/Gamma dashboard-load measurements and the
+remaining board tests. The M5 held 1 MH/s with its local page open; Gamma's
+open/closed difference was -0.74% in one short comparison. This does not establish
+long-duration stability or validate the other boards. A later M5 counter/health
+check passed for 3,604 seconds at 1.004141 MH/s; the Gamma hour-long measurement
+did not start because its initial bench health prerequisite failed.
 
 ## Fleet dashboard on Linux / Raspberry Pi
 
@@ -235,6 +240,16 @@ pass. For the actual browser closed/open comparison, the existing
 `tools/check_hardware.py measure` command still opens the dashboards and asks the
 operator to keep them in visible windows.
 
+Counter/health failures retain the first/last available readings, sample count,
+elapsed time and failure stage. Health failures name the failed checks; an
+unreachable device retains its last successful sample without labelling that
+sample unhealthy. Gamma's regulator check matches the firmware shutdown bits
+(`0x007c` while powered). Other STATUS_WORD bits, including CML (`0x0002`), are
+retained in `regulator_warning_bits` and `warnings`; a nonzero word alone does
+not fail the bench. Missing/malformed status and actual shutdown faults still
+fail, as do the existing temperature, voltage, fan and pool checks. The active
+frequency-calibration supervisor keeps its stricter preconditions.
+
 Optional OTA needs `--firmware <env>-firmware.bin --signature <file>.sig --version
 <version>`. The bench independently checks the release signature, ESP digest,
 target and version before uploading, then requires observing a pending trial and
@@ -250,7 +265,11 @@ fails. A pass requires observing the actual outage and healthy resumed mining;
 missing commands produce a skip. The bench never saves an invalid Wi-Fi network
 or changes pool credentials to manufacture a disconnect.
 
-V2 has automated loopback/browser/rendering tests. Real V2 mining, cooling,
-physical-screen and OTA acceptance must still be measured on each target board;
-V1 hardware evidence does not establish V2 hardware validation. See the
-[implementation record](implementation.md) for completed software checks.
+V2 has automated loopback/browser/rendering tests, owner-operated M5/Gamma
+readiness and short dashboard-load measurements, and a passed one-hour M5
+counter/health check. Gamma timed stability, longer-duration operation,
+physical-screen and OTA acceptance remain to be established for V2; the other
+physical boards remain unvalidated. V1 hardware evidence does not establish V2
+hardware validation. See the [implementation record](implementation.md) and
+[beta readiness audit](../audits/2026-11-02-v2-beta-readiness.md) for the scope of
+the recorded checks.
