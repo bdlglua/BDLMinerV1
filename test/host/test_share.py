@@ -41,6 +41,7 @@ double rate = 1.0234e6;
 double minerHashrate() { return rate; }
 struct { bool shareHashrate = true, sharePool = false; } settings;
 struct { bool poolConnected = true; } stats;
+auto minerStats() { return stats; }
 String activePool = "public-pool.io";
 const String &netPoolHost() { return activePool; }
 struct WiFiClientSecure {};

@@ -78,7 +78,7 @@ void sharePoll() {
     // The exact model only when it says more than the firmware's own name
     // ("M5StickC Plus2" is the same as "M5StickC-Plus2").
     const char *model = board::modelName();
-    const char *pool = settings.sharePool && stats.poolConnected ? netPoolHost().c_str() : nullptr;
+    const char *pool = settings.sharePool && minerStats().poolConnected ? netPoolHost().c_str() : nullptr;
     if (!shareBody(body, sizeof(body), rate, sameName(model, BOARD_NAME) ? nullptr : model, pool)) return;
     String url = STATS_URL;
     int start = url.indexOf("://") + 3, slash = url.indexOf('/', start);
