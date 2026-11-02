@@ -73,7 +73,10 @@ remaining board tests. The M5 held 1 MH/s with its local page open; Gamma's
 open/closed difference was -0.74% in one short comparison. This does not establish
 long-duration stability or validate the other boards. A later M5 counter/health
 check passed for 3,604 seconds at 1.004141 MH/s; the Gamma hour-long measurement
-did not start because its initial bench health prerequisite failed.
+did not start because its initial bench health prerequisite failed. After the
+host bench-status correction, the owner's Gamma passed a 61-second check at
+1.076066 TH/s while retaining status `0x0002` as a warning. Its hour-long check
+remains pending.
 
 ## Fleet dashboard on Linux / Raspberry Pi
 
@@ -267,7 +270,8 @@ or changes pool credentials to manufacture a disconnect.
 
 V2 has automated loopback/browser/rendering tests, owner-operated M5/Gamma
 readiness and short dashboard-load measurements, and a passed one-hour M5
-counter/health check. Gamma timed stability, longer-duration operation,
+counter/health check. The corrected Gamma host check also passed for 61 seconds;
+Gamma hour-long stability, longer-duration operation,
 physical-screen and OTA acceptance remain to be established for V2; the other
 physical boards remain unvalidated. V1 hardware evidence does not establish V2
 hardware validation. See the [implementation record](implementation.md) and

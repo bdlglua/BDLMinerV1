@@ -143,7 +143,19 @@ active frequency trials. Firmware interlocks and electrical settings are unchang
 Python regressions cover each STATUS_WORD bit, CML warning retention, real fault
 bits, initial rejection, read timeout, reboot evidence and successful counter rates.
 
+The owner then supplied `gamma-check.json`, recorded at 08:44:05 Europe/Paris
+(07:44:05 UTC), using the corrected host script with a requested 60-second run.
+Counter/health and pool-diagnostic cases both passed: 12 readings, 61 device
+seconds, and a recalculated 1.076066 TH/s. The same boot identity was retained;
+shares increased from 845 to 847 with zero rejected shares. Boundary readings
+showed 525 MHz, 100% effective power, 50 C ASIC and 56.5/56.25 C regulator. Status
+`0x0002` remained present at both boundaries and was retained as
+`regulator_warning_bits: 2` with a warning. This validates the host correction on
+the owner's Gamma without clearing its status or changing firmware protections.
+It is a short check, not the still-pending hour-long Gamma measurement. Raw
+intermediate readings and physical/OTA/network-fault tests were not supplied.
+
 V2 OTA trial/confirmation transitions, rollback, physical visual acceptance,
-Gamma timed stability and longer-duration operation remain unestablished.
+Gamma hour-long stability and longer-duration operation remain unestablished.
 NerdNOS and other physical boards remain unvalidated for V2. Earlier V1 hardware
 results and loopback software fixtures are not counted as V2 hardware acceptance.

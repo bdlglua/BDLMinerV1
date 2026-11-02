@@ -69,12 +69,17 @@ seconds at 1.004141 MH/s. Gamma's timed check was rejected at its initial health
 prerequisite; a later snapshot exposed the bench's overly broad rejection of
 nonzero regulator status. Host checks now distinguish firmware shutdown bits
 from warnings and retain failure telemetry. These reports do not establish V2
-OTA transitions, rollback, physical visual acceptance, Gamma timed stability or
+OTA transitions, rollback, physical visual acceptance, Gamma hour-long stability or
 longer-duration operation. NerdNOS and the other physical boards remain
 unvalidated. Earlier V1 measurements and OTA reports
 are not counted as V2 tests. The owner installed the V2 firmware; this workspace
 did not flash the boards. No V2 release/tag was published.
 Setup and real test commands are in [the V2 guide](README.md).
+
+The owner's subsequent corrected Gamma check passed over 61 device seconds at
+1.076066 TH/s, retaining status `0x0002` as a warning and accepting two additional
+shares with no rejection. This confirms the host fix on that card; it is not an
+hour-long Gamma stability result.
 
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 
