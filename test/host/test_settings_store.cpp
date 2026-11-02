@@ -40,14 +40,14 @@ struct Storage {
     }
 };
 int main() {
-    Settings legacy;
+    Settings legacySharing;
     const char *beforePoolSharing = R"({"power":75})";
-    assert(!legacy.sharePool);
-    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(beforePoolSharing), strlen(beforePoolSharing), legacy));
-    assert(!legacy.sharePool); // updates never opt an existing miner into pool sharing
-    legacy.sharePool = true;
+    assert(!legacySharing.sharePool);
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(beforePoolSharing), strlen(beforePoolSharing), legacySharing));
+    assert(!legacySharing.sharePool); // updates never opt an existing miner into pool sharing
+    legacySharing.sharePool = true;
     std::string consent;
-    assert(settingsstore::encode(legacy, consent));
+    assert(settingsstore::encode(legacySharing, consent));
     Settings restoredConsent;
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(consent.data()), consent.size(), restoredConsent));
     assert(restoredConsent.sharePool);
