@@ -17,6 +17,11 @@ whose reward is paid to **your** address.
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
+On the website: [interactive dashboard and fleet demos](https://bdlglua.github.io/#demo),
+[measured board comparison](https://bdlglua.github.io/#boards),
+[installation paths and troubleshooting](https://bdlglua.github.io/#discover), and
+[support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
+
 The V2 release candidate was tested on the owner's M5StickC Plus2 and Gamma 601:
 manual OTA confirmation on both, M5 physical rollback/network recovery and a
 clean Gamma hour at 1.070391 TH/s. See the

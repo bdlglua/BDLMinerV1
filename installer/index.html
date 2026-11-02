@@ -9,6 +9,9 @@
 <meta property="og:description" content="Free, open-source solo Bitcoin lottery miner for ESP32 boards. Install it from your browser.">
 <meta property="og:image" content="assets/screen-mining.png">
 <meta name="theme-color" content="#0b0d12">
+<link rel="stylesheet" href="assets/discovery.css">
+<script id="site-data" type="application/json">__SITE_DATA__</script>
+<script defer src="assets/discovery.js"></script>
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <style>
 :root{--bg:#0b0d12;--panel:#141922;--panel2:#10141c;--border:#262e3d;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a;--good:#3ddc84}
@@ -228,11 +231,13 @@ footer a{display:inline-block;padding:6px 2px}
    <span>BDLMiner <b>V2</b></span>
   </a>
   <div class="links" id="site-links">
-   <a href="#features" data-t="navFeatures">Features</a>
+   <a href="#help">FAQ</a>
+   <a href="#discover" id="nav-discover">Discover</a>
    <a href="#boards" data-t="navBoards">Boards</a>
    <a href="#install" data-t="navInstall">Install</a>
    <a href="#stats" data-t="navStats">Statistics</a>
    <a href="#community" data-t="navCommunity">Community</a>
+   <a href="#support" id="nav-support">Support</a>
   </div>
   <button id="lang" type="button">Français</button>
   <button id="menu" type="button" aria-expanded="false" aria-controls="site-links" data-al="menu" aria-label="Menu">☰</button>
@@ -262,6 +267,8 @@ footer a{display:inline-block;padding:6px 2px}
  </div>
 </div>
 
+<section id="discover" class="discovery-section"><div class="wrap" id="discovery-start"></div></section>
+
 <section id="features">
  <div class="wrap">
   <h2 data-t="featTitle">What it does</h2>
@@ -280,11 +287,14 @@ footer a{display:inline-block;padding:6px 2px}
  </div>
 </section>
 
+<section id="demo" class="discovery-section"><div class="wrap" id="discovery-demo"></div></section>
+
 <section id="boards">
  <div class="wrap">
   <h2 data-t="boardsTitle">Supported boards</h2>
   <p class="lead" data-t="boardsLead">One firmware per family. Dashed boards are experimental: reports from real hardware are welcome.</p>
   <ul class="boards" id="board-list"></ul>
+  <div id="board-comparison"></div>
  </div>
 </section>
 
@@ -357,6 +367,11 @@ footer a{display:inline-block;padding:6px 2px}
   <div class="note" data-t="lottery">A block pays 3.125 BTC plus fees to your own address, but at 1 MH/s finding one takes billions of years on average. Every hash has the same tiny chance, with no progress between them: the fun is in the build, the statistics and chasing your best difficulty. Spend on it only what you would on a gadget.</div>
  </div>
 </section>
+
+<section id="help" class="discovery-section"><div class="wrap" id="discovery-help"></div></section>
+<section id="news" class="discovery-section"><div class="wrap" id="discovery-news"></div></section>
+<section id="gallery" class="discovery-section"><div class="wrap" id="discovery-gallery"></div></section>
+<section id="support" class="discovery-section"><div class="wrap" id="discovery-support"></div></section>
 
 <section id="community">
  <div class="wrap">
@@ -635,7 +650,7 @@ function apply(){document.documentElement.lang=lang;
  document.querySelectorAll('[data-ph]').forEach(e=>e.placeholder=T(e.dataset.ph));
  chatRender();chatMe();chatMembers();
  document.getElementById('lang').textContent=lang=='fr'?'English':'Français';
- showScreen(screen);boards();stats()}
+ showScreen(screen);boards();stats();document.dispatchEvent(new Event('bdl-language-change'))}
 // The phone menu: opens under the bar, closes on a link, Escape or a tap elsewhere.
 {const menu=document.getElementById('menu'),links=document.getElementById('site-links');
  const set=open=>{links.classList.toggle('open',open);menu.setAttribute('aria-expanded',open);menu.textContent=open?'✕':'☰'};

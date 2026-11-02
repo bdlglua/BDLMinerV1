@@ -18,7 +18,9 @@ import json
 import os
 from pathlib import Path
 import shutil
+from urllib.parse import urlsplit
 from build_output import staged_directory
+from make_site_demo import build_demos
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -40,7 +42,36 @@ BOARDS = [
 CHIP_FAMILY = {"esp32": "ESP32", "esp32s2": "ESP32-S2", "esp32s3": "ESP32-S3", "esp32c3": "ESP32-C3"}
 
 
-def build_installer(release, out):
+def site_content(version, channel='stable', channels=None):
+    content = json.loads((Path(ROOT) / 'installer/content.json').read_text(encoding='utf-8'))
+    support = content['support']
+    for link in support['links']:
+        url = urlsplit(link['url'])
+        if url.scheme != 'https' or not url.hostname or url.username or url.password:
+            raise ValueError('Donation links must use HTTPS without credentials')
+    for key in ('bitcoin', 'lightning'):
+        value = support.get(key, '')
+        if any(c.isspace() or c in '<>"\'\\' for c in value):
+            raise ValueError('Invalid donation destination')
+    for entry in content['gallery']:
+        image = Path(entry['image'])
+        if image.is_absolute() or '..' in image.parts or image.parts[:1] != ('assets',):
+            raise ValueError('Gallery images must be local site assets')
+        url = urlsplit(entry['url'])
+        if url.scheme != 'https' or url.hostname not in ('reddit.com', 'www.reddit.com', 'old.reddit.com', 'discord.com', 'discord.gg'):
+            raise ValueError('Gallery entries must link to Reddit or Discord')
+        if entry.get('permission') is not True:
+            raise ValueError('Gallery photos require contributor permission')
+        if not (Path(ROOT) / 'installer' / image).is_file():
+            raise ValueError('Missing gallery image')
+    content.update(version=version, channel=channel, channels=channels or {
+        'stable': {'version': version, 'published_at': None},
+        'beta': {'version': version, 'published_at': None},
+    })
+    return content
+
+
+def build_installer(release, out, channel='stable', channels=None):
     version = os.path.basename(os.path.normpath(release))
     chips = json.loads((Path(release) / "boards.json").read_text(encoding="utf-8"))
     os.makedirs(out, exist_ok=True)
@@ -66,10 +97,13 @@ def build_installer(release, out):
         raise ValueError("No supported boards with factory images in this release")
     page = (Path(ROOT) / "installer/index.html").read_text(encoding="utf-8")
     page = page.replace("__BOARDS__", json.dumps(listed)).replace("__VERSION__", version)
+    content = json.dumps(site_content(version, channel, channels), ensure_ascii=False).replace('<', '\\u003c')
+    page = page.replace('__SITE_DATA__', content)
     (Path(out) / "index.html").write_text(page, encoding="utf-8")
     assets = Path(ROOT) / "installer/assets"
     if assets.is_dir():
         shutil.copytree(assets, Path(out) / "assets", dirs_exist_ok=True)
+    build_demos(ROOT, out, version)
     return version, len(listed)
 
 

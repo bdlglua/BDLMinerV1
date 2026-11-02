@@ -1,0 +1,41 @@
+name: Community setup / Installation communautaire
+description: Submit your miner photo for the website / Proposer une photo pour le site
+title: "Community setup: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your own setup for the BDLMiner website. Attach your photo here, or link your original Reddit/Discord post. Publication is reviewed manually.
+        Propose ta propre installation pour le site BDLMiner. Ajoute ta photo ici, ou le lien de ta publication Reddit/Discord. La publication est vérifiée manuellement.
+  - type: input
+    id: board
+    attributes:
+      label: Board model / Modèle de carte
+      placeholder: M5StickC Plus2, Bitaxe Gamma 601…
+    validations:
+      required: true
+  - type: textarea
+    id: photo
+    attributes:
+      label: Photo and original post / Photo et publication d’origine
+      description: Attach your photo and include a public Reddit/Discord link if available. / Ajoute ta photo et un lien public Reddit/Discord si disponible.
+    validations:
+      required: true
+  - type: input
+    id: credit
+    attributes:
+      label: Credit / Nom ou pseudo à afficher
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Tell us about your setup / Présente ton installation
+      description: Enclosure, screen, placement… / Boîtier, écran, emplacement…
+  - type: checkboxes
+    id: permission
+    attributes:
+      label: Photo permission / Autorisation pour la photo
+      options:
+        - label: I took this photo and allow its credited publication on the BDLMiner website. / J’ai pris cette photo et j’autorise sa publication avec crédit sur le site BDLMiner.
+          required: true

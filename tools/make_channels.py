@@ -52,8 +52,11 @@ def build_channels(releases, fetch, output, repository):
                 paths[tag] = folder
         stable_tag = stable.get('tag_name', stable.get('tagName'))
         beta_tag = beta.get('tag_name', beta.get('tagName'))
-        build_installer(str(paths[stable_tag]), str(output))
-        build_installer(str(paths[beta_tag]), str(Path(output) / 'beta'))
+        channels = {name: {'version': Version(item.get('tag_name', item.get('tagName'))).text,
+                           'published_at': item.get('published_at')}
+                    for name, item in (('stable', stable), ('beta', beta))}
+        build_installer(str(paths[stable_tag]), str(output), 'stable', channels)
+        build_installer(str(paths[beta_tag]), str(Path(output) / 'beta'), 'beta', channels)
         pointers = Path(output) / 'updates'
         pointers.mkdir(exist_ok=True)
         for channel, tag in (('stable', stable_tag), ('beta', beta_tag)):
@@ -69,7 +72,7 @@ def main():
     if not re.fullmatch(r'[\w.-]+/[\w.-]+', args.repository):
         p.error('Use owner/repository')
     listing = subprocess.run(['gh', 'api', '--paginate', f'repos/{args.repository}/releases?per_page=100',
-                              '--jq', '.[] | {tag_name,draft,prerelease}'], check=True, capture_output=True, text=True)
+                              '--jq', '.[] | {tag_name,draft,prerelease,published_at}'], check=True, capture_output=True, text=True)
     releases = [json.loads(line) for line in listing.stdout.splitlines() if line.strip()]
     def fetch(tag, folder):
         subprocess.run(['gh', 'release', 'download', tag, '--repo', args.repository, '--dir', str(folder),

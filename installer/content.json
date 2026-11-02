@@ -1,0 +1,26 @@
+{
+  "support": {"links": [{"label":{"en":"Support BDLMiner","fr":"Soutenir BDLMiner"},"url":"https://github.com/sponsors/bdlglua"}], "bitcoin": "", "lightning": ""},
+  "gallery": [],
+  "release_notes": {
+    "2.0.1": {
+      "en": ["BDLMiner V2 naming across setup, screens and project links.", "Saved settings, signed updates and automatic rollback are preserved.", "The stable channel remains the default; beta is opt-in."],
+      "fr": ["Le nom BDLMiner V2 dans la configuration, les écrans et les liens du projet.", "Réglages enregistrés, mises à jour signées et retour arrière conservés.", "Le canal stable reste proposé par défaut ; la bêta est un choix explicite."]
+    }
+  },
+  "boards": [
+    {"env":"m5stickc-plus2","name":"M5StickC Plus2","chip":"ESP32-PICO-V3-02","family":"esp32","display":"ST7789 · 135 × 240","rate":1004855,"measured":true,"image":"assets/boards/m5stickc-plus2.webp","source":"https://github.com/bdlglua/BDLMinerV2/blob/main/docs/v2/hardware-validation.md","note":{"en":"122-second beta.4 counter window. About 1.00 MH/s; not a promise for every ESP32.","fr":"Fenêtre de compteurs de 122 secondes en bêta 4. Environ 1,00 MH/s ; pas une promesse pour tous les ESP32."}},
+    {"env":"bitaxe-gamma-601","name":"Bitaxe Gamma 601","chip":"ESP32-S3 + BM1370 ASIC","family":"asic","display":"SSD1306 OLED · 128 × 32","rate":1070390677026,"measured":true,"experimental":true,"image":"assets/boards/gamma.webp","photo_caption":{"en":"Gamma 600 series · verify revision 601","fr":"Famille Gamma 600 · vérifier la révision 601"},"source":"https://github.com/bdlglua/BDLMinerV2/blob/main/docs/v2/hardware-validation.md#instrumented-gamma-hour","note":{"en":"3,604-second beta.4 run at 525 MHz. Dashboard closed, hub stopped. 5 V barrel supply and active cooling required.","fr":"Essai bêta 4 de 3 604 secondes à 525 MHz. Dashboard fermé, hub arrêté. Alimentation 5 V sur jack et ventilation active requises."}},
+    {"env":"m5stack-s3","name":"M5Cardputer / ADV","chip":"ESP32-S3 · dual-core LX7","family":"s3","display":"ST7789 · 240 × 135","source":"https://docs.m5stack.com/en/core/Cardputer","note":{"en":"Included in the M5Stack S3 firmware. No physical BDLMiner measurement recorded.","fr":"Intégré au firmware M5Stack S3. Aucune mesure physique BDLMiner enregistrée."}},
+    {"env":"m5stack-s3","name":"M5StickS3","chip":"ESP32-S3-PICO-1 · dual-core LX7","family":"s3","display":"ST7789 · 135 × 240","source":"https://docs.m5stack.com/en/core/StickS3","note":{"en":"The classic StickC Plus2's 1 MH/s result does not establish a StickS3 rate.","fr":"Le résultat de 1 MH/s du StickC Plus2 classique ne constitue pas une mesure du StickS3."}},
+    {"env":"m5stack-esp32","name":"M5Stack ESP32","chip":"ESP32 · model-dependent","family":"esp32","display":"Model-dependent / selon modèle","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"m5stack-s3","name":"Other M5Stack S3 / autres M5Stack S3","chip":"ESP32-S3","family":"s3","display":"Model-dependent / selon modèle","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"lilygo-t-display","name":"LilyGO T-Display","chip":"ESP32","family":"esp32","display":"ST7789 · 135 × 240","source":"https://github.com/Xinyuan-LilyGO/TTGO-T-Display"},
+    {"env":"lilygo-t-display-s3","name":"LilyGO T-Display-S3","chip":"ESP32-S3","family":"s3","display":"ST7789 · 170 × 320","image":"assets/boards/lilygo-t-display-s3.webp","source":"https://github.com/Xinyuan-LilyGO/T-Display-S3"},
+    {"env":"esp32-2432s028r","name":"Cheap Yellow Display","chip":"ESP32 · ESP32-2432S028R","family":"esp32","display":"ILI9341 · 320 × 240","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"esp32-headless","name":"ESP32","chip":"ESP32 · headless / sans écran","family":"esp32","display":"—","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"esp32s3-headless","name":"ESP32-S3","chip":"ESP32-S3 · headless / sans écran","family":"s3","display":"—","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"esp32s2-headless","name":"ESP32-S2","chip":"ESP32-S2 · headless / sans écran","family":"s2c3","display":"—","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"esp32c3-headless","name":"ESP32-C3","chip":"ESP32-C3 · headless / sans écran","family":"s2c3","display":"—","source":"https://github.com/bdlglua/BDLMinerV2#supported-boards"},
+    {"env":"nerdnos","name":"NerdNOS","chip":"ESP32-S3 + BM1397 ASIC","family":"asic","display":"ST7789 · 170 × 320","experimental":true,"source":"https://github.com/bdlglua/BDLMinerV2/blob/main/docs/hardware/nerdnos.md","note":{"en":"ASIC support is experimental. No physical BDLMiner measurement recorded.","fr":"Prise en charge ASIC expérimentale. Aucune mesure physique BDLMiner enregistrée."}}
+  ]
+}
