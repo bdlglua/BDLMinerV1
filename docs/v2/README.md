@@ -51,10 +51,18 @@ does not observe the full beta.3 OTA transition or establish hour-long stability
 Beta.4 includes the boot-selected S2/S3/C3 transfer optimization and host observers
 for the remaining tests. See [beta.4 changes](../releases/v2.0.0-beta.4.md) and
 the ordered protocol in [English](hardware-validation.md) or
-[French](hardware-validation.fr.md). Start Gamma's hour on its current beta.3
-while preparing the M5. **Test M5 rollback before its normal beta.4 confirmation.**
-Do not interrupt Gamma's network or update it during the hour. The protocol then
-covers M5 reconnection and Gamma beta.4 OTA. S2/S3/C3/NerdNOS measurements remain
+[French](hardware-validation.fr.md). The owner's Gamma beta.3 hour completed at
+1.071274 TH/s over 3,604 device seconds, with +141 accepted shares and no new
+rejection. One recovered HTTP timeout keeps its result `review`; health during
+that gap is unobserved. A subsequent complete beta.3-to-beta.4 OTA observation
+shows a new boot, pending trial and confirmation on that boot, at 1.073901 TH/s
+with six accepted shares and no rejection. The post-OTA check passed over 122 s
+at 1.073214 TH/s, with +3 accepted shares, no new rejection or reported read error
+and an unchanged stored-fault timestamp. M5 USB reset on `/dev/ttyACM0` is verified.
+M5 physical beta.4 rollback followed by normal beta.4 reinstallation/confirmation
+is also observed, ending at 1.003914 MH/s / 47 C IMU on boot `ab2a323b`.
+Its short counter check and dedicated Internet cut/recovery remain pending.
+**For reproduction, test M5 rollback before normal confirmation.** S2/S3/C3/NerdNOS measurements remain
 pending actual board availability.
 
 Extract the new kit into a separate directory, retaining configuration/settings
@@ -326,9 +334,11 @@ explains how to avoid interrupting Gamma's simultaneous hour-long test.
 
 V2 has automated loopback/browser/rendering tests, owner-operated M5/Gamma
 readiness and short dashboard-load measurements, and a passed one-hour M5
-counter/health check. The corrected Gamma host check also passed for 61 seconds;
-Gamma hour-long stability, longer-duration operation,
-physical-screen and OTA acceptance remain to be established for V2; the other
+counter/health check. The corrected Gamma host check also passed for 61 seconds.
+A later beta.3 hour completed at 1.071274 TH/s but remains `review` after one
+recovered HTTP timeout; the subsequent Gamma beta.4 OTA trial/confirmation is
+observed. Clean HTTP stability, longer-duration operation and physical-screen
+acceptance remain to be established; the other
 physical boards remain unvalidated. V1 hardware evidence does not establish V2
 hardware validation. See the [implementation record](implementation.md) and
 [beta readiness audit](../audits/2026-11-02-v2-beta-readiness.md) for the scope of

@@ -258,3 +258,123 @@ network interruption/recovery, Gamma hour-long stability and longer-duration V2
 operation remain pending physical reports. NerdNOS and ordinary S2/S3/C3 boards
 are unavailable to the owner and remain unvalidated. Earlier V1 results and
 loopback software fixtures are not counted as V2 hardware acceptance.
+
+### Gamma beta.3 hour completed with a recovered HTTP gap
+
+The owner supplied `gamma-stability-beta3.json`, recorded at
+2026-11-02 10:55:03.031971 UTC. Its overall and counter/health status is `review`.
+The requested 3,600-second window completed with 713 successful readings and
+3,604 device seconds (3,604.724 host seconds). All retained readings passed the
+bench's health and adjacent-counter checks; this does not establish health or
+HTTP availability during the missing read.
+
+The first/last boot is `6a012c1` on confirmed beta.3; uptime advances
+2,064 -> 5,668 s and hashes 2,202,962,000,000,000 -> 6,063,832,000,000,000.
+Recalculated throughput is **1.071273584906 TH/s**. Accepted shares advance
+85 -> 226 (**+141**) and rejected shares remain 1 (the pre-existing stale).
+Both endpoints show 525 MHz, 100% effective/configured power, connected Noise
+Stratum V2, 50 C ASIC, 5.242188 V input and 1.144531 V core. Regulator temperatures
+are 57 -> 56.25 C; automatic fan readings are 8,047 -> 7,267 RPM. These endpoint
+values are not full time-series extrema. Free heap changes 158,052 -> 153,460
+bytes with the same 131,060-byte largest block; endpoints alone do not establish
+a memory trend.
+
+One statistics read timed out at +805.063 host seconds, attempt 1, then recovered.
+`read_error_count` and `read_recoveries` are both 1. The report correctly retains
+`review` because health during the gap is unobserved; no timeout cause is proven.
+Regulator status 0 -> 2 is retained as `regulator_warning_bits: 2`, not a shutdown
+fault or the reason for review. Pool diagnostics pass (`ready`, 16 rolling bits
+for eight required). Controlled network recovery, OTA and physical-display cases
+remain explicitly skipped. This establishes a completed beta.3 mining-counter
+window with one recovered HTTP gap, not a clean HTTP stability pass or a beta.4
+result. Gamma beta.4 OTA can now be observed without interrupting the hour.
+
+The owner's M5 USB diagnostic shows no `/dev/serial/by-id/`, no `ttyUSB`/`ttyACM`
+port and no identifiable M5 USB bridge in the supplied `lsusb` listing. Cable/
+connection identification is pending; no hardware reset or rollback was performed.
+
+### Gamma beta.4 OTA confirmation and persisted prior fault
+
+The owner then supplied `ota-gamma-beta4.json`, recorded at 11:02:45.774675 UTC
+with tool version 4. The observer reports `confirmed`, `saw_pending_trial: true`
+and `passed: true`: confirmed beta.3 on `6a012c1` (15 observations), pending
+beta.4 on new boot `93c65b31` (85 observations from 10:59:51.530183 through
+11:02:43.737137 UTC), then confirmed beta.4 on that same new boot at
+11:02:45.774633 UTC. No reset command was requested. This establishes an
+owner-observed Gamma beta.3-to-beta.4 OTA trial and confirmation.
+
+The final snapshot at uptime 175 s reports 1.073900549 TH/s, 51 C ASIC, 525 MHz,
+100% effective power, six accepted shares and no rejection over Noise Stratum V2.
+Fan is automatic at 68% / 8,047 RPM; regulator is 56.5 C, status 0, core voltage
+1.144531 V and input 5.242188 V. These are current endpoint readings, not sustained
+beta.4 acceptance. The requested post-OTA counter/health check is still pending.
+
+The snapshot also includes a persisted `last_fault`: sensor I2C failure, regulator
+status `0x0842`, core 0.025 V and unavailable diode reading. Its Unix timestamp
+1793617177 is **10:59:37 UTC**, before the new observed beta.4 boot and after the
+completed beta.3 hour. `gamma601::saveFault/loadFault` deliberately preserves it
+across boots. Current running/voltage/status readings do not report that stopped
+state. The fault's cause, including any relationship to OTA, is unproven; retain
+the record and compare its timestamp after the post-OTA check. No safety check
+or fault-latching behavior was relaxed.
+
+A subsequent owner USB listing now shows `/dev/ttyACM0` after reconnecting the
+M5. Hardware-reset preflight has been requested on confirmed firmware, before
+starting its rollback OTA. Detection alone does not validate the reset.
+
+### M5 physical USB reset and Gamma beta.4 short check
+
+The M5 preflight report shows confirmed beta.3 on boot `2f867bc`, uptime 6,346 s
+at 11:06:22.261743 UTC. The owner ran `reset_serial.py --port /dev/ttyACM0`, which
+reported a reset pulse. At 11:07:08.103472 UTC the same M5 reports new boot
+`209bd24`, uptime 38 s, confirmed beta.3, connected Noise Stratum V2, 100% power
+and 49 C IMU. Early post-boot live rate is 0.994917 MH/s; this is not a sustained
+performance window. This validates the chosen USB hardware-reset path without
+flashing or erasing settings. It does not yet validate bootloader rollback.
+
+Gamma's subsequent beta.4 short check, recorded at 11:09:41.672401 UTC, passes
+both counters/health and pool diagnostics on 25 successful readings. Boot stays
+`93c65b31`; uptime 469 -> 591 s and hashes 488,281,900,000,000 ->
+619,214,000,000,000 give **1.073213934426 TH/s over 122 device seconds**.
+Accepted shares advance 18 -> 21, with no rejection or reported read error.
+Endpoints show 50 C ASIC, 525 MHz, 100% power, regulator status 0, 1.144531 V core
+and 5.242188 V input. The follow-up snapshot at 11:09:41.789078 UTC retains the
+same prior fault timestamp, 1793617177, and has no reported health issue. This
+is a clean short post-OTA check, not an hour-long beta.4 result or a proof of the
+stored I2C fault's cause. Suite network/OTA/display skips remain skips; the
+separate OTA report supplies its own confirmation evidence.
+
+### M5 beta.4 physical bootloader rollback
+
+The owner supplied `rollback-m5-beta4.json`, recorded at 11:15:50.713968 UTC,
+tool version 4, `observed_result: rollback`, `saw_pending_trial: true`,
+`reset_requested: true` and `passed: true`. The observer begins with confirmed
+beta.3 on `185f7662`, observes pending beta.4 on `da0776f2` at 11:15:40.225745 UTC,
+requests the configured USB reset once, then sees confirmed beta.3 on third boot
+`1f4bc50a` at 11:15:50.713926 UTC. Temporary timeout/URL errors are retained around
+the OTA/reboot transitions. They are not a controlled network-loss test.
+
+The returned beta.3 snapshot is only three seconds into startup, with pool
+connected and 53,248 hashes. Its 13.867 kH/s startup reading is not a sustained
+mining-performance measurement. The report establishes physical M5 bootloader
+rollback. Normal beta.4 reinstall/confirmation and the planned M5-only Internet
+block/recovery test still require their own observations. The pool-mode observer
+will use a 420-second timeout because firmware detects a silent V1/V2 pool after
+five minutes; no pool timeout or fault policy is changed for the test.
+
+### M5 beta.4 reinstallation and normal confirmation
+
+The next owner `ota-m5-beta4.json`, recorded at 11:22:04.275038 UTC, reports
+`confirmed`, observed pending trial, no reset request and `passed: true`.
+It begins on returned beta.3 boot `1f4bc50a`, observes 83 pending beta.4 samples
+on `ab2a323b` from 11:19:09.837566 to 11:22:02.199559 UTC, then confirmation on
+that same boot at 11:22:04.274996 UTC. A timeout during the planned upload is
+retained; no restart during the observed pending trial is reported.
+
+At uptime 175 s the M5 reports 1.003914269 MH/s (live 0.999175758 MH/s), 47 C IMU,
+100% power, confirmed firmware and connected Noise Stratum V2 at difficulty 1.
+Shares are zero in this short new session; this is not a share-acceptance test.
+This establishes owner-observed normal beta.4 OTA confirmation after the physical
+rollback test. The requested M5 short counter/health check and M5-only Internet
+block/recovery still need their own reports. Both boards currently report
+confirmed beta.4; ordinary S2/S3/C3/NerdNOS hardware remains unavailable.

@@ -10,11 +10,21 @@ vides et les icônes des réglages sont corrigés **sur les deux cartes**.
 | Point | État avant les nouveaux essais |
 |---|---|
 | 1. Affichage local | Espaces vides et icônes validés par le propriétaire sur M5 et Gamma en bêta 3. |
-| 2. Gamma : OTA et stabilité | Bêta 3 actuellement confirmée ; transition OTA complète non observée. Nouvel essai d'une heure à exécuter/terminer. |
-| 3. Rollback et réseau | Procédure ci-dessous prête ; aucun résultat physique encore fourni. |
+| 2. Gamma : OTA et stabilité | Heure bêta 3 terminée : 3 604 s, 1,071274 TH/s, +141 acceptées, aucun nouveau rejet ; `review` après un timeout récupéré. OTA bêta 4 confirmée et contrôle de 122 s réussi à 1,073214 TH/s. |
+| 3. Rollback et réseau | Reset USB, rollback bêta 4 → bêta 3, puis réinstallation/confirmation bêta 4 du M5 observés. Coupure réseau à terminer. |
 | 4. S3/S2/C3 et NerdNOS | Aucun de ces matériels de test disponible chez le propriétaire ; mesures physiques en attente. |
 
-## Commencer l'heure du Gamma en parallèle
+## Heure du Gamma : résultat reçu
+
+Le rapport reçu à 10:55:03 UTC contient 713 lectures réussies, le même boot
+`6a012c1`, et une fenêtre de 3 604 secondes. Il reste `review` : un timeout HTTP
+à +805,063 s a été récupéré, mais la santé pendant cet intervalle est inconnue.
+Les températures au début et à la fin sont de 50 °C ASIC ; ce ne sont pas les
+maxima de toute l'heure. Le statut régulateur `0x0002` est un avertissement hors
+bits de coupure, conservé dans le rapport. La stale présente au départ n'a pas
+augmenté. L'heure est terminée : l'OTA du Gamma peut maintenant être observée.
+
+Commande utilisée, conservée pour reproductibilité :
 
 Depuis le kit actuel en bêta 3, dans un terminal séparé :
 
@@ -44,7 +54,35 @@ carte. Utiliser uniquement `firmware/<carte>-firmware.bin` pour l'OTA. Les fichi
 ## Rollback du M5 avant sa confirmation normale
 
 Pour un reset USB automatique, identifier d'abord le port du M5 avec
-`ls -l /dev/serial/by-id/`. Le helper Linux `tools/reset_serial.py --port <port-M5>`
+`ls -l /dev/serial/by-id/`. Ce dossier peut être absent même si un port série
+existe. Dans ce cas, avec un câble de données reliant directement M5 et PC :
+
+```bash
+python3 -c 'import glob; print("\n".join(sorted(glob.glob("/dev/ttyUSB*")+glob.glob("/dev/ttyACM*"))) or "Aucun port serie detecte")'
+lsusb
+```
+
+Le premier relevé du propriétaire ne montre aucun de ces ports et aucun pont
+USB série identifiable pour le M5. Vérifier d'abord le câble de données et le
+port USB du PC ; le diagnostic d'un pilote/permission nécessite un périphérique
+USB identifié. Ne pas deviner `/dev/ttyUSB0` ni choisir un périphérique sans lien
+avec le M5.
+
+Un relevé ultérieur du propriétaire montre `/dev/ttyACM0`. Le reset de préparation
+est maintenant vérifié : `2f867bc` / uptime 6 346 s avant, puis `209bd24` / 38 s
+après, toujours en bêta 3 confirmée et reconnecté au pool. Ce reset seul ne valide
+pas encore le rollback du bootloader.
+
+Le rollback a ensuite été observé à 11:15:50 UTC : bêta 3 confirmée sur
+`185f7662` → bêta 4 en essai sur `da0776f2` → bêta 3 confirmée sur `1f4bc50a`, avec
+`reset_requested: true`. La réinstallation normale en bêta 4 reste à confirmer.
+
+La réinstallation a ensuite été confirmée à 11:22:04 UTC : `1f4bc50a` en bêta 3,
+puis 83 observations en essai bêta 4 sur `ab2a323b`, enfin confirmation sur ce
+même boot. À 175 s, le M5 indique 1,003914 MH/s, 47 °C IMU et un pool connecté.
+Le contrôle court des compteurs et la coupure Internet dédiée restent à terminer.
+
+Le helper Linux `tools/reset_serial.py --port <port-M5>`
 utilise seulement DTR/RTS : aucun octet série, firmware ou effacement n'est envoyé.
 Vérifier ce reset sur le M5 encore en bêta 3 confirmée, avant tout upload, puis
 attendre son retour au pool. Utiliser uniquement le port identifié du M5.
@@ -117,9 +155,34 @@ résultat reste `review` (code 2). Authentification, TLS, données invalides, re
 régression des compteurs et défaut matériel ne sont pas des succès réseau.
 Un échec ou Ctrl+C impose de vérifier que la connexion a bien été rétablie.
 
+Si la box peut seulement bloquer Internet pour le M5 tout en laissant son API
+locale accessible, utiliser plutôt :
+
+```bash
+python3 tools/monitor_network.py --config bdlhub.local.json --miner m5 --kind pool --timeout 420 --output network-m5-beta4.json
+```
+
+Le détecteur de silence du pool est de cinq minutes en V1/V2. Garder le blocage
+jusqu'au message demandant la restauration ; `--timeout 420` laisse le temps
+d'observer cette déconnexion. Ce test valide une reprise du pool après blocage
+Internet, pas une perte de la liaison Wi-Fi.
+
 ## OTA du Gamma après son heure de stabilité
 
-Depuis le nouveau kit, lorsque le test d'une heure est terminé :
+L'OTA a maintenant été observée : bêta 3 / boot `6a012c1`, puis bêta 4 en essai
+sur `93c65b31` (85 observations), puis confirmation sur ce même nouveau boot à
+11:02:45 UTC. À 175 s, le Gamma indique 1,073901 TH/s, 51 °C ASIC, six shares
+acceptées et aucun rejet. Le contrôle après OTA a ensuite réussi sur 25 lectures,
+122 s et le même boot : **1,073214 TH/s**, +3 shares acceptées, aucun nouveau rejet
+ni erreur de lecture signalée. L'horodatage du défaut mémorisé est inchangé au
+relevé de 11:09:41 UTC. Cela reste un contrôle court en bêta 4.
+
+Le champ persistant `last_fault` signale une erreur I²C horodatée 10:59:37 UTC,
+avant le nouveau démarrage observé. L'état courant est en minage, statut
+régulateur 0 et tension cœur 1,144531 V. La cause de l'erreur conservée n'est pas
+établie ; comparer son horodatage au prochain relevé pour détecter une récidive.
+
+Commande OTA utilisée, conservée pour reproductibilité :
 
 ```bash
 python3 tools/check_hardware.py ota-monitor http://192.168.1.135 --previous 2.0.0-beta.3 --expected 2.0.0-beta.4 --expect confirm --timeout 900 --output ota-gamma-beta4.json

@@ -115,6 +115,41 @@ cannot establish a Wi-Fi cut; operator attribution, the same boot and real
 healthy counter progress are required. S2/S3/C3/NerdNOS physical work is explicitly
 pending board availability. None of these pending tests is counted as passed.
 
+The next owner Gamma beta.3 hour completed over 3,604 device seconds at
+1.071273584906 TH/s, with 713 successful readings, the same boot and +141 accepted
+shares / no new rejection. One HTTP timeout recovered at +805.063 seconds, so the
+report stays `review` for unobserved health during the gap. It is a completed
+mining-counter window, not a clean HTTP pass. Gamma beta.4 OTA remains pending.
+The M5 currently has no detected `ttyUSB`/`ttyACM` or identifiable USB bridge in
+the owner's listing; cable/connection identification precedes its physical reset.
+
+The subsequent Gamma beta.3-to-beta.4 OTA report observes confirmed old firmware,
+85 pending-trial samples on new boot `93c65b31`, then confirmation on that boot.
+It ends at 1.073900549 TH/s / 51 C ASIC with six accepted and no rejected shares.
+A stored sensor-I2C fault is timestamped before that new boot; its cause remains
+unproven and the post-OTA check is pending. A later M5 listing now shows
+`/dev/ttyACM0`; its reset preflight is pending before rollback testing.
+
+The M5 USB reset preflight is now observed: `2f867bc` -> `209bd24`, uptime reset
+to 38 s, confirmed beta.3 and connected pool. Gamma's beta.4 short counter/health
+check passes over 122 device seconds at 1.073213934426 TH/s, with 25 readings,
++3 accepted shares, no new rejection or reported read error, and the same boot.
+The prior stored-fault timestamp remains unchanged. M5 rollback/confirmation and
+controlled network recovery remain pending their own observations.
+
+The next M5 report validates physical beta.4 rollback: confirmed beta.3 on
+`185f7662` -> pending beta.4 on `da0776f2` -> confirmed beta.3 on `1f4bc50a`, with
+one configured USB-reset request. Reinstalling/confirming beta.4 and controlled
+network recovery remain pending. The returned three-second startup snapshot is
+not used as a sustained-rate benchmark.
+
+M5 normal beta.4 reinstallation subsequently confirmed on `ab2a323b` after 83
+pending-trial observations, with no reset command. The 175-second snapshot reports
+1.003914269 MH/s, 47 C IMU and connected Noise Stratum V2 at difficulty 1. Both
+M5/Gamma now have owner-observed beta.4 OTA confirmations. The M5 short counter
+window and M5-only Internet block/recovery reports are still pending; ordinary
+S2/S3/C3/NerdNOS hardware remains unavailable.
+
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 
 The next development step combines a first Linux test kit, the embedded dashboard
