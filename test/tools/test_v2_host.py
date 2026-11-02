@@ -306,6 +306,134 @@ class HostTests(unittest.TestCase):
         a['asic']['fan_rpm'] = 0
         self.assertFalse(hardware_suite.healthy(a))
 
+    def test_bench_retains_the_failed_sample_and_health_reason(self):
+        for field, value, reason in (
+                ('fan_rpm', 0, 'Fan RPM unavailable or below 500'),
+                ('input_v', 5.5, 'Input voltage unavailable or outside bench limits'),
+                ('core_v', .8, 'Core voltage unavailable or outside bench limits'),
+                ('pool_connected', False, 'Pool disconnected')):
+            with self.subTest(field=field):
+                clock = Clock()
+                gamma = FakeGamma(clock)
+                original = gamma.stats
+                def sample():
+                    data = sanitize(original())
+                    if clock.value >= 10:
+                        if field == 'pool_connected':
+                            data['pool']['connected'] = value
+                        else:
+                            data['asic'][field] = value
+                    return data
+                gamma.stats = sample
+                with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+                    report = hardware_suite.measure_counters(gamma, 3600)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['failure_stage'], 'sample_health')
+                self.assertEqual(report['issues'], [reason])
+                self.assertEqual(report['elapsed_s'], 10)
+                self.assertEqual(report['samples'], 3)
+                self.assertTrue(hardware_suite.healthy(report['first']))
+                self.assertEqual(report['last']['uptime_s'], 510)
+                self.assertNotIn('HIDDEN', json.dumps(report))
+
+    def test_bench_explains_failure_before_the_measurement_starts(self):
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        sample = sanitize(reading())
+        sample['asic']['regulator_status'] = 4
+        gamma.stats = lambda: sample
+        with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+            report = hardware_suite.measure_counters(gamma, 3600)
+        self.assertEqual(report['status'], 'failed')
+        self.assertEqual(report['failure_stage'], 'initial_health')
+        self.assertEqual(report['issues'], ['Regulator shutdown fault bits set or status unavailable'])
+        self.assertEqual(report['elapsed_s'], 0)
+        self.assertEqual(report['samples'], 1)
+        self.assertEqual(report['first']['asic']['regulator_status'], 4)
+
+    def test_bench_matches_firmware_regulator_fault_bits_and_rejects_invalid_status(self):
+        # PMBus STATUS_WORD shutdown bits used by the powered Gamma firmware.
+        faults = {0x0040, 0x0020, 0x0010, 0x0008, 0x0004}
+        for index in range(16):
+            bit = 1 << index
+            with self.subTest(bit=bit):
+                sample = sanitize(reading())
+                sample['asic']['regulator_status'] = bit
+                self.assertEqual(hardware_suite.healthy(sample), bit not in faults)
+        for invalid in (None, True, False, '2', 2.0, -1, 65536):
+            with self.subTest(invalid=invalid):
+                sample = sanitize(reading())
+                sample['asic']['regulator_status'] = invalid
+                self.assertFalse(hardware_suite.healthy(sample))
+
+    def test_bench_retains_cml_as_a_warning_without_rejecting_healthy_mining(self):
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        original = gamma.stats
+        def sample():
+            data = sanitize(original())
+            data['asic']['regulator_status'] = 2
+            return data
+        gamma.stats = sample
+        with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+            report = hardware_suite.measure_counters(gamma, 60)
+        self.assertEqual(report['status'], 'passed')
+        self.assertEqual(report['regulator_warning_bits'], 2)
+        self.assertTrue(report['warnings'])
+        self.assertEqual(report['last']['asic']['regulator_status'], 2)
+        self.assertEqual(report['hashrate_hs'], 1e12)
+
+    def test_bench_distinguishes_transport_failure_from_unhealthy_hardware(self):
+        for fail_after in (0, 10):
+            with self.subTest(fail_after=fail_after):
+                clock = Clock()
+                gamma = FakeGamma(clock)
+                original = gamma.stats
+                def sample():
+                    if clock.value >= fail_after:
+                        raise DeviceError('Miner is unreachable or timed out')
+                    return sanitize(original())
+                gamma.stats = sample
+                with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+                    report = hardware_suite.measure_counters(gamma, 3600)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['error_type'], 'DeviceError')
+                self.assertEqual(report['failure_stage'], 'initial_read' if fail_after == 0 else 'sample_read')
+                self.assertNotIn('issues', report)
+                if fail_after:
+                    self.assertTrue(hardware_suite.healthy(report['last']))
+                    self.assertEqual(report['last']['uptime_s'], 505)
+                else:
+                    self.assertIsNone(report['last'])
+                    self.assertEqual(report['samples'], 0)
+
+    def test_bench_retains_the_new_boot_on_counter_failure(self):
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        original = gamma.stats
+        def sample():
+            data = sanitize(original())
+            if clock.value >= 10:
+                data['boot_id'] = 'restarted'
+            return data
+        gamma.stats = sample
+        with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+            report = hardware_suite.measure_counters(gamma, 3600)
+        self.assertEqual(report['status'], 'failed')
+        self.assertEqual(report['failure_stage'], 'counter_check')
+        self.assertEqual(report['first']['boot_id'], 'test-boot')
+        self.assertEqual(report['last']['boot_id'], 'restarted')
+
+    def test_bench_success_keeps_the_real_device_counter_rate(self):
+        clock = Clock()
+        gamma = FakeGamma(clock)
+        with patch.object(hardware_suite.time, 'monotonic', clock.now), patch.object(hardware_suite.time, 'sleep', clock.wait):
+            report = hardware_suite.measure_counters(gamma, 60)
+        self.assertEqual(report['status'], 'passed')
+        self.assertEqual(report['device_seconds'], 60)
+        self.assertEqual(report['hashrate_hs'], 1e12)
+        self.assertNotIn('error', report)
+
     def test_network_fault_always_runs_the_restore_command(self):
         clock=Clock();gamma=FakeGamma(clock)
         with patch.object(hardware_suite,'command',side_effect=[ValueError('disconnect failed'),None]) as commands,patch.object(hardware_suite.time,'monotonic',clock.now),patch.object(hardware_suite.time,'sleep',clock.wait):

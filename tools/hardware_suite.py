@@ -18,21 +18,42 @@ from bdlhost.client import Client, DeviceError, finite, load_config
 from firmware_image import inspect_app, verify_signature
 
 
-def healthy(sample):
+# Match bm1370::Health::fault() in src/core/bm1370.{h,cpp} while powered:
+# OFF, VOUT_OV, IOUT_OC, VIN_UV and TEMP. Other latched/summary bits, including
+# CML (0x0002), are reported separately rather than treated as a shutdown fault.
+GAMMA_STATUS_FAULT_MASK = 0x007c
+
+
+def gamma_regulator_fault(status):
+    return (type(status) is not int or not 0 <= status <= 0xffff or
+            bool(status & GAMMA_STATUS_FAULT_MASK))
+
+
+def health_issues(sample):
+    issues = []
     a = sample.get('asic', {})
     if a.get('model') in ('BM1370', 'BM1397') and (a.get('running') is not True or not finite(sample.get('temp_c'), -39)):
-        return False
+        issues.append('ASIC stopped or temperature unavailable')
     limit = sample.get('max_temp_c')
     if finite(limit, 30) and finite(sample.get('temp_c'), -39) and sample['temp_c'] >= limit:
-        return False
+        issues.append('Configured temperature limit reached')
     if a.get('model') == 'BM1370' and a.get('running'):
-        for value, low, high in ((sample.get('temp_c'), 0, 70), (a.get('regulator_temp_c'), 0, 90),
-                                  (a.get('input_v'), 4.6, 5.5), (a.get('core_v'), 1.0, 1.25)):
+        for name, value, low, high in (
+                ('ASIC temperature', sample.get('temp_c'), 0, 70),
+                ('Regulator temperature', a.get('regulator_temp_c'), 0, 90),
+                ('Input voltage', a.get('input_v'), 4.6, 5.5),
+                ('Core voltage', a.get('core_v'), 1.0, 1.25)):
             if not finite(value, low) or value >= high:
-                return False
-        if not finite(a.get('fan_rpm'), 500) or a.get('regulator_status') != 0:
-            return False
-    return True
+                issues.append(name + ' unavailable or outside bench limits')
+        if not finite(a.get('fan_rpm'), 500):
+            issues.append('Fan RPM unavailable or below 500')
+        if gamma_regulator_fault(a.get('regulator_status')):
+            issues.append('Regulator shutdown fault bits set or status unavailable')
+    return issues
+
+
+def healthy(sample):
+    return not health_issues(sample)
 
 
 def counter_measure(first, last):
@@ -42,6 +63,59 @@ def counter_measure(first, last):
         raise ValueError('Reboot, reset counters or insufficient elapsed device time')
     seconds = last['uptime_s'] - first['uptime_s']
     return {'device_seconds': seconds, 'hashrate_hs': (last['total_hashes'] - first['total_hashes']) / seconds}
+
+
+def measure_counters(client, seconds):
+    # A failed hour-long check must retain the offending reading. A transport
+    # failure keeps the last successful sample without claiming it was unhealthy.
+    report = {'status': 'failed', 'requested_seconds': seconds, 'samples': 0,
+              'first': None, 'last': None}
+    def remember(sample):
+        report.update(last=sample, samples=report['samples'] + 1)
+        asic = sample.get('asic', {})
+        status = asic.get('regulator_status')
+        if asic.get('model') == 'BM1370' and type(status) is int and 0 <= status <= 0xffff:
+            warning_bits = status & ~GAMMA_STATUS_FAULT_MASK
+            if warning_bits:
+                report['regulator_warning_bits'] = report.get('regulator_warning_bits', 0) | warning_bits
+                report['warnings'] = ['Gamma regulator STATUS_WORD contains non-trip bits; inspect regulator_warning_bits']
+    started = time.monotonic()
+    stage = 'initial_read'
+    try:
+        first = client.stats()
+        report['first'] = first
+        remember(first)
+        stage = 'initial_health'
+        issues = health_issues(first)
+        if not first.get('pool', {}).get('connected'):
+            issues.append('Pool disconnected')
+        if first['hashrate'] <= 0:
+            issues.append('Mining hashrate is zero')
+        if issues:
+            report['issues'] = issues
+            raise ValueError('Establish healthy active mining before measuring the hardware')
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            time.sleep(5)
+            stage = 'sample_read'
+            last = client.stats()
+            remember(last)
+            stage = 'counter_check'
+            counter_measure(first, last)
+            stage = 'sample_health'
+            issues = health_issues(last)
+            if not last.get('pool', {}).get('connected'):
+                issues.append('Pool disconnected')
+            if issues:
+                report['issues'] = issues
+                raise ValueError('Hardware health check failed')
+        measured = counter_measure(first, report['last'])
+        report.update(measured, status='passed' if measured['hashrate_hs'] > 0 else 'failed')
+    except Exception as error:
+        report.update(error=str(error) if isinstance(error, (ValueError, DeviceError)) else type(error).__name__,
+                      error_type=type(error).__name__, failure_stage=stage)
+    report['elapsed_s'] = round(time.monotonic() - started, 3)
+    return report
 
 
 def command(text):
@@ -174,21 +248,7 @@ def main():
         except Exception as error:
             results[name] = {'status': 'failed', 'error': str(error) if isinstance(error, (ValueError, DeviceError)) else type(error).__name__}
         print(name + ': ' + results[name]['status'], flush=True)
-    def counters():
-        first = client.stats()
-        if not healthy(first) or not first.get('pool', {}).get('connected') or first['hashrate'] <= 0:
-            raise ValueError('Establish healthy active mining before measuring the hardware')
-        last = first
-        deadline = time.monotonic() + args.seconds
-        while time.monotonic() < deadline:
-            time.sleep(5)
-            last = client.stats()
-            counter_measure(first, last)
-            if not healthy(last) or not last.get('pool', {}).get('connected'):
-                raise ValueError('Hardware health check failed')
-        measured=counter_measure(first,last)
-        return {'status': 'passed' if measured['hashrate_hs'] > 0 else 'failed', **measured, 'first': first, 'last': last}
-    case('counters_and_health', counters)
+    case('counters_and_health', lambda: measure_counters(client, args.seconds))
     def diagnostics():
         if client.stats().get('api_version', 0) < 2:
             return {'status': 'skipped', 'reason': 'Pool diagnostics require V2 firmware; counter/health checks remain available'}
