@@ -1,6 +1,6 @@
 {
-  "name": "BDLMiner",
-  "short_name": "BDLMiner",
+  "name": "BDLMiner V2",
+  "short_name": "BDLMiner V2",
   "description": "ESP32 Bitcoin lottery miner console",
   "start_url": "/",
   "scope": "/",

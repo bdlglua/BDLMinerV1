@@ -55,7 +55,7 @@ def build_installer(release, out):
             raise ValueError(f"Missing factory image: {image}")
         shutil.copyfile(os.path.join(release, image), os.path.join(out, image))
         manifest = {
-            "name": f"BDLMiner V1 - {name}",
+            "name": f"BDLMiner V2 - {name}",
             "version": version,
             "new_install_prompt_erase": True,
             "builds": [{"chipFamily": CHIP_FAMILY[chips[env]], "parts": [{"path": image, "offset": 0}]}],

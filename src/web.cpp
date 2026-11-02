@@ -1052,9 +1052,9 @@ void webStart() {
         server.sendHeader("Cache-Control", "no-cache");  // fixed URL: revalidate after an update
         server.send_P(200, "application/manifest+json", reinterpret_cast<PGM_P>(kWebManifest), sizeof(kWebManifest));
     });
-    server.on("/", HTTP_GET, []() { sendPage("BDLMiner V1", kDashboard, "dashboard"); });
-    server.on("/settings", HTTP_GET, []() { sendPage("BDLMiner settings", kSettingsPage, "settings"); });
-    server.on("/log", HTTP_GET, []() { sendPage("BDLMiner log", kLogPage, "log"); });
+    server.on("/", HTTP_GET, []() { sendPage("BDLMiner V2", kDashboard, "dashboard"); });
+    server.on("/settings", HTTP_GET, []() { sendPage("BDLMiner V2 settings", kSettingsPage, "settings"); });
+    server.on("/log", HTTP_GET, []() { sendPage("BDLMiner V2 log", kLogPage, "log"); });
     server.on("/api/stats", HTTP_GET, handleStats);
     server.on("/api/events", HTTP_GET, handleEvents);
     server.on("/api/history", HTTP_GET, handleHistory);
