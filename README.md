@@ -11,7 +11,7 @@ Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
 **Latest release: [v2.0.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.0.1)**
-· [Site and web flasher](https://bdlglua.github.io/BDLMinerV2/)
+· [Site and web flasher](https://bdlglua.github.io/)
 · [Release notes](docs/releases/v2.0.1.md) · [Français](docs/releases/v2.0.1.fr.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
@@ -74,7 +74,7 @@ and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
 
 ## Install
 
-Open **https://bdlglua.github.io/BDLMinerV2/** in Chrome or Edge on a computer, plug the
+Open **https://bdlglua.github.io/** in Chrome or Edge on a computer, plug the
 board in with a data USB cable, pick it in the list and click *Install* (it flashes the
 latest release; the first install erases the board). Each
 [release](https://github.com/bdlglua/BDLMinerV2/releases) also has a

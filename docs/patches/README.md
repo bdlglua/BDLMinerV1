@@ -2,9 +2,9 @@
 
 ## Account-root website
 
-`bdlglua.github.io-root-site.patch` applies to the separate
+`bdlglua.github.io-root-site.patch` records the initial migration of the separate
 [`bdlglua/bdlglua.github.io`](https://github.com/bdlglua/bdlglua.github.io)
-repository at `f3561c7bbbc78b77015d27fd1f2f3a58726070b0`.
+repository from `f3561c7bbbc78b77015d27fd1f2f3a58726070b0`.
 It preserves the original BDLXS / NovaFlow page and its assets under `/bdlxs/`,
 then publishes the complete BDLMiner website and USB installer at
 <https://bdlglua.github.io/> using GitHub Pages Actions.
@@ -17,25 +17,19 @@ firmware updates. The root site refreshes hourly or on a manual workflow run.
 The patch was applied to a clean base and its resulting tree checked against
 the prepared migration. Local browser checks covered both installers, all
 24 board selections/manifests, image paths, mobile layout and BDLXS assets.
-All four original BDLXS files were preserved byte-for-byte. Remote publication
-is pending: the GitHub integration returned `Resource not accessible by
-integration` when writing to this repository.
+All four original BDLXS files were preserved byte-for-byte.
 
-From a clean clone of **bdlglua.github.io** (not the firmware repository):
+**Already applied; do not reapply to current `main`.** Write access became
+available, and the migration was published as `7810738` on 2 November 2026.
+The initial attempt to change the Pages settings was refused. Commit `1f7ccf6`
+instead uses the existing Pages deployment permissions directly. The complete
+site was deployed and its live root, beta, USB manifests and BDLXS page passed
+verification in [workflow 41492450646](https://github.com/bdlglua/bdlglua.github.io/actions/runs/41492450646).
 
-```sh
-curl -fL 'https://raw.githubusercontent.com/bdlglua/BDLMinerV2/main/docs/patches/bdlglua.github.io-root-site.patch' -o /tmp/bdl-root-site.patch
-git apply --check /tmp/bdl-root-site.patch &&
-git apply --index /tmp/bdl-root-site.patch &&
-git commit -m 'feat: publish BDLMiner at the account Pages root' &&
-git push origin main
-```
-
-The **Publish BDLMiner** workflow builds the complete site, switches the existing
-Pages site to Actions publishing and verifies the published root and BDLXS pages.
-If GitHub rejects the Pages settings change, set **Settings → Pages → Source**
-to **GitHub Actions**, then rerun the failed workflow. Do not point existing
-users to the new root until its deployment and verification succeed.
+The current workflow also runs after every push and waits for any automatic
+branch-based Pages build before publishing the generated site. See the
+[current publishing workflow](https://github.com/bdlglua/bdlglua.github.io/blob/main/.github/workflows/pages.yml)
+for subsequent fixes; the archived patch retains the initial migration only.
 
 ## Statistics service V2 compatibility
 
