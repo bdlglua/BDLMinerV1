@@ -45,6 +45,12 @@ CHIP_FAMILY = {"esp32": "ESP32", "esp32s2": "ESP32-S2", "esp32s3": "ESP32-S3", "
 
 def site_content(version, channel='stable', channels=None):
     content = json.loads((Path(ROOT) / 'installer/content.json').read_text(encoding='utf-8'))
+    for pool, destination in content.get('pool_links', {}).items():
+        url = urlsplit(destination)
+        if (pool in ('other', 'unknown') or pool not in content.get('pool_names', {}) or
+                url.scheme != 'https' or not url.hostname or url.username or url.password or
+                url.query or url.fragment or not (url.hostname == pool or url.hostname.endswith('.' + pool))):
+            raise ValueError('Pool websites must be public HTTPS links for their recognised group')
     support = content['support']
     for link in support['links']:
         url = urlsplit(link['url'])

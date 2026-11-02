@@ -65,6 +65,21 @@ class SiteBuilderTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.content_error(lambda c: c['support'].update(links=[{'label': 'Support', 'url': url}]), 'HTTPS without credentials')
 
+    def test_pool_links_are_official_https_sites_without_private_or_undisclosed_groups(self):
+        for pool, destination in (
+            ('public-pool.io', 'javascript:alert(1)'),
+            ('public-pool.io', 'http://web.public-pool.io/'),
+            ('public-pool.io', 'https://name:secret@web.public-pool.io/'),
+            ('public-pool.io', 'https://192.168.1.40/'),
+            ('public-pool.io', 'https://public-pool.io.evil.example/'),
+            ('public-pool.io', 'https://web.public-pool.io/?worker=secret'),
+            ('public-pool.io', 'https://web.public-pool.io/#secret'),
+            ('other', 'https://private.example/'),
+            ('unknown', 'https://example.com/'),
+        ):
+            with self.subTest(pool=pool, destination=destination):
+                self.content_error(lambda c: c.update(pool_links={pool: destination}), 'public HTTPS links')
+
     def test_gallery_requires_permission_and_a_local_photo(self):
         for entry, message in (
             ({'image': 'assets/example.webp', 'url': 'https://www.reddit.com/r/bdlminer/comments/example'}, 'contributor permission'),

@@ -6,7 +6,7 @@
  window.confirm=()=>true;
  const storageKey='bdl-demo-values-'+(gammaView?'gamma':'m5');
  const saved=()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'{}')}catch{return{}}};
- const values={pool:'public-pool.io',port:23330,addr:'YOUR_BTC_ADDRESS.demo',diff:1,proto:1,sv2key:'0'.repeat(64),uaauto:true,ua:'BDLMinerV2/'+config.version,pool2:'',port2:3333,proto2:0,sv2key2:'',power:100,maxtemp:65,bright:80,cycle:10,nightfrom:255,saver:false,update:1,channel:0,count:false,sharehr:false,sharepool:false,customscreen:false,screen0:1,screen1:2,screen2:4,screen3:3,pages:255,...saved()};
+ const values={pool:'public-pool.io',port:23330,addr:'YOUR_BTC_ADDRESS.demo',diff:1,proto:1,sv2key:'0'.repeat(64),uaauto:true,ua:'BDLMinerV2/'+config.version,pool2:'',port2:3333,proto2:0,sv2key2:'',power:100,maxtemp:65,bright:80,cycle:10,nightfrom:255,saver:false,update:1,channel:0,count:false,sharehr:true,sharepool:true,customscreen:false,screen0:1,screen1:2,screen2:4,screen3:3,pages:255,...saved()};
  const state={scene:'mining',powers:{m5:100,gamma:100},channels:{m5:'stable',gamma:'stable'}};
  const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
  const elapsed=()=>Math.floor((performance.now()-started)/1000);

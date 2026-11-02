@@ -47,7 +47,7 @@ async function fixture(options={}){
   if(options.live)state.settings.live=['power','maxtemp','nightfrom','saver'];
   if(options.poolSharing){
     state.settings.schema.push(['sharehr','bool','Network','Share my hashrate anonymously',{}],['sharepool','bool','Network','Share my pool anonymously',{}]);
-    Object.assign(state.settings.values,{sharehr:true,sharepool:false});
+    Object.assign(state.settings.values,{sharehr:true,sharepool:true});
     state.settings.live=[...(state.settings.live||[]),'sharehr','sharepool'];
   }
   if(options.v2){
@@ -735,14 +735,14 @@ check('live settings save without a restart and keep the page usable',()=>run({l
   assert.match(await f.page.locator('#dirty').textContent(),/needs a restart/);
 }));
 
-check('pool sharing stays off until explicitly enabled and saves live in French',()=>run({poolSharing:true,language:'fr',postText:'{"restart":false,"changed":1}'},async f=>{
+check('pool sharing is on by default and can be disabled live in French',()=>run({poolSharing:true,language:'fr',postText:'{"restart":false,"changed":1}'},async f=>{
   await loaded(f);
-  assert.equal(await f.page.locator('#k_sharepool').isChecked(),false);
-  assert.match(await f.page.locator('.field').filter({has:f.page.locator('#k_sharepool')}).textContent(),/Partager ma pool anonymement.*Désactivé par défaut/s);
-  await f.page.check('#k_sharepool');
+  assert.equal(await f.page.locator('#k_sharepool').isChecked(),true);
+  assert.match(await f.page.locator('.field').filter({has:f.page.locator('#k_sharepool')}).textContent(),/Partager ma pool anonymement.*Activé par défaut/s);
+  await f.page.uncheck('#k_sharepool');
   assert.equal(await f.page.locator('#save').textContent(),'Enregistrer');
   await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('appliqu'));
-  assert.equal(JSON.parse(f.state.posts[0].body).sharepool,true);
+  assert.equal(JSON.parse(f.state.posts[0].body).sharepool,false);
   assert.equal(f.state.requests.some(r=>r.includes('/report')),false);
 }));
 

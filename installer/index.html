@@ -324,7 +324,7 @@ __PAGE_CONTENT__
 <script>
 const BOARDS=__BOARDS__;
 const STATS='https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary';
-let poolNames={};try{poolNames=JSON.parse(document.getElementById('site-data').textContent).pool_names||{}}catch{}
+let poolNames={},poolLinks={};try{const data=JSON.parse(document.getElementById('site-data').textContent);poolNames=data.pool_names||{};poolLinks=data.pool_links||{}}catch{}
 const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Flasher',navStats:'Statistiques',navCommunity:'Communauté',
 navHome:'Accueil',navStart:'Bien démarrer',navDemo:'Démo',navMore:'Explorer',navFAQ:'FAQ',navNews:'Nouveautés',navSupport:'Soutenir',navPages:'Toutes les pages',
 exploreTitle:'Découvrir BDLMiner',exploreLead:'Choisis ta carte, essaie l’interface ou trouve de l’aide pour la prochaine étape.',
@@ -353,7 +353,7 @@ s2:'Choisis la carte, clique sur Flasher et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV2-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
 after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
 statsTitle:'BDLMiner en ce moment',statsLead:'Totaux en direct des rapports anonymes : version du firmware, carte, hashrate et groupe de pool publique facultatif. Aucune adresse Bitcoin, aucun worker ni nom d’hôte privé.',
-poolsHelp:'Le partage de la pool est facultatif et désactivé par défaut, à partir du firmware 2.0.2. Active « Partager ma pool anonymement » dans les réglages Réseau du miner. Les autres pools sont masquées. « Pool non renseignée » inclut les anciennes versions, le partage désactivé et les connexions au pool interrompues.',
+poolsHelp:'Le partage de la pool est activé par défaut à partir du firmware 2.0.3. Tu peux désactiver « Partager ma pool anonymement » dans les réglages Réseau du miner ; un choix désactivé déjà enregistré est conservé. Le partage du hashrate doit aussi être activé. Les noms des pools mènent à leur site officiel. Les autres pools sont masquées. « Pool non renseignée » inclut les anciennes versions, le partage désactivé et les connexions au pool interrompues.',
 poolOther:'Autre / pool privée',poolUnknown:'Pool non renseignée',byPool:'Par pool',colPool:'Pool',
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',
@@ -496,13 +496,15 @@ function fleet(){const ul=document.getElementById('st-fleet');ul.innerHTML='';
  document.getElementById('st-on').textContent=summary?on:'–';document.getElementById('st-off').textContent=summary?off:'–'}
 
 // The miners online now, by board and by firmware version.
-function table(id,rows,head,label){const el=document.getElementById(id);el.innerHTML='';
+function table(id,rows,head,label,website){const el=document.getElementById(id);el.innerHTML='';
  if(!rows.length){const td=document.createElement('td');td.className='empty';td.textContent=T('noneNow');el.insertRow().appendChild(td);return}
  const h=el.createTHead().insertRow();
  for(const [k,cls] of [[head,''],['colMiners','num'],['colHashrate','num']]){const th=document.createElement('th');th.textContent=T(k);th.className=cls;h.appendChild(th)}
  const body=el.createTBody();
  for(const r of rows){const tr=body.insertRow();
-  for(const [v,cls] of [[label(r.name),''],[r.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'),'num'],[rate(r.hashrate),'num']]){const td=tr.insertCell();td.textContent=v;td.className=cls}}}
+  for(const [v,cls] of [[label(r.name),''],[r.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'),'num'],[rate(r.hashrate),'num']]){const td=tr.insertCell();td.textContent=v;td.className=cls;
+   const url=!cls&&website?.(r.name);if(url){const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=v;
+    const address=document.createElement('small');address.className='pool-site';address.textContent=url;a.appendChild(address);td.replaceChildren(a)}}}}
 function breakdowns(){
  const family=env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env};
  // By exact model when the miners tell it (from 1.9.4), by firmware otherwise.
@@ -514,7 +516,8 @@ function breakdowns(){
  table('st-boards',[...rows.values()].sort((a,b)=>b.hashrate-a.hashrate),'colBoard',n=>n);
  table('st-versions',summary?.versions||[],'colVersion',v=>v);
  const pools=summary?.pools??(summary?.miners?[{name:'unknown',miners:summary.miners,hashrate:summary.hashrate}]:[]);
- table('st-pools',pools,'colPool',key=>key==='unknown'?T('poolUnknown'):Object.hasOwn(poolNames,key)?poolNames[key]:T('poolOther'))}
+ table('st-pools',pools,'colPool',key=>key==='unknown'?T('poolUnknown'):Object.hasOwn(poolNames,key)?poolNames[key]:T('poolOther'),
+  key=>Object.hasOwn(poolNames,key)&&Object.hasOwn(poolLinks,key)?poolLinks[key]:null)}
 
 function stats(){if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}

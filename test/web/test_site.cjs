@@ -87,7 +87,11 @@ async function main(){
    }
    await page.goto(base+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
    assert.match(await page.locator('#st-pools').textContent(),/Public Pool.*Autre \/ pool privée.*Pool non renseignée/s);
-   assert.match(await page.locator('[data-t="poolsHelp"]').textContent(),/désactivé par défaut/);
+   assert.match(await page.locator('[data-t="poolsHelp"]').textContent(),/activé par défaut.*2\.0\.3/);
+   assert.equal(await page.locator('#st-pools a').count(),1);
+   assert.equal(await page.locator('#st-pools a').getAttribute('href'),'https://web.public-pool.io/');
+   assert.equal(await page.locator('#st-pools .pool-site').textContent(),'https://web.public-pool.io/');
+   assert.equal(await page.locator('#st-pools a').getAttribute('rel'),'noopener noreferrer');
    await page.goto(base+'/#support');await page.waitForURL(base+'/support.html');await page.locator('.support-panel').waitFor();
    assert.equal(await page.locator('main h1').count(),1);
    await page.goto(base+'/releases.html');await page.locator('.release-card').first().waitFor();
@@ -103,11 +107,20 @@ async function main(){
   await page.locator('#st-pools tbody tr').first().waitFor();
   assert.equal(await page.locator('#st-pools tbody tr').count(),1);
   assert.match(await page.locator('#st-pools').textContent(),/Pool non renseignée.*3.*2,5 MH\/s/s);
+  assert.equal(await page.locator('#st-pools a').count(),0,'undisclosed pools must have no link');
   await page.locator('#lang').click();assert.match(await page.locator('#st-pools').textContent(),/Not shared/);
   communityStats.pools=[{name:'<img src=x onerror=alert(1)>',miners:3,hashrate:2.5e6}];
   await page.goto(url+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
   assert.match(await page.locator('#st-pools').textContent(),/Other \/ private pool/);
   assert.equal(await page.locator('#st-pools img').count(),0);
+  assert.equal(await page.locator('#st-pools a').count(),0,'unrecognised names must never become links');
+  const poolSites=JSON.parse(fs.readFileSync(path.join(__dirname,'../../installer/content.json'))).pool_links;
+  communityStats.pools=Object.keys(poolSites).map(name=>({name,miners:1,hashrate:1e6,url:'https://attacker.example/worker'}));
+  communityStats.miners=communityStats.pools.length;communityStats.hashrate=communityStats.miners*1e6;
+  await page.goto(url+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
+  assert.equal(await page.locator('#st-pools a').count(),Object.keys(poolSites).length);
+  for(const destination of Object.values(poolSites))assert.equal(await page.locator('#st-pools a[href="'+destination+'"]').count(),1);
+  assert.doesNotMatch(await page.locator('#st-pools').innerHTML(),/attacker\.example/);
   for(const name of Object.values(pages)){
    await page.setViewportSize({width:375,height:812});await page.goto(url+'/'+name);
    await page.locator('main h1').first().waitFor();

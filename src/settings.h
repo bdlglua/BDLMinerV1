@@ -102,7 +102,7 @@ struct Settings {
 #endif  // 0 off, 1 check and offer, 2 install by itself
     bool usageCount = true;    // daily download of this version's ping-<board>.txt (ghupdate.h)
     bool shareHashrate = true;  // anonymous hashrate report every 5 minutes (share.h)
-    bool sharePool = false;     // opt in to a public pool group; never send a hostname
+    bool sharePool = true;      // public pool group only; saved opt-outs are preserved
 };
 
 inline void settingsNormalizeAgent(Settings &values) {

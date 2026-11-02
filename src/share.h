@@ -1,7 +1,7 @@
 // Anonymous hashrate sharing (settings.shareHashrate, on by default): every 5
 // minutes, the firmware version, the board and the hashrate are posted to the
 // BDLMiner statistics Worker, which adds up the reports of every miner.
-// Optional pool sharing (off by default) adds a public pool group. No Bitcoin
+// Pool sharing (on by default, independently switchable) adds a public pool group. No Bitcoin
 // address, worker, configured hostname, port, name or identifier is sent.
 #pragma once
 

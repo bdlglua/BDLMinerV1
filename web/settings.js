@@ -76,7 +76,7 @@ const FIELDS={
  peers:['Other miners','Shown on the dashboard: IP addresses or names, comma separated.'],
  webpass:['Web password','Optional. Asked before changing settings or installing firmware from these pages. Empty = no password: anyone on your network can.'],
  update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.'],
- sharepool:['Share my pool anonymously','Off by default. With hashrate sharing, adds the connected public pool group. Other pools are grouped as private/other. Never sends the hostname, port, Bitcoin address or worker.']};
+ sharepool:['Share my pool anonymously','On by default. Turn off to hide your pool group. Requires hashrate sharing. Other pools are grouped as private/other. Never sends the hostname, port, Bitcoin address or worker.']};
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],uaauto:[['true','Automatic'],['false','Manual']],
  fanauto:[['false','Manual'],['true','Automatic']],

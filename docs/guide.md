@@ -489,8 +489,10 @@ saved like the web setting; brightness works like the button.
 ## Anonymous pool statistics
 
 From 2.0.2, **Settings → Network → Anonymous statistics → Share my pool anonymously**
-adds the connected pool's public group to anonymous hashrate reports. This option
-is off by default, including after an update, and applies without a restart.
+adds the connected pool's public group to anonymous hashrate reports. Introduced
+as default-off in 2.0.2, it is on by default from 2.0.3 for new devices and records
+without the setting. Saved disabled choices are preserved. The setting applies
+without a restart and can be turned off independently.
 **Share my hashrate anonymously** must also be enabled. When a backup pool is
 active, its group is used instead of the main pool's.
 
@@ -500,6 +502,8 @@ leaving the board. No configured hostname, port, Bitcoin address or worker is se
 Older firmware, a disabled sharing option or a disconnected pool appears as
 **Not shared**. The public tables show miner counts and combined hashrate per
 group; they cannot diagnose an individual board or reveal its settings.
+Public pool names include a link and visible URL to the pool's predefined official
+website. Private/other and undisclosed groups have no link.
 
 ## Updates from GitHub
 

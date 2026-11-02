@@ -39,7 +39,7 @@ bool memoryOk = true;
 bool tlsMemoryOk() { return memoryOk; }
 double rate = 1.0234e6;
 double minerHashrate() { return rate; }
-struct { bool shareHashrate = true, sharePool = false; } settings;
+struct { bool shareHashrate = true, sharePool = true; } settings;
 struct { bool poolConnected = true; } stats;
 auto minerStats() { return stats; }
 String activePool = "public-pool.io";
@@ -95,6 +95,11 @@ int main() {
     assert(!strstr(out, "my-worker"));
     assert(!shareBody(out, 25, 1e6, "M5Stack Core2", "public-pool.io"));
 
+    assert(settings.sharePool);
+    nowMs = kFirstMs; sharePoll();
+    assert(posted.size() == 1 && posted.back().find(R"("pool":"public-pool.io")") != std::string::npos);
+    posted.clear(); hosts.clear(); nowMs = 0; next = kFirstMs;
+    settings.sharePool = false; // an owner can disable just the optional pool field
     sharePoll(); assert(posted.empty());                       // not before 3 minutes
     nowMs = kFirstMs; sharePoll(); assert(posted.size() == 1);
     assert(hosts.back() == "stats.example");
@@ -112,7 +117,7 @@ int main() {
     assert(posted.size() == 4 && posted[3].find("model") == std::string::npos);
     board::model = "M5Stack Core2"; nowMs += kEveryMs; sharePoll();
     assert(posted.size() == 5 && posted[4].find(R"("model":"M5Stack Core2")") != std::string::npos);
-    assert(posted.back().find("pool") == std::string::npos); // existing users have not opted in
+    assert(posted.back().find("pool") == std::string::npos); // the saved opt-out is still respected
     settings.sharePool = true; nowMs += kEveryMs; sharePoll();
     assert(posted.size() == 6 && posted.back().find(R"("pool":"public-pool.io")") != std::string::npos);
     activePool = "pool.nerdminers.org"; nowMs += kEveryMs; sharePoll();

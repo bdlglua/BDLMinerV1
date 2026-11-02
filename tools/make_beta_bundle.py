@@ -33,6 +33,7 @@ DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness
       'releases/v2.0.0.md','releases/v2.0.0.fr.md',
       'releases/v2.0.1.md','releases/v2.0.1.fr.md',
       'releases/v2.0.2.md','releases/v2.0.2.fr.md',
+      'releases/v2.0.3.md','releases/v2.0.3.fr.md',
       'patches/README.md','patches/BDLMiner-stats-v2-semver.patch')
 
 

@@ -166,13 +166,17 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 {"v": "2.0.1", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
-From 2.0.2, **Share my pool anonymously** (`sharepool`) optionally adds the public
-pool group. It is **off by default**, requires hashrate sharing and applies without
-a restart in *Settings → Network → Anonymous statistics*. Only the connected pool
+**Share my pool anonymously** (`sharepool`) adds the public pool group. It is
+**on by default from 2.0.3**, requires hashrate sharing and applies without
+a restart in *Settings → Network → Anonymous statistics*. Disable it there to
+hide the group. A saved disabled choice is kept, including one saved by 2.0.2,
+where this option was introduced with a disabled default. Only the connected pool
 is reported, including the backup when active. Recognised public hosts are mapped
 to a fixed group; every other host becomes *Other / private pool* on the device.
 The configured hostname, port, Bitcoin address and worker are never sent. Older
 versions, disabled pool sharing and disconnected pools appear as *Not shared*.
+Public pool names link to a predefined official website, with its URL shown below
+the name. Private/other and undisclosed groups have no link.
 
 No Bitcoin address, worker, private hostname, name or identifier is sent. The service
 adds the reports up live and keeps a 5-minute sample of the total 35 days; the sender's network

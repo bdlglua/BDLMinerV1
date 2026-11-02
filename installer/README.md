@@ -20,6 +20,11 @@ highlights and reviewed community gallery. The site's English/French copy is
 in `assets/discovery.js`. Keep measured hashrates tied to the evidence linked in
 each board entry; leave unmeasured targets without a `rate` value.
 
+`pool_names` and `pool_links` describe the recognised public pool groups and their
+official website links. Keep them aligned with `BDLMiner-stats/src/pools.js`.
+Links must use HTTPS on the group's public domain, without credentials, query or
+fragment. Never add links for `other` or `unknown`, or use an endpoint from a report.
+
 The support link is the owner's supplied GitHub Sponsors address. No address
 from a pool configuration or statistics sample is reused as a donation address.
 Bitcoin/Lightning fields are optional and remain empty unless supplied by the

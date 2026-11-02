@@ -42,15 +42,18 @@ struct Storage {
 int main() {
     Settings legacySharing;
     const char *beforePoolSharing = R"({"power":75})";
-    assert(!legacySharing.sharePool);
+    assert(legacySharing.sharePool);
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(beforePoolSharing), strlen(beforePoolSharing), legacySharing));
-    assert(!legacySharing.sharePool); // updates never opt an existing miner into pool sharing
+    assert(legacySharing.sharePool); // records predating the setting use the current default
     legacySharing.sharePool = true;
     std::string consent;
     assert(settingsstore::encode(legacySharing, consent));
     Settings restoredConsent;
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(consent.data()), consent.size(), restoredConsent));
     assert(restoredConsent.sharePool);
+    const char *savedOptOut = R"({"power":75,"sharepool":false})";
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(savedOptOut), strlen(savedOptOut), restoredConsent));
+    assert(!restoredConsent.sharePool); // an explicit stored choice overrides the new default
 #ifdef BOARD_GAMMA601
     Settings oldGammaSettings;const char *old=R"({"power":100})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(old),strlen(old),oldGammaSettings));
