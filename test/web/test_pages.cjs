@@ -63,7 +63,7 @@ async function fixture(options={}){
     if(req.method==='POST')state.posts.push({url:req.url,body});
     if(req.url==='/site'){
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
-      return res.end(fs.readFileSync(path.join(__dirname,'../../installer/index.html'),'utf8').replace('__BOARDS__',JSON.stringify([{env:'m5stickc-plus2',name:'M5StickC Plus2'}])).replaceAll('__VERSION__','test'));
+      return res.end(fs.readFileSync(path.join(__dirname,'../../installer/index.html'),'utf8').replace('__PAGE_CONTENT__',fs.readFileSync(path.join(__dirname,'../../installer/pages/home.html'),'utf8')).replaceAll('__PAGE_KEY__','home').replaceAll('__PAGE_TITLE__','BDLMiner V2: demo').replace('__BOARDS__',JSON.stringify([{env:'m5stickc-plus2',name:'M5StickC Plus2'}])).replaceAll('__VERSION__','test'));
     }
     if(['/', '/settings', '/log'].includes(req.url)){
       const page=req.url==='/'?'dashboard':req.url==='/settings'?'settings':'log';

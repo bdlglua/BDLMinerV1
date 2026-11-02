@@ -17,9 +17,9 @@ whose reward is paid to **your** address.
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-On the website: [interactive dashboard and fleet demos](https://bdlglua.github.io/#demo),
-[measured board comparison](https://bdlglua.github.io/#boards),
-[installation paths and troubleshooting](https://bdlglua.github.io/#discover), and
+On the website: [interactive dashboard and fleet demos](https://bdlglua.github.io/demo.html),
+[measured board comparison](https://bdlglua.github.io/boards.html),
+[installation paths and troubleshooting](https://bdlglua.github.io/start.html), and
 [support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
 
 The V2 release candidate was tested on the owner's M5StickC Plus2 and Gamma 601:
@@ -79,7 +79,7 @@ and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
 
 ## Install
 
-Open **https://bdlglua.github.io/** in Chrome or Edge on a computer, plug the
+Open **https://bdlglua.github.io/flash.html** in Chrome or Edge on a computer, plug the
 board in with a data USB cable, pick it in the list and click *Install* (it flashes the
 latest release; the first install erases the board). Each
 [release](https://github.com/bdlglua/BDLMinerV2/releases) also has a

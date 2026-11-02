@@ -7,7 +7,7 @@ name: Site
 on:
   push:
     branches: [main]
-    paths: ["installer/**", "web/**", "tools/bdlhost/web/**", "tools/make_installer.py", "tools/make_site_demo.py", "tools/make_channels.py", "tools/release_version.py", ".github/workflows/site.yml"]
+    paths: ["installer/**", "web/**", "tools/bdlhost/web/**", "tools/make_installer.py", "tools/make_site_demo.py", "tools/make_site_pages.py", "tools/make_channels.py", "tools/release_version.py", ".github/workflows/site.yml"]
   workflow_dispatch:
   release:
     types: [published]

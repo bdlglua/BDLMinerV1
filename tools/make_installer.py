@@ -21,6 +21,7 @@ import shutil
 from urllib.parse import urlsplit
 from build_output import staged_directory
 from make_site_demo import build_demos
+from make_site_pages import build_pages
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -95,11 +96,7 @@ def build_installer(release, out, channel='stable', channels=None):
         listed.append({"env": env, "name": name})
     if not listed:
         raise ValueError("No supported boards with factory images in this release")
-    page = (Path(ROOT) / "installer/index.html").read_text(encoding="utf-8")
-    page = page.replace("__BOARDS__", json.dumps(listed)).replace("__VERSION__", version)
-    content = json.dumps(site_content(version, channel, channels), ensure_ascii=False).replace('<', '\\u003c')
-    page = page.replace('__SITE_DATA__', content)
-    (Path(out) / "index.html").write_text(page, encoding="utf-8")
+    build_pages(ROOT, out, version, listed, site_content(version, channel, channels))
     assets = Path(ROOT) / "installer/assets"
     if assets.is_dir():
         shutil.copytree(assets, Path(out) / "assets", dirs_exist_ok=True)

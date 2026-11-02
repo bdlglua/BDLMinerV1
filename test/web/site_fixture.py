@@ -13,6 +13,11 @@ from make_installer import build_installer
 
 
 class Quiet(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.startswith('/BDLMinerV2/'):
+            self.path = self.path[len('/BDLMinerV2'):]
+        super().do_GET()
+
     def log_message(self, *_):
         pass
 

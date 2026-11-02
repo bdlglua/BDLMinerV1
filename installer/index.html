@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BDLMiner V2: solo Bitcoin mining on ESP32</title>
-<meta name="description" content="Free, open-source solo &quot;lottery&quot; Bitcoin miner for the M5StickC Plus2 and other ESP32 boards. Install it from your browser in two minutes.">
+<title>__PAGE_TITLE__</title>
+<meta name="description" content="Free, open-source solo &quot;lottery&quot; Bitcoin miner for the M5StickC Plus2 and other ESP32 boards. Flash it from your browser.">
 <meta property="og:title" content="BDLMiner V2">
 <meta property="og:description" content="Free, open-source solo Bitcoin lottery miner for ESP32 boards. Install it from your browser.">
 <meta property="og:image" content="assets/screen-mining.png">
@@ -222,171 +222,44 @@ footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
 footer a{display:inline-block;padding:6px 2px}
 </style>
 </head>
-<body>
+<body data-page="__PAGE_KEY__">
 <a class="skip" href="#main" data-t="skip">Skip to content</a>
 <nav aria-label="Main">
  <div class="wrap">
-  <a class="brand" href="#top" aria-label="BDLMiner V2">
+  <a class="brand" href="index.html" aria-label="BDLMiner V2">
    <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><g fill="#f7931a"><rect x="24" y="24" width="52" height="52" rx="10"/><g id="pins"><rect x="31" y="8" width="6" height="12" rx="2"/><rect x="47" y="8" width="6" height="12" rx="2"/><rect x="63" y="8" width="6" height="12" rx="2"/></g><use href="#pins" transform="translate(0 72)"/><use href="#pins" transform="rotate(90 50 50)"/><use href="#pins" transform="rotate(90 50 50) translate(0 72)"/></g><text x="50" y="64" text-anchor="middle" font-size="42" font-weight="900" font-family="system-ui,sans-serif" fill="#15100a">B</text></svg>
    <span>BDLMiner <b>V2</b></span>
   </a>
   <div class="links" id="site-links">
-   <a href="#help">FAQ</a>
-   <a href="#discover" id="nav-discover">Discover</a>
-   <a href="#boards" data-t="navBoards">Boards</a>
-   <a href="#install" data-t="navInstall">Install</a>
-   <a href="#stats" data-t="navStats">Statistics</a>
-   <a href="#community" data-t="navCommunity">Community</a>
-   <a href="#support" id="nav-support">Support</a>
+   <a href="boards.html" data-t="navBoards">Boards</a>
+   <a href="flash.html" data-t="navInstall" class="nav-flash">Flash</a>
+   <a href="demo.html" data-t="navDemo">Demo</a>
+   <details class="site-more" id="nav-more"><summary data-t="navMore">Explore</summary><div class="site-more-menu">
+    <a href="start.html" id="nav-discover" data-t="navStart">Get started</a>
+    <a href="faq.html" data-t="navFAQ">FAQ</a>
+    <a href="releases.html" data-t="navNews">Releases</a>
+    <a href="stats.html" data-t="navStats">Statistics</a>
+    <a href="gallery.html" data-t="navCommunity">Community</a>
+   </div></details>
+   <a href="support.html" id="nav-support" data-t="navSupport">Support</a>
   </div>
   <button id="lang" type="button">Français</button>
   <button id="menu" type="button" aria-expanded="false" aria-controls="site-links" data-al="menu" aria-label="Menu">☰</button>
  </div>
 </nav>
 
-<main id="main">
-<div class="wrap hero" id="top">
- <div>
-  <h1 data-h="title">Solo Bitcoin mining on a <b>pocket-sized</b> ESP32</h1>
-  <p data-t="tagline">BDLMiner V2 is free, open-source firmware that turns an M5StickC Plus2 or another ESP32 board into a solo "lottery" Bitcoin miner, with a live screen, a web dashboard and automatic signed updates.</p>
-  <div class="buttons">
-   <a class="btn" href="#install" data-t="ctaInstall">Install in 2 minutes</a>
-   <a class="btn ghost" href="https://github.com/bdlglua/BDLMinerV2/releases/download/v__VERSION__/BDLMiner-__VERSION__-Linux-kit.zip" data-t="ctaHub">Linux / Raspberry Pi hub</a>
-   <a class="btn ghost" href="https://github.com/bdlglua/BDLMinerV2">GitHub</a>
-   <a class="btn ghost" href="https://discord.gg/S8kSgD6Xe9">Discord</a>
-  </div>
-  <p class="s" data-t="version">Firmware available: __VERSION__.</p>
- </div>
- <div class="device">
-  <img id="screen" src="assets/screen-mining.png" width="320" height="170" alt="The miner's screen: 1.005 MH/s, 10827 shares, best difficulty 7.82, 52.1 °C" data-alt="altMining">
-  <div class="thumbs" role="group" aria-label="Screens" data-al="screens">
-   <button type="button" data-screen="graph" aria-pressed="false"><img src="assets/screen-graph.png" width="320" height="170" alt="Hashrate chart screen" data-alt="altGraph"></button>
-   <button type="button" data-screen="global" aria-pressed="false"><img src="assets/screen-global.png" width="320" height="170" alt="Bitcoin price and network screen" data-alt="altGlobal"></button>
-   <button type="button" data-screen="clock" aria-pressed="false"><img src="assets/screen-clock.png" width="320" height="170" alt="Clock screen" data-alt="altClock"></button>
-  </div>
- </div>
-</div>
-
-<section id="discover" class="discovery-section"><div class="wrap" id="discovery-start"></div></section>
-
-<section id="features">
- <div class="wrap">
-  <h2 data-t="featTitle">What it does</h2>
-  <p class="lead" data-t="featLead">The miner runs on the board. An optional Linux or Raspberry Pi hub brings your miners together in one dashboard.</p>
-  <div class="grid">
-   <div class="card"><div class="icon" aria-hidden="true">⚡</div><h3 data-t="f1t">Hardware SHA-256</h3><p data-t="f1">Uses the ESP32's SHA engine: about 1 MH/s on an M5StickC Plus2, with software mining as a fallback.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🔗</div><h3 data-t="f2t">Stratum V1 and V2</h3><p data-t="f2">Any solo pool, native Stratum V2 with Noise encryption, a backup pool and automatic failover.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">📊</div><h3 data-t="f3t">Live web dashboard</h3><p data-t="f3">Hashrate, accepted and rejected shares, history, settings and pool diagnostics from your browser.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🔒</div><h3 data-t="f4t">Signed automatic updates</h3><p data-t="f4">Stable by default, beta by choice. Signed updates run on trial and roll back if they fail.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🔔</div><h3 data-t="f5t">Alerts</h3><p data-t="f5">ntfy, Discord or Telegram webhooks: best shares, low hashrate, a daily summary and, who knows, a block.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🏠</div><h3 data-t="f6t">Home Assistant</h3><p data-t="f6">MQTT discovery with controls, and Prometheus metrics for your own graphs.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🖥️</div><h3 data-t="f7t">Configurable screens</h3><p data-t="f7">Choose your metrics, their order and enabled pages, in English or French. Headless boards work too.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🧪</div><h3 data-t="f8t">ASIC boards too</h3><p data-t="f8">Experimental support for the Bitaxe Gamma 601 and the NerdNOS, from hundreds of GH/s up to about 1 TH/s.</p></div>
-   <div class="card"><div class="icon" aria-hidden="true">🗂️</div><h3 data-t="f9t">Fleet hub</h3><p data-t="f9">Monitor several miners, keep local history and run supervised Gamma calibration from Linux or a Raspberry Pi.</p></div>
-  </div>
- </div>
-</section>
-
-<section id="demo" class="discovery-section"><div class="wrap" id="discovery-demo"></div></section>
-
-<section id="boards">
- <div class="wrap">
-  <h2 data-t="boardsTitle">Supported boards</h2>
-  <p class="lead" data-t="boardsLead">One firmware per family. Dashed boards are experimental: reports from real hardware are welcome.</p>
-  <ul class="boards" id="board-list"></ul>
-  <div id="board-comparison"></div>
- </div>
-</section>
-
-<section id="install">
- <div class="wrap">
-  <h2 data-t="installTitle">Install from your browser</h2>
-  <p class="lead" data-t="installLead">No software to install: Chrome or Edge on a computer flashes the board over USB.</p>
-  <div class="install">
-   <div class="card">
-    <label for="board" data-t="board">Your board</label>
-    <select id="board"></select>
-    <esp-web-install-button id="installer">
-     <button slot="activate" class="btn" data-t="install">Install</button>
-     <span slot="unsupported" data-t="unsupported">Your browser cannot install: use Chrome or Edge on a computer.</span>
-     <span slot="not-allowed" data-t="notallowed">The page must be opened over HTTPS.</span>
-    </esp-web-install-button>
-    <p class="s" data-t="erase">Version __VERSION__. The first install erases the board (settings and statistics).</p>
-   </div>
-   <div class="card">
-    <ol>
-     <li data-t="s1">Plug the board into this computer with a USB cable that carries data.</li>
-     <li data-t="s2">Pick the board, click Install and choose its serial port.</li>
-     <li data-t="s3">When it restarts, join the WiFi network BDLMinerV2-XXXX (password MineYourCoins) and enter your WiFi, pool and BTC address.</li>
-    </ol>
-    <p class="s" data-h="after">Then open the dashboard at <b>http://bdlminer-xxxx.local</b>. Updates arrive by themselves.</p>
-   </div>
-  </div>
- </div>
-</section>
-
-<section id="stats">
- <div class="wrap">
-  <h2 data-t="statsTitle">BDLMiner right now</h2>
-  <p class="lead" data-t="statsLead">The total of the miners that share their hashrate anonymously, live: every 5 minutes, the version, the board and the hashrate, nothing else.</p>
-  <div class="tiles" aria-live="polite">
-   <div class="tile"><div class="label" data-t="tHashrate">Total hashrate</div><div class="value accent" id="st-hashrate">–</div></div>
-   <div class="tile"><div class="label" data-t="tMiners">Miners</div><div class="value" id="st-miners">–</div></div>
-   <div class="tile"><div class="label" data-t="tAverage">Average per miner</div><div class="value" id="st-average">–</div></div>
-   <div class="tile"><div class="label" data-t="tRecord">Best hour</div><div class="value" id="st-record">–</div></div>
-  </div>
-  <div class="fleet-head">
-   <h3 data-t="devicesTitle">Devices</h3>
-   <span class="legend"><span class="dot on" aria-hidden="true"></span><span><b id="st-on">–</b> <span data-t="online">online</span></span></span>
-   <span class="legend"><span class="dot off" aria-hidden="true"></span><span><b id="st-off">–</b> <span data-t="offline">offline</span></span></span>
-  </div>
-  <ul class="fleet" id="st-fleet"></ul>
-  <button type="button" class="fleet-more" id="st-more" aria-expanded="false" aria-controls="st-fleet" hidden></button>
-  <div class="card">
-   <div class="chart-head">
-    <span class="live"><span class="dot on" aria-hidden="true"></span><span data-t="live">Live</span></span>
-    <span class="s" id="st-updated" aria-live="off"></span>
-    <div class="range" role="group" aria-label="Period" data-al="period">
-     <button type="button" data-range="day" aria-pressed="true">24 h</button>
-     <button type="button" data-range="week" aria-pressed="false" data-t="week">7 days</button>
-    </div>
-   </div>
-   <svg class="chart" id="st-chart" viewBox="0 0 960 200" role="img" aria-label="Total hashrate, last 24 hours"></svg>
-  </div>
-  <div class="split">
-   <div class="card"><h3 data-t="byBoard">By board</h3><table class="by" id="st-boards"></table></div>
-   <div class="card"><h3 data-t="byVersion">By version</h3><table class="by" id="st-versions"></table></div>
-  </div>
-  <p class="s" id="st-status" data-h="statsMore">Raw data: <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary">JSON</a> · <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/">statistics page</a>.</p>
- </div>
-</section>
-
-<section id="lottery">
- <div class="wrap">
-  <h2 data-t="lotteryTitle">A lottery ticket, not an income</h2>
-  <div class="note" data-t="lottery">A block pays 3.125 BTC plus fees to your own address, but at 1 MH/s finding one takes billions of years on average. Every hash has the same tiny chance, with no progress between them: the fun is in the build, the statistics and chasing your best difficulty. Spend on it only what you would on a gadget.</div>
- </div>
-</section>
-
-<section id="help" class="discovery-section"><div class="wrap" id="discovery-help"></div></section>
-<section id="news" class="discovery-section"><div class="wrap" id="discovery-news"></div></section>
-<section id="gallery" class="discovery-section"><div class="wrap" id="discovery-gallery"></div></section>
-<section id="support" class="discovery-section"><div class="wrap" id="discovery-support"></div></section>
-
-<section id="community">
- <div class="wrap">
-  <h2 data-t="communityTitle">Community</h2>
-  <p class="lead" data-t="communityLead">Questions, setups, best shares and ideas: come and say hello.</p>
-  <div class="grid">
-   <a class="card" href="https://discord.gg/S8kSgD6Xe9" style="text-decoration:none;color:inherit"><div class="icon" aria-hidden="true">💬</div><h3>Discord</h3><p data-t="cDiscord">Live help, announcements and the support tickets.</p></a>
-   <a class="card" href="https://www.reddit.com/r/bdlminer/" style="text-decoration:none;color:inherit"><div class="icon" aria-hidden="true">🟠</div><h3>Reddit</h3><p data-t="cReddit">r/bdlminer: show your setup and share your records.</p></a>
-   <a class="card" href="https://github.com/bdlglua/BDLMinerV2" style="text-decoration:none;color:inherit"><div class="icon" aria-hidden="true">🐙</div><h3>GitHub</h3><p data-t="cGithub">Source code, documentation, releases, bug reports and ideas.</p></a>
-  </div>
- </div>
-</section>
+<main id="main" class="page-content">
+__PAGE_CONTENT__
 </main>
 
 <footer>
+ <nav class="footer-nav wrap" aria-label="All pages" data-al="navPages">
+  <a href="index.html" data-t="navHome">Home</a><a href="start.html" data-t="navStart">Get started</a>
+  <a href="boards.html" data-t="navBoards">Boards</a><a href="flash.html" data-t="navInstall">Flash</a>
+  <a href="demo.html" data-t="navDemo">Demo</a><a href="faq.html" data-t="navFAQ">FAQ</a>
+  <a href="releases.html" data-t="navNews">Releases</a><a href="stats.html" data-t="navStats">Statistics</a>
+  <a href="gallery.html" data-t="navCommunity">Community</a><a href="support.html" data-t="navSupport">Support</a>
+ </nav>
  <div class="wrap">
   <span data-t="license">BDLMiner V2 is free software under the GNU GPL v3.0.</span>
   <span><a href="https://github.com/bdlglua/BDLMinerV2/blob/main/SECURITY.md" data-t="security">Security</a> · <a href="https://github.com/bdlglua/BDLMinerV2/blob/main/ACCESSIBILITY.md" data-t="accessibility">Accessibility</a> · <a href="https://github.com/bdlglua/BDLMinerV2/releases" data-t="releases">Releases</a></span>
@@ -451,10 +324,15 @@ footer a{display:inline-block;padding:6px 2px}
 <script>
 const BOARDS=__BOARDS__;
 const STATS='https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary';
-const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Installer',navStats:'Statistiques',navCommunity:'Communauté',
+const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Flasher',navStats:'Statistiques',navCommunity:'Communauté',
+navHome:'Accueil',navStart:'Bien démarrer',navDemo:'Démo',navMore:'Explorer',navFAQ:'FAQ',navNews:'Nouveautés',navSupport:'Soutenir',navPages:'Toutes les pages',
+exploreTitle:'Découvrir BDLMiner',exploreLead:'Choisis ta carte, essaie l’interface ou trouve de l’aide pour la prochaine étape.',
+exploreBoards:'Compare les puces, les écrans et les hashrates mesurés.',exploreDemo:'Essaie le dashboard et le hub sans posséder de miner.',
+exploreStart:'Première installation, mises à jour et passage depuis AxeOS.',exploreFAQ:'Dépannage USB, Wi-Fi, shares et performances.',
+exploreNews:'Derniers changements et canaux stable et bêta.',exploreCommunity:'Partage ton installation et retrouve les autres miners.',
 title:'Le minage Bitcoin solo sur un ESP32 <b>de poche</b>',
 tagline:'BDLMiner V2 est un firmware libre et gratuit qui transforme un M5StickC Plus2 ou une autre carte ESP32 en mineur Bitcoin solo « loterie », avec un écran en direct, un tableau de bord web et des mises à jour signées automatiques.',
-ctaInstall:'Installer en 2 minutes',ctaHub:'Hub Linux / Raspberry Pi',version:'Firmware proposé : __VERSION__.',
+ctaInstall:'Flasher',ctaHub:'Hub Linux / Raspberry Pi',version:'Firmware proposé : __VERSION__.',
 featTitle:'Ce qu\'il fait',featLead:'Le mineur tourne sur la carte. Un hub facultatif sur Linux ou Raspberry Pi regroupe tes mineurs dans un même tableau de bord.',
 f1t:'SHA-256 matériel',f1:'Utilise le moteur SHA de l\'ESP32 : environ 1 MH/s sur un M5StickC Plus2, avec le minage logiciel en secours.',
 f2t:'Stratum V1 et V2',f2:'N\'importe quelle pool solo, Stratum V2 natif chiffré avec Noise, une pool de secours et la bascule automatique.',
@@ -466,11 +344,11 @@ f7t:'Écrans configurables',f7:'Choisis tes métriques, leur ordre et les pages 
 f9t:'Hub multi-mineurs',f9:'Suis plusieurs mineurs, garde un historique local et lance la calibration supervisée du Gamma depuis Linux ou Raspberry Pi.',
 f8t:'Les cartes ASIC aussi',f8:'Prise en charge expérimentale du Bitaxe Gamma 601 et du NerdNOS, de quelques centaines de GH/s à environ 1 TH/s.',
 boardsTitle:'Cartes compatibles',boardsLead:'Un firmware par famille. Les cartes en pointillés sont expérimentales : les retours sur du vrai matériel sont les bienvenus.',
-installTitle:'Installer depuis ton navigateur',installLead:'Aucun logiciel à installer : Chrome ou Edge sur un ordinateur flashe la carte par USB.',
-board:'Ta carte',install:'Installer',unsupported:'Ce navigateur ne peut pas installer : utilise Chrome ou Edge sur un ordinateur.',
+installTitle:'Flasher ta carte',installLead:'Aucun logiciel à installer : Chrome ou Edge sur un ordinateur flashe la carte par USB.',
+board:'Ta carte',install:'Flasher',unsupported:'Ce navigateur ne peut pas installer : utilise Chrome ou Edge sur un ordinateur.',
 notallowed:'La page doit être ouverte en HTTPS.',erase:'Version __VERSION__. La première installation efface la carte (réglages et statistiques).',
 s1:'Branche la carte à cet ordinateur avec un câble USB qui transmet les données.',
-s2:'Choisis la carte, clique sur Installer et sélectionne son port série.',
+s2:'Choisis la carte, clique sur Flasher et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV2-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
 after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
 statsTitle:'BDLMiner en ce moment',statsLead:'Le total en direct des miners qui partagent leur hashrate anonymement : toutes les 5 minutes, la version, la carte et le hashrate, rien d\'autre.',
@@ -532,14 +410,14 @@ let screen='mining',summary=null;
 function rate(h){const u=['H/s','kH/s','MH/s','GH/s','TH/s','PH/s','EH/s'];if(!(h>0))return'0 H/s';let i=0;while(h>=1000&&i<u.length-1){h/=1000;i++}
  return h.toLocaleString(lang=='fr'?'fr-FR':'en-US',{maximumFractionDigits:h>=100?0:h>=10?1:2})+' '+u[i]}
 
-function showScreen(name){screen=name;const suffix=lang=='fr'?'-fr':'';
+function showScreen(name){if(!document.getElementById('screen'))return;screen=name;const suffix=lang=='fr'?'-fr':'';
  document.getElementById('screen').src='assets/screen-'+name+suffix+'.png';
  const big=document.getElementById('screen');big.alt=T({mining:'altMining',graph:'altGraph',global:'altGlobal',clock:'altClock'}[name]);
  document.querySelectorAll('[data-screen]').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.screen==name);b.querySelector('img').src='assets/screen-'+b.dataset.screen+suffix+'.png'})}
-let rotate=matchMedia('(prefers-reduced-motion: reduce)').matches?null:setInterval(()=>{const order=['mining','graph','global','clock'];showScreen(order[(order.indexOf(screen)+1)%order.length])},4000);
+let rotate=!document.getElementById('screen')||matchMedia('(prefers-reduced-motion: reduce)').matches?null:setInterval(()=>{const order=['mining','graph','global','clock'];showScreen(order[(order.indexOf(screen)+1)%order.length])},4000);
 document.querySelectorAll('[data-screen]').forEach(b=>b.onclick=()=>{clearInterval(rotate);rotate=null;showScreen(screen==b.dataset.screen?'mining':b.dataset.screen)});
 
-function boards(){const ul=document.getElementById('board-list');ul.innerHTML='';
+function boards(){const ul=document.getElementById('board-list');if(!ul)return;ul.innerHTML='';
  for(const b of BOARDS){const li=document.createElement('li');const exp=/experimental/i.test(b.name);li.className=exp?'exp':'';
   li.textContent=exp?b.name.replace(/\s*\(experimental[^)]*\)/i,'')+' ('+T('experimental')+')':b.name;ul.appendChild(li)}}
 
@@ -547,7 +425,7 @@ function boards(){const ul=document.getElementById('board-list');ul.innerHTML=''
 // both end with the total right now. Drawn at the chart's real width, so the
 // text and the live dot keep their shape on every screen.
 let range='day';
-function chart(){const svg=document.getElementById('st-chart');
+function chart(){const svg=document.getElementById('st-chart');if(!svg)return;
  svg.setAttribute('aria-label',T(range=='day'?'chartDay':'chartWeek'));
  const W=Math.max(280,Math.round(svg.clientWidth||960)),H=200,top=12,bottom=22,right=10;svg.setAttribute('viewBox','0 0 '+W+' '+H);
  const now=summary?.recent?.at(-1);
@@ -633,13 +511,13 @@ function breakdowns(){
  table('st-boards',[...rows.values()].sort((a,b)=>b.hashrate-a.hashrate),'colBoard',n=>n);
  table('st-versions',summary?.versions||[],'colVersion',v=>v)}
 
-function stats(){const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
+function stats(){if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}
  set('st-hashrate',rate(summary.hashrate));set('st-miners',summary.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'));
  set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
  chart();
  if(!summary.miners&&!summary.history.length)document.getElementById('st-status').textContent=T('noStats')}
-async function refresh(){try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
+async function refresh(){if(!document.getElementById('stats'))return;try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
  catch(e){if(!summary){chart();document.getElementById('st-status').textContent=T('statsDown')}}}
 
 function apply(){document.documentElement.lang=lang;
@@ -652,23 +530,27 @@ function apply(){document.documentElement.lang=lang;
  document.getElementById('lang').textContent=lang=='fr'?'English':'Français';
  showScreen(screen);boards();stats();document.dispatchEvent(new Event('bdl-language-change'))}
 // The phone menu: opens under the bar, closes on a link, Escape or a tap elsewhere.
-{const menu=document.getElementById('menu'),links=document.getElementById('site-links');
+{const menu=document.getElementById('menu'),links=document.getElementById('site-links'),more=document.getElementById('nav-more');
  const set=open=>{links.classList.toggle('open',open);menu.setAttribute('aria-expanded',open);menu.textContent=open?'✕':'☰'};
  menu.onclick=e=>{e.stopPropagation();set(!links.classList.contains('open'))};
  links.addEventListener('click',e=>{if(e.target.closest('a'))set(false)});
- document.addEventListener('click',e=>{if(!e.target.closest('nav'))set(false)});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&links.classList.contains('open')){set(false);menu.focus()}})}
-document.getElementById('st-more').onclick=()=>{fleetAll=!fleetAll;fleet()};
+ document.addEventListener('click',e=>{if(!e.target.closest('nav'))set(false);if(more&&!more.contains(e.target))more.open=false});
+ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(more?.open){more.open=false;more.querySelector('summary').focus();return}if(links.classList.contains('open')){set(false);menu.focus()}})}
+if(document.getElementById('st-more'))document.getElementById('st-more').onclick=()=>{fleetAll=!fleetAll;fleet()};
 document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
 
 const sel=document.getElementById('board'),btn=document.getElementById('installer');
+if(sel&&btn){
 for(const b of BOARDS){const o=document.createElement('option');o.value=b.env;o.textContent=b.name;sel.appendChild(o)}
 // The chosen board is remembered: a reload or the next visit keeps it. The button
 // gets it as an attribute too: esp-web-tools may load after this script, and its
 // element then starts with an empty manifest property.
-try{const saved=localStorage.getItem('board');if(BOARDS.some(b=>b.env===saved))sel.value=saved}catch(e){}
+const requested=new URLSearchParams(location.search).get('board');
+if(BOARDS.some(b=>b.env===requested))sel.value=requested;
+else try{const saved=localStorage.getItem('board');if(BOARDS.some(b=>b.env===saved))sel.value=saved}catch(e){}
 sel.onchange=()=>{const m='manifest-'+sel.value+'.json';btn.setAttribute('manifest',m);btn.manifest=m;
  try{localStorage.setItem('board',sel.value)}catch(e){}};sel.onchange();
+}
 // --- Live chat (BDLMiner-chat Worker) ---
 const CHAT_HOST='bdlminer-chat.bdlminer-bot.workers.dev';
 const CHAT='wss://'+CHAT_HOST+'/ws';

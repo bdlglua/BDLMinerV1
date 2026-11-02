@@ -4,6 +4,15 @@
 update pointers. The same files are published at both the project Pages address
 and the account root. No firmware release is needed for website changes.
 
+`index.html` is the shared layout. Independent content templates live in
+`pages/`; `tools/make_site_pages.py` renders the home page and separate
+`start.html`, `boards.html`, `flash.html`, `demo.html`, `faq.html`,
+`releases.html`, `stats.html`, `gallery.html` and `support.html` documents for
+both stable and beta. Each document contains only its own main content.
+The header/footer navigation and language preference are shared. Old home-page
+section links redirect to their matching page. The board comparison links to
+`flash.html?board=<profile>`, where only known profiles can be selected.
+
 ## Discovery content
 
 `content.json` supplies the board comparison, donation destination, release

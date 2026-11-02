@@ -10,6 +10,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 import make_installer
+from make_site_pages import PAGES
 
 
 class SiteBuilderTests(unittest.TestCase):
@@ -25,6 +26,15 @@ class SiteBuilderTests(unittest.TestCase):
                         'beta': {'version': '2.1.0-beta.1', 'published_at': None}}
             make_installer.build_installer(str(release), str(output), 'stable', channels)
             page = (output / 'index.html').read_text()
+            home = re.search(r'<main[^>]*>(.*?)</main>', page, re.S)[1]
+            for other in ('board-comparison', 'discovery-demo', 'discovery-help', 'discovery-support', 'installer'):
+                self.assertNotIn('id="' + other + '"', home)
+            for key, (filename, _, _) in PAGES.items():
+                document = (output / filename).read_text()
+                self.assertIn('data-page="' + key + '"', document)
+                self.assertNotIn('__PAGE_CONTENT__', document)
+                self.assertEqual('src="https://unpkg.com/esp-web-tools@' in document, key == 'flash')
+            self.assertIn('href="flash.html"', home)
             payload = json.loads(re.search(r'<script id="site-data" type="application/json">(.*?)</script>', page, re.S)[1])
             self.assertEqual(payload['channels']['beta']['version'], '2.1.0-beta.1')
             self.assertEqual(payload['support']['links'][0]['url'], 'https://github.com/sponsors/bdlglua')
