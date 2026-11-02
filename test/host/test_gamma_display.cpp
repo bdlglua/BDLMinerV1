@@ -114,9 +114,9 @@ int main(int argc, char **argv) {
     ui::page = 1; ui::render(); save(out, "no-sensors");
     assert(screen.width() == 128 && screen.height() == 32);
     ui::showSplash(); save(out, "startup");
-    ui::showPortal("BDLMinerV1-very-long-device-label", "MineYourCoins");
+    ui::showPortal("BDLMinerV2-very-long-device-label", "MineYourCoins");
     save(out, "wifi-setup"); first = pixels(); testMillis += 3000;
-    ui::showPortal("BDLMinerV1-very-long-device-label", "MineYourCoins");
+    ui::showPortal("BDLMinerV2-very-long-device-label", "MineYourCoins");
     assert(pixels() != first);
     ui::showMessage("WiFi", "Connecting...", "Open local dashboard"); save(out, "message");
     ui::blockFound(UINT32_MAX); first = pixels(); ui::nextScreen();

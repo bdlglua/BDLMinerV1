@@ -23,7 +23,7 @@ import time
 import tempfile
 import urllib.request
 
-REPO = "bdlglua/BDLMinerV1"
+REPO = "bdlglua/BDLMinerV2"
 STATE = os.path.expanduser("~/.cache/bdlminer_stats.json")
 
 

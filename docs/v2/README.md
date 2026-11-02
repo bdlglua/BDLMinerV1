@@ -1,21 +1,21 @@
 # BDLMiner V2
 
-The stable firmware version is **2.0.0**. See the release notes in
-[English](../releases/v2.0.0.md) or [French](../releases/v2.0.0.fr.md).
+The stable firmware version is **2.0.1**. See the release notes in
+[English](../releases/v2.0.1.md) or [French](../releases/v2.0.1.fr.md).
 The seven V2 features were developed on `v2/development`; the owner-operated
 acceptance results below identify the beta versions actually measured.
-The [previous stable V1 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15)
+The [previous stable V1 release](https://github.com/bdlglua/BDLMinerV2/releases/tag/v1.9.15)
 remains available.
 
 ## M5 / Gamma test kit
 
-Download the [2.0.0 Linux kit](https://github.com/bdlglua/BDLMinerV1/releases/download/v2.0.0/BDLMiner-2.0.0-Linux-kit.zip)
+Download the [2.0.1 Linux kit](https://github.com/bdlglua/BDLMinerV2/releases/download/v2.0.1/BDLMiner-2.0.1-Linux-kit.zip)
 and extract the complete ZIP. It contains the optional fleet hub, host tools,
 M5StickC Plus2 and Gamma 601
 firmware/factory images, their checksums and the read-only
 readiness checker. It does not install firmware automatically.
 
-For development builds, successful V2 [CI runs](https://github.com/bdlglua/BDLMinerV1/actions/workflows/ci.yml?query=branch%3Av2%2Fdevelopment)
+For development builds, successful V2 [CI runs](https://github.com/bdlglua/BDLMinerV2/actions/workflows/ci.yml?query=branch%3Av2%2Fdevelopment)
 also provide a `v2-linux-test-kit` artifact. CI previews are unsigned; the public
 release kit records verified firmware signatures in `kit.json`.
 
@@ -86,7 +86,7 @@ intentional pause; live rate has returned to about 1 MH/s.
 pending actual board availability.
 
 Extract the new kit into a separate directory, retaining configuration/settings
-backups. Its readiness launcher expects the kit version (2.0.0 for the stable
+backups. Its readiness launcher expects the kit version (2.0.1 for the stable
 kit), so an older card correctly reports `review` until its update completes.
 Stop the old hub before starting the new one
 on port 8787. Use only `*-firmware.bin` through the local dashboard; factory images

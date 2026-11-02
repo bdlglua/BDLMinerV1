@@ -477,7 +477,7 @@ recorded at **2026-11-02 13:23:53.091316 UTC**. It reports `simulated: false`,
 confirmed `2.0.0-beta.4`, Gamma 601 / BM1370. This is owner-operated physical
 evidence transcribed from the supplied report, not an independent LAN read by
 this workspace. The tracing tool is from commit `a31fef8`; its
-[CI run](https://github.com/bdlglua/BDLMinerV1/actions/runs/41444120904) passed.
+[CI run](https://github.com/bdlglua/BDLMinerV2/actions/runs/41444120904) passed.
 
 All 715 successful samples keep boot `93c65b31`. Uptime 5,038 -> 8,642 s gives
 3,604 device seconds (3,604.475 host seconds). Counter difference

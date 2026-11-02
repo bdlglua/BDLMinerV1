@@ -160,7 +160,7 @@ def write_checksums(out):
 
 def write_update_manifest(out, release_version):
     """Small discovery document, with the same asset fields as the releases API."""
-    repository = os.environ.get("GITHUB_REPOSITORY", "bdlglua/BDLMinerV1")
+    repository = os.environ.get("GITHUB_REPOSITORY", "bdlglua/BDLMinerV2")
     base = f"https://github.com/{repository}/releases/download/v{quote(release_version, safe='')}/"
     assets = []
     for name in sorted(os.listdir(out)):

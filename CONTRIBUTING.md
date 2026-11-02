@@ -1,11 +1,11 @@
-# Contributing to BDLMiner V1
+# Contributing to BDLMiner V2
 
 Thanks for helping! Bug reports, tests on real boards, translations, documentation
 and code are all welcome. By taking part you agree to the
 [code of conduct](CODE_OF_CONDUCT.md).
 
 - **A question, or help to install?** Ask on the [BDLMiner Discord](https://discord.gg/S8kSgD6Xe9).
-- **A bug or an idea?** Open an [issue](https://github.com/bdlglua/BDLMinerV1/issues/new/choose):
+- **A bug or an idea?** Open an [issue](https://github.com/bdlglua/BDLMinerV2/issues/new/choose):
   the forms ask for the board, the firmware version and the log, which is most of
   what is needed to help.
 - **A security problem?** Do not open an issue: see [SECURITY.md](SECURITY.md).
@@ -99,5 +99,5 @@ French speakers (read from `main`, so it can follow the release). Pull requests 
 
 ## License
 
-BDLMiner V1 is released under the [GNU GPL v3.0](LICENSE). By contributing, you
+BDLMiner V2 is released under the [GNU GPL v3.0](LICENSE). By contributing, you
 agree that your contribution is released under the same license.

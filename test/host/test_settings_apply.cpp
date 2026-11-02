@@ -45,6 +45,14 @@ int main() {
         settings=Settings();
     }
     assert(settings.userAgent == DEFAULT_USER_AGENT);
+    assert(!strcmp(DEFAULT_USER_AGENT, "BDLMinerV2/" FW_VERSION));
+    for (const char *oldNative : {"BDLMinerV1/1.9.15", "BDLMinerV2/2.0.0"}) {
+        Settings migrated; migrated.userAgent = oldNative;
+        settingsNormalizeAgent(migrated);
+        assert(migrated.userAgent == DEFAULT_USER_AGENT);
+        assert(!legacyManualAgent(oldNative));
+    }
+    assert(legacyManualAgent("BDLMinerV1-custom") && legacyManualAgent("BDLMinerV2-custom"));
     Settings identity;
     identity.userAgent = "NerdMinerV2";
     settingsNormalizeAgent(identity);

@@ -20,7 +20,11 @@ def validate_manifest(manifest, repository, tag, boards):
     if len(assets) != len(expected) or {a.get('name') for a in assets} != expected:
         raise ValueError('Channel requires one firmware/signature pair per board')
     base = f'https://github.com/{repository}/releases/download/{quote(tag, safe="")}/'
-    if any(a.get('browser_download_url') != base + a['name'] for a in assets):
+    bases = {base}
+    # Old immutable manifests retain their upload-time repository name after a rename.
+    if repository == 'bdlglua/BDLMinerV2' and Version(tag) <= Version('2.0.0'):
+        bases.add(f'https://github.com/bdlglua/BDLMinerV1/releases/download/{quote(tag, safe="")}/')
+    if any(a.get('browser_download_url') not in {prefix + a['name'] for prefix in bases} for a in assets):
         raise ValueError('Channel assets must belong to the selected repository release')
 
 
@@ -41,6 +45,10 @@ def build_channels(releases, fetch, output, repository):
                 manifest = json.loads((folder / 'update.json').read_text())
                 boards = json.loads((folder / 'boards.json').read_text())
                 validate_manifest(manifest, repository, tag, boards)
+                # Publish canonical links without modifying an archived release asset.
+                for asset in manifest['assets']:
+                    asset['browser_download_url'] = f'https://github.com/{repository}/releases/download/{quote(tag, safe="")}/' + asset['name']
+                (folder / 'update.json').write_text(json.dumps(manifest, separators=(',', ':')))
                 paths[tag] = folder
         stable_tag = stable.get('tag_name', stable.get('tagName'))
         beta_tag = beta.get('tag_name', beta.get('tagName'))

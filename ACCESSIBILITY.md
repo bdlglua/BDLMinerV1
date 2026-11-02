@@ -1,8 +1,8 @@
 # Accessibility
 
-BDLMiner V1 has two interfaces: the **web pages** each miner serves on the local
-network (dashboard, settings, log), and the **small screen** of the boards that have
-one. We want the web pages to be usable with a keyboard, a screen reader and
+BDLMiner V2 has the **web pages** each miner serves on the local network
+(dashboard, settings, log), an optional **fleet dashboard** on Linux/Raspberry Pi,
+and the **small screen** of the boards that have one. We want the web pages to be usable with a keyboard, a screen reader and
 zoom, in English and French.
 
 ## What the web pages do
@@ -37,6 +37,6 @@ zoom, in English and French.
 ## Reporting a barrier
 
 If something gets in your way, please open an
-[issue](https://github.com/bdlglua/BDLMinerV1/issues/new/choose) and add the
+[issue](https://github.com/bdlglua/BDLMinerV2/issues/new/choose) and add the
 *accessibility* label if you can: say which page, which browser and assistive
 technology, and what happened. Accessibility problems are treated as bugs.

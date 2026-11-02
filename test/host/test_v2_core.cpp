@@ -12,7 +12,7 @@ int main(){
     assert(release_version::compare("1.0","1.0.0")==0);
     assert(release_version::compare("2.0.0+abc","2.0.0+def")==0);
     for(const char *text:{"2.0.0-beta.01","01.0.0","2.0.0-","2.0.0+","2.0.0.1","2.0.0.","2.0.0-x..a","2.0.0oops"}){release_version::Version v;assert(!release_version::parse(text,v));}
-    char version[24];assert(release_version::find("BDLMiner V1 v2.0.0-beta.11",version,sizeof(version))&&!strcmp(version,"2.0.0-beta.11"));
+    char version[24];assert(release_version::find("BDLMiner V2 v2.0.0-beta.11",version,sizeof(version))&&!strcmp(version,"2.0.0-beta.11"));
     pool_diagnostics::Input in;in.connected=true;in.difficulty=10000;in.hashrate=1e6;
     assert(pool_diagnostics::diagnose(in).issue==pool_diagnostics::Issue::WaitingWork);
     in.work=true;auto report=pool_diagnostics::diagnose(in);

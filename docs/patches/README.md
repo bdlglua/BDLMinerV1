@@ -21,7 +21,7 @@ For an older deployment still based on `126ec1c`, from a clean clone of
 **BDLMiner-stats**, with Node 22 or newer (do not reapply to current `main`):
 
 ```sh
-curl -fL 'https://raw.githubusercontent.com/bdlglua/BDLMinerV1/v2/development/docs/patches/BDLMiner-stats-v2-semver.patch' -o /tmp/BDLMiner-stats-v2-semver.patch
+curl -fL 'https://raw.githubusercontent.com/bdlglua/BDLMinerV2/v2/development/docs/patches/BDLMiner-stats-v2-semver.patch' -o /tmp/BDLMiner-stats-v2-semver.patch
 git apply --check /tmp/BDLMiner-stats-v2-semver.patch
 git apply /tmp/BDLMiner-stats-v2-semver.patch
 npm test

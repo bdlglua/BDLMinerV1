@@ -84,6 +84,7 @@ void sharePoll() {
     http.setTimeout(10000);
     int code = -1;
     if (http.begin(tls, url) && tlsConnect(tls, host.c_str())) {
+        // Transport compatibility marker; the displayed/Stratum identity is BDLMinerV2.
         http.setUserAgent("BDLMinerV1/" FW_VERSION);
         http.addHeader("Content-Type", "application/json");
         code = http.POST((uint8_t *)body, strlen(body));

@@ -10,9 +10,9 @@ It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or nativ
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v2.0.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v2.0.0)**
-· [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v2.0.0.md) · [Français](docs/releases/v2.0.0.fr.md)
+**Latest release: [v2.0.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.0.1)**
+· [Site and web flasher](https://bdlglua.github.io/BDLMinerV2/)
+· [Release notes](docs/releases/v2.0.1.md) · [Français](docs/releases/v2.0.1.fr.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
@@ -56,17 +56,17 @@ and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
 
 ## Install
 
-Open **https://bdlglua.github.io/BDLMinerV1/** in Chrome or Edge on a computer, plug the
+Open **https://bdlglua.github.io/BDLMinerV2/** in Chrome or Edge on a computer, plug the
 board in with a data USB cable, pick it in the list and click *Install* (it flashes the
 latest release; the first install erases the board). Each
-[release](https://github.com/bdlglua/BDLMinerV1/releases) also has a
+[release](https://github.com/bdlglua/BDLMinerV2/releases) also has a
 `<board>-factory.bin` (first install, at 0x0) and a `<board>-firmware.bin` (update): see
 [Install a release](docs/guide.md#install-a-release-no-build-tools). To build it
 yourself, see [development.md](docs/development.md).
 
 ## First-time setup
 
-1. On first boot the board opens a Wi‑Fi access point **`BDLMinerV1-XXXX`**, password
+1. On first boot the board opens a Wi‑Fi access point **`BDLMinerV2-XXXX`**, password
    **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and enter your **pool**
    (see below), your **Bitcoin address** (optionally `address.worker`) and a **web
@@ -140,7 +140,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "2.0.0", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "2.0.1", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service
@@ -155,7 +155,7 @@ setting (`sharehr`), which applies at once.
 
 | Symptom | What to check |
 |---|---|
-| Can't find the `BDLMinerV1-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
+| Can't find the `BDLMinerV2-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
 | Portal saved but the board never mines | Read the serial monitor: Wi‑Fi password, pool host / port, and the `[pool]` lines. |
 | *Invalid BTC address?* at boot | The address checksum is wrong (typo, missing character, mixed upper/lower case) or it is not a Bitcoin address. Reopen the portal and fix it; ignore the warning only if your pool uses account names. |
 | Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
@@ -211,7 +211,7 @@ problems: see [SECURITY.md](SECURITY.md).
 
 ## License
 
-BDLMinerV1 is free software, released under the
+BDLMiner V2 is free software, released under the
 [GNU General Public License v3.0](LICENSE): you may use, modify and redistribute it,
 provided that modified versions you distribute are also released under the GPL‑3.0
 with their source code.

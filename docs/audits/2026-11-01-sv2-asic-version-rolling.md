@@ -44,7 +44,7 @@ The owner subsequently confirmed that this V1 change restored Gamma mining.
 The complete native suite and 24 host-tool tests passed after the correction.
 Both actual ASIC targets compiled successfully (`bitaxe-gamma-601`, `nerdnos`).
 The development version is 1.9.15. The complete
-[CI run](https://github.com/bdlglua/BDLMinerV1/actions/runs/41345688410) passed all
+[CI run](https://github.com/bdlglua/BDLMinerV2/actions/runs/41345688410) passed all
 twelve board builds plus native/tool and browser tests. The Gamma development
 artifact was independently checked against its GitHub ZIP digest, binary
 checksums, ESP32-S3 image checksum/appended SHA, version/model markers, matching
@@ -93,7 +93,7 @@ Following the owner's explicit request, annotated tag `v1.9.15` was pushed at
 the owner-tested corrective source at `db67b2123b1e784b93e7f079084a7e4ff8a93043`;
 intervening changes are documentation only. The normal workflow rebuilt and
 signed all twelve variants, then published
-[v1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15) on
+[v1.9.15](https://github.com/bdlglua/BDLMinerV2/releases/tag/v1.9.15) on
 1 November 2026 at 21:54:03 Europe/Paris.
 
 Independent public downloads verified all 51 asset sizes and GitHub SHA-256
@@ -103,10 +103,10 @@ board, matching factory apps and tested web/font assets. The ASIC-only rolling
 requirement marker is present in Gamma/NerdNOS and absent from software targets.
 The public latest-release endpoint and latest `update.json` advertise v1.9.15.
 
-The [release workflow](https://github.com/bdlglua/BDLMinerV1/actions/runs/41347995159)
+The [release workflow](https://github.com/bdlglua/BDLMinerV2/actions/runs/41347995159)
 passed its browser/native/tool checks, signed packaging and Pages deployment.
-The [main CI](https://github.com/bdlglua/BDLMinerV1/actions/runs/41347989356)
+The [main CI](https://github.com/bdlglua/BDLMinerV2/actions/runs/41347989356)
 passed every board build and all tests. The follow-up
-[site workflow](https://github.com/bdlglua/BDLMinerV1/actions/runs/41349250997)
+[site workflow](https://github.com/bdlglua/BDLMinerV2/actions/runs/41349250997)
 also built the twelve-board 1.9.15 installer and deployed it successfully.
 The short owner-run validation limits above remain unchanged.

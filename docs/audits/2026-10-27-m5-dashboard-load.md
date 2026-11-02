@@ -54,7 +54,7 @@ counter measurements and accepted-share statistics.
 
 ## Released and test firmware
 
-The signed [v1.6.3 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.6.3)
+The signed [v1.6.3 release](https://github.com/bdlglua/BDLMinerV2/releases/tag/v1.6.3)
 includes these changes for all supported variants. Existing M5StickC Plus2 devices
 can install the matching signed firmware through GitHub update discovery or the
 local update page. Reload the dashboard afterwards. v1.6.2 does not contain these

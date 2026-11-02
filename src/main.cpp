@@ -1,4 +1,4 @@
-// BDLMiner V1 - solo/lottery Bitcoin miner for the M5StickC Plus2 and other
+// BDLMiner V2 - solo/lottery Bitcoin miner for the M5StickC Plus2 and other
 // ESP32 boards. Connects to a Stratum V1 pool (public-pool.io by default).
 
 #include <Arduino.h>
@@ -58,7 +58,7 @@ void setup() {
 #endif
     delay(200);
     Serial.println();
-    logf("BDLMiner V1 %s on %s\n", FW_VERSION, BOARD_NAME);
+    logf("BDLMiner V2 %s on %s\n", FW_VERSION, BOARD_NAME);
     logBoot();
     crashBegin();
 

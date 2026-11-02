@@ -5,7 +5,7 @@
 #include "core/stratum.h"
 
 int main() {
-    constexpr const char *native = "BDLMinerV1/test";
+    constexpr const char *native = "BDLMinerV2/test";
     stratum::PoolAgent main, backup;
     for (const char *host : {"pool.nerdminers.org", "POOL.NERDMINERS.ORG.",
                              "pool.nerdminer.io", "pool.bitronics.store",

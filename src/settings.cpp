@@ -271,7 +271,7 @@ bool settingsSave(const Settings &values, bool forRestart) {
 String portalApName() {
     uint64_t mac = ESP.getEfuseMac();
     char buf[24];
-    snprintf(buf, sizeof(buf), "BDLMinerV1-%04X", (unsigned)((mac >> 32) & 0xFFFF));
+    snprintf(buf, sizeof(buf), "BDLMinerV2-%04X", (unsigned)((mac >> 32) & 0xFFFF));
     return buf;
 }
 
@@ -330,7 +330,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
 
     WiFiManager wm;
     wm.setDebugOutput(false);
-    wm.setTitle("BDLMiner V1");
+    wm.setTitle("BDLMiner V2");
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
     wm.setConnectTimeout(20);
     wm.setSaveConfigCallback([]() { shouldSave = true; });

@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the report! A **security problem**? Please do not post it here: see [SECURITY.md](https://github.com/bdlglua/BDLMinerV1/blob/main/SECURITY.md).
+        Thanks for the report! A **security problem**? Please do not post it here: see [SECURITY.md](https://github.com/bdlglua/BDLMinerV2/blob/main/SECURITY.md).
         Before posting logs, remove passwords, webhook URLs and ntfy topics (your payout address is fine).
   - type: dropdown
     id: board

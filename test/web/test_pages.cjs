@@ -32,7 +32,7 @@ const settings = {
     ['nightfrom','number','Display','Night hour',{min:0,max:255}],
     ['saver','bool','Safety','Battery saver',{}], ['webpass','secret','Network','Web password',{}]
   ],
-  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:true,ua:'BDLMinerV1/test',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
+  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:true,ua:'BDLMinerV2/test',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
 };
 let browser;
 const cases=[];
@@ -490,8 +490,8 @@ check('automatic pool identity is explained and updates when switching to backup
   await f.page.goto(f.url);
   await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('NerdMinerV2'));
   assert.match(await f.page.locator('#pool-grid').textContent(),/Stratum V1 · NerdMinerV2 · automatique/);
-  Object.assign(f.state.stats.pool,{host:'backup.example',backup:true,user_agent:'BDLMinerV1/test'});
-  await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('BDLMinerV1/test'));
+  Object.assign(f.state.stats.pool,{host:'backup.example',backup:true,user_agent:'BDLMinerV2/test'});
+  await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('BDLMinerV2/test'));
   assert.match(await f.page.locator('#pool-grid').textContent(),/Pool \(secours\)/);
   assert.doesNotMatch(await f.page.locator('#pool-grid').textContent(),/NerdMinerV2/);
 }));
@@ -564,7 +564,7 @@ check('a refused password stays inside the translated interface',()=>run({langua
   assert.equal(await f.page.locator('#save').isDisabled(),true);assert.equal(await f.page.locator('h1').textContent(),'Réglages et maintenance');
 }));
 
-check('USB-only boards explain the update path and prevent web installs',()=>run({capabilities:{ota:false},stats:{github_update:{available:true,supported:false,version:'1.1.0',release_url:'https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.1.0'}}},async f=>{
+check('USB-only boards explain the update path and prevent web installs',()=>run({capabilities:{ota:false},stats:{github_update:{available:true,supported:false,version:'1.1.0',release_url:'https://github.com/bdlglua/BDLMinerV2/releases/tag/v1.1.0'}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#updates a');assert.equal(await f.page.locator('.gh-install').count(),0);
   assert.match(await f.page.locator('#updates a').getAttribute('href'),/v1\.1\.0/);
   await loaded(f);await f.page.setInputFiles('#fw',{name:'board-firmware.bin',mimeType:'application/octet-stream',buffer:Buffer.from([0xe9,1,2,3])});

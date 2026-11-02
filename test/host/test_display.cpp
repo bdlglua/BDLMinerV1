@@ -156,11 +156,11 @@ int main(int argc, char **argv) {
         auto alerted = image(lcd);
         view.alert("BLOCK CANDIDATE", "915432", "Check pool / chain"); assert(image(lcd) == alerted);
         view.render(example(0, false)); // dismissing restores the mining frame
-        view.message("BDLMiner V1", "M5StickC Plus2", "v" FW_VERSION " / hold A: setup");
+        view.message("BDLMiner V2", "M5StickC Plus2", "v" FW_VERSION " / hold A: setup");
         if (!out.empty()) ppm(lcd, out + "/splash_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         view.message("WiFi", "Connecting...", "Hold A at boot: setup");
         if (!out.empty()) ppm(lcd, out + "/startup_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
-        view.portal("WiFi setup", "BDLMinerV1-XXXX", "MineYourCoins", "WIFI:T:WPA;S:BDLMinerV1-XXXX;P:MineYourCoins;;");
+        view.portal("WiFi setup", "BDLMinerV2-XXXX", "MineYourCoins", "WIFI:T:WPA;S:BDLMinerV2-XXXX;P:MineYourCoins;;");
         if (!out.empty()) ppm(lcd, out + "/setup_" + std::to_string(size[0]) + "x" + std::to_string(size[1]) + "_en.ppm");
         std::cout << size[0] << 'x' << size[1] << ": 8 pages, EN/FR, strip/direct parity, cache, edge cases and update recovery passed\n";
     }

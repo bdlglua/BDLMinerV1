@@ -23,6 +23,7 @@ PACKAGE=('__init__.py','client.py','hub.py','calibration.py','example.json',
          'web/index.html','web/app.js','web/style.css')
 DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness.md',
       'v2/hardware-validation.md','v2/hardware-validation.fr.md',
+      'v2/repository-migration.md',
       'audits/2026-11-02-resumable-sha.md',
       'audits/2026-11-02-board-hashrate-research.md',
       'benchmarks/v2-native-sha256d-2026-11-02.json',
@@ -30,6 +31,7 @@ DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness
       'releases/v2.0.0-beta.3.md','releases/v2.0.0-beta.3.fr.md',
       'releases/v2.0.0-beta.4.md','releases/v2.0.0-beta.4.fr.md',
       'releases/v2.0.0.md','releases/v2.0.0.fr.md',
+      'releases/v2.0.1.md','releases/v2.0.1.fr.md',
       'patches/README.md','patches/BDLMiner-stats-v2-semver.patch')
 
 

@@ -177,18 +177,18 @@ documentation and the host-only LAN observer/tests. The normal tag workflow
 rebuilt and signed all twelve variants, updated the existing draft's notes and
 files, then published it on 1 November 2026 at 20:22:33 Europe/Paris.
 
-[Release v1.9.14](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.14)
+[Release v1.9.14](https://github.com/bdlglua/BDLMinerV2/releases/tag/v1.9.14)
 contains 51 assets. Independent downloads verified all 51 GitHub asset digests
 and sizes, twelve firmware signatures with the bundled public key, 24 binary
 checksums, image checksums/chip IDs, both OTA slots, factory app identity and
 the tested web/font assets. The public latest-release endpoint and latest
 `update.json` both advertise v1.9.14. All twelve installer layouts were checked.
 
-The [release workflow](https://github.com/bdlglua/BDLMinerV1/actions/runs/41340099997)
+The [release workflow](https://github.com/bdlglua/BDLMinerV2/actions/runs/41340099997)
 passed web tests, native/tool tests, signed packaging and Pages deployment.
-The [main CI](https://github.com/bdlglua/BDLMinerV1/actions/runs/41340086093)
+The [main CI](https://github.com/bdlglua/BDLMinerV2/actions/runs/41340086093)
 also passed every board build plus native/tool and browser checks. The
-[web flasher](https://bdlglua.github.io/BDLMinerV1/) was deployed with 1.9.14.
+[web flasher](https://bdlglua.github.io/BDLMinerV2/) was deployed with 1.9.14.
 The hardware-validation limits above remain explicit; publication does not
 turn the short owner-run checks into long-duration or all-board validation.
 

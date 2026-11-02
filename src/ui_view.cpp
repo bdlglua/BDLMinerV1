@@ -425,7 +425,7 @@ void View::render(const Model &m) {
 }
 
 void View::message(const char *title, const char *line1, const char *line2) {
-    bool splash = title && std::string(title) == "BDLMiner V1";
+    bool splash = title && std::string(title) == "BDLMiner V2";
     frame(splash ? -4 : -1, accent_, language_);
     header(title ? title : "", "", kMuted);
     Rect b = body();

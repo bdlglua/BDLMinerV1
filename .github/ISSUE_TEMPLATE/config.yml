@@ -4,8 +4,8 @@ contact_links:
     url: https://discord.gg/S8kSgD6Xe9
     about: "Installation, pools, settings: ask the community on the BDLMiner Discord."
   - name: Security vulnerability
-    url: https://github.com/bdlglua/BDLMinerV1/security/advisories/new
+    url: https://github.com/bdlglua/BDLMinerV2/security/advisories/new
     about: Report it privately, please do not open a public issue.
   - name: Installation guide and FAQ
-    url: https://github.com/bdlglua/BDLMinerV1#readme
+    url: https://github.com/bdlglua/BDLMinerV2#readme
     about: Install from the browser, set up WiFi and pools, troubleshooting.

@@ -1,4 +1,4 @@
-# BDLMiner V1 development
+# BDLMiner V2 development
 
 Building the firmware, how it hashes, making a release, and the code layout. See also
 [CONTRIBUTING.md](../CONTRIBUTING.md) and the [user guide](guide.md).

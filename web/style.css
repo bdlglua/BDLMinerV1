@@ -1,4 +1,4 @@
-/* BDLMiner console: the look of the BDLMiner site (bdlglua.github.io/BDLMinerV1): dark panels, one accent colour, tabular numbers. */
+/* BDLMiner console: the look of the BDLMiner site (bdlglua.github.io/BDLMinerV2): dark panels, one accent colour, tabular numbers. */
 :root{color-scheme:dark;--bg:#0b0d12;--side:#0b0d12;--panel:#141922;--raised:#1a2030;--border:#262e3d;--line:#1e2633;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a;--ok:#3ddc84;--bad:#ff4d4f;--warn:#ffbf5a;--radius:12px}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:74px}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 button,input,select{font:inherit}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}button,a,input,select{-webkit-tap-highlight-color:transparent}

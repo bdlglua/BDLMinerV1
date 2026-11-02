@@ -68,8 +68,8 @@ controls are not exposed for this backend.
 Use a USB supply rated for at least **2 A** (the ASIC draws about 8 W).
 
 1. Download **`nerdnos-factory.bin`** from the latest
-   [release](https://github.com/bdlglua/BDLMinerV1/releases/latest) and flash it at
-   **0x0**, or select **NerdNOS** in the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
+   [release](https://github.com/bdlglua/BDLMinerV2/releases/latest) and flash it at
+   **0x0**, or select **NerdNOS** in the [web flasher](https://bdlglua.github.io/BDLMinerV2/).
    To build it yourself:
 
    ```sh
@@ -77,7 +77,7 @@ Use a USB supply rated for at least **2 A** (the ASIC draws about 8 W).
    pio device monitor -b 115200
    ```
 
-2. Connect to `BDLMinerV1-XXXX`, password `MineYourCoins`, open `http://192.168.4.1`,
+2. Connect to `BDLMinerV2-XXXX`, password `MineYourCoins`, open `http://192.168.4.1`,
    and set WiFi, your payout address and a web password.
 3. The log (`/log`) shows `[nerdnos] BM1397 at 300 MHz` once the chip runs; the
    dashboard's *ASIC · BM1397* tile shows its state, frequency, verified results and

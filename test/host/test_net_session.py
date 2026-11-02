@@ -22,7 +22,7 @@ prefix = r'''
 #include "core/pool_agent.h"
 using std::min;
 #define FW_VERSION "test"
-#define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
+#define DEFAULT_USER_AGENT "BDLMinerV2/" FW_VERSION
 #define pdMS_TO_TICKS(x) (x)
 struct String : std::string {
     using std::string::string;
@@ -130,7 +130,7 @@ int main() {
     host = "custom.example"; protocol.reset(); poolConnected = false;
     WiFiClient refused(refusal);
     session(refused, protocol, 0, main);
-    assert(refused.sent.size() == 1 && refused.sent[0].find("BDLMinerV1/test") != std::string::npos);
+    assert(refused.sent.size() == 1 && refused.sent[0].find("BDLMinerV2/test") != std::string::npos);
     assert(retryAgent && !poolConnected);
     retryAgent = false; protocol.reset();
     WiFiClient retried(ok);
@@ -145,7 +145,7 @@ int main() {
     host = "backup.example"; onBackup = true; protocol.reset();
     WiFiClient secondary(ok);
     session(secondary, protocol, 0, backup);
-    assert(secondary.sent[0].find("BDLMinerV1/test") != std::string::npos);
+    assert(secondary.sent[0].find("BDLMinerV2/test") != std::string::npos);
     assert(status == "Mining (backup pool)");
 
     host = "auth.example"; protocol.reset(); poolConnected = false;

@@ -6,7 +6,8 @@
 #include <cstring>
 
 inline bool legacyManualAgent(const char *agent) {
-    return agent && *agent && strcmp(agent, "NerdMinerV2") && strncmp(agent, "BDLMinerV1/", 11);
+    return agent && *agent && strcmp(agent, "NerdMinerV2") &&
+        strncmp(agent, "BDLMinerV1/", 11) && strncmp(agent, "BDLMinerV2/", 11);
 }
 
 #define DEFAULT_POOL_HOST "public-pool.io"
@@ -27,11 +28,11 @@ inline bool legacyManualAgent(const char *agent) {
 #ifndef FW_VERSION
 #define FW_VERSION "dev"
 #endif
-#define DEFAULT_USER_AGENT "BDLMinerV1/" FW_VERSION
+#define DEFAULT_USER_AGENT "BDLMinerV2/" FW_VERSION
 #define DEFAULT_NTFY_SERVER "ntfy.sh"
 // Firmware updates come from the releases of this GitHub repository.
 #ifndef GITHUB_REPO
-#define GITHUB_REPO "bdlglua/BDLMinerV1"
+#define GITHUB_REPO "bdlglua/BDLMinerV2"
 #endif
 #define HOUR_OFF 255  // nightFrom / nightTo: no night mode
 
@@ -105,10 +106,9 @@ struct Settings {
 
 inline void settingsNormalizeAgent(Settings &values) {
     const char *agent = values.userAgent.c_str();
-    // A manual "BDLMinerV1/<version>" is the native identity saved by an older
-    // firmware: it follows the running version instead of announcing that one.
+    // Saved native identities follow the running version, including old V1 records.
     if (!*agent || strlen(agent) > 64 || (values.userAgentAuto && !strcmp(agent, "NerdMinerV2")) ||
-        !strncmp(agent, "BDLMinerV1/", 11))
+        !strncmp(agent, "BDLMinerV1/", 11) || !strncmp(agent, "BDLMinerV2/", 11))
         values.userAgent = DEFAULT_USER_AGENT;
 }
 

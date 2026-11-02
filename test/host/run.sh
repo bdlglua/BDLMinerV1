@@ -71,6 +71,7 @@ python3 test/host/test_settings_persistence.py
 python3 test/host/test_web_upload.py
 python3 test/host/test_web_delivery.py
 python3 test/host/test_ghupdate.py
+python3 test/host/test_update_redirects.py
 
 # Gamma-only schema: frequency bounds, staged values and old-record migration.
 g++ -std=c++17 -O2 -Wall -DBOARD_GAMMA601 -DBOARD_ASIC -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_settings_apply.cpp src/core/sv2_key.cpp src/core/work.cpp src/core/sha256.cpp -o .pio/host/test_gamma_settings_apply

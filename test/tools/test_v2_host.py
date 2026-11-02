@@ -628,12 +628,12 @@ class ArtifactTests(unittest.TestCase):
         def fetch(tag, root):
             (root / 'boards.json').write_text(json.dumps({'m5stickc-plus2': 'esp32'}))
             (root / 'm5stickc-plus2-factory.bin').write_bytes(b'fixture')
-            base = 'https://github.com/bdlglua/BDLMinerV1/releases/download/' + tag + '/'
+            base = 'https://github.com/bdlglua/BDLMinerV2/releases/download/' + tag + '/'
             assets = [{'name': 'm5stickc-plus2-firmware.bin' + suffix,
                        'browser_download_url': base + 'm5stickc-plus2-firmware.bin' + suffix} for suffix in ('', '.sig')]
             (root / 'update.json').write_text(json.dumps({'tag_name': tag, 'assets': assets}))
         with tempfile.TemporaryDirectory() as tmp:
-            stable, beta = build_channels(releases, fetch, tmp, 'bdlglua/BDLMinerV1')
+            stable, beta = build_channels(releases, fetch, tmp, 'bdlglua/BDLMinerV2')
             self.assertEqual(stable, 'v1.9.15')
             self.assertEqual(beta, 'v2.0.0-beta.1')
             self.assertEqual(json.loads((Path(tmp) / 'manifest-m5stickc-plus2.json').read_text())['version'], '1.9.15')

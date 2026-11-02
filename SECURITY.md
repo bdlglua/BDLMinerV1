@@ -1,6 +1,6 @@
 # Security policy
 
-BDLMiner V1 runs on small ESP32 boards on home networks, installs its own updates
+BDLMiner V2 runs on small ESP32 boards on home networks, installs its own updates
 from GitHub and keeps a WiFi password, a payout address and optional notification
 and MQTT credentials. Reports that help keep that safe are very welcome.
 
@@ -8,7 +8,7 @@ and MQTT credentials. Reports that help keep that safe are very welcome.
 
 | Version | Supported |
 |---|---|
-| 1.9.x (latest release) | ✅ security fixes |
+| 2.0.x (latest release) | ✅ security fixes |
 | older releases | ❌ — miners install the latest release by themselves (GitHub updates, setting `2`, the default) |
 
 Fixes ship as a new release; the boards marked **experimental** (Bitaxe Gamma 601,
@@ -19,7 +19,7 @@ NerdNOS) receive the same fixes, on a best-effort basis for their hardware code.
 **Please do not open a public issue, discussion or Discord message for a
 vulnerability.** Report it privately through GitHub instead:
 
-👉 **[Report a vulnerability](https://github.com/bdlglua/BDLMinerV1/security/advisories/new)**
+👉 **[Report a vulnerability](https://github.com/bdlglua/BDLMinerV2/security/advisories/new)**
 (the repository's *Security* tab → *Report a vulnerability*).
 
 Please include:
@@ -47,7 +47,7 @@ In scope:
   (ntfy, webhook), MQTT / Home Assistant, the anonymous usage count and hashrate
   sharing;
 - the release pipeline: release signing, `update.json`, the published files, and the
-  web installer at <https://bdlglua.github.io/BDLMinerV1/>.
+  web installer at <https://bdlglua.github.io/BDLMinerV2/>.
 
 Out of scope:
 

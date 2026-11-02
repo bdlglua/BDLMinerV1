@@ -84,6 +84,7 @@ bool httpsGet(String url, WiFiClientSecure &tls, HTTPClient &http, int *code) {
         // the first request. Connect afterwards so GET() reuses the guarded
         // handshake instead of starting another one with the miner running.
         if (!tlsConnect(tls, host.c_str())) return false;
+        // Retain the legacy binary version marker required by existing offline OTA validators.
         http.setUserAgent("BDLMinerV1/" FW_VERSION);
         http.addHeader("Accept", "application/vnd.github+json");
         http.collectHeaders(kHeaders, 1);

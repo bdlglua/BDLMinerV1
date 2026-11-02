@@ -90,6 +90,14 @@ int main() {
     legacy = R"({"pool":"legacy.pool","ua":"NerdMinerV2"})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(legacy), strlen(legacy), migrated));
     assert(migrated.userAgentAuto);
+    for (const char *native : {"BDLMinerV1/1.9.15", "BDLMinerV2/2.0.0"}) {
+        std::string record = std::string("{\"pool\":\"legacy.pool\",\"ua\":\"") + native + "\"}";
+        Settings decoded;
+        assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(record.data()), record.size(), decoded));
+        settingsNormalizeAgent(decoded);
+        assert(decoded.userAgentAuto && decoded.userAgent == DEFAULT_USER_AGENT);
+        assert(decoded.poolHost == "legacy.pool" && decoded.poolProtocol == 0);
+    }
     Storage modes;uint32_t modeSequence=0;
     Settings manual;manual.userAgentAuto=false;manual.userAgent="MyMiner";
     manual.poolProtocol=1;manual.poolAuthority="authority-main";manual.backupProtocol=0;manual.backupAuthority="authority-backup";

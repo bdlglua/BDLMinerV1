@@ -27,7 +27,7 @@ using std::min;
 #include "ota.h"
 #define FW_VERSION "1.0.10"
 #define FW_ENV "test"
-#define GITHUB_REPO "bdlglua/BDLMinerV1"
+#define GITHUB_REPO "bdlglua/BDLMinerV2"
 #define portENTER_CRITICAL(x) ((void)0)
 #define portEXIT_CRITICAL(x) ((void)0)
 using portMUX_TYPE = int;
@@ -151,7 +151,7 @@ int main() {
     reset(); manifest.body=R"({"tag_name":"v2.0.0-beta.1","assets":[{"name":"test-firmware.bin","browser_download_url":"firmware"},{"name":"test-firmware.bin.sig","browser_download_url":"signature"}]})";
     assert(!check() && !state.available && strstr(state.error,"beta channel"));
     settings.updateChannel=1; assert(check() && state.available);
-    assert(requests.back()=="https://bdlglua.github.io/BDLMinerV1/updates/beta.json");
+    assert(requests.back()=="https://bdlglua.github.io/BDLMinerV2/updates/beta.json");
     manifest.code=404; requests.clear(); assert(!check() && requests.size()==1);
     assert(strstr(state.error,"beta channel unavailable"));
     manifest={200,valid,false}; nowMs=0; ghUpdatePoll(); // synchronize scheduler channel

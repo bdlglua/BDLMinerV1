@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the BDLMiner V1 Discord server: roles, categories, channels, forum tags,
+"""Build the BDLMiner V2 Discord server: roles, categories, channels, forum tags,
 a GitHub release webhook and the pinned welcome, rules, install and FAQ texts.
 
 Once it has run, save it as a template in Discord (Server Settings > Server
@@ -26,8 +26,8 @@ import urllib.error
 import urllib.request
 
 API = "https://discord.com/api/v10"
-FLASHER = "https://bdlglua.github.io/BDLMinerV1/"
-REPO = "https://github.com/bdlglua/BDLMinerV1"
+FLASHER = "https://bdlglua.github.io/BDLMinerV2/"
+REPO = "https://github.com/bdlglua/BDLMinerV2"
 
 # Discord permission bits.
 VIEW, SEND, REACT, HISTORY = 1 << 10, 1 << 11, 1 << 6, 1 << 16
@@ -66,7 +66,7 @@ BOARD_TAGS = [("M5StickC Plus2", "📱"), ("M5Stack", "📱"), ("T-Display", "�
 # type: 0 text, 2 voice, 4 category, 5 announcement, 15 forum.
 CATEGORIES = [
     {"name": "📢 BIENVENUE", "access": READ_ONLY, "channels": [
-        {"name": "👋-bienvenue", "topic": "Bienvenue sur le serveur de BDLMiner V1, le firmware de minage Bitcoin solo pour ESP32."},
+        {"name": "👋-bienvenue", "topic": "Bienvenue sur le serveur de BDLMiner V2, le firmware de minage Bitcoin solo pour ESP32."},
         {"name": "📜-règles", "topic": "À lire avant de participer."},
         {"name": "📣-annonces", "type": 5, "topic": "Nouvelles versions et informations importantes."},
         {"name": "🔔-releases-github", "topic": "Publié automatiquement à chaque release GitHub.", "webhook": "GitHub"},
@@ -114,8 +114,8 @@ CATEGORIES = [
 
 MESSAGES = {
     "👋-bienvenue": [
-        "# ⛏️ Bienvenue sur le serveur BDLMiner V1 !\n\n"
-        "**BDLMiner V1** est un firmware libre (GPL-3.0) qui transforme une petite carte ESP32 en "
+        "# ⛏️ Bienvenue sur le serveur BDLMiner V2 !\n\n"
+        "**BDLMiner V2** est un firmware libre (GPL-3.0) qui transforme une petite carte ESP32 en "
         "**mineur Bitcoin solo** : si ton miner trouve un bloc, la récompense va **directement à ton adresse**. "
         "C'est une loterie, mais une vraie : chaque hash a sa chance.\n\n"
         "**Pour commencer**\n"
@@ -156,7 +156,7 @@ MESSAGES = {
         f"1. Ouvre l'installateur web dans **Chrome ou Edge** : {FLASHER}\n"
         "2. Branche ta carte en **USB** (un câble qui transmet les données), choisis ta carte, clique sur "
         "**Installer**.\n"
-        "3. Sur ton téléphone, connecte-toi au WiFi **`BDLMinerV1-XXXX`**, mot de passe **`MineYourCoins`**. "
+        "3. Sur ton téléphone, connecte-toi au WiFi **`BDLMinerV2-XXXX`**, mot de passe **`MineYourCoins`**. "
         "La page de configuration s'ouvre (sinon : `http://192.168.4.1`).\n"
         "4. Choisis ton WiFi, entre ton **adresse Bitcoin** (tu peux ajouter un nom de worker : "
         "`adresse.nom`), et si tu veux un **mot de passe web** (facultatif), puis enregistre.\n"
@@ -217,7 +217,7 @@ class Discord:
             req = urllib.request.Request(API + path, data=data, method=method, headers={
                 "Authorization": "Bot " + self.token,
                 "Content-Type": "application/json",
-                "User-Agent": "DiscordBot (https://github.com/bdlglua/BDLMinerV1, 1.0)",
+                "User-Agent": "DiscordBot (https://github.com/bdlglua/BDLMinerV2, 1.0)",
             })
             try:
                 with urllib.request.urlopen(req, timeout=30) as res:

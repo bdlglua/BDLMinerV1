@@ -54,9 +54,9 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    rollback, back up the flash with esptool before erasing it. BDLMiner does not
    import AxeOS NVS settings.
 2. Download **`bitaxe-gamma-601-factory.bin`** from the
-   [latest release](https://github.com/bdlglua/BDLMinerV1/releases/latest) and
+   [latest release](https://github.com/bdlglua/BDLMinerV2/releases/latest) and
    flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
-   the [web flasher](https://bdlglua.github.io/BDLMinerV1/).
+   the [web flasher](https://bdlglua.github.io/BDLMinerV2/).
    Alternatively, build with PlatformIO 6.1.19:
 
    ```sh
@@ -71,7 +71,7 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    CI artifacts remain unsigned development builds for USB testing.
    A packaged factory image is flashed at **0x0**; the app-only
    `firmware.bin` is not a complete image for offset 0.
-3. Connect to `BDLMinerV1-XXXX`, password `MineYourCoins`, and open
+3. Connect to `BDLMinerV2-XXXX`, password `MineYourCoins`, and open
    `http://192.168.4.1`. Set WiFi, your payout address/worker, and a web password.
 4. Defaults are `public-pool.io:3333`, Stratum V1, suggested difficulty **1024**,
    automatic BDLMiner user agent. The pool must accept BIP310 version rolling

@@ -1,16 +1,16 @@
-# BDLMiner V1 user guide
+# BDLMiner V2 user guide
 
-Everything about installing, setting up and using BDLMiner V1. The [README](../README.md)
+Everything about installing, setting up and using BDLMiner V2. The [README](../README.md)
 has the short version; [development.md](development.md) covers building, releases and
 the code.
 
 ## Install a release (no build tools)
 
-**Easiest:** open **https://bdlglua.github.io/BDLMinerV1/** in Chrome or Edge on a
+**Easiest:** open **https://bdlglua.github.io/BDLMinerV2/** in Chrome or Edge on a
 computer, plug the board in with a data USB cable, pick it in the list and click
 *Install* (it flashes the latest release; the first install erases the board).
 
-Each [release](https://github.com/bdlglua/BDLMinerV1/releases) also has two files per board (`<board>` = the environment name of the table
+Each [release](https://github.com/bdlglua/BDLMinerV2/releases) also has two files per board (`<board>` = the environment name of the table
 above, e.g. `m5stickc-plus2`):
 
 * **`<board>-factory.bin`**: complete image for a first install, flashed at address
@@ -43,7 +43,7 @@ Boards without a display report everything on the serial monitor and the
 ## First-time setup
 
 1. On first boot the board opens a Wi‑Fi access point
-   **`BDLMinerV1-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
+   **`BDLMinerV2-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
    * **Pool host / port**: `public-pool.io` / `21496` is the compiled default.
      For low-hashrate ESP32 feedback, see [Pools for ESP32](../README.md#pools-for-esp32),
@@ -102,7 +102,7 @@ or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard 
 
 Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
 Automatic is the default; it requires no manual identity entry.
-Every pool receives `BDLMinerV1/<version>` on the first connection, including
+Every pool receives `BDLMinerV2/<version>` on the first connection, including
 ESP32/NerdMiner pools. The manual field also defaults to this native identity.
 If a pool explicitly refuses that user agent, the miner retries it once
 as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
