@@ -22,7 +22,9 @@ TOOLS=('bdlhub.py','calibrate_gamma.py','check_fleet.py','check_hardware.py',
 PACKAGE=('__init__.py','client.py','hub.py','calibration.py','example.json',
          'web/index.html','web/app.js','web/style.css')
 DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness.md',
-      'benchmarks/v2-native-sha256d-2026-11-02.json')
+      'benchmarks/v2-native-sha256d-2026-11-02.json',
+      'releases/v2.0.0-beta.2.md','releases/v2.0.0-beta.2.fr.md',
+      'patches/README.md','patches/BDLMiner-stats-v2-semver.patch')
 
 
 def build_kit(release,output,boards=DEFAULT_BOARDS):

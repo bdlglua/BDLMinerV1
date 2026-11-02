@@ -1,10 +1,10 @@
 # BDLMiner V2 development
 
 The seven V2 features are implemented on `v2/development`. The firmware version
-is `2.0.0-beta.1`; this branch is not a published release. Stable V1 remains
+is `2.0.0-beta.2`; this branch is not a published release. Stable V1 remains
 [1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15).
 
-## First M5 / Gamma test kit
+## M5 / Gamma test kit
 
 The successful V2 [CI runs](https://github.com/bdlglua/BDLMinerV1/actions/workflows/ci.yml?query=branch%3Av2%2Fdevelopment)
 provide a `v2-linux-test-kit` artifact. Sign in to GitHub, download that artifact
@@ -40,6 +40,33 @@ python3 tools/make_beta_bundle.py --archive .pio/BDLMiner-V2-Linux-test-kit.zip
 The builder checks chip/target/version, binary hashes, factory application and
 both OTA slots. The ZIP contains only checksum-listed distribution files;
 runtime databases/caches, private keys and local reports are excluded.
+
+## Beta.1 to beta.2 on the owner's cards
+
+Beta.2 includes the official dashboard logo, V2 browser/app titles, full-width
+device/record/update panels and the improved host collector. See the
+[changes and validation limits](../releases/v2.0.0-beta.2.md).
+
+Extract the new kit into a separate directory. Keep the existing hub configuration
+and private settings backup. Stop the old hub with Ctrl+C before starting the
+new one; both use port 8787. The kit's readiness launcher expects beta.2, so a
+card still on beta.1 correctly reports `review` until its manual update completes.
+
+To observe the M5 update, start this in the new kit **before** uploading the image:
+
+```bash
+python3 tools/check_hardware.py ota-monitor http://192.168.1.40 --previous 2.0.0-beta.1 --expected 2.0.0-beta.2 --expect confirm --timeout 900 --output ota-m5-beta2.json
+```
+
+Then open the M5's local Settings page and upload
+`firmware/m5stickc-plus2-firmware.bin`. Leave the observer running through the
+trial and automatic confirmation; it observes only and does not upload/reboot.
+For Gamma, use the same observer command with `192.168.1.135`, output
+`ota-gamma-beta2.json`, and upload `firmware/bitaxe-gamma-601-firmware.bin` through
+that card's Settings page. Use `*-firmware.bin` for OTA, not `*-factory.bin`.
+After confirmation, run `sh check-miners.sh` and check the V2 tab titles, official
+logo and full-width detail panels. These are pending beta.2 hardware checks;
+the earlier beta.1 reports do not establish their outcome.
 
 ## Local dashboard and mining work
 
