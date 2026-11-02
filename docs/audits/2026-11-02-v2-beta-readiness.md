@@ -408,3 +408,32 @@ first report remains failed; no network recovery pass is retroactively assigned.
 A matching `wifi`/local-connectivity observation with a distinct filename and
 explicit restoration during the running observer has been requested. No firmware
 timeouts, health interlocks or pass criteria were weakened.
+
+### Matched M5 blacklist/connectivity recovery passes
+
+The owner supplied `network-m5-beta4-blacklist.json`, starting at
+11:43:16.064509 UTC in `wifi` mode. It reports `passed`, observed outage,
+restored connectivity and `operator_confirmed: true`, with 75 successful
+readings over 199.827 host seconds. Boot stays `ab2a323b` on confirmed beta.4.
+Three planned-interruption HTTP timeouts are retained at +151.261 and +161.269 s
+during outage detection, then +171.277 s during recovery. The operator confirms
+adding/removing only the M5 in the router blacklist while the computer stays
+connected. This attribution is part of the test; HTTP loss alone is not
+independent proof of Wi-Fi radio state. Health during the HTTP outage remains
+explicitly unobserved.
+
+After restoration, the observer sees connected Noise Stratum V2 and counts
+1,553,819,000 hashes at uptime 1,627 s, then 1,563,871,000 at 1,637 s:
+**1.0052 MH/s over ten resumed device seconds**, matching the report. The final
+snapshot has 45 C IMU, 100% power and live rate 1.000359041 MH/s. Its displayed
+60-tick average is 0.366686646 MH/s because the window still includes the
+intentional pause; counters and live rate independently establish resumed work.
+The first failed pool-mode attempt remains failed. The matching report validates
+same-boot local-connectivity/pool recovery after the operator's blacklist action,
+not uninterrupted mining or long-duration beta.4 stability.
+
+Current scope: owner accepts the local layout fixes; both beta.4 OTA confirmations,
+M5 physical rollback, both short counter windows and matched M5 network recovery
+are observed. Gamma's beta.3 hour remains `review` after one recovered HTTP timeout.
+Ordinary S2/S3/C3 and NerdNOS hardware are still unavailable, so no physical gain
+or 1 MH/s claim for those chip families is added.

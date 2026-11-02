@@ -158,6 +158,14 @@ a new snapshot shows restored mining on the same boot. The failed report is
 retained. A matching Wi-Fi/local-connectivity observation is pending; the operator
 must restore access while the observer runs so recovery can be measured.
 
+The matching blacklist/local-connectivity recovery report now passes. It retains
+three HTTP timeouts during the deliberate interruption, unchanged M5 boot
+`ab2a323b`, operator-confirmed restoration and ten resumed device seconds at
+1.0052 MH/s. The failed pool-mode report remains failed. Layout acceptance, both
+beta.4 OTA confirmations, M5 rollback, both short counter windows and matched M5
+network recovery are recorded; Gamma's beta.3 hour stays `review`, and other-board
+physical measurements remain blocked on hardware availability.
+
 ## Beta readiness follow-up — 2026-11-02 (Europe/Paris)
 
 The next development step combines a first Linux test kit, the embedded dashboard

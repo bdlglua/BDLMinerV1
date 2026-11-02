@@ -12,7 +12,7 @@ confirmed that dashboard gaps and settings icons are fixed on both boards.
 |---|---|
 | Local dashboard | Owner accepts gap/icon corrections on both beta.3 devices. |
 | Gamma OTA/stability | Beta.3 hour completed: 3,604 s, 1.071274 TH/s, +141 accepted / no new rejected shares, `review` after one recovered timeout. Beta.4 OTA and 122-second post-OTA check at 1.073214 TH/s passed. |
-| Rollback/network recovery | M5 USB reset, rollback, normal beta.4 confirmation and short check passed. First pool-mode network attempt unvalidated; matching blacklist/Wi-Fi observation requested. |
+| Rollback/network recovery | M5 USB reset, rollback, normal beta.4 confirmation, short check and same-boot blacklist recovery passed (1.0052 MH/s over 10 s after recovery). First pool-mode failure retained. |
 | S2/S3/C3 and NerdNOS | No ordinary test boards available to the owner; physical measurements pending. |
 
 ## Gamma hour result
@@ -149,6 +149,14 @@ blacklist the M5 resumes mining on the same boot. The matching retry uses a
 separate report filename. **Remove the M5 from the blacklist when restoration
 is requested while the observer is still running**, so recovery can be measured.
 Also remove the block after an error/timeout.
+
+The new `network-m5-beta4-blacklist.json` now passes: outage, restoration and
+operator action confirmed, with boot `ab2a323b` unchanged. Resumed counters
+1,553,819,000 -> 1,563,871,000 over uptimes 1,627 -> 1,637 s give **1.0052 MH/s**.
+The 60-tick displayed average still includes the intentional pause; live rate
+returns to about 1 MH/s. Health during HTTP loss remains unobserved. This is
+operator-attributed blacklist/connectivity recovery, while the first failed
+pool-mode attempt remains failed.
 
 ## Gamma OTA after its hour
 

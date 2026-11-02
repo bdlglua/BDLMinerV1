@@ -7,11 +7,11 @@ acceptées et une stale. Ce sont des valeurs instantanées ; la stale existe dé
 avant les nouveaux essais. Le propriétaire confirme ensuite que les espaces
 vides et les icônes des réglages sont corrigés **sur les deux cartes**.
 
-| Point | État avant les nouveaux essais |
+| Point | État actuel |
 |---|---|
 | 1. Affichage local | Espaces vides et icônes validés par le propriétaire sur M5 et Gamma en bêta 3. |
 | 2. Gamma : OTA et stabilité | Heure bêta 3 terminée : 3 604 s, 1,071274 TH/s, +141 acceptées, aucun nouveau rejet ; `review` après un timeout récupéré. OTA bêta 4 confirmée et contrôle de 122 s réussi à 1,073214 TH/s. |
-| 3. Rollback et réseau | Reset USB, rollback, réinstallation/confirmation bêta 4 et contrôle court du M5 validés. Premier essai réseau `pool` non validé ; nouvel essai avec blacklist en mode `wifi` demandé. |
+| 3. Rollback et réseau | Reset USB, rollback, réinstallation/confirmation bêta 4 et contrôle court du M5 validés. Reprise après blacklist validée sur le même boot à 1,0052 MH/s sur 10 s ; premier essai `pool` conservé non validé. |
 | 4. S3/S2/C3 et NerdNOS | Aucun de ces matériels de test disponible chez le propriétaire ; mesures physiques en attente. |
 
 ## Heure du Gamma : résultat reçu
@@ -179,6 +179,15 @@ Après retrait de la blacklist, le M5 est revenu en minage sur le même boot.
 Le nouvel essai conserve un nom de fichier distinct. **Retirer le M5 de la
 blacklist dès le message de restauration, pendant que le script tourne encore**,
 pour qu'il puisse mesurer la reprise. Le retirer aussi si le test expire/échoue.
+
+Le nouveau rapport `network-m5-beta4-blacklist.json` est maintenant `passed` :
+coupure observée, restauration et manipulation confirmées par l'opérateur, boot
+`ab2a323b` inchangé. Les compteurs passent de 1 553 819 000 à 1 563 871 000 entre
+les uptimes 1 627 et 1 637 s : **1,0052 MH/s après reprise**. La moyenne affichée
+sur 60 ticks inclut encore la pause ; le débit live est revenu à environ 1 MH/s.
+La santé pendant la coupure HTTP reste non observée. Ce résultat valide la reprise
+après blacklist avec confirmation de l'opérateur ; le premier essai en mode
+`pool` reste conservé en échec.
 
 ## OTA du Gamma après son heure de stabilité
 
