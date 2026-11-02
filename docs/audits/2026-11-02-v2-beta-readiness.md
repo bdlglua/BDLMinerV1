@@ -177,6 +177,24 @@ partial counter window after a read failure. Adjacent counter checks also catch
 a decrease that remains above the initial baseline. These collection changes do
 not identify or fix the unknown cause of the owner's interrupted HTTP read.
 
+The owner then supplied the Gamma ring log. Its time prefixes are **device
+uptime**, as formatted by `src/log.cpp`, not local/UTC wall-clock times. The last
+counter reading (25,291 seconds) corresponds to uptime 07:01:31. Subsequent
+30-second mining log entries continued, with accepted shares advancing from
+896 to 921 and zero pool rejections through uptime 07:15:09. This supports
+continued mining after the bench's failed read, without proving web availability
+or health at every instant in the missing interval.
+
+The same log repeatedly reports `[share] hashrate not shared: HTTP 400`. This
+is the anonymous community statistics upload, not a pool share rejection.
+The separate BDLMiner-stats service's parser at `126ec1c` only accepts numeric
+stable versions and rejects `2.0.0-beta.1`. A bounded SemVer compatibility fix
+passed all 19 service tests and is provided as a
+[patch](../patches/BDLMiner-stats-v2-semver.patch) with
+[application instructions](../patches/README.md). Pushing that separate repository
+returned HTTP 403, so its live deployment remains unchanged. This HTTP 400 does
+not establish the cause of the earlier local statistics-read interruption.
+
 V2 OTA trial/confirmation transitions, rollback, physical visual acceptance,
 Gamma hour-long stability and longer-duration operation remain unestablished.
 NerdNOS and other physical boards remain unvalidated for V2. Earlier V1 hardware

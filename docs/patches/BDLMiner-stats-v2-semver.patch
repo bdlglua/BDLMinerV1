@@ -1,0 +1,88 @@
+From 17da523ad62c1f5137548d4252dd76d371bc46c7 Mon Sep 17 00:00:00 2001
+From: BDL Povlov <chauvecrane2@gmail.com>
+Date: Mon, 2 Nov 2026 08:27:43 +0000
+Subject: [PATCH] fix: accept bounded SemVer prerelease reports from V2 miners
+
+---
+ README.md          |  5 +++++
+ src/store.js       |  8 +++++++-
+ test/stats.test.js | 21 +++++++++++++++++++++
+ 3 files changed, 33 insertions(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index b23c915..5b82466 100644
+--- a/README.md
++++ b/README.md
+@@ -15,6 +15,11 @@ BDLMiner 1.9.0) post a report every 5 minutes (1.9.0 and 1.9.1: once an hour, wi
+ `model` (from 1.9.4) only comes when the board tells more than its firmware: the M5Stack
+ firmware serves several models, which the summary's `models` list tells apart.
+ 
++The version may also be a SemVer prerelease such as `2.0.0-beta.1` or `2.0.0-rc.1`,
++with optional build metadata. It is kept as reported and bounded to the firmware's
++23-character limit. The same board-specific hashrate limits apply to stable and
++prerelease reports; accepting a beta does not imply its release or hardware validation.
++
+ That is all they send: no Bitcoin address, worker, pool, name or identifier. This
+ [Cloudflare Worker](https://developers.cloudflare.com/workers/) (free plan) adds them up
+ in the SQLite storage of a Durable Object. Without an identifier, each report stands for
+diff --git a/src/store.js b/src/store.js
+index 1a3db1c..27b800a 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -255,7 +255,13 @@ const maxHashrate = (board) => (Object.hasOwn(ASIC_MAX, board) ? ASIC_MAX[board]
+ export function parseReport(value) {
+   if (!value || typeof value !== "object") return null;
+   const { v, board, hashrate, every, model } = value;
+-  if (typeof v !== "string" || !/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v)) return null;
++  // Firmware versions fit 23 characters and may be SemVer prereleases/builds.
++  // Keep the original bounds on core components and reject leading zeroes in
++  // numeric prerelease identifiers; labels are stored exactly as reported.
++  const version = typeof v === "string" && v.length <= 23
++    ? /^(?:0|[1-9]\d{0,2})\.(?:0|[1-9]\d{0,2})\.(?:0|[1-9]\d{0,2})(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(v)
++    : null;
++  if (!version || version[0] !== v || (version[1] ?? "").split(".").some((part) => /^0\d+$/.test(part))) return null;
+   if (typeof board !== "string" || !/^[a-z0-9-]{1,32}$/.test(board)) return null;
+   if (typeof hashrate !== "number" || !(hashrate > 0) || hashrate > maxHashrate(board)) return null;
+   if (every !== undefined && (!Number.isInteger(every) || every < 60 || every > 86400)) return null;
+diff --git a/test/stats.test.js b/test/stats.test.js
+index 9a5a0ba..4a0b61d 100644
+--- a/test/stats.test.js
++++ b/test/stats.test.js
+@@ -182,6 +182,14 @@ describe("stats store", () => {
+       assert.equal(parseReport(bad), null, JSON.stringify(bad));
+   });
+ 
++  it("accepts firmware SemVer prereleases without accepting malformed version labels", () => {
++    for (const v of ["1.9.15", "2.0.0-beta.1", "2.0.0-rc.2", "2.0.0-alpha.0", "2.0.0-dev", "2.0.0-beta.1+abc", "2.0.0+build.001"])
++      assert.equal(parseReport({ v, board: "bitaxe-gamma-601", hashrate: 1.08e12, every: 300 })?.v, v);
++    for (const v of ["2.0", "2.0.0-", "2.0.0-beta..1", "2.0.0-beta.01", "2.0.0-01", "2.0.0+", "2.0.0-beta.1\n",
++      "2.0.0-<script>", "02.0.0-beta.1", "2.0.0-" + "a".repeat(20)])
++      assert.equal(parseReport({ v, board: "bitaxe-gamma-601", hashrate: 1.08e12, every: 300 }), null, v);
++  });
++
+   it("refuses a hashrate the board cannot do", () => {
+     const ok = (board, hashrate) => parseReport({ v: "1.9.6", board, hashrate, every: 300 }) !== null;
+     assert.ok(ok("m5stickc-plus2", 1.02e6) && ok("esp32-headless", 5e6) && ok("dev", 3e5));
+@@ -213,6 +221,19 @@ describe("stats worker", () => {
+     assert.equal(store.summary().miners, 1);
+   });
+ 
++  it("stores real V2 beta report shapes for ESP32 and Gamma while keeping hardware caps", async () => {
++    const gamma = { v: "2.0.0-beta.1", board: "bitaxe-gamma-601", hashrate: 1.08e12, every: 300 };
++    const m5 = { v: "2.0.0-beta.1", board: "m5stickc-plus2", hashrate: 1.02e6, every: 300 };
++    assert.equal((await post(gamma)).status, 204);
++    assert.equal((await post(m5)).status, 204);
++    assert.equal((await post({ ...gamma, hashrate: 1e13 })).status, 400);
++    assert.equal((await post({ ...m5, hashrate: 6e6 })).status, 400);
++    const summary = store.summary();
++    near(summary.hashrate, gamma.hashrate + m5.hashrate);
++    assert.equal(summary.miners, 2);
++    assert.deepEqual(summary.versions.map(({name, miners}) => [name, miners]), [["2.0.0-beta.1", 2]]);
++  });
++
+   it("shows the page and the summary to everyone", async () => {
+     delete env.STATS_PASSWORD;
+     await post(report(1e6));
+-- 
+2.52.0
+
