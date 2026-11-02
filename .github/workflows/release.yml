@@ -127,6 +127,8 @@ jobs:
           trap 'rm -f "$RELEASE_SIGNING_KEY_FILE"' EXIT
           printf '%s\n' "$KEY" > "$RELEASE_SIGNING_KEY_FILE"
           python3 tools/assemble_release.py --inputs build-inputs --version "$VERSION"
+      - name: Package the Linux fleet hub and hardware tools
+        run: python3 tools/make_beta_bundle.py --release "release/$VERSION" --output .pio/v2-linux-kit --archive "release/$VERSION/BDLMiner-$VERSION-Linux-kit.zip"
       - name: Release notes
         run: |
           NOTES="docs/releases/v$VERSION.md"

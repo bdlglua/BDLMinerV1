@@ -1,30 +1,28 @@
-# BDLMiner V2 development
+# BDLMiner V2
 
-The `v2/development` branch adds a Linux/Raspberry Pi fleet dashboard, pool
+Version 2.0.0 adds a Linux/Raspberry Pi fleet dashboard, pool
 diagnostics, supervised Gamma calibration, clearer share statistics, configurable
 physical screens, signed stable/beta channels and a hardware bench with parallel
 release builds. See the [V2 setup and validation guide](docs/v2/README.md).
-Firmware `2.0.0-beta.4` is under development and has not been published.
-The latest published stable release remains **1.9.15**.
 
 Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
 It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or native
 Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
 whose reward is paid to **your** address.
 
-**Latest release: [v1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15)**
+**Latest release: [v2.0.0](https://github.com/bdlglua/BDLMinerV1/releases/tag/v2.0.0)**
 · [Site and web flasher](https://bdlglua.github.io/BDLMinerV1/)
-· [Release notes](docs/releases/v1.9.15.md)
+· [Release notes](docs/releases/v2.0.0.md) · [Français](docs/releases/v2.0.0.fr.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlminer-stats.bdlminer-bot.workers.dev/)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
 
-Version **1.9.15** fixes Stratum V2 ASIC negotiation so Gamma/NerdNOS request the
-version rolling they require. Incompatible jobs are rejected and count towards
-configured backup failover. The owner confirmed Gamma OTA and accepted shares
-over V2 at 525 MHz with the corrective build. See the
-[Stratum V2 validation record](docs/audits/2026-11-01-sv2-asic-version-rolling.md)
-and [hardware-validation limits](docs/hardware/validation.md).
+The V2 release candidate was tested on the owner's M5StickC Plus2 and Gamma 601:
+manual OTA confirmation on both, M5 physical rollback/network recovery and a
+clean Gamma hour at 1.070391 TH/s. See the
+[hardware validation record and limits](docs/v2/hardware-validation.md).
+S2/S3/C3 and NerdNOS profiles build and have automated tests, but physical V2
+measurements remain pending; Gamma/NerdNOS retain their experimental board status.
 Earlier versions are described in [docs/releases](docs/releases/).
 
 > For scale: the classic ESP32 revision 3+ reaches about 1 MH/s with its dedicated
@@ -142,7 +140,7 @@ on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "1.9.15", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
+{"v": "2.0.0", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2"}
 ```
 
 Nothing else is sent: no Bitcoin address, worker, pool, name or identifier. The service

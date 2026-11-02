@@ -3,6 +3,13 @@
 Work requested: implement the seven V2 features on a dedicated branch, preserving
 the published V1 release and user settings. Branch: `v2/development`.
 
+The owner subsequently selected **2.0.0 stable** for publication. The release
+notes in [English](../releases/v2.0.0.md) and [French](../releases/v2.0.0.fr.md)
+summarize the resulting features and limits. Historical entries below retain
+their original test versions and outcomes. The [current hardware record](hardware-validation.md)
+includes the successful beta.4 Gamma hour and M5 OTA/rollback/network results;
+other-board physical measurements are still pending.
+
 ## Deliverables
 
 - [x] Fleet dashboard: optional Linux/Raspberry Pi hub, bounded polling, real

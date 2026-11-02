@@ -1,16 +1,23 @@
-# BDLMiner V2 development
+# BDLMiner V2
 
-The seven V2 features are implemented on `v2/development`. The firmware version
-is `2.0.0-beta.4`; this branch is not a published release. Stable V1 remains
-[1.9.15](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15).
+The stable firmware version is **2.0.0**. See the release notes in
+[English](../releases/v2.0.0.md) or [French](../releases/v2.0.0.fr.md).
+The seven V2 features were developed on `v2/development`; the owner-operated
+acceptance results below identify the beta versions actually measured.
+The [previous stable V1 release](https://github.com/bdlglua/BDLMinerV1/releases/tag/v1.9.15)
+remains available.
 
 ## M5 / Gamma test kit
 
-The successful V2 [CI runs](https://github.com/bdlglua/BDLMinerV1/actions/workflows/ci.yml?query=branch%3Av2%2Fdevelopment)
-provide a `v2-linux-test-kit` artifact. Sign in to GitHub, download that artifact
-and extract the complete ZIP. It contains the M5StickC Plus2 and Gamma 601
-firmware/factory images, their checksums, the optional hub and the read-only
+Download the [2.0.0 Linux kit](https://github.com/bdlglua/BDLMinerV1/releases/download/v2.0.0/BDLMiner-2.0.0-Linux-kit.zip)
+and extract the complete ZIP. It contains the optional fleet hub, host tools,
+M5StickC Plus2 and Gamma 601
+firmware/factory images, their checksums and the read-only
 readiness checker. It does not install firmware automatically.
+
+For development builds, successful V2 [CI runs](https://github.com/bdlglua/BDLMinerV1/actions/workflows/ci.yml?query=branch%3Av2%2Fdevelopment)
+also provide a `v2-linux-test-kit` artifact. CI previews are unsigned; the public
+release kit records verified firmware signatures in `kit.json`.
 
 From the extracted folder on a Linux computer on the miners' LAN:
 
@@ -79,8 +86,9 @@ intentional pause; live rate has returned to about 1 MH/s.
 pending actual board availability.
 
 Extract the new kit into a separate directory, retaining configuration/settings
-backups. Its readiness launcher expects beta.4, so a beta.3 card correctly reports
-`review` until its update completes. Stop the old hub before starting the new one
+backups. Its readiness launcher expects the kit version (2.0.0 for the stable
+kit), so an older card correctly reports `review` until its update completes.
+Stop the old hub before starting the new one
 on port 8787. Use only `*-firmware.bin` through the local dashboard; factory images
 are for USB. Observers do not upload firmware or change settings; an OTA observer
 only requests a physical reset when `--reset-command` is explicitly supplied.
@@ -357,9 +365,11 @@ V2 has automated loopback/browser/rendering tests, owner-operated M5/Gamma
 readiness and short dashboard-load measurements, and a passed one-hour M5
 counter/health check. The corrected Gamma host check also passed for 61 seconds.
 A later beta.3 hour completed at 1.071274 TH/s but remains `review` after one
-recovered HTTP timeout; the subsequent Gamma beta.4 OTA trial/confirmation is
-observed. Clean HTTP stability, longer-duration operation and physical-screen
-acceptance remain to be established; the other
+recovered HTTP timeout. Gamma beta.4 OTA trial/confirmation and a clean
+3,604-second instrumented hour at 1.070391 TH/s are now observed; that hour used
+operator-declared dashboard-closed/hub-stopped conditions and had 715 error-free
+stats reads. Longer-duration operation and physical-screen acceptance remain
+to be established; the other
 physical boards remain unvalidated. V1 hardware evidence does not establish V2
 hardware validation. See the [implementation record](implementation.md) and
 [beta readiness audit](../audits/2026-11-02-v2-beta-readiness.md) for the scope of
