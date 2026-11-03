@@ -1,3 +1,5 @@
+#include <cassert>
+#include <cctype>
 // Host-side tests for the portable mining core.
 //   ./test/host/run.sh
 #include <math.h>
@@ -651,6 +653,42 @@ static void testAddress() {
     }
 }
 
+
+// Published CashAddr conversion vectors, including checksum/case isolation.
+void testCashAddr() {
+    using address::Type;
+    const char *p2pkh[] = {
+        "qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a",
+        "qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy",
+        "qqq3728yw0y47sqn6l2na30mcw6zm78dzqre909m2r"};
+    const char *p2sh[] = {
+        "ppm2qsznhks23z7629mms6s4cwef74vcwvn0h829pq",
+        "pr95sy3j9xwd2ap32xkykttr4cvcu7as4yc93ky28e"};
+    for (const auto &set : {std::make_pair(p2pkh, 3u), std::make_pair(p2sh, 2u)}) {
+        Type expected = set.first == p2pkh ? Type::P2PKH : Type::P2SH;
+        for (unsigned i = 0; i < set.second; ++i) {
+            std::string bare = set.first[i], full = "bitcoincash:" + bare;
+            assert(address::parse(bare, 1).type == expected);
+            assert(address::parse(full + ".worker", 1).type == expected);
+            assert(address::parse(full, 1).network == address::Network::Main);
+            assert(!address::parse(full).valid());
+            std::string upper = full;
+            for (char &c : upper) c = std::toupper(static_cast<unsigned char>(c));
+            assert(address::parse(upper, 1).type == expected);
+            assert(!address::parse("B" + full.substr(1), 1).valid());
+            for (size_t j = 0; j < bare.size(); ++j) {
+                auto broken = bare; broken[j] = bare[j] == 'q' ? 'p' : 'q';
+                assert(!address::parse(broken, 1).valid());
+            }
+        }
+    }
+    for (const char *bad : {"bitcoincash:", "bitcoincash:qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn", "bchtest:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a", "ecash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a", "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"})
+        assert(!address::parse(bad, 1).valid());
+    assert(address::parse("1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu.worker", 1).type == Type::P2PKH);
+    assert(!address::parse(std::string(2000, 'q'), 1).valid());
+    puts("BCH CashAddr: official P2PKH/P2SH vectors, prefix/case/worker, checksum mutation, payload, legacy and cross-chain rejection passed");
+}
+
 int main() {
     testSha();
     testHashDifficulty();
@@ -661,6 +699,7 @@ int main() {
     testStratumSessionUpdates();
     testStratumJob();
     testAddress();
+    testCashAddr();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);
     return failures ? 1 : 0;
 }

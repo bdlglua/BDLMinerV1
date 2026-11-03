@@ -4,6 +4,7 @@
 #include "settings_store.h"
 Settings settings;
 const SettingInfo kSettings[] = {
+    {"coin", SettingType::Number, &settings.miningCoin, 8, "", ""},
     {"sharepool", SettingType::Bool, &settings.sharePool, 0, "", ""},
 #ifdef BOARD_GAMMA601
     {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
@@ -40,6 +41,16 @@ struct Storage {
     }
 };
 int main() {
+    Settings legacyCoin;
+    const char *oldCoin = R"({"pool":"old.pool","power":75})";
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(oldCoin), strlen(oldCoin), legacyCoin));
+    assert(legacyCoin.miningCoin == coin::BTC && legacyCoin.poolHost == "old.pool");
+    legacyCoin.miningCoin = coin::BCH;
+    std::string encodedCoin; assert(settingsstore::encode(legacyCoin, encodedCoin));
+    Settings decodedCoin;
+    assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(encodedCoin.data()), encodedCoin.size(), decodedCoin));
+    assert(decodedCoin.miningCoin == coin::BCH);
+
     Settings legacySharing;
     const char *beforePoolSharing = R"({"power":75})";
     assert(legacySharing.sharePool);

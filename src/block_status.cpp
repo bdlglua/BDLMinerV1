@@ -77,7 +77,9 @@ bool blockStatusGet(const uint8_t hash[32], BlockChainStatus &out) {
 
 void blockStatusPoll() {
     BlockCandidate candidate{};
-    if (!minerLastBlockCandidate(candidate)) return;
+    // This explorer serves Bitcoin only. An alternate-chain proof must not
+    // be reported missing merely because it is absent from BTC.
+    if (!minerLastBlockCandidate(candidate) || candidate.coin != 0) return;
     uint32_t now = millis();
     portENTER_CRITICAL(&chainMux);
     bool changed = !haveTarget || memcmp(candidate.hash, observed.hash, 32);

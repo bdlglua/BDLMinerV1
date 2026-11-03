@@ -28,9 +28,10 @@ static const char *kNamespace = "bdlminer";
 #define N(key, field, group, label) {key, SettingType::Number, &settings.field, 8 * sizeof(settings.field), group, label}
 
 const SettingInfo kSettings[] = {
+    N("coin", miningCoin, "Pool", "Cryptocurrency"),
     S("pool", Text, poolHost, "Pool", "Pool host"),
     N("port", poolPort, "Pool", "Pool port"),
-    S("addr", Text, btcAddress, "Pool", "BTC address (optionally address.worker)"),
+    S("addr", Text, btcAddress, "Pool", "Payout address or pool account (optionally .worker)"),
     S("pass", Text, poolPassword, "Pool", "Pool password"),
     S("diff", Decimal, suggestedDifficulty, "Pool", "Suggested share difficulty"),
     N("proto", poolProtocol, "Pool", "Main pool protocol"),
@@ -92,7 +93,7 @@ const SettingInfo kSettings[] = {
     S("count", Bool, usageCount, "Network",
       "Anonymous usage count: once a day, download a 2-byte file of this version's release (nothing is sent)"),
     S("sharehr", Bool, shareHashrate, "Network",
-      "Share my hashrate anonymously: every 5 minutes, send the version, the board and the hashrate"),
+      "Share my hashrate anonymously: every 5 minutes, send the version, the board, the cryptocurrency and the hashrate"),
     S("sharepool", Bool, sharePool, "Network",
       "Share my pool anonymously: optional public pool group, only with hashrate sharing"),
 };
@@ -136,6 +137,7 @@ static void poolURL(String &host, uint8_t &protocol, String &authority) {
 }
 
 void settingsSanitize(Settings &settings) {
+    if (!coin::valid(settings.miningCoin)) settings.miningCoin = coin::BTC;
     for (size_t i = 0; i < kSettingCount; i++)
         if (kSettings[i].type == SettingType::Text) ((String *)settingValue(kSettings[i], settings))->trim();
     poolURL(settings.poolHost, settings.poolProtocol, settings.poolAuthority);
@@ -347,12 +349,14 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     char proto[2] = {char('0' + settings.poolProtocol), 0}, proto2[2] = {char('0' + settings.backupProtocol), 0};
     char automatic[2] = {settings.userAgentAuto ? '1' : '0', 0};
 
+    char selectedCoin[2] = {char('0' + settings.miningCoin), 0};
+    WiFiManagerParameter pCoin("coin", "Cryptocurrency: 0 BTC, 1 BCH (SHA-256d). Use matching pools and payout address; BCH requires Stratum V1.", selectedCoin, 1, "type='number' min='0' max='1'");
     WiFiManagerParameter pHost("pool", "Pool host", settings.poolHost.c_str(), 80);
     WiFiManagerParameter pPort("port", "Pool port", port, 6, "type='number' min='1' max='65535'");
     WiFiManagerParameter pHost2("pool2", "Backup pool host (optional, e.g. solo.ckpool.org)",
                                 settings.backupHost.c_str(), 80);
     WiFiManagerParameter pPort2("port2", "Backup pool port", port2, 6, "type='number' min='1' max='65535'");
-    WiFiManagerParameter pAddr("addr", "Your BTC address (optionally address.worker)",
+    WiFiManagerParameter pAddr("addr", "Payout address or pool account (optionally .worker)",
                                settings.btcAddress.c_str(), 100);
     WiFiManagerParameter pPass("pass", "Pool password", settings.poolPassword.c_str(), 40);
     WiFiManagerParameter pDiff("diff", "Suggested share difficulty", diff, 15);
@@ -374,6 +378,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
                               "Web password, optional, leave empty: only to protect the dashboard's settings "
                               "and firmware update on a shared network",
                               settings.webPassword.c_str(), 40, "type='password'");
+    wm.addParameter(&pCoin);
     wm.addParameter(&pHost);
     wm.addParameter(&pPort);
     wm.addParameter(&pProto);
@@ -418,6 +423,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     }
 
     if (shouldSave) {
+        settings.miningCoin = atoi(pCoin.getValue());
         settings.poolHost = pHost.getValue();
         settings.poolPort = atoi(pPort.getValue());
         settings.backupHost = pHost2.getValue();

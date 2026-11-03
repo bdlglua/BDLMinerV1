@@ -20,6 +20,7 @@ prefix = r'''
 #include "core/stratum.h"
 #include "core/line_buffer.h"
 #include "core/pool_agent.h"
+#include "core/coin.h"
 using std::min;
 #define FW_VERSION "test"
 #define DEFAULT_USER_AGENT "BDLMinerV2/" FW_VERSION
@@ -36,7 +37,7 @@ struct {
     String userAgent = DEFAULT_USER_AGENT, poolHost = "main.pool", backupHost = "backup.pool";
     String btcAddress = "address.worker", poolPassword = "x";
     uint16_t backupPort = 3333;
-    uint8_t rotateHours = 0, poolProtocol = 0, backupProtocol = 0;
+    uint8_t miningCoin = 0, rotateHours = 0, poolProtocol = 0, backupProtocol = 0;
 } settings;
 struct { bool isConnected() { return true; } void reconnect() {} } WiFi;
 struct EndNetworkTest {};
@@ -79,7 +80,8 @@ constexpr int kFailoverAfter = 3;
 constexpr uint32_t kBackupSessionMs = 1800000;
 uint32_t clockMs = 1000;
 uint32_t millis() { return clockMs; }
-void vTaskDelay(uint32_t ms) { clockMs += ms; }
+bool stopAtGuard = false;
+void vTaskDelay(uint32_t ms) { clockMs += ms; if(stopAtGuard && ms==30000)throw EndNetworkTest{}; }
 void logf(const char *, ...) {}
 std::string status;
 void setStatus(const char *s) { status = s; }
@@ -214,6 +216,13 @@ int main() {
     attemptedHosts.clear(); onBackup = false;
     try { netTask(nullptr); } catch (const EndNetworkTest &) {}
     assert((attemptedHosts == std::vector<std::string>{"main.pool", "main.pool", "main.pool", "main.pool"}));
+    stopAtGuard=true;settings.miningCoin=1;onBackup=false;settings.poolHost="public-pool.io";
+    attemptedHosts.clear();try{netTask(nullptr);}catch(const EndNetworkTest&){}
+    assert(attemptedHosts.empty() && status=="Choose a pool for the selected cryptocurrency");
+    settings.poolHost="bch.example.org";settings.poolProtocol=1;
+    try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty() && status=="BCH requires Stratum V1");
+    settings.poolProtocol=0;onBackup=true;settings.backupHost="solo.ckpool.org";
+    try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty());
     puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, automatic/manual identity, no-work timeout, V1/V2 failover and backup isolation passed");
 }
 '''

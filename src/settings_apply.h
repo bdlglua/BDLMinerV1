@@ -15,6 +15,13 @@
 #include "core/display_config.h"
 
 struct SettingLimits { long minimum, maximum; };
+// Old complete backups predate coin selection and describe a BTC configuration.
+// Partial settings-only restores keep the current chain unless they include a
+// complete pool identity. Never reinterpret an old BTC backup as BCH.
+inline void settingsMigrateBackupCoin(JsonObject values, bool full) {
+    if (values["coin"].isUnbound() && (full || (!values["pool"].isUnbound() && !values["addr"].isUnbound())))
+        values["coin"] = unsigned(coin::BTC);
+}
 inline SettingLimits settingLimits(const SettingInfo &s) {
     SettingLimits limits{0, s.bits == 8 ? 255 : 65535};
     if (!strcmp(s.key, "port") || !strcmp(s.key, "port2") || !strcmp(s.key, "mqttport")) limits.minimum = 1;
@@ -22,6 +29,7 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "alertmin")) { limits.minimum = 1; limits.maximum = 240; }
     if (!strcmp(s.key, "rot")) limits.maximum = 3;
     if (!strcmp(s.key, "lang")) limits.maximum = 1;
+    if (!strcmp(s.key, "coin")) limits.maximum = coin::Count - 1;
     if (!strcmp(s.key, "theme")) limits.maximum = 4;
     if (!strcmp(s.key, "proto") || !strcmp(s.key, "proto2")) limits.maximum = 1;
     if (!strcmp(s.key, "update")) limits.maximum = 2;
@@ -86,6 +94,9 @@ inline const char *settingsError(JsonObjectConst values) {
         }
     }
     bool automatic = values["uaauto"] | settings.userAgentAuto;
+    unsigned selectedCoin = values["coin"] | unsigned(settings.miningCoin);
+    const char *user = values["addr"] | settings.btcAddress.c_str();
+    if (!coin::addressCompatible(selectedCoin, stratum::trimIdentity(user))) return "Use an address for the selected cryptocurrency";
     const char *agent = values["ua"] | settings.userAgent.c_str();
     if (!automatic) {
         while (*agent && std::isspace(static_cast<unsigned char>(*agent))) ++agent;
@@ -97,6 +108,8 @@ inline const char *settingsError(JsonObjectConst values) {
         const bool main = !strcmp(fields.first, "proto");
         const char *host = values[main ? "pool" : "pool2"] | (main ? settings.poolHost.c_str() : settings.backupHost.c_str());
         auto identity = stratum::poolIdentity(host, protocol, key);
+        if (main || !stratum::trimIdentity(host).empty())
+            if (const char *error = coin::poolError(selectedCoin, host, identity.protocol)) return error;
         uint8_t authority[32];
         if (identity.protocol == 1 && !sv2::authorityKey(identity.authority.c_str(), authority)) return "A valid Stratum V2 authority key is required";
     }

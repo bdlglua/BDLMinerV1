@@ -201,6 +201,17 @@ void netTask(void *) {
     int failures = 0;
 
     for (;;) {
+        // Also guard portal/imported settings before opening a socket. A
+        // mismatched backup must never switch mining to another chain.
+        const char *configurationError = coin::poolError(settings.miningCoin, netPoolHost().c_str(),
+            onBackup ? settings.backupProtocol : settings.poolProtocol);
+        if (!configurationError && !coin::addressCompatible(settings.miningCoin, settings.btcAddress.c_str()))
+            configurationError = "Use an address for the selected cryptocurrency";
+        if (configurationError) {
+            setStatus(configurationError);
+            vTaskDelay(pdMS_TO_TICKS(30000));
+            continue;
+        }
         if (!WiFi.isConnected()) {
             setStatus("WiFi lost, reconnecting");
             // The WiFi driver reconnects by itself; only restart the attempt

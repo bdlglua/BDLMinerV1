@@ -72,6 +72,7 @@ struct BlockCandidate {
     uint8_t hash[32];  // digest byte order; reverse for the usual block identifier
     uint8_t state;
     bool previousSession = false;
+    uint8_t coin = 0; // retained with the proof across a change of chain
 };
 // Latest candidate, including a saved proof from an earlier boot. Saved proofs
 // are never resubmitted or announced as newly found. Pool ACK != chain proof.
@@ -94,7 +95,7 @@ void minerInvalidate();
 bool minerNextShare(stratum::Share &share, uint32_t waitMs);
 
 // Starts one mining task per available engine/core.
-void minerStart();
+void minerStart(unsigned selectedCoin = 0);
 
 // Total hashes since boot and the hash rate in H/s (average of the last
 // minute), updated by minerTick() once per second.

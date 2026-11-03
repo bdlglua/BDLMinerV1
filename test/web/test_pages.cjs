@@ -50,6 +50,10 @@ async function fixture(options={}){
     Object.assign(state.settings.values,{sharehr:true,sharepool:true});
     state.settings.live=[...(state.settings.live||[]),'sharehr','sharepool'];
   }
+  if(options.coins){
+    state.settings.schema.unshift(['coin','number','Pool','Cryptocurrency',{min:0,max:1}]);
+    state.settings.values.coin=0;
+  }
   if(options.v2){
     for(const key of ['channel','screen0','screen1','screen2','screen3','pages'])state.settings.schema.push([key,'number',key==='channel'?'Network':'Display',key,{min:0,max:255}]);
     state.settings.schema.push(['customscreen','bool','Display','Custom screen',{}]);
@@ -1058,6 +1062,31 @@ check('V2 Gamma exposes three native pages and discards unsaved page/metric chan
  await pages.nth(2).uncheck();await f.page.selectOption('#k_screen0','8');await f.page.click('#discard');
  assert.equal(await f.page.locator('#k_screen0').inputValue(),'1');assert.equal(await f.page.locator('[data-key=pages] .presets input').nth(2).isChecked(),true);
  assert.match(await f.page.locator('[data-key=channel]').textContent(),/Canal/);
+}));
+
+check('coin selection keeps payout and pool settings while choosing BCH Stratum V1',()=>run({coins:true},async f=>{
+ await loaded(f);
+ assert.equal(await f.page.locator('#k_coin').inputValue(),'0');
+ await f.page.selectOption('#k_proto','1');
+ await f.page.selectOption('#k_coin','1');
+ assert.equal(await f.page.locator('#k_proto').inputValue(),'0');
+ assert.equal(await f.page.locator('#k_proto2').inputValue(),'0');
+ assert.equal(await f.page.locator('#k_proto option[value="1"]').isDisabled(),true);
+ assert.equal(await f.page.locator('#k_pool').inputValue(),'pool.example');
+ assert.equal(await f.page.locator('#k_addr').inputValue(),'address.worker');
+ await f.page.fill('#k_pool','bch.example.org');await f.page.fill('#k_addr','bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a.worker');
+ await f.page.click('#save');await f.page.waitForFunction(()=>document.getElementById('save').disabled);
+ await f.page.waitForTimeout(100);
+ const body=JSON.parse(f.state.posts[0].body);assert.equal(body.coin,1);assert.equal(body.proto,0);assert.equal(body.pool,'bch.example.org');
+}));
+check('BCH dashboard names the coin and hides Bitcoin market data',()=>run({stats:{coin:'BCH',coin_name:'Bitcoin Cash',market:{updated_s:60,price:78000,currency:'USD',fees:[3,1,1],hashrate:1e21,mempool_tx:10,retarget:{change:1,blocks:10,progress:50}}}},async f=>{
+ await f.page.goto(f.url+'/');await f.page.waitForSelector('.t');
+ const tiles=await f.page.locator('body').innerText();
+ assert.match(tiles,/Bitcoin Cash/);assert.match(tiles,/BCH/);assert.doesNotMatch(tiles,/BTC price|Fees sat\/vB|Next retarget/);
+}));
+check('coin selection and compatibility guidance are translated into French',()=>run({coins:true,language:'fr'},async f=>{
+ await loaded(f);assert.match(await f.page.locator('[data-key=coin]').innerText(),/Cryptomonnaie/);
+ assert.match(await f.page.locator('[data-key=coin]').innerText(),/La pool détermine/);
 }));
 
 (async()=>{

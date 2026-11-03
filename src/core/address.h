@@ -1,4 +1,4 @@
-// Bitcoin address checks (Base58Check and Bech32 / Bech32m), used to warn
+// Chain-aware address checks (Base58Check, Bech32 / Bech32m and BCH CashAddr), used to warn
 // about a mistyped payout address instead of mining for nothing.
 // Portable (std C++ only) so it can be tested on a PC.
 #pragma once
@@ -19,7 +19,7 @@ struct Info {
 
 // `user` is the Stratum user name: an address, optionally followed by
 // ".workerName". Only the address part is checked.
-Info parse(const std::string &user);
+Info parse(const std::string &user, unsigned coin = 0);
 
 // "P2WPKH", "P2TR"... or "invalid".
 const char *typeName(Type type);

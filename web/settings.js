@@ -25,6 +25,7 @@ function sync(){
  if($('notify-test'))$('notify-test').disabled=off||notificationPending;
  if($('k_fanpct'))$('k_fanpct').disabled=off||$('k_fanauto')?.value==='true';
  if($('k_ua')){$('k_ua').disabled=off||$('k_uaauto')?.value!=='false';$('k_ua').required=$('k_uaauto')?.value==='false';$('k_ua').maxLength=64}
+ for(const key of ['proto','proto2'])for(const option of $('k_'+key)?.options||[])option.disabled=$('k_coin')?.value==='1'&&option.value==='1';
  for(const [protocol,key]of [['proto','sv2key'],['proto2','sv2key2']])if($('k_'+key)){$('k_'+key).disabled=off||$('k_'+protocol)?.value!=='1';$('k_'+key).required=$('k_'+protocol)?.value==='1';$('k_'+key).maxLength=64}
 }
 // Presentation only: titles, hints, units and choices for the settings the
@@ -52,8 +53,9 @@ function settingsIcon(name){
 document.querySelectorAll('[data-icon]').forEach(node=>node.replaceWith(settingsIcon(node.dataset.icon)));
 const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 const FIELDS={
+ coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH uses Stratum V1; Bitcoin market data is unavailable for BCH.'],
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
- addr:['Bitcoin address','Your payout address. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
+ addr:['Payout address or pool account','Use the selected coin\'s address or the account name required by your pool. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
  diff:['Suggested difficulty','Share difficulty asked of the pool; it may choose another.'],proto:['Protocol'],
  sv2key:['Stratum V2 authority key','Given by the pool for encrypted V2 connections.'],
  uaauto:['User agent','How the miner names itself to the pool.'],ua:['Manual user agent','Up to 64 characters.'],
@@ -75,7 +77,7 @@ const FIELDS={
  mqtt:['MQTT broker','Your Home Assistant broker. Empty = off.'],mqttport:['MQTT port'],mqttuser:['MQTT user'],mqttpass:['MQTT password'],
  peers:['Other miners','Shown on the dashboard: IP addresses or names, comma separated.'],
  webpass:['Web password','Optional. Asked before changing settings or installing firmware from these pages. Empty = no password: anyone on your network can.'],
- update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.'],
+ update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board, the cryptocurrency and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.'],
  sharepool:['Share my pool anonymously','On by default. Turn off to hide your pool group. Requires hashrate sharing. Other pools are grouped as private/other. Never sends the hostname, port, Bitcoin address or worker.']};
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],uaauto:[['true','Automatic'],['false','Manual']],
@@ -85,6 +87,7 @@ const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Str
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
 const THEMES=['#f7931a','#38d07a','#3b9cf6','#a66bf5','#ec5aa0'];
+CHOICES.coin=[[0,'Bitcoin (BTC)'],[1,'Bitcoin Cash (BCH)']];
 Object.assign(FIELDS,{channel:['Update channel','Beta versions receive the same signature checks and rollback protection.'],
  customscreen:['Custom mining screen','Choose the four metrics and their order on the mining screen.'],
  screen0:['First screen metric'],screen1:['Second screen metric'],screen2:['Third screen metric'],screen3:['Fourth screen metric'],pages:['Enabled screens','The mining screen remains available.']});
@@ -126,6 +129,10 @@ function render(data){
   i.addEventListener('input',()=>{i.setCustomValidity('');dirtyState();if(options)sync()});
   if(options)i.addEventListener('change',()=>{dirtyState();sync()});
   if(k==='pool'||k==='pool2')i.addEventListener('change',()=>poolURLChanged(k));
+  if(k==='coin')i.addEventListener('change',()=>{
+   if(i.value==='1')for(const key of ['proto','proto2'])if($('k_'+key))$('k_'+key).value='0';
+   dirtyState();sync();
+  });
   const row=document.createElement('div');row.className='field'+(type==='bool'?' boolean':'');row.dataset.key=k;
   const text=document.createElement('div');text.className='field-text';text.appendChild(l);
   if(hint){const p=document.createElement('p');p.className='field-hint';p.id='h_'+k;p.textContent=t(hint);text.appendChild(p);i.setAttribute('aria-describedby',p.id)}
@@ -138,6 +145,10 @@ function render(data){
   if(k==='theme'){const swatch=document.createElement('span');swatch.className='swatch';swatch.setAttribute('aria-hidden','true');const paint=()=>swatch.style.background=THEMES[Number(i.value)]||THEMES[0];i.addEventListener('change',paint);paint();control.prepend(swatch)}
   if(type==='secret'){const show=document.createElement('button');show.type='button';show.className='secondary secret-toggle';show.textContent=t('Show');show.setAttribute('aria-label',t('Show')+' '+l.textContent);show.onclick=()=>{const visible=i.type==='password';i.type=visible?'text':'password';show.textContent=t(visible?'Hide':'Show');show.setAttribute('aria-label',t(visible?'Hide':'Show')+' '+l.textContent)};control.appendChild(show)}
   if(k==='pool')row.appendChild(help(t('Choose automatic or manual user agent below. Each pool has its own protocol and authority key.')));
+  if(k==='coin'){
+   const guide=document.createElement('a');guide.href='https://github.com/bdlglua/BDLMinerV2/blob/main/docs/mining-coins.md';guide.target='_blank';guide.rel='noopener noreferrer';guide.textContent=t('BTC / BCH setup guide');
+   const note=help('');note.appendChild(guide);row.appendChild(note);
+  }
   if(k==='proto'||k==='proto2')row.appendChild(help(t('Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.')));
   if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental, up to 800 MHz. Default: 525 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.')));
   if(k==='fanauto')row.appendChild(help(t('Default: manual 100%. Startup, stopped ASIC, missing temperature or heat safety force full cooling.')));
@@ -159,7 +170,7 @@ function screenControls(data){
  input.type='hidden';const row=input.closest('.field'),label=row.querySelector('label');
  label.removeAttribute('for');label.id='screen-pages-label';
  const group=document.createElement('div');group.className='presets';group.setAttribute('role','group');group.setAttribute('aria-labelledby',label.id);
- const names=count===3?['Mining','Power / thermal','Pool / records']:['Mining','Clock','Bitcoin','Network','Device','Hashrate','Records','Blocks'];
+ const names=count===3?['Mining','Power / thermal','Pool / records']:['Mining','Clock','Cryptocurrency','Network','Device','Hashrate','Records','Blocks'];
  names.forEach((name,n)=>{const l=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.checked=n===0||!!(Number(input.value)&(1<<n));box.disabled=n===0;box.dataset.fixed=String(n===0);
   box.onchange=()=>{input.value=Number(input.value)^(1<<n);input.dispatchEvent(new Event('input',{bubbles:true}))};l.append(box,' '+t(name));group.appendChild(l)});
  input.parentNode.appendChild(group);

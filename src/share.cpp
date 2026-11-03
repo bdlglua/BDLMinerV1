@@ -44,7 +44,7 @@ bool sameName(const char *a, const char *b) {
     }
 }
 
-size_t shareBody(char *out, size_t size, double hashrate, const char *model, const char *poolHost) {
+size_t shareBody(char *out, size_t size, double hashrate, const char *model, const char *poolHost, unsigned selectedCoin) {
     double rounded = hashrate > 0 && isfinite(hashrate) ? hashrate : 0;
     if (rounded > 0) {
         double scale = pow(10, floor(log10(rounded)) - 2);
@@ -58,8 +58,8 @@ size_t shareBody(char *out, size_t size, double hashrate, const char *model, con
         if (isalnum((unsigned char)*c) || strchr(" .-+()", *c)) safe[k++] = *c;
     safe[k] = 0;
     const char *pool = poolHost ? publicPoolGroup(poolHost) : nullptr;
-    int n = snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g,\"every\":%u%s%s%s%s%s%s}",
-                     FW_VERSION, FW_ENV, rounded, (unsigned)kEverySeconds,
+    int n = snprintf(out, size, "{\"v\":\"%s\",\"board\":\"%s\",\"hashrate\":%.3g,\"every\":%u,\"coin\":\"%s\"%s%s%s%s%s%s}",
+                     FW_VERSION, FW_ENV, rounded, (unsigned)kEverySeconds, coin::ticker(selectedCoin),
                      safe[0] ? ",\"model\":\"" : "", safe, safe[0] ? "\"" : "",
                      pool ? ",\"pool\":\"" : "", pool ? pool : "", pool ? "\"" : "");
     return n > 0 && (size_t)n < size ? (size_t)n : 0;
@@ -79,7 +79,7 @@ void sharePoll() {
     // ("M5StickC Plus2" is the same as "M5StickC-Plus2").
     const char *model = board::modelName();
     const char *pool = settings.sharePool && minerStats().poolConnected ? netPoolHost().c_str() : nullptr;
-    if (!shareBody(body, sizeof(body), rate, sameName(model, BOARD_NAME) ? nullptr : model, pool)) return;
+    if (!shareBody(body, sizeof(body), rate, sameName(model, BOARD_NAME) ? nullptr : model, pool, settings.miningCoin)) return;
     String url = STATS_URL;
     int start = url.indexOf("://") + 3, slash = url.indexOf('/', start);
     String host = url.substring(start, slash < 0 ? url.length() : slash);

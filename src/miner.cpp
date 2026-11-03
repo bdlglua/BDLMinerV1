@@ -16,6 +16,7 @@
 #include <atomic>
 
 #include "core/mining_safety.h"
+#include "core/coin.h"
 #include "hw_sha.h"
 #include "log.h"
 #include "ota.h"
@@ -32,6 +33,7 @@ extern "C" bool sw_sha256d_prefilter(const uint32_t *mid, const uint8_t *tail, c
 MinerStats stats;
 
 namespace {
+uint8_t activeMiningCoin = coin::BTC; // fixed before worker tasks start
 
 // Hashes done between two looks at the job board (and two updates of the
 // hash counter): ~0.1 s of software work, ~67 ms of the original ESP32's
@@ -216,6 +218,7 @@ void onCandidate(uint32_t nonce, const uint8_t hash[32], void *ctx) {
                 record = {};
                 record.info.number = ++stats.blocksFound;
                 record.info.height = w.height;
+                record.info.coin = activeMiningCoin;
                 memcpy(record.info.hash, hash, 32);
                 record.info.state = enqueued ? BlockQueued : BlockQueueFull;
                 ++candidateRevision;
@@ -499,7 +502,8 @@ bool minerNextShare(stratum::Share &share, uint32_t waitMs) {
     }
 }
 
-void minerStart() {
+void minerStart(unsigned selectedCoin) {
+    activeMiningCoin = coin::valid(selectedCoin) ? selectedCoin : coin::BTC;
     jobMutex = xSemaphoreCreateMutex();
     shareQueue = xQueueCreate(16, sizeof(QueuedShare));
     if (!runtime::started(jobMutex && shareQueue, runtime::Miner, "miner resources")) return;
@@ -900,10 +904,11 @@ SemaphoreHandle_t saveMutex = xSemaphoreCreateMutex();
 // Independent extension: keep the original statA/statB layout readable by
 // rollback firmware. Never persist RTOS/session IDs or replay old submissions.
 constexpr uint32_t kCandidateMagic = 0x31434c42; // BLC1
+constexpr uint32_t kMultiCoinCandidateMagic = 0x32434c42; // BLC2: older firmware ignores non-BTC proofs
 struct CandidateSave {
     uint32_t magic, seq, height;
     uint8_t hash[32];
-    uint8_t state, reserved[3];
+    uint8_t state, coin, reserved[2];
     uint32_t crc;
 };
 uint32_t candidateSaveSeq = 0;
@@ -912,7 +917,9 @@ uint32_t candidateCrc(const CandidateSave &r) {
 }
 bool readCandidateSlot(Preferences &p, const char *key, CandidateSave &r) {
     return p.getBytesLength(key) == sizeof(r) && p.getBytes(key, &r, sizeof(r)) == sizeof(r) &&
-           r.magic == kCandidateMagic && r.state <= BlockQueueFull && r.crc == candidateCrc(r);
+           ((r.magic == kCandidateMagic && r.coin == coin::BTC) ||
+            (r.magic == kMultiCoinCandidateMagic && r.coin == coin::BCH)) &&
+           r.state <= BlockQueueFull && r.crc == candidateCrc(r);
 }
 void loadCandidate() {
     Preferences p;
@@ -925,6 +932,7 @@ void loadCandidate() {
     candidateSaveSeq = r.seq;
     previousCandidate = {};
     previousCandidate.height = r.height;
+    previousCandidate.coin = r.coin;
     memcpy(previousCandidate.hash, r.hash, 32);
     previousCandidate.state = r.state == BlockQueued ? BlockStale : r.state == BlockSubmitted ? BlockUnanswered : r.state;
     previousCandidate.previousSession = true;
@@ -938,12 +946,13 @@ bool saveCandidate() {
     bool needed = candidateCount && revision != savedCandidateRevision;
     if (needed) {
         const auto &info = candidates[(candidateHead + 3) % 4].info;
-        r.height = info.height; r.state = info.state;
+        r.height = info.height; r.state = info.state; r.coin = info.coin;
         memcpy(r.hash, info.hash, 32);
     }
     portEXIT_CRITICAL(&statsMux);
     if (!needed) return true;
-    r.magic = kCandidateMagic; r.seq = candidateSaveSeq + 1; r.crc = candidateCrc(r);
+    r.magic = r.coin == coin::BTC ? kCandidateMagic : kMultiCoinCandidateMagic;
+    r.seq = candidateSaveSeq + 1; r.crc = candidateCrc(r);
     Preferences p;
     if (!p.begin("stats", false)) return false;
     const char *key = r.seq & 1 ? "blockB" : "blockA";

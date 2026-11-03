@@ -4,6 +4,10 @@
   "pool_names": {"public-pool.io":"Public Pool","nerdminers.org":"Nerdminers.org","nerdminer.io":"NerdMiner.io","ckpool.org":"CKPool","ocean.xyz":"OCEAN","braiins.com":"Braiins Pool","viabtc.com":"ViaBTC","f2pool.com":"F2Pool","antpool.com":"AntPool"},
   "pool_links": {"public-pool.io":"https://web.public-pool.io/","nerdminers.org":"https://pool.nerdminers.org/","nerdminer.io":"https://nerdminer.io/","ckpool.org":"https://solo.ckpool.org/","ocean.xyz":"https://ocean.xyz/","braiins.com":"https://braiins.com/pool","viabtc.com":"https://www.viabtc.com/","f2pool.com":"https://www.f2pool.com/","antpool.com":"https://www.antpool.com/"},
   "release_notes": {
+    "2.1.0": {
+      "en": ["Choose Bitcoin (BTC) or Bitcoin Cash (BCH) in the miner settings; existing configurations keep BTC.", "BCH uses Stratum V1 and its own pool/address; CashAddr checks and cryptocurrency labels are included.", "Public statistics show separate totals by cryptocurrency. Bitcoin market/explorer data is not used for BCH."],
+      "fr": ["Choisis Bitcoin (BTC) ou Bitcoin Cash (BCH) dans les réglages ; les configurations existantes restent sur BTC.", "BCH utilise Stratum V1 et sa propre pool/adresse ; vérification CashAddr et affichage de la monnaie inclus.", "Les statistiques publiques distinguent les monnaies. Les données du marché et de l’explorateur Bitcoin ne sont pas utilisées en BCH."]
+    },
     "2.0.3": {
       "en": ["Public pool sharing is enabled by default and can be disabled in Network settings; saved opt-outs are kept.", "Pool names in the statistics link to their official website. Private endpoints, Bitcoin addresses and workers are never sent."],
       "fr": ["Le partage de la pool publique est activé par défaut et reste désactivable dans Réseau ; les choix désactivés enregistrés sont conservés.", "Les noms des pools dans les statistiques mènent à leur site officiel. Aucun nom d’hôte privé, adresse Bitcoin ni worker n’est envoyé."]

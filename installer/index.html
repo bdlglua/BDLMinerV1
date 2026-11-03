@@ -91,8 +91,8 @@ ol{padding-left:20px;margin:0}li{margin:6px 0}
 .chart-head .live{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:#3ddc84}
 .chart-head .live .dot{width:9px;height:9px}
 .split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px}
-.pool-breakdown{margin-top:12px}
-.split h3,.pool-breakdown h3{font-size:13px;font-weight:600;color:var(--label);margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em}
+.pool-breakdown,.coin-breakdown{margin-top:12px}
+.split h3,.pool-breakdown h3,.coin-breakdown h3{font-size:13px;font-weight:600;color:var(--label);margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em}
 table.by{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
 table.by th,table.by td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--border)}
 table.by th{color:var(--label);font-weight:500;font-size:13px}
@@ -353,8 +353,8 @@ s1:'Branche la carte à cet ordinateur avec un câble USB qui transmet les donn�
 s2:'Choisis la carte, clique sur Flasher et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV2-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
 after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
-statsTitle:'BDLMiner en ce moment',statsLead:'Totaux en direct des rapports anonymes : version du firmware, carte, hashrate et groupe de pool publique facultatif. Aucune adresse Bitcoin, aucun worker ni nom d’hôte privé.',
-poolOther:'Autre / pool privée',poolUnknown:'Pool non renseignée',byPool:'Par pool',colPool:'Pool',
+statsTitle:'BDLMiner en ce moment',statsLead:'Totaux en direct des rapports anonymes : version du firmware, carte, hashrate, cryptomonnaie et groupe de pool publique facultatif. Aucune adresse Bitcoin, aucun worker ni nom d’hôte privé.',
+poolOther:'Autre / pool privée',poolUnknown:'Pool non renseignée',byPool:'Par pool',colPool:'Pool',colCoin:'Cryptomonnaie',coinsTitle:'Par cryptomonnaie',
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
@@ -387,7 +387,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={poolOther:'Other / private pool',poolUnknown:'Not shared',colPool:'Pool',chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={colCoin:'Cryptocurrency',coinsTitle:'By cryptocurrency',poolOther:'Other / private pool',poolUnknown:'Not shared',colPool:'Pool',chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -515,6 +515,7 @@ function breakdowns(){
   row.miners+=m.miners;row.hashrate+=m.hashrate;rows.set(key,row)}
  table('st-boards',[...rows.values()].sort((a,b)=>b.hashrate-a.hashrate),'colBoard',n=>n);
  table('st-versions',summary?.versions||[],'colVersion',v=>v);
+ table('st-coins',summary?.coins||[],'colCoin',v=>v);
  const pools=summary?.pools??(summary?.miners?[{name:'unknown',miners:summary.miners,hashrate:summary.hashrate}]:[]);
  table('st-pools',pools,'colPool',key=>key==='unknown'?T('poolUnknown'):Object.hasOwn(poolNames,key)?poolNames[key]:T('poolOther'),
   key=>Object.hasOwn(poolNames,key)&&Object.hasOwn(poolLinks,key)?poolLinks[key]:null)}

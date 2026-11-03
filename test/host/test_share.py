@@ -16,6 +16,7 @@ prefix = r'''
 #include <string>
 #include <vector>
 #include "core/public_pool.h"
+#include "core/coin.h"
 #define FW_VERSION "1.9.0"
 #define BOARD_NAME "M5StickC-Plus2"
 namespace board { const char *model = "M5StickC-Plus2"; const char *modelName() { return model; } }
@@ -39,7 +40,7 @@ bool memoryOk = true;
 bool tlsMemoryOk() { return memoryOk; }
 double rate = 1.0234e6;
 double minerHashrate() { return rate; }
-struct { bool shareHashrate = true, sharePool = true; } settings;
+struct { bool shareHashrate = true, sharePool = true; unsigned miningCoin = 0; } settings;
 struct { bool poolConnected = true; } stats;
 auto minerStats() { return stats; }
 String activePool = "public-pool.io";
@@ -57,7 +58,7 @@ struct HTTPClient {
     int POST(uint8_t *data, size_t n) { posted.emplace_back((char *)data, n); return answer; }
     void end() {}
 };
-size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr, const char *poolHost = nullptr);
+size_t shareBody(char *out, size_t size, double hashrate, const char *model = nullptr, const char *poolHost = nullptr, unsigned selectedCoin = 0);
 bool sameName(const char *a, const char *b);
 void sharePoll();
 '''
@@ -65,15 +66,17 @@ tests = r'''
 int main() {
     char out[256];
     assert(shareBody(out, sizeof(out), 1.0234e6));
-    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300})"));
+    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300,"coin":"BTC"})"));
     shareBody(out, sizeof(out), 987654321.0); assert(strstr(out, "\"hashrate\":9.88e+08,"));
     shareBody(out, sizeof(out), 0); assert(strstr(out, "\"hashrate\":0,"));
     shareBody(out, sizeof(out), NAN); assert(strstr(out, "\"hashrate\":0,"));
     assert(shareBody(out, 20, 1e6) == 0);
+    shareBody(out, sizeof(out), 1e6, nullptr, "bch.example.org", 1);
+    assert(strstr(out, R"("coin":"BCH")"));
     assert(sameName("M5StickC Plus2", "M5StickC-Plus2") && sameName("abc", "A.B-C") && !sameName("M5Stack Core2", "M5Stack-ESP32") && !sameName("ab", "abc"));
     // The exact model, cleaned, only when given.
     shareBody(out, sizeof(out), 1e6, "M5Stack Core2");
-    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"model":"M5Stack Core2"})"));
+    assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"coin":"BTC","model":"M5Stack Core2"})"));
     shareBody(out, sizeof(out), 1e6, "Bad\"name\\x"); assert(strstr(out, "\"model\":\"Badnamex\"}"));
 
     // A finite public group leaves the device, never the raw endpoint.
@@ -88,7 +91,7 @@ int main() {
                              ".public-pool.io", "x..public-pool.io", "x/public-pool.io", "[fd00::1]"}) {
         assert(!strcmp(publicPoolGroup(host), "other"));
         shareBody(out, sizeof(out), 1e6, nullptr, host);
-        assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"pool":"other"})"));
+        assert(!strcmp(out, R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1e+06,"every":300,"coin":"BTC","pool":"other"})"));
     }
     shareBody(out, sizeof(out), 1e6, "M5Stack Core2", "my-worker.public-pool.io");
     assert(strstr(out, "\"model\":\"M5Stack Core2\",\"pool\":\"public-pool.io\"}"));
@@ -103,7 +106,7 @@ int main() {
     sharePoll(); assert(posted.empty());                       // not before 3 minutes
     nowMs = kFirstMs; sharePoll(); assert(posted.size() == 1);
     assert(hosts.back() == "stats.example");
-    assert(posted[0] == R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300})");
+    assert(posted[0] == R"({"v":"1.9.0","board":"m5stickc-plus2","hashrate":1.02e+06,"every":300,"coin":"BTC"})");
     assert(kEveryMs == kEverySeconds * 1000 && kEverySeconds == 300);
     nowMs += kEveryMs - 1; sharePoll(); assert(posted.size() == 1);
     nowMs += 1; answer = 500; sharePoll(); assert(posted.size() == 2);
