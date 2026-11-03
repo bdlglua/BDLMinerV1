@@ -148,12 +148,20 @@ void buildModel(const MinerStats &stats, uint32_t now) {
             if (year > 0) date = date.substring(0, year);
             metric(0, "LOCAL TIME", clock);
             metric(1, "DATE", date);
-            metric(2, "BTC PRICE", priceText(market.price), String(), accent());
+            if (settings.miningCoin == coin::BTC) metric(2, "BTC PRICE", priceText(market.price), String(), accent());
+            else metric(2, "CRYPTO", coin::ticker(settings.miningCoin), String(), accent());
             metric(3, "BLOCK", stats.blockHeight ? String(stats.blockHeight) : String("-"));
             break;
         }
         case 2: {
-            model.title = tr("BITCOIN");
+            model.title = coin::name(settings.miningCoin);
+            if (!coin::bitcoinData(settings.miningCoin)) {
+                metric(0, "BLOCK HEIGHT", stats.blockHeight ? String(stats.blockHeight) : String("-"), String(), accent());
+                metric(1, "NETWORK DIFF", diffText(stats.networkDiff));
+                metric(2, "POOL", netPoolHost());
+                metric(3, "LIVE HASHRATE", String(work::formatSI(minerHashrateLive(), 1).c_str()), "H/s");
+                break;
+            }
             metric(0, "BITCOIN PRICE", priceText(market.price), settings.currency, accent());
             metric(1, "FEES sat/vB", market.feeFast ? String(market.feeFast) + "/" + market.feeHalfHour + "/" + market.feeHour : String("-"));
             char retarget[20] = "-";

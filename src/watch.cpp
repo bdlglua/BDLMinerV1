@@ -106,8 +106,8 @@ void blockAlert() {
     if (!minerLastBlockCandidate(candidate) || candidate.previousSession || candidate.number == lastBlocks) return;
     lastBlocks = candidate.number;
     char msg[160];
-    snprintf(msg, sizeof(msg), "Block candidate at height %u by %s. Check pool submission and Bitcoin chain confirmation.",
-             (unsigned)candidate.height, board::modelName());
+    snprintf(msg, sizeof(msg), "%s block candidate at height %u by %s. Check pool submission and chain confirmation.",
+             coin::ticker(candidate.coin), (unsigned)candidate.height, board::modelName());
     notify("BLOCK CANDIDATE", msg, 5, "tada");
     logf("[miner] block candidate alert at height %u; chain confirmation unknown\n", (unsigned)candidate.height);
     watchWake();

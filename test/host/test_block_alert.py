@@ -9,6 +9,7 @@ source = (root / 'src/watch.cpp').read_text()
 alert = source[source.index('void blockAlert('):source.index('void events(')]
 prefix = r'''
 #include "miner.h"
+#include "core/coin.h"
 #include <cassert>
 #include <cstdio>
 BlockCandidate latest{};

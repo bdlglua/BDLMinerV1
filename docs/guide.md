@@ -45,16 +45,21 @@ Boards without a display report everything on the serial monitor and the
 1. On first boot the board opens a Wi‑Fi access point
    **`BDLMinerV2-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
+   * **Cryptocurrency**: `0` BTC (default) or `1` BCH in the setup portal; the
+     local Settings → Pool page has a named dropdown. Use matching main/backup
+     pools and a payout address or account for that coin. BCH requires V1. See
+     [BTC / BCH setup](mining-coins.md);
    * **Pool host / port**: `public-pool.io` / `21496` is the compiled default.
      For low-hashrate ESP32 feedback, see [Pools for ESP32](../README.md#pools-for-esp32),
      or use your own pool. A pasted
      `stratum+tcp://host:port` is accepted: the prefix is dropped and the port taken;
    * **Backup pool host / port** (optional): used when the main pool fails, see
      [Backup pool](#backup-pool);
-   * **BTC address**: your payout address, optionally followed by `.workerName`.
-     It is checked at boot (Base58Check and Bech32/Bech32m checksums): if it looks
-     mistyped, the screen shows *Invalid BTC address?* for 5 s and the serial monitor
-     a warning. Mining still starts, since some pools use account names instead;
+   * **Payout address or pool account**: an address for the selected coin, optionally
+     followed by `.workerName`, or the username required by an account-based pool.
+     BTC checks Base58Check and Bech32/Bech32m; BCH checks standard CashAddr
+     (with or without `bitcoincash:`) and legacy Base58Check. Unrecognized addresses
+     show a warning because some pools require account names;
    * **Pool password**: usually `x`;
    * **Suggested difficulty (V1)**: share difficulty requested from the pool,
      `0.0002` by default; the pool may enforce a higher minimum. V2 uses the target

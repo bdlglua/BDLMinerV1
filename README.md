@@ -5,15 +5,16 @@ supervised Gamma calibration, configurable physical screens and signed stable/be
 updates with automatic rollback. See the
 [V2 setup and validation guide](docs/v2/README.md).
 
-Solo "lottery" Bitcoin miner for the **M5StickC Plus2** and compatible ESP32 boards.
-It computes SHA‑256d hashes and connects to a pool using **Stratum V1 or native
-Stratum V2**. With an enormous amount of luck, it may find a full Bitcoin block
-whose reward is paid to **your** address.
+Solo "lottery" SHA-256d miner for the **M5StickC Plus2** and compatible ESP32 boards.
+Choose **Bitcoin (BTC)** or **Bitcoin Cash (BCH)** in Settings → Pool. Bitcoin
+supports **Stratum V1 or native Stratum V2**; BCH uses **Stratum V1**. The pool
+supplies the actual chain's work and controls payouts. See the
+[BTC / BCH configuration guide](docs/mining-coins.md).
 
-**Latest stable release: [v2.0.3](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.0.3)**
+**Latest stable release: [v2.1.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.1.0)**
 · [Website](https://bdlglua.github.io/)
 · [Flash / Flasher](https://bdlglua.github.io/flash.html)
-· [Release notes](docs/releases/v2.0.3.md) · [Français](docs/releases/v2.0.3.fr.md)
+· [Release notes](docs/releases/v2.1.0.md) · [Français](docs/releases/v2.1.0.fr.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlglua.github.io/stats.html)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
@@ -24,7 +25,11 @@ On the website: [interactive dashboard and fleet demos](https://bdlglua.github.i
 [troubleshooting FAQ](https://bdlglua.github.io/faq.html), and
 [support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
 
-**New in 2.0.3:** public pool sharing is enabled by default and can be disabled in
+**New in 2.1.0:** choose BTC or BCH, with chain-aware address checks, dashboard
+and physical-screen labels, and anonymous totals by cryptocurrency. Existing
+settings stay on BTC. See the [configuration guide](docs/mining-coins.md).
+
+**Since 2.0.3:** public pool sharing is enabled by default and can be disabled in
 the miner's Network settings; saved disabled choices are preserved. The
 [statistics page](https://bdlglua.github.io/stats.html) shows miner counts and total
 hashrate by pool, with clickable official website URLs. Private/custom pools stay
@@ -168,12 +173,12 @@ by default; turn it off with the *Anonymous usage count* setting (`count`).
 
 To know the total hashrate of the BDLMiner miners, every 5 minutes (the first time 3
 minutes after boot) the miner posts its firmware version, its board, its hashrate (the
-average of the last minute, rounded to 3 digits), the interval until its next report and,
+average of the last minute, rounded to 3 digits), the selected cryptocurrency, the interval until its next report and,
 on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
 [BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
 
 ```json
-{"v": "2.0.3", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2", "pool": "public-pool.io"}
+{"v": "2.1.0", "coin": "BTC", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2", "pool": "public-pool.io"}
 ```
 
 **Share my pool anonymously** (`sharepool`) adds the public pool group. It is
@@ -192,7 +197,7 @@ No Bitcoin address, worker, private hostname, name or identifier is sent. The se
 adds the reports up live and keeps a 5-minute sample of the total 35 days; the sender's network
 address only limits the number of reports and is never stored. The totals are public:
 **<https://bdlminer-stats.bdlminer-bot.workers.dev/>** (total hashrate, miners, 7-day
-chart, by board, version and pool). A paused miner sends
+chart, by board, version, cryptocurrency and pool). A paused miner sends
 nothing. It is on by default; turn it off with the *Share my hashrate anonymously*
 setting (`sharehr`), which applies at once.
 
@@ -202,7 +207,7 @@ setting (`sharehr`), which applies at once.
 |---|---|
 | Can't find the `BDLMinerV2-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
 | Portal saved but the board never mines | Read the serial monitor: Wi‑Fi password, pool host / port, and the `[pool]` lines. |
-| *Invalid BTC address?* at boot | The address checksum is wrong (typo, missing character, mixed upper/lower case) or it is not a Bitcoin address. Reopen the portal and fix it; ignore the warning only if your pool uses account names. |
+| *Check payout / account* at boot | The username is not a recognized address for the selected coin. Check the address checksum, selected chain and pool instructions; account-based pools use their account name instead. |
 | Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
 | Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
 | Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](docs/guide.md#pool-shares-and-local-records). |

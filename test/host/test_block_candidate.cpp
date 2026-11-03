@@ -125,6 +125,15 @@ int main() {
     Preferences::data["blockB"].resize(3);
     reboot();
     assert(!minerLastBlockCandidate(last) && stats.lifetimeBlocks > 0);
+    activeMiningCoin = coin::BCH;
+    assert(fetchWork(miner, seq)); w = miner.work;
+    assert(work::targetFromBits(0x207fffff, w.networkTarget));
+    candidate(9000); assert(minerLastBlockCandidate(last) && last.coin == coin::BCH);
+    assert(minerSaveStats());
+    CandidateSave saved{}; Preferences prefs;
+    assert(readCandidateSlot(prefs, candidateSaveSeq & 1 ? "blockB" : "blockA", saved));
+    assert(saved.magic == kMultiCoinCandidateMagic && saved.coin == coin::BCH);
+    reboot(); assert(minerLastBlockCandidate(last) && last.previousSession && last.coin == coin::BCH);
     delete shareQueue;
     puts("Candidate persistence: compatible stats layout, alternating CRC slots, failure/retry, reboot state, no replay and corrupt-slot fallback passed");
     puts("Block candidates: genesis proof/hash, full share queue, priority, deduplication, original height, immediate snapshot, delayed ACK/rejection, disconnect/ID reuse, stale work and explicit overflow passed");

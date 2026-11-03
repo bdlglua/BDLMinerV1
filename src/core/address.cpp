@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "sha256.h"
+#include "coin.h"
 
 namespace address {
 
@@ -133,9 +134,68 @@ bool startsWithNoCase(const std::string &s, const char *prefix) {
 
 }  // namespace
 
-Info parse(const std::string &user) {
+// CashAddr specification: https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/cashaddr.md
+// Bounded decoding verifies the prefix, 40-bit checksum, version, hash length
+// and zero padding. It never corrects a mistyped payout address.
+static bool parseCashAddr(const std::string &addr, Info &info) {
+    if (addr.empty() || addr.size() > 124) return false;
+    bool lower = false, upper = false;
+    std::string text;
+    for (unsigned char c : addr) {
+        if (c < 33 || c > 126) return false;
+        lower |= std::islower(c); upper |= std::isupper(c);
+        text += char(std::tolower(c));
+    }
+    if (lower && upper) return false;
+    size_t colon = text.find(':');
+    std::string prefix = colon == std::string::npos ? "bitcoincash" : text.substr(0, colon);
+    Network network = prefix == "bitcoincash" ? Network::Main : prefix == "bchtest" ? Network::Test :
+                      prefix == "bchreg" ? Network::Regtest : Network::Unknown;
+    if (network == Network::Unknown) return false;
+    std::string payload = colon == std::string::npos ? text : text.substr(colon + 1);
+    if (payload.size() < 42 || payload.size() > 112) return false;
+    uint64_t check = 1;
+    auto step = [&](uint8_t value) {
+        static const uint64_t generator[] = {0x98f2bc8e61ULL, 0x79b76d99e2ULL, 0xf33e5fb3c4ULL, 0xae2eabe2a8ULL, 0x1e4f43e470ULL};
+        uint8_t top = check >> 35;
+        check = ((check & 0x07ffffffffULL) << 5) ^ value;
+        for (unsigned i = 0; i < 5; ++i) if (top & (1 << i)) check ^= generator[i];
+    };
+    for (char c : prefix) step(c & 31);
+    step(0);
+    uint8_t decoded[65]{};
+    unsigned length = 0, bits = 0;
+    uint32_t accumulator = 0;
+    for (size_t i = 0; i < payload.size(); ++i) {
+        const char *p = strchr(kBech32, payload[i]);
+        if (!p) return false;
+        unsigned value = unsigned(p - kBech32);
+        step(value);
+        if (i + 8 >= payload.size()) continue;
+        accumulator = ((accumulator << 5) | value) & 0xfff;
+        bits += 5;
+        if (bits >= 8) {
+            bits -= 8;
+            if (length == sizeof(decoded)) return false;
+            decoded[length++] = uint8_t(accumulator >> bits);
+        }
+    }
+    if (check != 1 || bits >= 5 || ((accumulator << (8 - bits)) & 255) || !length) return false;
+    static const unsigned sizes[] = {20, 24, 28, 32, 40, 48, 56, 64};
+    uint8_t version = decoded[0];
+    if ((version & 0x80) || length != sizes[version & 7] + 1 || (version >> 3) > 1) return false;
+    info = Info((version >> 3) ? Type::P2SH : Type::P2PKH, network);
+    return true;
+}
+
+Info parse(const std::string &user, unsigned selectedCoin) {
     std::string addr = user.substr(0, user.find('.'));
     Info info;
+    if (!coin::valid(selectedCoin)) return info;
+    if (selectedCoin == coin::BCH) {
+        if (!parseCashAddr(addr, info) && !parseBase58(addr, info)) return Info();
+        return info;
+    }
     bool segwit = startsWithNoCase(addr, "bc1") || startsWithNoCase(addr, "tb1") || startsWithNoCase(addr, "bcrt1");
     if (!(segwit ? parseSegwit(addr, info) : parseBase58(addr, info))) info = Info();
     return info;

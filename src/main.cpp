@@ -83,19 +83,19 @@ void setup() {
         logf("[cfg] backup pool %s:%u\n", settings.backupHost.c_str(), settings.backupPort);
 
     // Some pools use account names, so a bad address is only a warning.
-    address::Info addr = address::parse(settings.btcAddress.c_str());
+    logf("[cfg] cryptocurrency %s (pool-supplied SHA-256d jobs)\n", coin::ticker(settings.miningCoin));
+    address::Info addr = address::parse(settings.btcAddress.c_str(), settings.miningCoin);
     if (addr.valid()) {
         logf("[cfg] address type %s%s\n", address::typeName(addr.type),
              addr.network == address::Network::Main ? "" : " (testnet)");
     } else {
-        logf("[cfg] WARNING: not a valid Bitcoin address, rewards may be lost. "
-             "Hold the main button at boot to fix it.\n");
-        ui::showMessage("Warning", "Invalid BTC address?", "Hold A at boot to fix");
+        logf("[cfg] Address is not recognized for %s; check the pool's address/account requirements.\n", coin::ticker(settings.miningCoin));
+        ui::showMessage("Warning", "Check payout / account", "Hold A at boot to fix");
         delay(5000);
     }
 
     minerLoadStats();
-    minerStart();
+    minerStart(settings.miningCoin);
     notifyStart();
     trialBegin();  // may notify a rollback
     netStart();

@@ -240,14 +240,15 @@ void buildStats(JsonDocument &j, bool history) {
         uint8_t id[32];
         for (unsigned i = 0; i < 32; ++i) id[i] = candidate.hash[31 - i];
         j["block_candidate"]["height"] = candidate.height;
+        j["block_candidate"]["coin"] = coin::ticker(candidate.coin);
         j["block_candidate"]["hash"] = work::toHex(id, 32);
         j["block_candidate"]["status"] = states[candidate.state];
         j["block_candidate"]["previous_session"] = candidate.previousSession;
         BlockChainStatus chain{};
-        bool checked = blockStatusGet(candidate.hash, chain);
+        bool checked = candidate.coin == coin::BTC && blockStatusGet(candidate.hash, chain);
         if (checked && chain.known && !chain.error) j["block_candidate"]["chain_confirmed"] = chain.inBestChain;
         else j["block_candidate"]["chain_confirmed"] = nullptr;
-        j["block_candidate"]["chain_source"] = "mempool.space";
+        j["block_candidate"]["chain_source"] = candidate.coin == coin::BTC ? "mempool.space" : "";
         j["block_candidate"]["confirmations"] = checked && chain.known && !chain.error ? chain.confirmations : 0;
         if (checked && chain.checkedMs) j["block_candidate"]["chain_checked_s"] = uint32_t(millis() - chain.checkedMs) / 1000;
         else j["block_candidate"]["chain_checked_s"] = -1;
@@ -304,7 +305,10 @@ void buildStats(JsonDocument &j, bool history) {
     j["network"]["height"] = stats.blockHeight;
     j["network"]["difficulty"] = stats.networkDiff;
     j["address"] = settings.btcAddress;
-    j["address_type"] = address::typeName(address::parse(settings.btcAddress.c_str()).type);
+    j["coin"] = coin::ticker(settings.miningCoin);
+    j["coin_name"] = coin::name(settings.miningCoin);
+    j["algorithm"] = "SHA-256d";
+    j["address_type"] = address::typeName(address::parse(settings.btcAddress.c_str(), settings.miningCoin).type);
     j["lifetime"]["hashes"] = (double)stats.lifetimeHashes;
     j["lifetime"]["shares"] = stats.lifetimeShares;
     j["lifetime"]["blocks"] = stats.lifetimeBlocks;
@@ -786,6 +790,7 @@ void handlePostBackup() {
     }
     bool full = j["bdlminer_backup"].is<unsigned>();
     keepSecrets(full ? j["settings"].as<JsonObject>() : j.as<JsonObject>());
+    settingsMigrateBackupCoin(full ? j["settings"].as<JsonObject>() : j.as<JsonObject>(), full);
     JsonObjectConst values = full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>();
     if (const char *error = settingsError(values)) {
         server.send(400, "text/plain", error);

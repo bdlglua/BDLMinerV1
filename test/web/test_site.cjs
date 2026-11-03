@@ -13,7 +13,7 @@ async function main(){
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   if(process.env.BDL_VERBOSE)page.on('console',message=>{if(message.type()==='error')console.error('BROWSER:',message.text())});
   await page.route('https://**/*',route=>route.fulfill({status:200,contentType:'text/javascript',body:''}));
-  let communityStats={at:Date.now(),miners:3,hashrate:2.5e6,boards:[],versions:[],fleet:[],history:[],recent:[],record:null,
+  let communityStats={at:Date.now(),miners:3,hashrate:2.5e6,coins:[{name:"BTC",miners:2,hashrate:2e6},{name:"BCH",miners:1,hashrate:5e5}],boards:[],versions:[],fleet:[],history:[],recent:[],record:null,
    pools:[{name:'public-pool.io',miners:1,hashrate:1e6},{name:'other',miners:1,hashrate:1e6},{name:'unknown',miners:1,hashrate:5e5}]};
   await page.route('https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(communityStats)}));
   await page.addInitScript(()=>{window.WebSocket=class{constructor(){this.readyState=1;setTimeout(()=>this.onopen?.(),0)}send(){}close(){}}});
@@ -86,6 +86,7 @@ async function main(){
     assert.equal(html.includes('src="https://unpkg.com/esp-web-tools@'),key==='flash','load the USB tool only on its own page');
    }
    await page.goto(base+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
+   assert.match(await page.locator('#st-coins').textContent(),/BTC.*BCH/s);
    assert.match(await page.locator('#st-pools').textContent(),/Public Pool.*Autre \/ pool privée.*Pool non renseignée/s);
    assert.equal(await page.locator('[data-t="poolsHelp"]').count(),0);
    const breakdownStyle=await page.evaluate(()=>{

@@ -113,11 +113,11 @@ void render() {
             rows[i]=String(display_config::label(widgets[i],settings.language))+" "+value;}
         lines(rows[0],rows[1],rows[2],rows[3]);return;
     }
-    if (page == 0) lines(a.stockFallback?"BM1370 525M FALLBACK":"BDLMiner / BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
+    if (page == 0) lines(a.stockFallback?String("BM1370 525M FALLBACK"):String("BDLMiner ")+coin::ticker(settings.miningCoin)+"/BM1370",String(work::formatSI(minerHashrateLive(),2).c_str())+"H/s",
         temp+" C  Fan "+String(a.rpm),String("A:")+counter(s.accepted)+" R:"+counter(s.rejected));
     else if (page == 1) lines("Power / thermal",String("Vin ")+reading(a.inputVoltage,2)+"V Vc "+reading(a.coreVoltage,3)+"V",
         reading(a.frequency,0)+" MHz  "+reading(a.current,1)+"A",String("VR ")+reading(a.regulatorTemperature,1)+" C");
-    else lines("Pool / records",s.poolConnected?"Pool connected":"Pool disconnected",String("Best ")+work::formatSI(s.bestDiff,2).c_str(),WiFi.localIP().toString());
+    else lines(String(coin::ticker(settings.miningCoin))+" / Pool / records",s.poolConnected?"Pool connected":"Pool disconnected",String("Best ")+work::formatSI(s.bestDiff,2).c_str(),WiFi.localIP().toString());
 }
 }
 #endif

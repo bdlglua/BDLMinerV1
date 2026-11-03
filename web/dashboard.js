@@ -12,7 +12,7 @@ function odds(hr,nd,s){if(!hr||!nd)return'-';const p=-Math.expm1(-hr*s/(nd*42949
 function tile(label,value,sub,big){const e=document.createElement('div');e.className='t'+(big?' big':'');
  if(label===t('Hashrate'))e.classList.add('hero');
  if(label===t('Hashrate history'))e.classList.add('history');
- for(const [group,names]of Object.entries({pool:['Pool','Pool (backup)','Payout address','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash','Crash history','Integrations'],records:['32-bit shares','64-bit shares','Block chance','Block candidates','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
+ for(const [group,names]of Object.entries({pool:['Cryptocurrency','Pool','Pool (backup)','Payout address','Payout address or pool account','Seen by the pool'],market:['BTC price','Fees sat/vB','Network hashrate','Next retarget','Recent blocks'],device:['Device','WiFi','Temperature','Memory','Effective power','Last crash','Crash history','Integrations'],records:['32-bit shares','64-bit shares','Block chance','Block candidates','Total hashes','Block height','Lifetime','Best shares']}))if(names.some(name=>label===t(name)))e.dataset.group=group;
  for(const[c,x]of[['l',label],['v',value],['s',sub]])if(x!==undefined){const d=document.createElement('div');d.className=c;d.textContent=x;e.appendChild(d)}return e}
 
 function textAt(id,value){const node=document.getElementById(id);if(node.textContent!==String(value))node.textContent=value}
@@ -80,6 +80,7 @@ function blockCandidateTile(j){
  else if(c?.chain_confirmed===false&&!c.chain_error)lines.push(t('Outside the explorer best chain'));
  else lines.push(t('Local candidates; chain confirmation unknown'));
  if(c){
+  lines.push(t('Cryptocurrency')+COLON+(c.coin||'BTC'));
   if(c.previous_session)lines.push(t('Saved from a previous session'));
   lines.push(t('Block height')+COLON+(c.height||'-'),t(labels[c.status]||'Unknown submission status'));
   if(c.chain_not_found)lines.push(t('Not indexed by the explorer yet'));
@@ -195,12 +196,13 @@ function show(j){
   if(B.length)T.push(tile(t('Recent blocks'),B[0].mining?B[0].h+' · '+t('mining now'):B[0].h,B.filter(b=>!b.mining).slice(0,6).map(b=>b.h+' · '+(b.pool||'?')+' · '+(LANG=='fr'?t('ago')+' '+dur(now-b.t):dur(now-b.t)+' '+t('ago'))+' · '+b.tx+' tx'+(b.best!=null?' · '+t('your best')+' '+diff(b.best):'')).join('\n')+(B[0].mining&&B[0].best!=null?'\n'+t('mining now')+COLON+t('your best')+' '+diff(B[0].best):''),true));
   if(Array.isArray(j.shares_log)&&j.shares_log.length)T.push(sharesTile(j.shares_log));
   if(j.top&&j.top.length)T.push(tile(t('Best shares'),j.top.slice(0,5).map(x=>diff(x.d)).join('  '),j.top.slice(0,5).map(x=>x.t?new Date(x.t*1e3).toLocaleDateString():'-').join(' · '),true));
-  if(m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString(LOCALE)+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString(LOCALE)+' '+t('sats')+' / '+m.currency:'',true),
+  if((j.coin||'BTC')==='BTC'&&m.updated_s>=0){T.push(tile(t('BTC price'),m.price?Math.round(m.price).toLocaleString(LOCALE)+' '+m.currency:'-',m.price?Math.round(1e8/m.price).toLocaleString(LOCALE)+' '+t('sats')+' / '+m.currency:'',true),
    tile(t('Fees sat/vB'),m.fees.join(' / '),t('fast / 30 min / 1 h')),
    tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString(LOCALE)+' '+t('tx in mempool')),
    tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+fix(m.retarget.change,2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+fix(m.retarget.progress,0)+' % '+t('done')+')'))}
-  T.push(tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')+poolUptime(j.pool)),
-   tile(t('Payout address'),j.address,j.address_type==='invalid'?'⚠ '+t('not a valid Bitcoin address'):j.address_type),
+  T.push(tile(t('Cryptocurrency'),j.coin||'BTC',(j.coin_name||'Bitcoin')+' · SHA-256d'+((j.coin||'BTC')!=='BTC'?'\n'+t('Bitcoin market data is unavailable for this coin.'):'')),
+   tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')+poolUptime(j.pool)),
+   tile(t('Payout address or pool account'),j.address,j.address_type==='invalid'?t('Check the selected coin and the pool account requirements.'):j.address_type),
    tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+COLON+j.max_temp_c+' °C':'')),
    tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+COLON+(j.power_limit_percent??'-')+' %'),
    tile(t('Memory'),si(j.heap,'B'),t('largest block')+COLON+si(j.heap_max_block,'B')),
@@ -220,7 +222,7 @@ function show(j){
   if(lastChartLimit!==j.max_temp_c){lastChartLimit=j.max_temp_c;renderHistory()}
   document.getElementById('market-note').textContent=m.updated_s>=0?'':t('Public market data is temporarily unavailable. Mining can continue.');
   renderHealth(j);
-  document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString(LOCALE)+(m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
+  document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString(LOCALE)+((j.coin||'BTC')==='BTC'&&m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
 
   // Auxiliary requests have their own non-overlapping schedulers. A slow
   // history response or unreachable peer must not hold up local readings.

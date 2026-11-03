@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include <cstring>
+#include "core/coin.h"
 
 inline bool legacyManualAgent(const char *agent) {
     return agent && *agent && strcmp(agent, "NerdMinerV2") &&
@@ -38,12 +39,13 @@ inline bool legacyManualAgent(const char *agent) {
 
 struct Settings {
     // Pool
+    uint8_t miningCoin = coin::BTC; // absent from older records: retain Bitcoin
     String poolHost = DEFAULT_POOL_HOST;
     uint16_t poolPort = DEFAULT_POOL_PORT;
     String backupHost;  // used when the main pool keeps failing, empty = none
     uint16_t backupPort = DEFAULT_BACKUP_PORT;
     uint8_t rotateHours = 0;  // > 0: alternate main and backup pool every N hours
-    String btcAddress;  // payout address (worker name may be appended: addr.worker)
+    String btcAddress;  // Stratum username/address; legacy member/key kept for backups
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
     bool userAgentAuto = true;

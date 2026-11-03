@@ -4,6 +4,8 @@
 
 Settings settings;
 const SettingInfo kSettings[] = {
+    {"coin", SettingType::Number, &settings.miningCoin, 8, "", ""},
+    {"addr", SettingType::Text, &settings.btcAddress, 0, "", ""},
     {"sharepool", SettingType::Bool, &settings.sharePool, 0, "", ""},
     {"channel", SettingType::Number, &settings.updateChannel, 8, "", ""},
     {"customscreen", SettingType::Bool, &settings.customScreen, 0, "", ""},
@@ -33,6 +35,40 @@ const SettingInfo kSettings[] = {
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
 int main() {
+
+    assert(settings.miningCoin == coin::BTC);
+    {
+        JsonDocument oldBackup; deserializeJson(oldBackup,R"({"pool":"public-pool.io","addr":"address.worker"})");
+        settingsMigrateBackupCoin(oldBackup.as<JsonObject>(),true);assert(oldBackup["coin"].as<unsigned>()==coin::BTC);
+        JsonDocument partial;deserializeJson(partial,R"({"power":75})");
+        settingsMigrateBackupCoin(partial.as<JsonObject>(),false);assert(partial["coin"].isUnbound());
+        JsonDocument modern;deserializeJson(modern,R"({"coin":1,"pool":"bch.example.org","addr":"account.worker"})");
+        settingsMigrateBackupCoin(modern.as<JsonObject>(),true);assert(modern["coin"].as<unsigned>()==coin::BCH);
+    }
+    {
+        JsonDocument change;
+        assert(!deserializeJson(change, R"({"coin":1,"pool":"bch.example.org","addr":"bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a","proto":0})"));
+        assert(!settingsError(change.as<JsonObjectConst>()));
+        Settings staged = settings;
+        settingsApply(staged, change.as<JsonObjectConst>());
+        assert(staged.miningCoin == coin::BCH && !settingsCompare(staged, settings).live);
+        settingsCopyLive(settings, staged); assert(settings.miningCoin == coin::BTC);
+        for (const char *raw : {R"({"coin":2})", R"({"coin":"BCH"})", R"({"coin":1})",
+            R"({"coin":1,"pool":"public-pool.io"})",
+            R"({"coin":1,"pool":"bch.example.org","proto":1})",
+            R"({"coin":1,"pool":"stratum2+tcp://bch.example.org:3333/key"})",
+            R"({"coin":1,"pool":"bch.example.org","pool2":"solo.ckpool.org"})",
+            R"({"coin":1,"pool":"bch.example.org","addr":"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"})",
+            R"({"coin":0,"addr":"bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a"})"}) {
+            JsonDocument invalid; assert(!deserializeJson(invalid, raw));
+            assert(settingsError(invalid.as<JsonObjectConst>()));
+        }
+        assert(coin::poolCompatible(coin::BCH,"stratum+tcp://bch.custom.example:3333"));
+        assert(!coin::poolCompatible(coin::BCH,"STRATUM+TCP://MAIN.PUBLIC-POOL.IO.:21496"));
+        assert(coin::poolCompatible(coin::BCH,"public-pool.io.example.org"));
+        assert(!coin::poolCompatible(coin::BTC,"b4c.f2pool.com"));
+    }
+
     assert(settings.sharePool);
     Settings sharing = settings; JsonDocument sharingValues;
     assert(!deserializeJson(sharingValues, R"({"sharepool":false})"));

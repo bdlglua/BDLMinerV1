@@ -12,6 +12,8 @@ discovery = source[source.index('// "eu.pool.example" -> "pool.example"'):source
 best_assignment = next(line.strip() for line in source.splitlines() if 'p.bestEver =' in line)
 prefix = r'''
 #include <cassert>
+#include "core/coin.h"
+struct { unsigned miningCoin = 0; } settings;
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -41,6 +43,8 @@ int main() {
  poolBackup=true;pool.updatedMs=456;pool.hashrate=10;
  assert(poolStatsGet().hashrate==10);
  backup=false;assert(poolStatsGet().updatedMs==0 && poolStatsGet().hashrate==0);
+ settings.miningCoin=1;auto bch=poolStatsGet();assert(!bch.updatedMs && bch.hashrate==0 && !bch.supported);
+ settings.miningCoin=0;
  for(const char *raw:{R"({"bestDifficulty":12.5})",R"({"bestDifficulty":"12.5"})",R"({"bestDifficulty":" 1.25e1 "})"}) {
   PoolStats p;JsonDocument doc;assert(!deserializeJson(doc,raw));
   BEST_ASSIGNMENT

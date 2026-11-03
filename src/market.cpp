@@ -419,12 +419,12 @@ void marketTask(void *) {
             lastPoolBackup = backup;
             nextPool = millis();  // do not wait up to an hour after failover
         }
-        if (WiFi.isConnected() && (int32_t)(millis() - nextMarket) >= 0) {
+        if (coin::bitcoinData(settings.miningCoin) && WiFi.isConnected() && (int32_t)(millis() - nextMarket) >= 0) {
             bool ok = refresh();
             nextMarket = millis() + (ok ? kRefreshMs : retry);
             retry = ok ? kRetryMs : min<uint32_t>(retry * 2, kRefreshMs);
         }
-        if (WiFi.isConnected() && minerStats().poolConnected && (int32_t)(millis() - nextPool) >= 0) {
+        if (coin::bitcoinData(settings.miningCoin) && WiFi.isConnected() && minerStats().poolConnected && (int32_t)(millis() - nextPool) >= 0) {
             bool ok = refreshPoolStats();
             nextPool = millis() + (ok ? kPoolStatsMs : kPoolStatsRetryMs);
         }
@@ -442,6 +442,7 @@ void marketStart() {
 }
 
 PoolStats poolStatsGet() {
+    if (!coin::bitcoinData(settings.miningCoin)) { PoolStats unavailable; unavailable.supported = false; return unavailable; }
     portENTER_CRITICAL(&dataMux);
     PoolStats p = pool;
     bool backup = poolBackup;
@@ -450,6 +451,7 @@ PoolStats poolStatsGet() {
 }
 
 MarketData marketGet() {
+    if (!coin::bitcoinData(settings.miningCoin)) return MarketData{};
     portENTER_CRITICAL(&dataMux);
     MarketData d = data;
     portEXIT_CRITICAL(&dataMux);
