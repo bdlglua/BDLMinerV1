@@ -91,7 +91,8 @@ ol{padding-left:20px;margin:0}li{margin:6px 0}
 .chart-head .live{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:#3ddc84}
 .chart-head .live .dot{width:9px;height:9px}
 .split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px}
-.split h3{font-size:13px;font-weight:600;color:var(--label);margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em}
+.pool-breakdown{margin-top:12px}
+.split h3,.pool-breakdown h3{font-size:13px;font-weight:600;color:var(--label);margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em}
 table.by{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
 table.by th,table.by td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--border)}
 table.by th{color:var(--label);font-weight:500;font-size:13px}
@@ -353,7 +354,6 @@ s2:'Choisis la carte, clique sur Flasher et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV2-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
 after:'Ouvre ensuite le tableau de bord sur <b>http://bdlminer-xxxx.local</b>. Les mises à jour arrivent toutes seules.',
 statsTitle:'BDLMiner en ce moment',statsLead:'Totaux en direct des rapports anonymes : version du firmware, carte, hashrate et groupe de pool publique facultatif. Aucune adresse Bitcoin, aucun worker ni nom d’hôte privé.',
-poolsHelp:'Le partage de la pool est activé par défaut à partir du firmware 2.0.3. Tu peux désactiver « Partager ma pool anonymement » dans les réglages Réseau du miner ; un choix désactivé déjà enregistré est conservé. Le partage du hashrate doit aussi être activé. Les noms des pools mènent à leur site officiel. Les autres pools sont masquées. « Pool non renseignée » inclut les anciennes versions, le partage désactivé et les connexions au pool interrompues.',
 poolOther:'Autre / pool privée',poolUnknown:'Pool non renseignée',byPool:'Par pool',colPool:'Pool',
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',

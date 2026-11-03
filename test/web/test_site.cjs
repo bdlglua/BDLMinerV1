@@ -87,7 +87,14 @@ async function main(){
    }
    await page.goto(base+'/stats.html');await page.locator('#st-pools tbody tr').first().waitFor();
    assert.match(await page.locator('#st-pools').textContent(),/Public Pool.*Autre \/ pool privée.*Pool non renseignée/s);
-   assert.match(await page.locator('[data-t="poolsHelp"]').textContent(),/activé par défaut.*2\.0\.3/);
+   assert.equal(await page.locator('[data-t="poolsHelp"]').count(),0);
+   const breakdownStyle=await page.evaluate(()=>{
+    const board=document.querySelector('#st-boards').closest('.card'),pool=document.querySelector('#st-pools').closest('.card');
+    const heading=card=>{const s=getComputedStyle(card.querySelector('h3'));return[s.fontSize,s.fontWeight,s.color,s.textTransform]};
+    return{gap:pool.getBoundingClientRect().top-board.parentElement.getBoundingClientRect().bottom,board:heading(board),pool:heading(pool)};
+   });
+   assert.ok(breakdownStyle.gap>=12,'separate the pool card from the other breakdowns');
+   assert.deepEqual(breakdownStyle.pool,breakdownStyle.board,'all breakdown headings should have the same appearance');
    assert.equal(await page.locator('#st-pools a').count(),1);
    assert.equal(await page.locator('#st-pools a').getAttribute('href'),'https://web.public-pool.io/');
    assert.equal(await page.locator('#st-pools .pool-site').textContent(),'https://web.public-pool.io/');
