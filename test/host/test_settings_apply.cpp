@@ -37,6 +37,16 @@ const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 int main() {
 
     assert(settings.miningCoin == coin::BTC);
+    for(unsigned id:{unsigned(coin::BSV),unsigned(coin::XEC),unsigned(coin::DGB)}) {
+        JsonDocument request;request["coin"]=id;request["pool"]="custom.coin.example";request["addr"]="account.worker";request["proto"]=0;
+        assert(!settingsError(request.as<JsonObjectConst>()));Settings staged=settings;settingsApply(staged,request.as<JsonObjectConst>());
+        assert(staged.miningCoin==id && !settingsCompare(staged,settings).live);
+        request["proto"]=1;assert(settingsError(request.as<JsonObjectConst>()));request["proto"]=0;
+        request["pool2"]="public-pool.io";assert(settingsError(request.as<JsonObjectConst>()));
+    }
+    assert(!coin::addressCompatible(coin::XEC,"bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a"));
+    assert(!coin::poolCompatible(coin::BSV,"xec.solopool.org"));
+
     {
         JsonDocument oldBackup; deserializeJson(oldBackup,R"({"pool":"public-pool.io","addr":"address.worker"})");
         settingsMigrateBackupCoin(oldBackup.as<JsonObject>(),true);assert(oldBackup["coin"].as<unsigned>()==coin::BTC);
@@ -53,7 +63,7 @@ int main() {
         settingsApply(staged, change.as<JsonObjectConst>());
         assert(staged.miningCoin == coin::BCH && !settingsCompare(staged, settings).live);
         settingsCopyLive(settings, staged); assert(settings.miningCoin == coin::BTC);
-        for (const char *raw : {R"({"coin":2})", R"({"coin":"BCH"})", R"({"coin":1})",
+        for (const char *raw : {R"({"coin":5})", R"({"coin":"BCH"})", R"({"coin":1})",
             R"({"coin":1,"pool":"public-pool.io"})",
             R"({"coin":1,"pool":"bch.example.org","proto":1})",
             R"({"coin":1,"pool":"stratum2+tcp://bch.example.org:3333/key"})",

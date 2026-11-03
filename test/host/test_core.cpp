@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "core/address.h"
+#include "core/coin.h"
 #include "core/fill.h"
 #include "core/sha256.h"
 #include "core/stratum.h"
@@ -689,6 +690,70 @@ void testCashAddr() {
     puts("BCH CashAddr: official P2PKH/P2SH vectors, prefix/case/worker, checksum mutation, payload, legacy and cross-chain rejection passed");
 }
 
+
+// Bitcoin ABC ecashaddrjs and DigiByte Core key_io_valid.json published vectors.
+// https://github.com/Bitcoin-ABC/bitcoin-abc/tree/master/modules/ecashaddrjs/test
+// https://github.com/DigiByte-Core/digibyte/blob/develop/src/test/data/key_io_valid.json
+static void testMoreCoinAddresses() {
+    using address::Type; using address::Network;
+    struct Case { const char *text; unsigned coin; Type type; Network network; };
+    const Case cases[] = {
+        {"ecash:qpm2qsznhks23z7629mms6s4cwef74vcwva87rkuu2", 3, Type::P2PKH, Network::Main},
+        {"ecash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4ykdcjcn6n", 3, Type::P2PKH, Network::Main},
+        {"ecash:qqq3728yw0y47sqn6l2na30mcw6zm78dzq653y7pv5", 3, Type::P2PKH, Network::Main},
+        {"ecash:ppm2qsznhks23z7629mms6s4cwef74vcwv2zrv3l8h", 3, Type::P2SH, Network::Main},
+        {"ecash:pr95sy3j9xwd2ap32xkykttr4cvcu7as4ypg9alspw", 3, Type::P2SH, Network::Main},
+        {"ecash:pqq3728yw0y47sqn6l2na30mcw6zm78dzqd3vtezhf", 3, Type::P2SH, Network::Main},
+        {"ectest:qpm2qsznhks23z7629mms6s4cwef74vcwvmvqr33lm", 3, Type::P2PKH, Network::Test},
+        {"ectest:qr95sy3j9xwd2ap32xkykttr4cvcu7as4ysxxjl7ez", 3, Type::P2PKH, Network::Test},
+        {"ectest:qqq3728yw0y47sqn6l2na30mcw6zm78dzqul0yev09", 3, Type::P2PKH, Network::Test},
+        {"ectest:ppm2qsznhks23z7629mms6s4cwef74vcwvvfavkjyx", 3, Type::P2SH, Network::Test},
+        {"ectest:pr95sy3j9xwd2ap32xkykttr4cvcu7as4y8rmacazl", 3, Type::P2SH, Network::Test},
+        {"ectest:pqq3728yw0y47sqn6l2na30mcw6zm78dzqt6jt705c", 3, Type::P2SH, Network::Test},
+        {"DSC6tGC2NvN6AHio2p8pU4seTbPKDi7KZb", 4, Type::P2PKH, Network::Main},
+        {"SefNWSMmXAxc4N8sxHyg8hHXTTU9GojgzX", 4, Type::P2SH, Network::Main},
+        {"sxnDwNPKaPKZd5ZgJfVfom8cX4ZJkYr1zL", 4, Type::P2PKH, Network::Test},
+        {"yf4ztby3Z5cFgxjbTpnwzU2TNxn5oiorbW", 4, Type::P2SH, Network::Test},
+        {"dgb1qhyz5jznu8rxjz6emktwwkz5m0m4gr9q9rvhegc", 4, Type::P2WPKH, Network::Main},
+        {"dgb1qs6parp27xaccjznw4sruj9nrtuyl3wtraf58ml7nen522da2vxqql3zq6n", 4, Type::P2WSH, Network::Main},
+        {"dgb1pva0l3ng2q0gt2t3rqqpqxk5y57l4u0xyryxdslrt76k5u54rvpssjpmuhq", 4, Type::P2TR, Network::Main},
+        {"dgbt1qznyt7p9zln65ydpuzfq8ksuz4hkvcwdl9qtcty", 4, Type::P2WPKH, Network::Test},
+        {"dgbt1qu2au468tx43wqwzkhgruhxzksgt2j785kekzsw0hymg7kyzgumtq02uk88", 4, Type::P2WSH, Network::Test},
+        {"dgbt1pykapk8r8wlwrl60zwz8rhfy5x3dc3k545utuea798ye2qk6vay9q3l9vt7", 4, Type::P2TR, Network::Test},
+        {"dgbrt1qgmzq7xt3pkclw9d6emultxnhj4lumdldzeyypq", 4, Type::P2WPKH, Network::Regtest},
+        {"dgbrt1qdmn2glunkfcmahndk3ukygkwgwsr26842gzlctfz4mnscp2mz6uql5jdft", 4, Type::P2WSH, Network::Regtest},
+        {"dgbrt1pwvzf9ga8e7gp5v5eut66fctgkf29uu7efty3aseha3tzzc3sp92qjz3afh", 4, Type::P2TR, Network::Regtest},
+        {"1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu", coin::BSV, Type::P2PKH, Network::Main},
+        {"3CWFddi6m4ndiGyKqzYvsFYagqDLPVMTzC", coin::BSV, Type::P2SH, Network::Main},
+    };
+    for (const auto &v : cases) {
+        auto parsed=address::parse(std::string(v.text)+".worker",v.coin);
+        assert(parsed.type==v.type && parsed.network==v.network);
+        if (v.coin==coin::XEC) {
+            assert(!address::parse(v.text,coin::BCH).valid());
+            std::string s=v.text;auto split=s.find(':');
+            if (v.network==Network::Main) assert(address::parse(s.substr(split+1),v.coin).type==v.type);
+            for(char &c:s)c=std::toupper(static_cast<unsigned char>(c));
+            assert(address::parse(s,v.coin).type==v.type);
+        }
+        if (v.coin==coin::DGB) assert(!address::parse(v.text,coin::BTC).valid());
+        std::string broken=v.text;broken.back()=broken.back()=='q'?'p':'q';
+        assert(!address::parse(broken,v.coin).valid());
+    }
+    assert(!address::parse("bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a",coin::XEC).valid());
+    assert(!address::parse("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",coin::BSV).valid());
+    assert(!address::parse("1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu",coin::DGB).valid());
+    assert(coin::halvingInterval(coin::DGB)==0);
+    for(unsigned id=0;id<coin::Count;++id) {
+        assert(coin::fromTicker(coin::ticker(id))==id);
+        assert(coin::jobCompatible(id,0x20000000,0x1fffe000));
+    }
+    for(uint32_t algo=1;algo<16;++algo)assert(!coin::jobCompatible(coin::DGB,0x20000000|(algo<<8),0));
+    assert(!coin::jobCompatible(coin::DGB,0x20000000,0x100));
+    puts("BSV/XEC/DGB: official address vectors, network isolation, checksums and SHA-256d algorithm/rolling guards passed");
+}
+
+
 int main() {
     testSha();
     testHashDifficulty();
@@ -700,6 +765,7 @@ int main() {
     testStratumJob();
     testAddress();
     testCashAddr();
+    testMoreCoinAddresses();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);
     return failures ? 1 : 0;
 }

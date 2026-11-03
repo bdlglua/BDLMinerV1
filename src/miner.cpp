@@ -437,6 +437,7 @@ void invalidateBlockQueue() {
 
 void minerPublishJob(const work::Job &job, bool clean) {
     if (!jobMutex || !shareQueue) return;
+    if (!coin::jobCompatible(activeMiningCoin, job.version, job.versionMask)) { minerInvalidate(); return; }
     xSemaphoreTake(jobMutex, portMAX_DELAY);
     if (clean) {
         workGeneration++;
@@ -918,7 +919,7 @@ uint32_t candidateCrc(const CandidateSave &r) {
 bool readCandidateSlot(Preferences &p, const char *key, CandidateSave &r) {
     return p.getBytesLength(key) == sizeof(r) && p.getBytes(key, &r, sizeof(r)) == sizeof(r) &&
            ((r.magic == kCandidateMagic && r.coin == coin::BTC) ||
-            (r.magic == kMultiCoinCandidateMagic && r.coin == coin::BCH)) &&
+            (r.magic == kMultiCoinCandidateMagic && r.coin != coin::BTC && coin::valid(r.coin))) &&
            r.state <= BlockQueueFull && r.crc == candidateCrc(r);
 }
 void loadCandidate() {

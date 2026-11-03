@@ -353,7 +353,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     });
 
     char selectedCoin[2] = {char('0' + settings.miningCoin), 0};
-    WiFiManagerParameter pCoin("coin", "Cryptocurrency: 0 BTC, 1 BCH (SHA-256d). Use matching pools and payout address; BCH requires Stratum V1.", selectedCoin, 1, "type='number' min='0' max='1'");
+    WiFiManagerParameter pCoin("coin", "SHA-256d: 0 BTC, 1 BCH, 2 BSV, 3 XEC, 4 DGB. Use matching pools/address; other coins require Stratum V1. DGB: SHA-256d port only.", selectedCoin, 1, "type='number' min='0' max='4'");
     WiFiManagerParameter pHost("pool", "Pool host", settings.poolHost.c_str(), 80);
     WiFiManagerParameter pPort("port", "Pool port", port, 6, "type='number' min='1' max='65535'");
     WiFiManagerParameter pHost2("pool2", "Backup pool host (optional, e.g. solo.ckpool.org)",

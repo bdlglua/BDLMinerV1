@@ -10,6 +10,8 @@
 namespace settingsstore {
 struct Header { uint32_t magic, sequence, length, crc; };
 constexpr uint32_t kMagic = 0x32474643;
+// New-profile records must also be rejected by firmware predating `coin`.
+constexpr uint32_t kNewCoinMagic = 0x33474643;
 constexpr size_t kMaxPayload = 8192;
 
 inline uint32_t checksum(const uint8_t *data, size_t length) {
@@ -22,6 +24,7 @@ inline uint32_t checksum(const uint8_t *data, size_t length) {
 }
 
 inline bool encode(const Settings &values, std::string &text) {
+    if (!coin::valid(values.miningCoin)) return false;
     JsonDocument doc;
     for (size_t i = 0; i < kSettingCount; ++i) {
         const auto &s = kSettings[i];
@@ -67,6 +70,7 @@ inline bool decode(const uint8_t *payload, size_t length, Settings &values) {
                 *(bool *)value = v.as<bool>(); break;
         }
     }
+    if (!coin::valid(values.miningCoin)) return false;
     settingsNormalizeAgent(values);
     return true;
 }
@@ -79,10 +83,11 @@ bool read(Storage &p, const char *key, Settings &values, uint32_t &sequence) {
     if (p.getBytes(key, bytes.data(), size) != size) return false;
     Header header;
     std::memcpy(&header, bytes.data(), sizeof(header));
-    if (header.magic != kMagic || header.length != size - sizeof(header)) return false;
+    if ((header.magic != kMagic && header.magic != kNewCoinMagic) || header.length != size - sizeof(header)) return false;
     std::memset(bytes.data() + offsetof(Header, crc), 0, sizeof(header.crc));
     if (checksum(bytes.data(), size) != header.crc) return false;
     if (!decode(bytes.data() + sizeof(Header), header.length, values)) return false;
+    if ((header.magic == kNewCoinMagic) != (values.miningCoin > coin::BCH)) return false;
     sequence = header.sequence;
     return true;
 }
@@ -107,7 +112,7 @@ bool save(Storage &p, const Settings &values, uint32_t &sequence) {
     // Bound the addition and copy at the point of use too. This keeps the
     // record builder safe independently of encode() and visible to FORTIFY.
     if (!length || length > kMaxPayload) return false;
-    Header header{kMagic, sequence + 1, uint32_t(length), 0};
+    Header header{values.miningCoin > coin::BCH ? kNewCoinMagic : kMagic, sequence + 1, uint32_t(length), 0};
     std::vector<uint8_t> bytes(sizeof(Header) + length);
     std::memcpy(bytes.data(), &header, sizeof(header));
     std::memcpy(bytes.data() + sizeof(header), payload.data(), length);

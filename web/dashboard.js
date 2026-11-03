@@ -220,7 +220,8 @@ function show(j){
   for(const [group,id]of Object.entries({pool:'pool-grid',market:'market-grid',device:'device-grid',records:'records-grid',main:'m'}))syncTiles(id,T.filter(e=>(e.dataset.group||'main')===group));
   renderOverview(j);
   if(lastChartLimit!==j.max_temp_c){lastChartLimit=j.max_temp_c;renderHistory()}
-  document.getElementById('market-note').textContent=m.updated_s>=0?'':t('Public market data is temporarily unavailable. Mining can continue.');
+  document.getElementById('market-title').textContent=(j.coin||'BTC')==='BTC'?t('Bitcoin network'):(j.coin+' · '+t('Network'));
+  document.getElementById('market-note').textContent=(j.coin||'BTC')!=='BTC'?t('Public market and explorer data are not provided for this coin. Pool job data is shown.'):m.updated_s>=0?'':t('Public market data is temporarily unavailable. Mining can continue.');
   renderHealth(j);
   document.getElementById('f').textContent=t('Updated')+' '+new Date().toLocaleTimeString(LOCALE)+((j.coin||'BTC')==='BTC'&&m.updated_s>=0?' · '+t('market data')+' '+Math.round(m.updated_s/60)+' '+t('min old')+' (mempool.space)':'');
 

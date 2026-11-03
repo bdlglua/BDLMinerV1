@@ -68,5 +68,8 @@ int main(){
     minerAsicCandidate(w,2083236893,0);
     assert(stats.blocksFound==found+1 && !minerNextShare(share,0));
     puts("ASIC block candidate: verified genesis proof, full hash, priority submission and duplicate suppression passed");
+    activeMiningCoin=coin::DGB;job.version=0x20000100;minerPublishJob(job,true);assert(!minerAsicWork(w));
+    job.version=0x20000000;job.versionMask=0x1fffe000;minerPublishJob(job,true);assert(minerAsicWork(w));
+    job.versionMask=0x100;minerPublishJob(job,true);assert(!minerAsicWork(w));
     puts("Native ASIC mining: unique work/version masks, independent SHA-256d, corrupted/stale results, no software fallback and accurate 1.2 TH/s counters/stop decay passed");
 }

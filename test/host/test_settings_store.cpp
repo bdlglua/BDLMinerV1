@@ -41,6 +41,20 @@ struct Storage {
     }
 };
 int main() {
+    for(unsigned id=0;id<coin::Count;++id) {
+        Settings record;record.miningCoin=id;std::string encoded;
+        assert(settingsstore::encode(record,encoded));JsonDocument json;assert(!deserializeJson(json,encoded));
+        assert(json["coin"].is<unsigned>() && json["coin"].as<unsigned>()==id);
+        Storage nvs;uint32_t sequence=0;assert(settingsstore::save(nvs,record,sequence));
+        settingsstore::Header header;std::memcpy(&header,nvs.bytes["cfgB"].data(),sizeof(header));
+        assert(header.magic==(id>coin::BCH?settingsstore::kNewCoinMagic:settingsstore::kMagic));
+        Settings loaded;assert(settingsstore::load(nvs,loaded,sequence) && loaded.miningCoin==id);
+        Settings restored;assert(settingsstore::decode(reinterpret_cast<const uint8_t*>(encoded.data()),encoded.size(),restored));
+        assert(restored.miningCoin==id);
+    }
+    Settings invalidCoin;
+    const char *invalid=R"({"coin":"LTC"})";
+    assert(!settingsstore::decode(reinterpret_cast<const uint8_t*>(invalid),strlen(invalid),invalidCoin));
     Settings legacyCoin;
     const char *oldCoin = R"({"pool":"old.pool","power":75})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(oldCoin), strlen(oldCoin), legacyCoin));

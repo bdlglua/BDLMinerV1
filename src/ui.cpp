@@ -175,7 +175,9 @@ void buildModel(const MinerStats &stats, uint32_t now) {
             metric(0, "BLOCK HEIGHT", stats.blockHeight ? String(stats.blockHeight) : String("-"), String(), accent());
             metric(1, "NETWORK DIFF", diffText(stats.networkDiff));
             metric(2, netOnBackup() ? "BACKUP POOL" : "POOL", netPoolHost(), String(), netOnBackup() ? kAmber : kText);
-            metric(3, "HALVING", stats.blockHeight ? String((stats.blockHeight / 210000 + 1) * 210000 - stats.blockHeight) : String("-"));
+            unsigned interval = coin::halvingInterval(settings.miningCoin);
+            if (interval) metric(3, "HALVING", stats.blockHeight ? String((stats.blockHeight / interval + 1) * interval - stats.blockHeight) : String("-"));
+            else metric(3, "CRYPTO", coin::ticker(settings.miningCoin));
             break;
         }
         case 4: {

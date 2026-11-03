@@ -52,7 +52,7 @@ async function fixture(options={}){
     state.settings.live=[...(state.settings.live||[]),'sharehr','sharepool'];
   }
   if(options.coins){
-    state.settings.schema.unshift(['coin','number','Pool','Cryptocurrency',{min:0,max:1}]);
+    state.settings.schema.unshift(['coin','number','Pool','Cryptocurrency',{min:0,max:4}]);
     state.settings.values.coin=0;
   }
   if(options.v2){
@@ -1093,6 +1093,22 @@ check('coin selection and compatibility guidance are translated into French',()=
  await loaded(f);assert.match(await f.page.locator('[data-key=coin]').innerText(),/Cryptomonnaie/);
  assert.match(await f.page.locator('[data-key=coin]').innerText(),/La pool détermine/);
 }));
+
+for(const [id,ticker,name,address]of [[2,'BSV','Bitcoin SV','1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu'],[3,'XEC','eCash','ecash:qpm2qsznhks23z7629mms6s4cwef74vcwva87rkuu2'],[4,'DGB','DigiByte','DSC6tGC2NvN6AHio2p8pU4seTbPKDi7KZb']]){
+ check('new SHA-256d coin '+ticker+' can be saved with V1 and its payout identity',()=>run({coins:true},async f=>{
+  await loaded(f);await f.page.selectOption('#k_proto','1');await f.page.selectOption('#k_coin',String(id));
+  assert.equal(await f.page.locator('#k_coin option').count(),5);
+  assert.equal(await f.page.locator('#k_proto').inputValue(),'0');assert.equal(await f.page.locator('#k_proto option[value="1"]').isDisabled(),true);
+  await f.page.fill('#k_pool',ticker.toLowerCase()+'.pool.example');await f.page.fill('#k_addr',address);
+  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
+  const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.coin,id);assert.equal(saved.proto,0);assert.equal(saved.addr,address);
+ }));
+ check('new SHA-256d coin '+ticker+' shows its own name without Bitcoin market data',()=>run({stats:{coin:ticker,coin_name:name}},async f=>{
+  await f.page.goto(f.url);await f.page.waitForSelector('#pool-grid .t');
+  assert.match(await f.page.locator('#pool-grid').innerText(),new RegExp(ticker));assert.match(await f.page.locator('#pool-grid').innerText(),new RegExp(name));
+  assert.doesNotMatch(await f.page.locator('#market-grid').innerText(),/BTC price|Next retarget/);
+ }));
+}
 
 (async()=>{
   const executablePath=process.env.BDL_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined);

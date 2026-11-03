@@ -25,7 +25,7 @@ function sync(){
  if($('notify-test'))$('notify-test').disabled=off||notificationPending;
  if($('k_fanpct'))$('k_fanpct').disabled=off||$('k_fanauto')?.value==='true';
  if($('k_ua'))$('k_ua').required=true;
- for(const key of ['proto','proto2'])for(const option of $('k_'+key)?.options||[])option.disabled=$('k_coin')?.value==='1'&&option.value==='1';
+ for(const key of ['proto','proto2'])for(const option of $('k_'+key)?.options||[])option.disabled=!!$('k_coin')&&$('k_coin').value!=='0'&&option.value==='1';
  for(const [protocol,key]of [['proto','sv2key'],['proto2','sv2key2']])if($('k_'+key)){$('k_'+key).disabled=off||$('k_'+protocol)?.value!=='1';$('k_'+key).required=$('k_'+protocol)?.value==='1';$('k_'+key).maxLength=64}
 }
 // Presentation only: titles, hints, units and choices for the settings the
@@ -53,7 +53,7 @@ function settingsIcon(name){
 document.querySelectorAll('[data-icon]').forEach(node=>node.replaceWith(settingsIcon(node.dataset.icon)));
 const SECTIONS={pool:'Main pool',ua:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 const FIELDS={
- coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH uses Stratum V1; Bitcoin market data is unavailable for BCH.'],
+ coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH, BSV, XEC and DGB use Stratum V1. DGB requires a SHA-256d port. Bitcoin market data is unavailable for other coins.'],
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
  addr:['Payout address or pool account','Use the selected coin\'s address or the account name required by your pool. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
  diff:['Suggested difficulty','Share difficulty asked of the pool; it may choose another.'],proto:['Protocol'],
@@ -87,7 +87,7 @@ const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Str
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
 const THEMES=['#f7931a','#38d07a','#3b9cf6','#a66bf5','#ec5aa0'];
-CHOICES.coin=[[0,'Bitcoin (BTC)'],[1,'Bitcoin Cash (BCH)']];
+CHOICES.coin=[[0,'Bitcoin (BTC)'],[1,'Bitcoin Cash (BCH)'],[2,'Bitcoin SV (BSV)'],[3,'eCash (XEC)'],[4,'DigiByte · SHA-256d (DGB)']];
 Object.assign(FIELDS,{channel:['Update channel','Beta versions receive the same signature checks and rollback protection.'],
  customscreen:['Custom mining screen','Choose the four metrics and their order on the mining screen.'],
  screen0:['First screen metric'],screen1:['Second screen metric'],screen2:['Third screen metric'],screen3:['Fourth screen metric'],pages:['Enabled screens','The mining screen remains available.']});
@@ -134,7 +134,7 @@ function render(data){
   if(options)i.addEventListener('change',()=>{dirtyState();sync()});
   if(k==='pool'||k==='pool2')i.addEventListener('change',()=>poolURLChanged(k));
   if(k==='coin')i.addEventListener('change',()=>{
-   if(i.value==='1')for(const key of ['proto','proto2'])if($('k_'+key))$('k_'+key).value='0';
+   if(i.value!=='0')for(const key of ['proto','proto2'])if($('k_'+key))$('k_'+key).value='0';
    dirtyState();sync();
   });
   const row=document.createElement('div');row.className='field'+(type==='bool'?' boolean':'');row.dataset.key=k;
@@ -150,7 +150,7 @@ function render(data){
   if(type==='secret'){const show=document.createElement('button');show.type='button';show.className='secondary secret-toggle';show.textContent=t('Show');show.setAttribute('aria-label',t('Show')+' '+l.textContent);show.onclick=()=>{const visible=i.type==='password';i.type=visible?'text':'password';show.textContent=t(visible?'Hide':'Show');show.setAttribute('aria-label',t(visible?'Hide':'Show')+' '+l.textContent)};control.appendChild(show)}
   if(k==='pool')row.appendChild(help(t('Choose the user agent below. Each pool has its own protocol and authority key.')));
   if(k==='coin'){
-   const guide=document.createElement('a');guide.href='https://github.com/bdlglua/BDLMinerV2/blob/main/docs/mining-coins.md';guide.target='_blank';guide.rel='noopener noreferrer';guide.textContent=t('BTC / BCH setup guide');
+   const guide=document.createElement('a');guide.href='https://github.com/bdlglua/BDLMinerV2/blob/main/docs/mining-coins.md';guide.target='_blank';guide.rel='noopener noreferrer';guide.textContent=t('SHA-256d coin setup guide');
    const note=help('');note.appendChild(guide);row.appendChild(note);
   }
   if(k==='proto'||k==='proto2')row.appendChild(help(t('Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.')));

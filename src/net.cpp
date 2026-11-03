@@ -106,6 +106,9 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         // Pools can send the first notify before authorization.
                         // Keep that work, but only start hashing once accepted.
                         if (proto.hasJob()) {
+                            if (!coin::jobCompatible(settings.miningCoin, proto.job().version, proto.job().versionMask)) {
+                                minerInvalidate(); setStatus("DGB requires a SHA-256d pool"); return;
+                            }
                             minerPoolDifficulty(proto.job().difficulty);
                             minerPublishJob(proto.job(), proto.job().clean);
                         }
@@ -116,6 +119,9 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         return;
                     case stratum::Event::NewJob:
                         if (!proto.authorized() || !proto.hasJob()) break;
+                        if (!coin::jobCompatible(settings.miningCoin, proto.job().version, proto.job().versionMask)) {
+                            minerInvalidate(); setStatus("DGB requires a SHA-256d pool"); return;
+                        }
                         minerPoolDifficulty(proto.job().difficulty);
                         minerPublishJob(proto.job(), proto.job().clean);
                         // The log keeps a few KB: only a new block is worth a line (job
@@ -247,7 +253,7 @@ void netTask(void *) {
                 hadWork = result.authorized && result.hasWork; sessionTimedOut = result.timedOut;
             } else {
                 session(client, proto, maxMs, agents[onBackup ? 1 : 0]);
-                hadWork = proto.authorized() && proto.hasJob();
+                hadWork = proto.authorized() && proto.hasJob() && coin::jobCompatible(settings.miningCoin, proto.job().version, proto.job().versionMask);
             }
             client.stop();
             if (millis() - t0 > 60000) backoffMs = 2000;  // session was healthy

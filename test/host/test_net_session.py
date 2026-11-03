@@ -221,11 +221,22 @@ int main() {
     attemptedHosts.clear(); onBackup = false;
     try { netTask(nullptr); } catch (const EndNetworkTest &) {}
     assert((attemptedHosts == std::vector<std::string>{"main.pool", "main.pool", "main.pool", "main.pool"}));
+    settings.miningCoin=coin::DGB;
+    for(bool earlyJob:{false,true})for(const char *version:{"20000100","20000000"}) {
+        std::string sub="{\"id\":1,\"result\":[[],\"aabb\",4],\"error\":null}\n";
+        std::string auth="{\"id\":2,\"result\":true,\"error\":null}\n";
+        std::string job="{\"method\":\"mining.notify\",\"params\":[\"dgb\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"0102\",\"03\",[],\""+std::string(version)+"\",\"1d00ffff\",\"6b49d200\",true]}\n";
+        std::string frames=sub+(earlyJob?job+auth:auth+job);
+        WiFiClient dgb(frames.c_str());protocol.reset();published=0;poolConnected=false;
+        session(dgb,protocol,0,main);
+        if(std::string(version)=="20000100")assert(published==0 && status=="DGB requires a SHA-256d pool");
+        else assert(published==1);
+    }
     stopAtGuard=true;settings.miningCoin=1;onBackup=false;settings.poolHost="public-pool.io";
     attemptedHosts.clear();try{netTask(nullptr);}catch(const EndNetworkTest&){}
     assert(attemptedHosts.empty() && status=="Choose a pool for the selected cryptocurrency");
     settings.poolHost="bch.example.org";settings.poolProtocol=1;
-    try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty() && status=="BCH requires Stratum V1");
+    try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty() && status=="This cryptocurrency requires Stratum V1");
     settings.poolProtocol=0;onBackup=true;settings.backupHost="solo.ckpool.org";
     try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty());
     puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, explicit NerdMinerV2/native identities without refusal replacement, no-work timeout, V1/V2 failover and backup isolation passed");
