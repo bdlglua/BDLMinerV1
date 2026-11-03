@@ -89,6 +89,21 @@ int main() {
         assert(settings.updateChannel==1&&settings.customScreen&&settings.screenWidget0==8&&settings.screenPages==5);
         settings=Settings();
     }
+    {
+        JsonDocument legacy;deserializeJson(legacy,R"({"ua":"OldCustomAgent","uaauto":true})");
+        settingsMigrateBackupAgent(legacy.as<JsonObject>());
+        assert(!settingsError(legacy.as<JsonObjectConst>()));
+        assert(legacy["ua"].as<std::string>()==DEFAULT_USER_AGENT && !legacy["uaauto"].as<bool>());
+    }
+    for(const char *selected:{"NerdMinerV2",DEFAULT_USER_AGENT}){
+        Settings choice;JsonDocument request;request["ua"]=selected;request["uaauto"]=true;
+        assert(!settingsError(request.as<JsonObjectConst>()));settingsApply(choice,request.as<JsonObjectConst>());
+        assert(choice.userAgent==selected && !choice.userAgentAuto);
+        auto html=user_agent::portalSelect(selected,DEFAULT_USER_AGENT);
+        assert(html.find("<input")==std::string::npos && html.find("name='ua'")!=std::string::npos);
+        unsigned options=0;for(size_t p=0;(p=html.find("<option ",p))!=std::string::npos;++p)++options;
+        assert(options==2 && html.find(std::string("value='")+selected+"' selected")!=std::string::npos);
+    }
     assert(settings.userAgent == DEFAULT_USER_AGENT);
     assert(!strcmp(DEFAULT_USER_AGENT, "BDLMinerV2/" FW_VERSION));
     for (const char *oldNative : {"BDLMinerV1/1.9.15", "BDLMinerV2/2.0.0"}) {
@@ -101,13 +116,13 @@ int main() {
     Settings identity;
     identity.userAgent = "NerdMinerV2";
     settingsNormalizeAgent(identity);
-    assert(identity.userAgent == DEFAULT_USER_AGENT && identity.userAgentAuto);
+    assert(identity.userAgent == "NerdMinerV2" && !identity.userAgentAuto);
     identity.userAgentAuto = false; identity.userAgent = "NerdMinerV2";
     settingsNormalizeAgent(identity);
     assert(identity.userAgent == "NerdMinerV2" && !identity.userAgentAuto);
     identity.userAgentAuto = true; identity.userAgent = "MySavedIdentity";
     settingsNormalizeAgent(identity);
-    assert(identity.userAgent == "MySavedIdentity");
+    assert(identity.userAgent == DEFAULT_USER_AGENT && !identity.userAgentAuto);
     for (const auto &agent : {std::string(), std::string(65, 'x')}) {
         identity.userAgent = agent;
         settingsNormalizeAgent(identity);
@@ -148,15 +163,15 @@ int main() {
     assert(!deserializeJson(changes, R"({"power":0,"port":65535,"diff":0.000001,"saver":false,"maxtemp":0,"nightfrom":255})"));
     assert(settingsError(changes.as<JsonObjectConst>()) == nullptr);
     puts("Staged settings preserve live network strings and clamp numeric fields: passed");
-    for(const char *raw:{R"({"proto":2})",R"({"proto":1})",R"({"proto2":1,"sv2key2":"bad"})",R"({"uaauto":false,"ua":"   "})",R"({"uaauto":"true"})",
+    for(const char *raw:{R"({"proto":2})",R"({"proto":1})",R"({"proto2":1,"sv2key2":"bad"})",R"({"uaauto":false,"ua":"   "})",R"({"uaauto":"true"})",R"({"ua":"CustomMiner"})",
                         R"({"proto":1,"sv2key":"9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH7"})"}){
         assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>())!=nullptr);
     }
-    assert(!deserializeJson(changes,R"({"proto":1,"sv2key":"9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6","proto2":0,"uaauto":false,"ua":"CustomMiner"})"));
+    assert(!deserializeJson(changes,R"({"proto":1,"sv2key":"9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6","proto2":0,"uaauto":false,"ua":"NerdMinerV2"})"));
     assert(settingsError(changes.as<JsonObjectConst>())==nullptr);
     assert(settingsApply(pending,changes.as<JsonObjectConst>())==5);
-    assert(pending.poolProtocol==1&&pending.backupProtocol==0&&!pending.userAgentAuto&&pending.userAgent=="CustomMiner");
-    assert(settings.poolProtocol==0&&settings.userAgentAuto);
+    assert(pending.poolProtocol==1&&pending.backupProtocol==0&&!pending.userAgentAuto&&pending.userAgent=="NerdMinerV2");
+    assert(settings.poolProtocol==0&&!settings.userAgentAuto);
     // Pasted V2 URLs select V2 during sanitization. Validate that effective
     // protocol/key too, including backup URLs and whitespace around keys.
     for (const char *raw : {R"({"pool":"stratum2+tcp://public-pool.io:23330","proto":0})",
@@ -187,5 +202,5 @@ int main() {
         assert(staged.asicFrequency==mhz&&settings.asicFrequency==525); // stock default
     }
 #endif
-    puts("V1/V2 and automatic/manual settings: validation, staged isolation and preserved manual identity passed");
+    puts("V1/V2 and explicit user agent settings: validation, staged isolation and preserved manual identity passed");
 }

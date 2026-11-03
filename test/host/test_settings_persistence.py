@@ -9,6 +9,7 @@ settings = (root / 'src/settings.cpp').read_text()
 web = (root / 'src/web.cpp').read_text()
 save = settings[settings.index('bool settingsSave('):settings.index('String portalApName()')]
 apply = web[web.index('int applySettings('):web.index('void handleGetSettings()')]
+get = web[web.index('void handleGetSettings()'):web.index('// Saves the settings present')]
 post = web[web.index('void handlePostSettings()'):web.index('// GET /api/backup:')]
 prefix = r'''
 #include <cassert>
@@ -19,8 +20,12 @@ prefix = r'''
 #include "settings_apply.h"
 #include "ota.h"
 #include <freertos/semphr.h>
+#define FW_ENV "test"
+void *esp_ota_get_next_update_partition(void *) { return reinterpret_cast<void *>(1); }
 Settings settings;
 const SettingInfo kSettings[] = {
+ {"uaauto",SettingType::Bool,&settings.userAgentAuto,0,"Pool","User agent mode"},
+ {"ua",SettingType::Text,&settings.userAgent,0,"Pool","User agent"},
  {"pool",SettingType::Text,&settings.poolHost,0,"",""},
  {"addr",SettingType::Text,&settings.btcAddress,0,"",""},
  {"power",SettingType::Number,&settings.miningPower,8,"",""},
@@ -73,11 +78,22 @@ struct {
  std::string body=R"({"power":50})",message;
  int status=0;
  std::string arg(const char *) { return body; }
+ void sendHeader(const char *,const char *) {}
  void send(int code,const char *,const std::string &text) { status=code;message=text; }
 } server;
+void settingValues(JsonObject values,bool){values["ua"]=settings.userAgent;}
+
 '''
 tests = r'''
 int main() {
+ handleGetSettings();assert(server.status==200);
+ JsonDocument response;assert(!deserializeJson(response,server.message));
+ assert(response["capabilities"]["user_agents"].size()==2);
+ assert(response["capabilities"]["user_agents"][0]=="NerdMinerV2");
+ assert(response["capabilities"]["user_agents"][1]==DEFAULT_USER_AGENT);
+ bool found=false;for(JsonArray row:response["schema"].as<JsonArray>()){assert(row[0]!="uaauto");if(row[0]=="ua")found=true;}
+ assert(found);
+
  settings.poolHost="pool.example";settings.btcAddress="address.worker";
  Preferences::failOpen=true;handlePostSettings();
  assert(server.status==500 && restarts==0 && settingsSequence==0 && settings.miningPower==100);
@@ -125,7 +141,7 @@ int main() {
 with tempfile.TemporaryDirectory(prefix='bdl-settings-') as temp:
     cpp = Path(temp) / 'test.cpp'
     exe = Path(temp) / 'test'
-    cpp.write_text(prefix + save + apply + post + tests)
+    cpp.write_text(prefix + save + apply + get + post + tests)
     for definitions in ([], ['-DBOARD_GAMMA601','-DBOARD_ASIC']):
         subprocess.run(['g++', '-std=c++17', '-O2', *definitions, '-Itest/host/stubs/miner', '-Isrc',
                         '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp),

@@ -105,7 +105,9 @@ void minerShareSent(double, bool, uint32_t, const uint8_t *) {}
 bool minerNextShare(stratum::Share &, uint32_t ms) { ++polled; if (!poolConnected) ++premature; clockMs += ms; return false; }
 namespace sv2 {
 struct SessionResult { bool authorized = false, timedOut = false, hasWork = false; std::string refusal; };
-SessionResult session(WiFiClient &, uint32_t, const char *, void (*)(const char *), std::atomic<uint8_t> &) {
+std::vector<std::string> identities;
+SessionResult session(WiFiClient &, uint32_t, const char *identity, void (*)(const char *), std::atomic<uint8_t> &) {
+    identities.emplace_back(identity);
     return {true, false, scriptedWork, {}};
 }
 }
@@ -127,14 +129,14 @@ int main() {
     WiFiClient known(ok);
     session(known, protocol, 0, main);
     assert(known.sent.size() == 3 && known.sent[0].find(DEFAULT_USER_AGENT) != std::string::npos);
-    assert(poolConnected && status == "Mining" && !retryAgent);
+    assert(poolConnected && status == "Mining");
 
     host = "custom.example"; protocol.reset(); poolConnected = false;
     WiFiClient refused(refusal);
     session(refused, protocol, 0, main);
     assert(refused.sent.size() == 1 && refused.sent[0].find("BDLMinerV2/test") != std::string::npos);
-    assert(retryAgent && !poolConnected);
-    retryAgent = false; protocol.reset();
+    assert(!poolConnected);
+    settings.userAgent="NerdMinerV2"; protocol.reset();
     WiFiClient retried(ok);
     session(retried, protocol, 0, main);
     assert(retried.sent[0].find("NerdMinerV2") != std::string::npos && poolConnected);
@@ -142,9 +144,9 @@ int main() {
     protocol.reset();
     WiFiClient refusedAgain(refusal);
     session(refusedAgain, protocol, 0, main);
-    assert(!retryAgent); // already compatible: do not loop
+    assert(refusedAgain.sent.size()==1 && refusedAgain.sent[0].find("NerdMinerV2")!=std::string::npos); // no replacement
 
-    host = "backup.example"; onBackup = true; protocol.reset();
+    host = "backup.example"; settings.userAgent=DEFAULT_USER_AGENT; onBackup = true; protocol.reset();
     WiFiClient secondary(ok);
     session(secondary, protocol, 0, backup);
     assert(secondary.sent[0].find("BDLMinerV2/test") != std::string::npos);
@@ -154,12 +156,12 @@ int main() {
     WiFiClient auth("{\"id\":1,\"result\":[[],\"aabb\",4],\"error\":null}\n"
                     "{\"id\":2,\"result\":false,\"error\":[24,\"Invalid worker\",null]}\n");
     session(auth, protocol, 0, backup);
-    assert(!retryAgent && !poolConnected && status == "Auth failed: check address");
-    host = "pool.nerdminers.org"; settings.userAgentAuto = false; settings.userAgent = "MyManualMiner";
+    assert(!poolConnected && status == "Auth failed: check address");
+    host = "pool.nerdminers.org"; settings.userAgentAuto = false; settings.userAgent = "NerdMinerV2";
     protocol.reset(); onBackup = false;
     WiFiClient manual(refusal);
     session(manual, protocol, 0, main);
-    assert(manual.sent[0].find("MyManualMiner") != std::string::npos && !retryAgent);
+    assert(manual.sent[0].find("NerdMinerV2") != std::string::npos);
 
     // A pool may notify between subscribe and authorize. Keep its job, but
     // neither publish it nor poll shares until the worker is authorized.
@@ -197,12 +199,15 @@ int main() {
     // Exercise the real reconnect/failover loop too: authorization alone is
     // not a successful mining session, on either protocol.
     runningNetworkTask = true;
-    for (unsigned version : {0u, 1u}) {
+    for(const char *identity:{"NerdMinerV2",DEFAULT_USER_AGENT})for (unsigned version : {0u, 1u}) {
+        settings.userAgent=identity;sv2::identities.clear();
         settings.poolProtocol = version;
         scriptedFrames = ok; scriptedWork = false;
         attemptedHosts.clear(); onBackup = false;
         try { netTask(nullptr); } catch (const EndNetworkTest &) {}
         assert((attemptedHosts == std::vector<std::string>{"main.pool", "main.pool", "main.pool", "backup.pool"}));
+        assert(!strcmp(activeAgent.load(), identity));
+        if(version==1)for(const auto &sent:sv2::identities)assert(sent==identity);
     }
     // Pools that do send work retain the original successful-session policy.
     settings.poolProtocol = 0; scriptedWork = true;
@@ -223,7 +228,7 @@ int main() {
     try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty() && status=="BCH requires Stratum V1");
     settings.poolProtocol=0;onBackup=true;settings.backupHost="solo.ckpool.org";
     try{netTask(nullptr);}catch(const EndNetworkTest&){}assert(attemptedHosts.empty());
-    puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, automatic/manual identity, no-work timeout, V1/V2 failover and backup isolation passed");
+    puts("Production Stratum session: partial writes, deferred early jobs, refused authorization, explicit NerdMinerV2/native identities without refusal replacement, no-work timeout, V1/V2 failover and backup isolation passed");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='bdl-session-') as temp:

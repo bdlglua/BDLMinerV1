@@ -66,8 +66,8 @@ Boards without a display report everything on the serial monitor and the
      assigned to its mining channel;
    * **Main / backup protocol**: Stratum V1 by default, or Stratum V2 with Noise
      and a pool authority key (see [Stratum V1 and Stratum V2](#stratum-v1-and-stratum-v2));
-   * **User agent mode**: Automatic selects an identity for the pool; Manual sends
-     your custom identity. The stored manual value is kept when switching modes;
+   * **User agent**: select `NerdMinerV2` or `BDLMinerV2/<version>` from the two-option
+     menu. The selected identity is sent on both main and backup pools;
    * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
      bits (difficulty ≥ 1) is found, `0` stays silent. M5 devices use their buzzer or
      speaker (StickC Plus2: GPIO2); on other boards add `-DBUZZER_PIN=<gpio>` to
@@ -103,22 +103,21 @@ or a *Backup* label), the status reads `Mining (backup pool)` and the dashboard 
 
 <a id="automatic-pool-identity-and-stratum-versions"></a>
 
-## Automatic or manual user agent
+## User agent
 
-Choose **Automatic** or **Manual** user agent in the setup portal or dashboard.
-Automatic is the default; it requires no manual identity entry.
-Every pool receives `BDLMinerV2/<version>` on the first connection, including
-ESP32/NerdMiner pools. The manual field also defaults to this native identity.
-If a pool explicitly refuses that user agent, the miner retries it once
-as `NerdMinerV2`. Main and backup pools keep separate decisions until restart;
-changing an endpoint resets its decision. Unrelated connection or authorization
-errors still follow the usual reconnect/failover policy. In Manual mode the exact
-configured identity is used, including on NerdMiner pools, without automatic
-replacement after a refusal. Saved custom identities survive switching to Automatic.
-Older customized identities migrate to Manual; older default identities and
-records without an identity use Automatic. A saved `NerdMinerV2` default in
-Automatic mode is replaced with the native identity; explicit Manual choices
-are preserved. Existing protocol settings default to V1.
+The setup portal and local dashboard offer exactly two identities:
+**NerdMinerV2** and **BDLMinerV2/<installed version>** (for example,
+`BDLMinerV2/2.1.1`). Select the one accepted by your pool, then save and restart.
+There is no mode selector or text field. Both main/backup pools and Stratum V1/V2
+use the selected identity. Refusals do not silently change it; the ordinary
+reconnect/failover policy still applies.
+
+The default is the native BDLMiner identity. A saved `NerdMinerV2` selection is
+preserved across restarts and updates; native identities follow the firmware
+version. Old custom/obsolete identities migrate to the current native option.
+The obsolete `uaauto: false` key is retained only in saved records/backups for
+compatibility with rollback firmware; it is not shown as a user setting.
+User agent selection does not choose the cryptocurrency or override pool difficulty.
 
 ## Stratum V1 and Stratum V2
 

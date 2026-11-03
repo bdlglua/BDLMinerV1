@@ -657,8 +657,12 @@ void handleGetSettings() {
     j["capabilities"]["thermal_steps"] = true;
 #endif
     JsonArray schema = j["schema"].to<JsonArray>();
+    JsonArray agents = j["capabilities"]["user_agents"].to<JsonArray>();
+    agents.add(user_agent::kNerdMiner);
+    agents.add(DEFAULT_USER_AGENT);
     for (size_t i = 0; i < kSettingCount; i++) {
         const SettingInfo &s = kSettings[i];
+        if (!strcmp(s.key, "uaauto")) continue; // retained only in saved records for rollback
         JsonArray row = schema.add<JsonArray>();
         row.add(s.key);
         row.add(kTypes[(int)s.type]);
@@ -791,6 +795,7 @@ void handlePostBackup() {
     bool full = j["bdlminer_backup"].is<unsigned>();
     keepSecrets(full ? j["settings"].as<JsonObject>() : j.as<JsonObject>());
     settingsMigrateBackupCoin(full ? j["settings"].as<JsonObject>() : j.as<JsonObject>(), full);
+    settingsMigrateBackupAgent(full ? j["settings"].as<JsonObject>() : j.as<JsonObject>());
     JsonObjectConst values = full ? j["settings"].as<JsonObjectConst>() : j.as<JsonObjectConst>();
     if (const char *error = settingsError(values)) {
         server.send(400, "text/plain", error);

@@ -67,8 +67,7 @@ inline bool decode(const uint8_t *payload, size_t length, Settings &values) {
                 *(bool *)value = v.as<bool>(); break;
         }
     }
-    if (doc["uaauto"].isUnbound() && doc["ua"].is<const char *>())
-        values.userAgentAuto = !legacyManualAgent(doc["ua"].as<const char *>());
+    settingsNormalizeAgent(values);
     return true;
 }
 
