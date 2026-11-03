@@ -6,15 +6,16 @@ updates with automatic rollback. See the
 [V2 setup and validation guide](docs/v2/README.md).
 
 Solo "lottery" SHA-256d miner for the **M5StickC Plus2** and compatible ESP32 boards.
-Choose **Bitcoin (BTC)** or **Bitcoin Cash (BCH)** in Settings → Pool. Bitcoin
-supports **Stratum V1 or native Stratum V2**; BCH uses **Stratum V1**. The pool
+Choose **Bitcoin (BTC)**, **Bitcoin Cash (BCH)**, **Bitcoin SV (BSV)**, **eCash
+(XEC)** or **DigiByte SHA-256d (DGB)** in Settings → Pool. Bitcoin supports
+**Stratum V1 or native Stratum V2**; the other profiles use **Stratum V1**. The pool
 supplies the actual chain's work and controls payouts. See the
-[BTC / BCH configuration guide](docs/mining-coins.md).
+[SHA-256d configuration guide](docs/mining-coins.md).
 
-**Latest stable release: [v2.1.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.1.1)**
+**Latest stable release: [v2.2.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.2.0)**
 · [Website](https://bdlglua.github.io/)
 · [Flash / Flasher](https://bdlglua.github.io/flash.html)
-· [Release notes](docs/releases/v2.1.1.md) · [Français](docs/releases/v2.1.1.fr.md)
+· [Release notes](docs/releases/v2.2.0.md) · [Français](docs/releases/v2.2.0.fr.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlglua.github.io/stats.html)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
@@ -25,7 +26,11 @@ On the website: [interactive dashboard and fleet demos](https://bdlglua.github.i
 [troubleshooting FAQ](https://bdlglua.github.io/faq.html), and
 [support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
 
-**New in 2.1.1:** one User agent dropdown: `NerdMinerV2` or
+**New in 2.2.0:** BSV, XEC and DigiByte SHA-256d join BTC and BCH. Includes
+chain-specific address checks, separate public statistics and a guard against
+non-SHA-256d DigiByte jobs. [Setup and pool requirements](docs/mining-coins.md).
+
+**Since 2.1.1:** one User agent dropdown: `NerdMinerV2` or
 `BDLMinerV2/2.1.1`. The selected identity is used for both pools and protocols.
 
 **Since 2.1.0:** choose BTC or BCH, with chain-aware address checks, dashboard

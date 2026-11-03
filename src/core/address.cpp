@@ -18,7 +18,7 @@ constexpr uint32_t kBech32Const = 1;
 constexpr uint32_t kBech32mConst = 0x2bc830a3;
 
 // Legacy address: 25 bytes = version + hash160 + 4-byte sha256d checksum.
-bool parseBase58(const std::string &s, Info &info) {
+bool parseBase58(const std::string &s, Info &info, unsigned selectedCoin = coin::BTC) {
     if (s.size() < 26 || s.size() > 35) return false;
     uint8_t num[25] = {0};
     for (char c : s) {
@@ -42,6 +42,15 @@ bool parseBase58(const std::string &s, Info &info) {
     sha::sha256d(num, 21, hash);
     if (memcmp(hash, num + 21, 4) != 0) return false;
 
+    if (selectedCoin == coin::DGB) {
+        switch (num[0]) {
+            case 30: info = Info(Type::P2PKH, Network::Main); return true;
+            case 5: case 63: info = Info(Type::P2SH, Network::Main); return true;
+            case 126: info = Info(Type::P2PKH, Network::Test); return true;
+            case 140: info = Info(Type::P2SH, Network::Test); return true;
+            default: return false;
+        }
+    }
     switch (num[0]) {
         case 0x00: info = Info(Type::P2PKH, Network::Main); return true;
         case 0x05: info = Info(Type::P2SH, Network::Main); return true;
@@ -64,7 +73,7 @@ uint32_t polymod(const std::vector<uint8_t> &values) {
 }
 
 // SegWit address (BIP173 / BIP350): hrp "1" witness version + program + checksum.
-bool parseSegwit(const std::string &addr, Info &info) {
+bool parseSegwit(const std::string &addr, Info &info, unsigned selectedCoin = coin::BTC) {
     if (addr.size() > 90) return false;
     bool lower = false, upper = false;
     std::string s;
@@ -79,8 +88,10 @@ bool parseSegwit(const std::string &addr, Info &info) {
     size_t sep = s.rfind('1');
     if (sep == std::string::npos || sep == 0 || sep + 8 > s.size()) return false;
     std::string hrp = s.substr(0, sep);
-    Network net = hrp == "bc" ? Network::Main : hrp == "tb" ? Network::Test : hrp == "bcrt" ? Network::Regtest
-                                                                                          : Network::Unknown;
+    const bool dgb = selectedCoin == coin::DGB;
+    Network net = hrp == (dgb ? "dgb" : "bc") ? Network::Main :
+                  hrp == (dgb ? "dgbt" : "tb") ? Network::Test :
+                  hrp == (dgb ? "dgbrt" : "bcrt") ? Network::Regtest : Network::Unknown;
     if (net == Network::Unknown) return false;
 
     std::vector<uint8_t> data;
@@ -126,18 +137,14 @@ bool parseSegwit(const std::string &addr, Info &info) {
     return true;
 }
 
-bool startsWithNoCase(const std::string &s, const char *prefix) {
-    for (size_t i = 0; prefix[i]; i++)
-        if (i >= s.size() || tolower((unsigned char)s[i]) != prefix[i]) return false;
-    return true;
-}
+
 
 }  // namespace
 
 // CashAddr specification: https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/cashaddr.md
 // Bounded decoding verifies the prefix, 40-bit checksum, version, hash length
 // and zero padding. It never corrects a mistyped payout address.
-static bool parseCashAddr(const std::string &addr, Info &info) {
+static bool parseCashAddr(const std::string &addr, Info &info, unsigned selectedCoin) {
     if (addr.empty() || addr.size() > 124) return false;
     bool lower = false, upper = false;
     std::string text;
@@ -148,9 +155,10 @@ static bool parseCashAddr(const std::string &addr, Info &info) {
     }
     if (lower && upper) return false;
     size_t colon = text.find(':');
-    std::string prefix = colon == std::string::npos ? "bitcoincash" : text.substr(0, colon);
-    Network network = prefix == "bitcoincash" ? Network::Main : prefix == "bchtest" ? Network::Test :
-                      prefix == "bchreg" ? Network::Regtest : Network::Unknown;
+    std::string prefix = colon == std::string::npos ? coin::cashPrefix(selectedCoin) : text.substr(0, colon);
+    Network network = prefix == coin::cashPrefix(selectedCoin, 0) ? Network::Main :
+                      prefix == coin::cashPrefix(selectedCoin, 1) ? Network::Test :
+                      prefix == coin::cashPrefix(selectedCoin, 2) ? Network::Regtest : Network::Unknown;
     if (network == Network::Unknown) return false;
     std::string payload = colon == std::string::npos ? text : text.substr(colon + 1);
     if (payload.size() < 42 || payload.size() > 112) return false;
@@ -192,12 +200,9 @@ Info parse(const std::string &user, unsigned selectedCoin) {
     std::string addr = user.substr(0, user.find('.'));
     Info info;
     if (!coin::valid(selectedCoin)) return info;
-    if (selectedCoin == coin::BCH) {
-        if (!parseCashAddr(addr, info) && !parseBase58(addr, info)) return Info();
-        return info;
-    }
-    bool segwit = startsWithNoCase(addr, "bc1") || startsWithNoCase(addr, "tb1") || startsWithNoCase(addr, "bcrt1");
-    if (!(segwit ? parseSegwit(addr, info) : parseBase58(addr, info))) info = Info();
+    if (coin::cashPrefix(selectedCoin) && parseCashAddr(addr, info, selectedCoin)) return info;
+    bool segwit = selectedCoin == coin::BTC || selectedCoin == coin::DGB;
+    if (!(segwit && parseSegwit(addr, info, selectedCoin)) && !parseBase58(addr, info, selectedCoin)) info = Info();
     return info;
 }
 

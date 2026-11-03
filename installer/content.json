@@ -4,6 +4,10 @@
   "pool_names": {"public-pool.io":"Public Pool","nerdminers.org":"Nerdminers.org","nerdminer.io":"NerdMiner.io","ckpool.org":"CKPool","ocean.xyz":"OCEAN","braiins.com":"Braiins Pool","viabtc.com":"ViaBTC","f2pool.com":"F2Pool","antpool.com":"AntPool"},
   "pool_links": {"public-pool.io":"https://web.public-pool.io/","nerdminers.org":"https://pool.nerdminers.org/","nerdminer.io":"https://nerdminer.io/","ckpool.org":"https://solo.ckpool.org/","ocean.xyz":"https://ocean.xyz/","braiins.com":"https://braiins.com/pool","viabtc.com":"https://www.viabtc.com/","f2pool.com":"https://www.f2pool.com/","antpool.com":"https://www.antpool.com/"},
   "release_notes": {
+    "2.2.0": {
+      "en": ["Mine BSV, eCash (XEC) or DigiByte SHA-256d (DGB), alongside BTC and BCH.", "New address checks and public statistics for all five profiles. Other profiles use Stratum V1; DGB rejects jobs from other algorithms.", "Existing BTC/BCH choices, user agent selection and signed OTA updates are preserved."],
+      "fr": ["Mine BSV, eCash (XEC) ou DigiByte SHA-256d (DGB), en plus de BTC et BCH.", "Vérification des adresses et statistiques pour les cinq profils. Les autres profils utilisent Stratum V1 ; DGB refuse les jobs des autres algorithmes.", "Les choix BTC/BCH existants, le user agent et les mises à jour OTA signées sont conservés."]
+    },
     "2.1.1": {
       "en": ["User agent is a single menu: NerdMinerV2 or BDLMinerV2/2.1.1, without Automatic/Manual modes or free text.", "The selected identity is retained for both pools and protocols; the BDLMiner version follows firmware updates."],
       "fr": ["Le user agent est un seul menu : NerdMinerV2 ou BDLMinerV2/2.1.1, sans modes Automatique/Manuel ni saisie libre.", "Le choix est conservé pour les deux pools et protocoles ; la version BDLMiner suit les mises à jour du firmware."]

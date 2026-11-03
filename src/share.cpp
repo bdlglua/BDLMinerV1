@@ -45,6 +45,7 @@ bool sameName(const char *a, const char *b) {
 }
 
 size_t shareBody(char *out, size_t size, double hashrate, const char *model, const char *poolHost, unsigned selectedCoin) {
+    if (!coin::valid(selectedCoin)) return 0;
     double rounded = hashrate > 0 && isfinite(hashrate) ? hashrate : 0;
     if (rounded > 0) {
         double scale = pow(10, floor(log10(rounded)) - 2);

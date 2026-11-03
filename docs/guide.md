@@ -45,10 +45,11 @@ Boards without a display report everything on the serial monitor and the
 1. On first boot the board opens a Wi‑Fi access point
    **`BDLMinerV2-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
-   * **Cryptocurrency**: `0` BTC (default) or `1` BCH in the setup portal; the
+   * **Cryptocurrency**: `0` BTC (default), `1` BCH, `2` BSV, `3` XEC or `4` DGB
+     (SHA-256d) in the setup portal; the
      local Settings → Pool page has a named dropdown. Use matching main/backup
-     pools and a payout address or account for that coin. BCH requires V1. See
-     [BTC / BCH setup](mining-coins.md);
+     pools and a payout address or account for that coin. Non-BTC profiles require
+     V1; DGB requires a SHA-256d pool port. See [SHA-256d setup](mining-coins.md);
    * **Pool host / port**: `public-pool.io` / `21496` is the compiled default.
      For low-hashrate ESP32 feedback, see [Pools for ESP32](../README.md#pools-for-esp32),
      or use your own pool. A pasted
@@ -57,8 +58,9 @@ Boards without a display report everything on the serial monitor and the
      [Backup pool](#backup-pool);
    * **Payout address or pool account**: an address for the selected coin, optionally
      followed by `.workerName`, or the username required by an account-based pool.
-     BTC checks Base58Check and Bech32/Bech32m; BCH checks standard CashAddr
-     (with or without `bitcoincash:`) and legacy Base58Check. Unrecognized addresses
+     BTC/DGB check their own Base58Check and Bech32/Bech32m prefixes; BCH/XEC
+     check their own CashAddr prefixes and legacy encodings. BSV uses legacy
+     Base58Check. Unrecognized addresses
      show a warning because some pools require account names;
    * **Pool password**: usually `x`;
    * **Suggested difficulty (V1)**: share difficulty requested from the pool,

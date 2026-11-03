@@ -52,8 +52,11 @@ int main() {
     testMillis = UINT32_MAX - 5000; ++current.hash[0]; blockStatusPoll(); testMillis += kInitialMs;
     replies = {{200,R"({"in_best_chain":false})"}}; blockStatusPoll();
     assert(blockStatusGet(current.hash,status) && status.known && !status.error);
-    current.coin = 1; ++current.hash[0]; size_t bchRequests = urls.size();
-    for (unsigned i = 0; i < 3; ++i) { testMillis += 600000; blockStatusPoll(); }
-    assert(urls.size() == bchRequests && !blockStatusGet(current.hash,status));
+    size_t oldRequests=urls.size();
+    for(unsigned id=1;id<5;++id){
+        current.coin=id;++current.hash[0];
+        for(unsigned i=0;i<3;++i){testMillis+=600000;blockStatusPoll();}
+        assert(urls.size()==oldRequests && !blockStatusGet(current.hash,status));
+    }
     puts("Explorer status: idle without proof, delay/backoff, confirmed hash/height, tip and confirmations, reorg, HTTP/malformed/oversized bodies, stale-response isolation, memory/WiFi deferral and timer wrap passed");
 }

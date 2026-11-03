@@ -73,6 +73,11 @@ int main() {
     assert(shareBody(out, 20, 1e6) == 0);
     shareBody(out, sizeof(out), 1e6, nullptr, "bch.example.org", 1);
     assert(strstr(out, R"("coin":"BCH")"));
+    for(unsigned id=2;id<coin::Count;++id) {
+        shareBody(out,sizeof(out),1e6,nullptr,nullptr,id);
+        assert(std::string(out).find(std::string("\"coin\":\"")+coin::ticker(id)+"\"")!=std::string::npos);
+    }
+    assert(!shareBody(out,sizeof(out),1e6,nullptr,nullptr,coin::Count));
     assert(sameName("M5StickC Plus2", "M5StickC-Plus2") && sameName("abc", "A.B-C") && !sameName("M5Stack Core2", "M5Stack-ESP32") && !sameName("ab", "abc"));
     // The exact model, cleaned, only when given.
     shareBody(out, sizeof(out), 1e6, "M5Stack Core2");
