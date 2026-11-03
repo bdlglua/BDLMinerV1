@@ -106,30 +106,30 @@ int main() {
     replacement.peers = std::string(9000, 'x'); // not in this descriptor fixture
     replacement.poolHost = std::string(9000, 'x');
     assert(!settingsstore::save(wrapped, replacement, sequence));
-    // Older customized identities migrate to manual; old default identities
-    // and records without an identity retain automatic mode and V1.
+    // Old custom/native identities migrate to the current native option;
+    // NerdMinerV2 is retained and the obsolete automatic flag is cleared.
     const char *legacy = R"({"pool":"legacy.pool","power":75,"ua":"custom-old-agent"})";
     Settings migrated;
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(legacy), strlen(legacy), migrated));
     assert(migrated.poolHost == "legacy.pool" && migrated.miningPower == 75);
-    assert(!migrated.userAgentAuto && migrated.userAgent == "custom-old-agent" && migrated.poolProtocol == 0);
+    assert(!migrated.userAgentAuto && migrated.userAgent == DEFAULT_USER_AGENT && migrated.poolProtocol == 0);
     legacy = R"({"pool":"legacy.pool","ua":"NerdMinerV2"})";
     assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(legacy), strlen(legacy), migrated));
-    assert(migrated.userAgentAuto);
+    assert(!migrated.userAgentAuto && migrated.userAgent == "NerdMinerV2");
     for (const char *native : {"BDLMinerV1/1.9.15", "BDLMinerV2/2.0.0"}) {
         std::string record = std::string("{\"pool\":\"legacy.pool\",\"ua\":\"") + native + "\"}";
         Settings decoded;
         assert(settingsstore::decode(reinterpret_cast<const uint8_t *>(record.data()), record.size(), decoded));
         settingsNormalizeAgent(decoded);
-        assert(decoded.userAgentAuto && decoded.userAgent == DEFAULT_USER_AGENT);
+        assert(!decoded.userAgentAuto && decoded.userAgent == DEFAULT_USER_AGENT);
         assert(decoded.poolHost == "legacy.pool" && decoded.poolProtocol == 0);
     }
     Storage modes;uint32_t modeSequence=0;
-    Settings manual;manual.userAgentAuto=false;manual.userAgent="MyMiner";
+    Settings manual;manual.userAgentAuto=false;manual.userAgent="NerdMinerV2";
     manual.poolProtocol=1;manual.poolAuthority="authority-main";manual.backupProtocol=0;manual.backupAuthority="authority-backup";
     assert(settingsstore::save(modes,manual,modeSequence));
     Settings restored;assert(settingsstore::load(modes,restored,modeSequence));
-    assert(!restored.userAgentAuto&&restored.userAgent=="MyMiner"&&restored.poolProtocol==1&&restored.backupProtocol==0);
+    assert(!restored.userAgentAuto&&restored.userAgent=="NerdMinerV2"&&restored.poolProtocol==1&&restored.backupProtocol==0);
     assert(restored.poolAuthority=="authority-main"&&restored.backupAuthority=="authority-backup");
     Storage boundary;uint32_t boundarySequence=0;
     Settings maximum=original;std::string payload;

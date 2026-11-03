@@ -98,7 +98,7 @@ src/
     sv2_protocol.* bounded Stratum V2 extended-channel state machine and share acknowledgments
     sv2_noise.*    authenticated Noise_NX handshake and encrypted records
     sv2_key.cpp    authority-key decoding and checksum verification
-    pool_agent.h   automatic identity selection and endpoint-specific retries
+    user_agent.h   explicit identity validation, migration and portal options
     address.*      payout address check (Base58Check, Bech32, Bech32m)
   hw_sha.*         hardware engine (S2/S3/C3, original ESP32) + self-test
   hw_sha_classic.S cycle-counted SHA256d loop for the original ESP32 (MIT, NerdMiner Modded)
@@ -154,7 +154,7 @@ Monocypher implementation; libsodium is a native test dependency.
 
 The default checks include V2 certificate, encrypted-record, replay and truncated-frame
 cases, independent proof reconstruction, fragmented production socket sessions,
-exact target boundaries and automatic/manual setting migration. They use a local
+exact target boundaries and explicit identity choices and legacy setting migration. They use a local
 test peer. The optional `pool` command connects to a real V1 pool and needs your
 address; its timeout may expire before a share is found at the assigned difficulty.
 

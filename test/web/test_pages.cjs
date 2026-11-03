@@ -20,6 +20,7 @@ const baseStats = {
   ip:'192.168.1.20', ssid:'WiFi',rssi:-45, peers:[], market:{updated_s:-1}, github_update:{available:false}
 };
 const settings = {
+  capabilities:{user_agents:['NerdMinerV2','BDLMinerV2/2.1.1']},
   schema:[
     ['pool','text','Pool','Pool host',{}], ['port','number','Pool','Pool port',{min:1,max:65535}],
     ['addr','text','Pool','BTC address',{}], ['diff','decimal','Pool','Suggested difficulty',{min:0}],
@@ -32,7 +33,7 @@ const settings = {
     ['nightfrom','number','Display','Night hour',{min:0,max:255}],
     ['saver','bool','Safety','Battery saver',{}], ['webpass','secret','Network','Web password',{}]
   ],
-  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:true,ua:'BDLMinerV2/test',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
+  values:{pool:'pool.example',port:3333,addr:'address.worker',diff:0.0002,proto:0,sv2key:'',uaauto:false,ua:'BDLMinerV2/2.1.1',pool2:'',port2:3333,proto2:0,sv2key2:'',power:75,maxtemp:65,nightfrom:255,saver:false,webpass:'password'}
 };
 let browser;
 const cases=[];
@@ -43,7 +44,7 @@ async function fixture(options={}){
   const state={settings:clone(settings),postStatus:options.postStatus||200,postText:options.postText||null,requests:[],stats:clone(baseStats),posts:[],inflight:0,peak:0,settingsCalls:0,logCalls:0,failLog:!!options.logFailure,historyCalls:0,history:options.history||{hashrate:[1000000,900000],temperature_c:[45,55],power_percent:[100,50],coverage_percent:[100,100],interval_s:300,revision:1},diagnostics:options.diagnostics||{uptime_s:0,firmware:'test',tls:{handshakes:2,failures:0,total_ms:1000,last_ms:500},engines:[{index:0,name:'hw',hashing_ms:10000,rest_ms:20,waiting_ms:30,paused_ms:40}]}};
   if(options.stats) Object.assign(state.stats,options.stats);
   state.statsStatus=200;state.logDelay=0;state.logText='Miner log is available';
-  if(options.capabilities)state.settings.capabilities=options.capabilities;
+  if(options.capabilities)state.settings.capabilities={...state.settings.capabilities,...options.capabilities};
   if(options.live)state.settings.live=['power','maxtemp','nightfrom','saver'];
   if(options.poolSharing){
     state.settings.schema.push(['sharehr','bool','Network','Share my hashrate anonymously',{}],['sharepool','bool','Network','Share my pool anonymously',{}]);
@@ -192,7 +193,7 @@ check('notification test remains locked while settings controls change',()=>run(
   });
   await loaded(f);await f.page.click('#notify-test');await posting;
   try{
-    await f.page.selectOption('#k_uaauto','false');assert.equal(await f.page.locator('#notify-test').isDisabled(),true);
+    await f.page.selectOption('#k_ua','NerdMinerV2');assert.equal(await f.page.locator('#notify-test').isDisabled(),true);
     await f.page.evaluate(()=>testNotification());assert.equal(posts,1);
     await f.page.click('#discard');assert.equal(await f.page.locator('#notify-test').isDisabled(),true);
     assert.equal(await f.page.locator('#notify-result').textContent(),'Sending…');
@@ -491,43 +492,47 @@ check('settings stay within a mobile viewport and labels focus their inputs',()=
   await f.page.locator('label[for="k_power"]').click();assert.equal(await f.page.evaluate(()=>document.activeElement.id),'k_power');
 }));
 
-check('automatic pool identity is explained and updates when switching to backup',()=>run({language:'fr'},async f=>{
+check('selected pool identity updates when switching to backup without a mode label',()=>run({language:'fr'},async f=>{
   await loaded(f);
-  assert.match(await f.page.locator('#group-pool').textContent(),/automatique ou manuel/);
-  assert.equal(await f.page.locator('#k_ua').isDisabled(),true);
+  assert.match(await f.page.locator('#group-pool').textContent(),/Choisis le user agent/);
+  assert.equal(await f.page.locator('#k_ua').isEnabled(),true);
   f.state.stats.pool.user_agent='NerdMinerV2';f.state.stats.pool.protocol='Stratum V1';
   await f.page.goto(f.url);
   await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('NerdMinerV2'));
-  assert.match(await f.page.locator('#pool-grid').textContent(),/Stratum V1 · NerdMinerV2 · automatique/);
+  assert.match(await f.page.locator('#pool-grid').textContent(),/Stratum V1 · NerdMinerV2/);
   Object.assign(f.state.stats.pool,{host:'backup.example',backup:true,user_agent:'BDLMinerV2/test'});
   await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('BDLMinerV2/test'));
   assert.match(await f.page.locator('#pool-grid').textContent(),/Pool \(secours\)/);
   assert.doesNotMatch(await f.page.locator('#pool-grid').textContent(),/NerdMinerV2/);
 }));
 
-check('manual user agent and independent V1/V2 choices are saved with their actual types',()=>run({},async f=>{
- await loaded(f);await f.page.selectOption('#k_uaauto','false');assert.equal(await f.page.locator('#k_ua').isEnabled(),true);
- await f.page.fill('#k_ua','MyMiner/test');await f.page.selectOption('#k_proto','1');
- assert.equal(await f.page.locator('#k_sv2key').isEnabled(),true);await f.page.click('#save');
- assert.equal(f.state.posts.length,0); // no unauthenticated V2 setting can be submitted without a key
+check('user agent has exactly two choices without mode or free text in French',()=>run({language:'fr'},async f=>{
+ await loaded(f);
+ assert.equal(await f.page.locator('#k_uaauto').count(),0);
+ assert.equal(await f.page.locator('#k_ua').evaluate(e=>e.tagName),'SELECT');
+ assert.deepEqual(await f.page.locator('#k_ua option').allTextContents(),['NerdMinerV2','BDLMinerV2/2.1.1']);
+ assert.doesNotMatch(await f.page.locator('#group-pool').innerText(),/Automatique|Manuel|saisie libre/);
+ f.state.stats.pool.user_agent='NerdMinerV2';f.state.stats.pool.protocol='Stratum V1';
+ await f.page.goto(f.url);await f.page.waitForFunction(()=>document.querySelector('#pool-grid').textContent.includes('NerdMinerV2'));
+ assert.match(await f.page.locator('#pool-grid').innerText(),/Stratum V1 · NerdMinerV2/);
+ assert.doesNotMatch(await f.page.locator('#pool-grid').innerText(),/automatique|manuel/);
+}));
+check('selected user agent and independent V1/V2 choices are saved',()=>run({},async f=>{
+ await loaded(f);await f.page.selectOption('#k_ua','NerdMinerV2');await f.page.selectOption('#k_proto','1');
+ assert.equal(await f.page.locator('#k_sv2key').isEnabled(),true);await f.page.click('#save');assert.equal(f.state.posts.length,0);
  await f.page.fill('#k_sv2key','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');
  assert.equal(await f.page.locator('#k_proto2').inputValue(),'0');assert.equal(await f.page.locator('#k_sv2key2').isDisabled(),true);
- await f.page.selectOption('#k_proto','0');assert.equal(await f.page.locator('#k_sv2key').isDisabled(),true);
- await f.page.selectOption('#k_proto','1');assert.equal(await f.page.locator('#k_sv2key').isEnabled(),true);
- assert.equal(await f.page.locator('[id^="public-pool"]').count(),0);
  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
- const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,false);assert.equal(saved.ua,'MyMiner/test');assert.equal(saved.proto,1);assert.equal(saved.proto2,0);assert.equal(saved.sv2key,'9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');
+ const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,false);assert.equal(saved.ua,'NerdMinerV2');assert.equal(saved.proto,1);assert.equal(saved.proto2,0);
 }));
-
-check('automatic mode preserves a manual value and V2 backup does not change the main endpoint',()=>run({},async f=>{
- await loaded(f);await f.page.selectOption('#k_uaauto','false');await f.page.fill('#k_ua','SavedCustomMiner');
- await f.page.selectOption('#k_uaauto','true');assert.equal(await f.page.locator('#k_ua').isDisabled(),true);
+check('native identity can be selected and discarded without editing text or main pool',()=>run({},async f=>{
+ await loaded(f);await f.page.selectOption('#k_ua','NerdMinerV2');await f.page.click('#discard');
+ assert.equal(await f.page.locator('#k_ua').inputValue(),'BDLMinerV2/2.1.1');
  await f.page.fill('#k_pool2','public-pool.io');await f.page.fill('#k_port2','23330');await f.page.selectOption('#k_proto2','1');
- await f.page.fill('#k_sv2key2','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');assert.equal(await f.page.locator('#k_pool').inputValue(),'pool.example');assert.equal(await f.page.locator('#k_proto').inputValue(),'0');
+ await f.page.fill('#k_sv2key2','9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6');
  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));
- const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,true);assert.equal(saved.ua,'SavedCustomMiner');assert.equal(saved.proto2,1);assert.equal(saved.port2,23330);assert.equal(saved.pool2,'public-pool.io');
+ const saved=JSON.parse(f.state.posts[0].body);assert.equal(saved.uaauto,false);assert.equal(saved.ua,'BDLMinerV2/2.1.1');assert.equal(saved.pool,'pool.example');assert.equal(saved.proto,0);assert.equal(saved.proto2,1);
 }));
-
 
 check('full performance is an explicit 100 percent choice and preserves thermal protection',()=>run({language:'fr'},async f=>{
   await loaded(f);await f.page.fill('#settings-search','puissance');

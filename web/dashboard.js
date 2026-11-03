@@ -201,7 +201,7 @@ function show(j){
    tile(t('Network hashrate'),si(m.hashrate,'H/s'),m.mempool_tx.toLocaleString(LOCALE)+' '+t('tx in mempool')),
    tile(t('Next retarget'),(m.retarget.change>=0?'+':'')+fix(m.retarget.change,2)+' %',t('in')+' '+m.retarget.blocks+' '+t('blocks')+' ('+fix(m.retarget.progress,0)+' % '+t('done')+')'))}
   T.push(tile(t('Cryptocurrency'),j.coin||'BTC',(j.coin_name||'Bitcoin')+' · SHA-256d'+((j.coin||'BTC')!=='BTC'?'\n'+t('Bitcoin market data is unavailable for this coin.'):'')),
-   tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent+' · '+t(j.pool.user_agent_auto===false?'manual':'automatic'):'')+poolUptime(j.pool)),
+   tile(t(j.pool.backup?'Pool (backup)':'Pool'),j.pool.host+':'+j.pool.port,t(j.pool.status)+(j.pool.user_agent?'\n'+(j.pool.protocol||'Stratum V1')+' · '+j.pool.user_agent:'')+poolUptime(j.pool)),
    tile(t('Payout address or pool account'),j.address,j.address_type==='invalid'?t('Check the selected coin and the pool account requirements.'):j.address_type),
    tile(t('Temperature'),j.temp_c==null?'-':j.temp_c+' °C',(j.temperature_source||'')+(j.max_temp_c?' · '+t('Configured limit')+COLON+j.max_temp_c+' °C':'')),
    tile(t('Effective power'),(j.power_percent??'-')+' %',t('Configured limit')+COLON+(j.power_limit_percent??'-')+' %'),

@@ -24,7 +24,7 @@ function sync(){
  document.querySelectorAll('#f input,#f select,#f button,#fw,#imp').forEach(i=>i.disabled=busy||restarting||i.dataset.fixed==='true');
  if($('notify-test'))$('notify-test').disabled=off||notificationPending;
  if($('k_fanpct'))$('k_fanpct').disabled=off||$('k_fanauto')?.value==='true';
- if($('k_ua')){$('k_ua').disabled=off||$('k_uaauto')?.value!=='false';$('k_ua').required=$('k_uaauto')?.value==='false';$('k_ua').maxLength=64}
+ if($('k_ua'))$('k_ua').required=true;
  for(const key of ['proto','proto2'])for(const option of $('k_'+key)?.options||[])option.disabled=$('k_coin')?.value==='1'&&option.value==='1';
  for(const [protocol,key]of [['proto','sv2key'],['proto2','sv2key2']])if($('k_'+key)){$('k_'+key).disabled=off||$('k_'+protocol)?.value!=='1';$('k_'+key).required=$('k_'+protocol)?.value==='1';$('k_'+key).maxLength=64}
 }
@@ -51,14 +51,14 @@ function settingsIcon(name){
  mark.appendChild(svg);return mark;
 }
 document.querySelectorAll('[data-icon]').forEach(node=>node.replaceWith(settingsIcon(node.dataset.icon)));
-const SECTIONS={pool:'Main pool',uaauto:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
+const SECTIONS={pool:'Main pool',ua:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 const FIELDS={
  coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH uses Stratum V1; Bitcoin market data is unavailable for BCH.'],
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
  addr:['Payout address or pool account','Use the selected coin\'s address or the account name required by your pool. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
  diff:['Suggested difficulty','Share difficulty asked of the pool; it may choose another.'],proto:['Protocol'],
  sv2key:['Stratum V2 authority key','Given by the pool for encrypted V2 connections.'],
- uaauto:['User agent','How the miner names itself to the pool.'],ua:['Manual user agent','Up to 64 characters.'],
+ ua:['User agent','Choose the identity sent to the pool. BDLMinerV2 follows the installed firmware version.'],
  pool2:['Backup pool host','Used when the main pool keeps failing. Empty = none.'],port2:['Backup pool port'],proto2:['Backup protocol'],
  sv2key2:['Backup Stratum V2 authority key'],rotateh:['Alternate pools every','0 = switch only when the main pool fails.','h'],
  bright:['Brightness','','%'],rot:['Rotation'],autorot:['Follow the accelerometer','M5 devices with a motion sensor: the picture turns with the device.'],
@@ -80,7 +80,7 @@ const FIELDS={
  update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board, the cryptocurrency and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.'],
  sharepool:['Share my pool anonymously','On by default. Turn off to hide your pool group. Requires hashrate sharing. Other pools are grouped as private/other. Never sends the hostname, port, Bitcoin address or worker.']};
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
-const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],uaauto:[['true','Automatic'],['false','Manual']],
+const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],
  fanauto:[['false','Manual'],['true','Automatic']],
  asicmhz:Array.from({length:12},(_,n)=>{const mhz=525+n*25;return[mhz,n?mhz+' MHz':'525 MHz (stock)']}),
  lang:[[0,'English'],[1,'Français']],rot:[[0,'Portrait'],[1,'Landscape'],[2,'Portrait, upside down'],[3,'Landscape, upside down']],
@@ -95,6 +95,10 @@ CHOICES.channel=[[0,'Stable'],[1,'Beta']];
 for(const key of ['screen0','screen1','screen2','screen3'])CHOICES[key]=[[1,'Hashrate'],[2,'Accepted shares'],[3,'Temperature'],[4,'Best difficulty'],[5,'uptime'],[6,'Pool'],[7,'ASIC frequency'],[8,'Fan RPM']];
 function help(text){const p=document.createElement('p');p.className='field-help';p.textContent=text;return p}
 function render(data){
+ const agents=data.capabilities?.user_agents;
+ if(!Array.isArray(agents)||agents.length!==2||agents[0]!=='NerdMinerV2'||!/^BDLMinerV2\//.test(agents[1]))throw Error(t('Invalid response from the miner.'));
+ CHOICES.ua=agents.map(value=>[value,value]);
+ data={...data,schema:data.schema.filter(([key])=>key!=='uaauto')};
  const f=$('f');f.replaceChildren();$('settings-nav').replaceChildren();const groups=new Map();let section=null;
  for(const[k,type,group,label,limits]of data.schema){
   let fs=groups.get(group);
@@ -116,7 +120,7 @@ function render(data){
   const l=document.createElement('label'),i=document.createElement(options?'select':'input');l.textContent=t(title);i.id='k_'+k;l.htmlFor=i.id;
   if(options){
    for(const[v,name]of options){const option=document.createElement('option');option.value=String(v);option.textContent=t(name);i.appendChild(option)}
-   const current=String(value??(k==='asicmhz'?525:k==='uaauto'?true:k==='fanauto'?false:0));
+   const current=String(k==='ua'?(value==='NerdMinerV2'?value:agents[1]):value??(k==='asicmhz'?525:k==='fanauto'?false:0));
    if(![...i.options].some(o=>o.value===current)){const option=document.createElement('option');option.value=current;option.textContent=current;i.appendChild(option)}
    i.value=current;if(k==='asicmhz')i.required=true;
   }else if(type=='bool'){i.type='checkbox';i.className='switch';i.setAttribute('role','switch');i.checked=value}
@@ -144,7 +148,7 @@ function render(data){
   }else if(unit){const u=document.createElement('span');u.className='unit';u.setAttribute('aria-hidden','true');u.textContent=unit;control.classList.add('with-unit');control.appendChild(u)}
   if(k==='theme'){const swatch=document.createElement('span');swatch.className='swatch';swatch.setAttribute('aria-hidden','true');const paint=()=>swatch.style.background=THEMES[Number(i.value)]||THEMES[0];i.addEventListener('change',paint);paint();control.prepend(swatch)}
   if(type==='secret'){const show=document.createElement('button');show.type='button';show.className='secondary secret-toggle';show.textContent=t('Show');show.setAttribute('aria-label',t('Show')+' '+l.textContent);show.onclick=()=>{const visible=i.type==='password';i.type=visible?'text':'password';show.textContent=t(visible?'Hide':'Show');show.setAttribute('aria-label',t(visible?'Hide':'Show')+' '+l.textContent)};control.appendChild(show)}
-  if(k==='pool')row.appendChild(help(t('Choose automatic or manual user agent below. Each pool has its own protocol and authority key.')));
+  if(k==='pool')row.appendChild(help(t('Choose the user agent below. Each pool has its own protocol and authority key.')));
   if(k==='coin'){
    const guide=document.createElement('a');guide.href='https://github.com/bdlglua/BDLMinerV2/blob/main/docs/mining-coins.md';guide.target='_blank';guide.rel='noopener noreferrer';guide.textContent=t('BTC / BCH setup guide');
    const note=help('');note.appendChild(guide);row.appendChild(note);
@@ -196,6 +200,7 @@ function watchSections(){
 }
 function values(){
  const v={};
+ if(S.schema.some(([key])=>key==='ua'))v.uaauto=false;
  for(const[k,type]of S.schema){
   const i=$('k_'+k);v[k]=fieldValue(k,type);
   if((k==='pool'||k==='addr')&&!v[k].trim())i.setCustomValidity(t('Enter a valid value.'));

@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <cstring>
 #include "core/coin.h"
+#include "core/user_agent.h"
 
 inline bool legacyManualAgent(const char *agent) {
     return agent && *agent && strcmp(agent, "NerdMinerV2") &&
@@ -48,7 +49,7 @@ struct Settings {
     String btcAddress;  // Stratum username/address; legacy member/key kept for backups
     String poolPassword = DEFAULT_POOL_PASSWORD;
     double suggestedDifficulty = DEFAULT_DIFFICULTY;
-    bool userAgentAuto = true;
+    bool userAgentAuto = false; // compatibility key for backups/OTA rollback; never an automatic mode
     String userAgent = DEFAULT_USER_AGENT;
     uint8_t poolProtocol = 0, backupProtocol = 0; // 0 Stratum V1, 1 Stratum V2 + Noise
     uint8_t updateChannel=0; // 0 stable, including migrated settings; 1 beta
@@ -108,11 +109,8 @@ struct Settings {
 };
 
 inline void settingsNormalizeAgent(Settings &values) {
-    const char *agent = values.userAgent.c_str();
-    // Saved native identities follow the running version, including old V1 records.
-    if (!*agent || strlen(agent) > 64 || (values.userAgentAuto && !strcmp(agent, "NerdMinerV2")) ||
-        !strncmp(agent, "BDLMinerV1/", 11) || !strncmp(agent, "BDLMinerV2/", 11))
-        values.userAgent = DEFAULT_USER_AGENT;
+    values.userAgent = user_agent::normalize(values.userAgent.c_str(), DEFAULT_USER_AGENT);
+    values.userAgentAuto = false;
 }
 
 extern Settings settings;

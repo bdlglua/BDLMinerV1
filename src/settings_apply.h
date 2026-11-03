@@ -22,6 +22,10 @@ inline void settingsMigrateBackupCoin(JsonObject values, bool full) {
     if (values["coin"].isUnbound() && (full || (!values["pool"].isUnbound() && !values["addr"].isUnbound())))
         values["coin"] = unsigned(coin::BTC);
 }
+inline void settingsMigrateBackupAgent(JsonObject values) {
+    if (values["ua"].is<const char *>()) values["ua"] = user_agent::normalize(values["ua"].as<const char *>(), DEFAULT_USER_AGENT);
+    if (values["uaauto"].is<bool>()) values["uaauto"] = false;
+}
 inline SettingLimits settingLimits(const SettingInfo &s) {
     SettingLimits limits{0, s.bits == 8 ? 255 : 65535};
     if (!strcmp(s.key, "port") || !strcmp(s.key, "port2") || !strcmp(s.key, "mqttport")) limits.minimum = 1;
@@ -93,15 +97,11 @@ inline const char *settingsError(JsonObjectConst values) {
                 break;
         }
     }
-    bool automatic = values["uaauto"] | settings.userAgentAuto;
     unsigned selectedCoin = values["coin"] | unsigned(settings.miningCoin);
     const char *user = values["addr"] | settings.btcAddress.c_str();
     if (!coin::addressCompatible(selectedCoin, stratum::trimIdentity(user))) return "Use an address for the selected cryptocurrency";
     const char *agent = values["ua"] | settings.userAgent.c_str();
-    if (!automatic) {
-        while (*agent && std::isspace(static_cast<unsigned char>(*agent))) ++agent;
-        if (!*agent) return "A manual user agent is required";
-    }
+    if (!user_agent::valid(agent, DEFAULT_USER_AGENT)) return "Choose one of the available user agents";
     for (const auto &fields : {std::pair<const char *, const char *>{"proto", "sv2key"}, {"proto2", "sv2key2"}}) {
         unsigned protocol = values[fields.first] | unsigned(!strcmp(fields.first, "proto") ? settings.poolProtocol : settings.backupProtocol);
         const char *key = values[fields.second] | (!strcmp(fields.first, "proto") ? settings.poolAuthority.c_str() : settings.backupAuthority.c_str());
@@ -139,8 +139,7 @@ inline int settingsApply(Settings &pending, JsonObjectConst values) {
         }
         changed++;
     }
-    if (values["uaauto"].isUnbound() && values["ua"].is<const char *>())
-        pending.userAgentAuto = !legacyManualAgent(values["ua"].as<const char *>());
+    settingsNormalizeAgent(pending);
     return changed;
 }
 

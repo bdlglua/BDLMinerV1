@@ -51,7 +51,6 @@ bool sendLine(WiFiClient &client, const std::string &line) {
 }
 
 bool sessionTimedOut = false;  // the last session ended because of its `maxMs`
-bool retryAgent = false;
 constexpr const char kNativeAgent[] = DEFAULT_USER_AGENT;
 std::atomic<const char *> activeAgent{kNativeAgent};
 
@@ -65,9 +64,9 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
     uint32_t lastShareReply = start;
 
     agent.endpoint(netPoolHost().c_str(), netPoolPort());
-    const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
+    const char *identity = agent.select(kNativeAgent, false, settings.userAgent.c_str());
     activeAgent = identity;
-    logf("[pool] Stratum V1 user agent \"%s\" (%s)\n", identity, settings.userAgentAuto ? "automatic" : "manual");
+    logf("[pool] Stratum V1 user agent \"%s\"\n", identity);
     #ifdef BOARD_ASIC
     if (!sendLine(client, proto.configureVersionRolling())) return;
 #endif
@@ -100,10 +99,6 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         setStatus("Subscribe refused");
                         logf("[pool] subscribe refused: %s (user agent \"%s\")\n", proto.lastError().c_str(),
                              identity);
-                        if (settings.userAgentAuto && agent.refused(proto.lastError().c_str())) {
-                            retryAgent = true;
-                            logf("[pool] retrying this pool with user agent \"%s\"\n", agent.select(kNativeAgent));
-                        }
                         return;
                     case stratum::Event::Authorized:
                         minerPoolConnected(true);
@@ -237,7 +232,6 @@ void netTask(void *) {
         setStatus(msg);
         bool hadWork = false;
         sessionTimedOut = false;
-        retryAgent = false;
         if (client.connect(netPoolHost().c_str(), netPoolPort(), 10000)) {
             client.setNoDelay(true);
             proto.reset();
@@ -247,14 +241,10 @@ void netTask(void *) {
             if ((onBackup ? settings.backupProtocol : settings.poolProtocol) == 1) {
                 auto &agent = agents[onBackup ? 1 : 0];
                 agent.endpoint(netPoolHost().c_str(), netPoolPort());
-                const char *identity = agent.select(kNativeAgent, settings.userAgentAuto, settings.userAgent.c_str());
+                const char *identity = agent.select(kNativeAgent, false, settings.userAgent.c_str());
                 activeAgent = identity;
                 sv2::SessionResult result = sv2::session(client, maxMs, identity, setStatus, pendingShares);
                 hadWork = result.authorized && result.hasWork; sessionTimedOut = result.timedOut;
-                if (settings.userAgentAuto && !result.refusal.empty() && agent.refused(result.refusal.c_str())) {
-                    retryAgent = true;
-                    logf("[pool] retrying this V2 pool with identity \"%s\"\n", agent.select(kNativeAgent));
-                }
             } else {
                 session(client, proto, maxMs, agents[onBackup ? 1 : 0]);
                 hadWork = proto.authorized() && proto.hasJob();
@@ -270,9 +260,6 @@ void netTask(void *) {
         minerInvalidate();
         if (netStatus().startsWith("Mining")) setStatus("Disconnected");
 
-        // An explicit identity retry is part of the same connection attempt:
-        // do not count it towards failover or wait for exponential backoff.
-        if (retryAgent) { backoffMs = 2000; continue; }
         failures = hadWork ? 0 : failures + 1;
         if (rotate && sessionTimedOut) {
             onBackup = !onBackup;

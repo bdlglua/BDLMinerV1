@@ -11,10 +11,10 @@ supports **Stratum V1 or native Stratum V2**; BCH uses **Stratum V1**. The pool
 supplies the actual chain's work and controls payouts. See the
 [BTC / BCH configuration guide](docs/mining-coins.md).
 
-**Latest stable release: [v2.1.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.1.0)**
+**Latest stable release: [v2.1.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.1.1)**
 · [Website](https://bdlglua.github.io/)
 · [Flash / Flasher](https://bdlglua.github.io/flash.html)
-· [Release notes](docs/releases/v2.1.0.md) · [Français](docs/releases/v2.1.0.fr.md)
+· [Release notes](docs/releases/v2.1.1.md) · [Français](docs/releases/v2.1.1.fr.md)
 · [User guide](docs/guide.md)
 · [Statistics](https://bdlglua.github.io/stats.html)
 · [Discord](https://discord.gg/S8kSgD6Xe9)
@@ -25,7 +25,10 @@ On the website: [interactive dashboard and fleet demos](https://bdlglua.github.i
 [troubleshooting FAQ](https://bdlglua.github.io/faq.html), and
 [support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
 
-**New in 2.1.0:** choose BTC or BCH, with chain-aware address checks, dashboard
+**New in 2.1.1:** one User agent dropdown: `NerdMinerV2` or
+`BDLMinerV2/2.1.1`. The selected identity is used for both pools and protocols.
+
+**Since 2.1.0:** choose BTC or BCH, with chain-aware address checks, dashboard
 and physical-screen labels, and anonymous totals by cryptocurrency. Existing
 settings stay on BTC. See the [configuration guide](docs/mining-coins.md).
 
@@ -124,7 +127,7 @@ finding a valid Bitcoin block.
 
 | Pool | Host | Port | Protocol / setup |
 |---|---|---|---|
-| [Nerdminers.org](https://pool.nerdminers.org/) | `pool.nerdminers.org` | `3333` | V1; designed for NerdMiner and similar ESP32 devices. Leave user agent on Automatic. |
+| [Nerdminers.org](https://pool.nerdminers.org/) | `pool.nerdminers.org` | `3333` | V1; designed for NerdMiner and similar ESP32 devices. Select the `NerdMinerV2` user agent. |
 | [NerdMiner.io](https://nerdminer.io/) | `pool.nerdminer.io` | `3333` | V1; announces adaptive difficulty for small miners. Use your valid Bitcoin address as the worker. |
 | [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `3333` | V1. |
 | [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `23330` | V2, with the authority key below. |
@@ -214,7 +217,7 @@ setting (`sharehr`), which applies at once.
 | M5StickC Plus2 slows down with the local dashboard open | The dashboard uses live events, with a 10-second polling fallback. Since v1.9.12, hidden tabs close their live stream. See the [current review](docs/audits/2026-11-01.md) and [dashboard-load review](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
 | `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. Pasting the pool's `stratum2+tcp://host:port/key` address fills both; an altered or expired server certificate is refused. |
 | `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
-| A manually selected user agent is refused | Enter an identity accepted by that pool or select Automatic. Manual mode preserves your choice rather than replacing it after a refusal. |
+| The selected user agent is refused | Choose `NerdMinerV2` or `BDLMinerV2/<version>` according to the pool instructions. The chosen identity is retained for both protocols and pools. |
 | No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
 | `bdlminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
 | Clock / Global screens stay empty | The board needs Internet access to `mempool.space` (HTTPS) and `pool.ntp.org`. The `[market]` serial line shows how many requests succeeded (`5/5 ok`). |

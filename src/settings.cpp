@@ -37,7 +37,7 @@ const SettingInfo kSettings[] = {
     N("proto", poolProtocol, "Pool", "Main pool protocol"),
     S("sv2key", Text, poolAuthority, "Pool", "Main pool Stratum V2 authority key"),
     S("uaauto", Bool, userAgentAuto, "Pool", "User agent mode"),
-    S("ua", Text, userAgent, "Pool", "Manual user agent"),
+    S("ua", Text, userAgent, "Pool", "User agent"),
     S("pool2", Text, backupHost, "Pool", "Backup pool host (empty = none)"),
     N("port2", backupPort, "Pool", "Backup pool port"),
     N("proto2", backupProtocol, "Pool", "Backup pool protocol"),
@@ -232,7 +232,6 @@ void settingsLoad() {
     // (every save stored the value) switch to 2; those saved since carry
     // "updv" and keep their choice.
     if (!p.isKey("updv")) settings.githubUpdate = 2;
-    if (!p.isKey("uaauto") && p.isKey("ua")) settings.userAgentAuto = !legacyManualAgent(settings.userAgent.c_str());
     p.end();
     settingsSanitize();
     liveBrightness = settings.brightness;
@@ -347,7 +346,11 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     snprintf(port2, sizeof(port2), "%u", settings.backupPort);
     snprintf(diff, sizeof(diff), "%g", settings.suggestedDifficulty);
     char proto[2] = {char('0' + settings.poolProtocol), 0}, proto2[2] = {char('0' + settings.backupProtocol), 0};
-    char automatic[2] = {settings.userAgentAuto ? '1' : '0', 0};
+    String portalAgent = settings.userAgent;
+    const std::string agentHtml = user_agent::portalSelect(portalAgent.c_str(), DEFAULT_USER_AGENT);
+    wm.setSaveParamsCallback([&]() {
+        if (wm.server && wm.server->hasArg("ua")) portalAgent = wm.server->arg("ua");
+    });
 
     char selectedCoin[2] = {char('0' + settings.miningCoin), 0};
     WiFiManagerParameter pCoin("coin", "Cryptocurrency: 0 BTC, 1 BCH (SHA-256d). Use matching pools and payout address; BCH requires Stratum V1.", selectedCoin, 1, "type='number' min='0' max='1'");
@@ -364,8 +367,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     WiFiManagerParameter pKey("sv2key", "Main SV2 authority key (required for V2)", settings.poolAuthority.c_str(), 64);
     WiFiManagerParameter pProto2("proto2", "Backup protocol: 0 Stratum V1, 1 Stratum V2 (Noise)", proto2, 1, "type='number' min='0' max='1'");
     WiFiManagerParameter pKey2("sv2key2", "Backup SV2 authority key (required for V2)", settings.backupAuthority.c_str(), 64);
-    WiFiManagerParameter pAuto("uaauto", "User agent: 1 automatic, 0 manual", automatic, 1, "type='number' min='0' max='1'");
-    WiFiManagerParameter pUa("ua", "Manual user agent (used only in manual mode)", settings.userAgent.c_str(), 64);
+    WiFiManagerParameter pUa(agentHtml.c_str());
     WiFiManagerParameter pBeep("beep", "Beep on a 32-bit share (1 = on, 0 = off)", beep, 1,
                                "type='number' min='0' max='1'");
     WiFiManagerParameter pTz("tz", "Timezone (POSIX TZ, e.g. CET-1CEST,M3.5.0,M10.5.0/3 or UTC0)",
@@ -390,7 +392,6 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
     wm.addParameter(&pAddr);
     wm.addParameter(&pPass);
     wm.addParameter(&pDiff);
-    wm.addParameter(&pAuto);
     wm.addParameter(&pUa);
     wm.addParameter(&pBeep);
     wm.addParameter(&pTz);
@@ -433,7 +434,7 @@ void wifiSetup(bool forcePortal, void (*onPortal)()) {
         settings.suggestedDifficulty = atof(pDiff.getValue());
         settings.poolProtocol = atoi(pProto.getValue()); settings.backupProtocol = atoi(pProto2.getValue());
         settings.poolAuthority = pKey.getValue(); settings.backupAuthority = pKey2.getValue();
-        settings.userAgentAuto = atoi(pAuto.getValue()) != 0; settings.userAgent = pUa.getValue();
+        settings.userAgent = portalAgent;
         settings.beep = atoi(pBeep.getValue()) != 0;
         settings.timezone = pTz.getValue();
         settings.currency = pFiat.getValue();

@@ -264,3 +264,9 @@ Object.assign(FR,{
  'Default: manual 100%. Startup, stopped ASIC, missing temperature or heat safety force full cooling.':'Par défaut : manuel à 100 %. Le démarrage, l’ASIC arrêté, une température indisponible ou la sécurité thermique imposent la ventilation maximale.',
  'Minimum 30%. Safety forces 100% at ASIC 60 °C or regulator 80 °C until both cool by 5 °C. A lower thermal limit raises cooling earlier. Fan-stop protection remains active.':'Minimum 30 %. La sécurité impose 100 % dès 60 °C sur l’ASIC ou 80 °C sur le régulateur, jusqu’à ce que les deux soient refroidis de 5 °C. Une limite thermique plus basse augmente la ventilation plus tôt. La protection contre l’arrêt du ventilateur reste active.'
 });
+
+Object.assign(FR,{
+ 'Choose the identity sent to the pool. BDLMinerV2 follows the installed firmware version.':'Choisis l’identité envoyée à la pool. BDLMinerV2 suit la version du firmware installé.',
+ 'Choose the user agent below. Each pool has its own protocol and authority key.':'Choisis le user agent ci-dessous. Chaque pool utilise son propre protocole et sa propre clé d’autorité.',
+ 'Choose one of the available user agents':'Choisis l’un des user agents proposés'
+});
