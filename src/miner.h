@@ -101,6 +101,8 @@ void minerStart(unsigned selectedCoin = 0);
 // minute), updated by minerTick() once per second.
 uint64_t minerTotalHashes();
 double minerHashrate();
+// ntime of the latest pool job (0 = none yet): a clock when NTP is blocked.
+uint32_t minerJobTime();
 // Hash rate over the last 10 seconds, for the screen: the 60-second average
 // barely moves and looks frozen.
 double minerHashrateLive();

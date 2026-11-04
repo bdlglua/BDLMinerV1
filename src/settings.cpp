@@ -284,6 +284,12 @@ String portalApName() {
     return buf;
 }
 
+String deviceHostName() {
+    char name[24];
+    snprintf(name, sizeof(name), "bdlminer-%04x", (unsigned)((ESP.getEfuseMac() >> 32) & 0xFFFF));
+    return name;
+}
+
 static bool shouldSave = false;
 
 // The portal's network, read once connected: fallbacks are joined without
@@ -316,6 +322,10 @@ bool wifiTryFallbacks() {
 }
 
 void wifiSetup(bool forcePortal, void (*onPortal)()) {
+    // Before the station starts: the router then lists (and its local DNS
+    // often names) the miner bdlminer-xxxx, a name the dashboard accepts
+    // under any domain (bdlminer-xxxx.fritz.box), instead of esp32-xxxxxx.
+    WiFi.setHostname(deviceHostName().c_str());
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);
 

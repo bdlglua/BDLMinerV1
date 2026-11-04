@@ -32,6 +32,7 @@ g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_pool_agent.cpp $CORE -o 
 .pio/host/test_pool_agent
 python3 test/host/test_net_session.py
 python3 test/host/test_market_pool.py
+python3 test/host/test_clock_fallback.py
 python3 test/host/test_tls.py
 python3 test/host/test_share.py
 python3 test/host/test_remote.py

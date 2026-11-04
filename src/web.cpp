@@ -1054,9 +1054,8 @@ uint32_t webBootId() { return bootSession; }
 
 void webStart() {
     bootSession = esp_random();
-    char name[24];
-    snprintf(name, sizeof(name), "bdlminer-%04x", (unsigned)((ESP.getEfuseMac() >> 32) & 0xFFFF));
-    hostName = name;
+    hostName = deviceHostName();
+    const char *name = hostName.c_str();
     if (MDNS.begin(name)) MDNS.addService("http", "tcp", 80);
 
     server.on("/assets/style.css", HTTP_GET, []() { sendAsset("text/css; charset=utf-8", kWebStyle, sizeof(kWebStyle)); });

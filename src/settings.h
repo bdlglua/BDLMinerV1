@@ -148,6 +148,8 @@ inline const void *settingValue(const SettingInfo &info, const Settings &values)
 
 // Name of the access point opened by the configuration portal.
 String portalApName();
+// "bdlminer-xxxx": mDNS name (bdlminer-xxxx.local) and DHCP host name.
+String deviceHostName();
 
 // Connects to WiFi using stored credentials, then the fallback networks.
 // Opens the configuration portal when nothing is stored, when `forcePortal`

@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <sys/time.h>
 
 #include "ghupdate.h"
 #include "log.h"
@@ -406,11 +407,27 @@ bool refreshPoolStats() {
     return code == HTTP_CODE_OK;
 }
 
+// Some networks block NTP. Certificates are checked against the clock, so no
+// notification, market or update request could ever be made: after a minute
+// without NTP, the pool's job time (within minutes of the real time) sets
+// it. NTP keeps trying and corrects it whenever it answers.
+void clockFromPool() {
+    static bool done = false;
+    if (done || tlsClockSet() || millis() < 60000) return;
+    uint32_t jobTime = minerJobTime();
+    if (jobTime < 1700000000) return;
+    timeval now{time_t(jobTime), 0};
+    if (settimeofday(&now, nullptr) != 0) return;
+    done = true;
+    logf("[time] NTP not answering: clock set from the pool's job time\n");
+}
+
 void marketTask(void *) {
     uint32_t nextMarket = 0, nextPool = 60000;  // pool stats once mining for a minute
     bool lastPoolBackup = netOnBackup();
     uint32_t retry = kRetryMs;
     for (;;) {
+        clockFromPool();
         ghUpdatePoll();
         notifyPoll();
         sharePoll();
