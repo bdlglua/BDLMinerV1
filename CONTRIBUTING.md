@@ -23,7 +23,7 @@ pio device monitor -b 115200              # serial log
 ```
 
 Every board is a PlatformIO environment in [`platformio.ini`](platformio.ini); the
-[README](README.md#supported-boards) lists them. `FW_VERSION` there is the version
+[board reference](docs/hardware/supported-boards.md) lists them. `FW_VERSION` there is the version
 the build reports.
 
 ## Project layout

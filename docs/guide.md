@@ -10,8 +10,9 @@ the code.
 computer, plug the board in with a data USB cable, pick it in the list and click
 *Install* (it flashes the latest release; the first install erases the board).
 
-Each [release](https://github.com/bdlglua/BDLMinerV2/releases) also has two files per board (`<board>` = the environment name of the table
-above, e.g. `m5stickc-plus2`):
+Each [release](https://github.com/bdlglua/BDLMinerV2/releases) also has two files per board
+(`<board>` = an environment in the [board reference](hardware/supported-boards.md),
+e.g. `m5stickc-plus2`):
 
 * **`<board>-factory.bin`**: complete image for a first install, flashed at address
   **0x0**. In Chrome or Edge: https://espressif.github.io/esptool-js/ → *Connect* →
@@ -51,7 +52,7 @@ Boards without a display report everything on the serial monitor and the
      pools and a payout address or account for that coin. Non-BTC profiles require
      V1; DGB requires a SHA-256d pool port. See [SHA-256d setup](mining-coins.md);
    * **Pool host / port**: `public-pool.io` / `21496` is the compiled default.
-     For low-hashrate ESP32 feedback, see [Pools for ESP32](../README.md#pools-for-esp32),
+     For low-hashrate ESP32 feedback, see [Pools for ESP32](pools.md),
      or use your own pool. A pasted
      `stratum+tcp://host:port` is accepted: the prefix is dropped and the port taken;
    * **Backup pool host / port** (optional): used when the main pool fails, see

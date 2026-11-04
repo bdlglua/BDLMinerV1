@@ -1,275 +1,106 @@
 # BDLMiner V2
 
-BDLMiner V2 includes a Linux/Raspberry Pi fleet dashboard, pool diagnostics,
-supervised Gamma calibration, configurable physical screens and signed stable/beta
-updates with automatic rollback. See the
-[V2 setup and validation guide](docs/v2/README.md).
+Solo SHA-256d mining firmware for ESP32 boards and experimental ASIC boards,
+with a local dashboard and a Linux/Raspberry Pi fleet hub.
 
-Solo "lottery" SHA-256d miner for the **M5StickC Plus2** and compatible ESP32 boards.
-Choose **Bitcoin (BTC)**, **Bitcoin Cash (BCH)**, **Bitcoin SV (BSV)**, **eCash
-(XEC)** or **DigiByte SHA-256d (DGB)** in Settings → Pool. Bitcoin supports
-**Stratum V1 or native Stratum V2**; the other profiles use **Stratum V1**. The pool
-supplies the actual chain's work and controls payouts. See the
-[SHA-256d configuration guide](docs/mining-coins.md).
+**[Flasher](https://bdlglua.github.io/flash.html)** ·
+[Website](https://bdlglua.github.io/) ·
+[Interactive demos](https://bdlglua.github.io/demo.html) ·
+[Statistics](https://bdlglua.github.io/stats.html) ·
+**[Stable v2.2.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.2.0)**
 
-**Latest stable release: [v2.2.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.2.0)**
-· [Website](https://bdlglua.github.io/)
-· [Flash / Flasher](https://bdlglua.github.io/flash.html)
-· [Release notes](docs/releases/v2.2.0.md) · [Français](docs/releases/v2.2.0.fr.md)
-· [User guide](docs/guide.md)
-· [Statistics](https://bdlglua.github.io/stats.html)
-· [Discord](https://discord.gg/S8kSgD6Xe9)
+Mine **BTC, BCH, BSV, eCash (XEC) or DigiByte SHA-256d (DGB)** with a matching
+pool and payout address/account. BTC supports Stratum V1 and native V2; the other
+profiles require V1. [Coin and pool setup](docs/mining-coins.md).
 
-On the website: [interactive dashboard and fleet demos](https://bdlglua.github.io/demo.html),
-[measured board comparison](https://bdlglua.github.io/boards.html),
-[first installation and updates](https://bdlglua.github.io/start.html),
-[troubleshooting FAQ](https://bdlglua.github.io/faq.html), and
-[support development through GitHub Sponsors](https://github.com/sponsors/bdlglua).
+![BDLMiner V2 local dashboard with mining statistics and hashrate, temperature and power charts](docs/images/dashboard-v2.png)
 
-**New in 2.2.0:** BSV, XEC and DigiByte SHA-256d join BTC and BCH. Includes
-chain-specific address checks, separate public statistics and a guard against
-non-SHA-256d DigiByte jobs. [Setup and pool requirements](docs/mining-coins.md).
+*Dashboard preview with demo data.*
 
-**Since 2.1.1:** one User agent dropdown: `NerdMinerV2` or
-`BDLMinerV2/2.1.1`. The selected identity is used for both pools and protocols.
-
-**Since 2.1.0:** choose BTC or BCH, with chain-aware address checks, dashboard
-and physical-screen labels, and anonymous totals by cryptocurrency. Existing
-settings stay on BTC. See the [configuration guide](docs/mining-coins.md).
-
-**Since 2.0.3:** public pool sharing is enabled by default and can be disabled in
-the miner's Network settings; saved disabled choices are preserved. The
-[statistics page](https://bdlglua.github.io/stats.html) shows miner counts and total
-hashrate by pool, with clickable official website URLs. Private/custom pools stay
-masked and have no link. See [anonymous hashrate sharing](#anonymous-hashrate-sharing)
-for the data sent and the controls.
-
-The V2 release candidate was tested on the owner's M5StickC Plus2 and Gamma 601:
-manual OTA confirmation on both, M5 physical rollback/network recovery and a
-clean Gamma hour at 1.070391 TH/s. See the
-[hardware validation record and limits](docs/v2/hardware-validation.md).
-S2/S3/C3 and NerdNOS profiles build and have automated tests, but physical V2
-measurements remain pending; Gamma/NerdNOS retain their experimental board status.
-Earlier versions are described in [docs/releases](docs/releases/).
-
-> For scale: the classic ESP32 revision 3+ reaches about 1 MH/s with its dedicated
-> hardware SHA loop. S2/S3/C3 use a different hardware path; 1 MH/s is not a rating
-> for every supported board. The Bitcoin network does about 10^21 H/s.
-> This is a lottery ticket and an educational gadget, not a source of income.
-
-## Preview
-
-The [local web dashboard](docs/guide.md#web-dashboard) shows live mining statistics,
-hashrate history, temperature and effective power in your browser.
-
-![BDLMiner V2 local dashboard with mining statistics and six-hour hashrate, temperature and power charts](docs/images/dashboard-v2.png)
-
-On-device screens, shown here in landscape orientation:
+<details>
+<summary>On-device screen previews (demo data)</summary>
 
 | Mining | Clock |
 | :---: | :---: |
-| ![Mining screen with hashrate, shares, best difficulty and temperature](installer/assets/screen-mining.png) | ![Clock screen with time, date, Bitcoin price and block height](installer/assets/screen-clock.png) |
+| ![Mining screen](installer/assets/screen-mining.png) | ![Clock screen](installer/assets/screen-clock.png) |
 | **Bitcoin network** | **Hashrate history** |
-| ![Bitcoin screen with price, transaction fees, difficulty adjustment and network hashrate](installer/assets/screen-global.png) | ![On-device hashrate chart with minimum and maximum rates](installer/assets/screen-graph.png) |
+| ![Bitcoin network screen](installer/assets/screen-global.png) | ![Hashrate chart](installer/assets/screen-graph.png) |
 
-All previews use demo data. For measured results, see the
-[hardware validation record](docs/v2/hardware-validation.md).
+</details>
+
+## Features
+
+- Live dashboard, charts, settings, backups, pool diagnostics and multi-miner hub.
+- Eight physical screens, English/French, themes, rotation and night mode.
+- Signed stable/beta updates with trial boot and automatic rollback.
+- Notifications, Home Assistant/MQTT, JSON API and Prometheus metrics.
+
+## Install and update
+
+1. Open the **[Flasher](https://bdlglua.github.io/flash.html)** in Chrome or Edge
+   on a computer. Connect your board with a data USB cable and select **Flash**.
+   **First installation erases the board.** Read the ASIC board guide first.
+2. Join **`BDLMinerV2-XXXX`**, password **`MineYourCoins`**, then open
+   **http://192.168.4.1**. Set Wi-Fi, cryptocurrency, matching pool and payout
+   address or pool account.
+3. Open the local dashboard at the IP shown on the screen/serial monitor, or
+   **http://bdlminer-xxxx.local/**.
+
+Already installed? Use automatic signed updates or upload the matching
+`<board>-firmware.bin` from the local dashboard.
+[Installation and update guide](docs/guide.md#install-a-release-no-build-tools).
 
 ## Supported boards
 
-| PlatformIO environment | Boards | Display |
-|---|---|---|
-| `bitaxe-gamma-601` **experimental** | Bitaxe Gamma **601**, one BM1370, ESP32-S3 N16R8 | SSD1306 OLED 128×32 |
-| `nerdnos` **experimental** | [NerdNOS](docs/hardware/nerdnos.md): one BM1397 on a board carrying a T‑Display‑S3 | ST7789 170×320 (parallel) |
-| `m5stickc-plus2` (default) | M5StickC Plus2 | ST7789V2 135×240 |
-| `m5stack-esp32` | StickC / StickC Plus, Core Basic/Gray/Fire, Core2, Tough, Atom Lite/Matrix, Stamp Pico… (auto-detected) | depends on model |
-| `m5stack-s3` | AtomS3 / S3R / S3 Lite, CoreS3 / SE, Cardputer / ADV, StampS3, Dial, DinMeter, StickS3… | depends on model |
-| `lilygo-t-display` | LilyGO TTGO T‑Display (ESP32) | ST7789 135×240 |
-| `lilygo-t-display-s3` | LilyGO T‑Display‑S3 | ST7789 170×320 (parallel) |
-| `esp32-2432s028r` | ESP32‑2432S028R "Cheap Yellow Display" | ILI9341 320×240 |
-| `esp32-headless` | any ESP32 board (LED on GPIO2) | — (serial + web) |
-| `esp32s3-headless` | any ESP32‑S3 board | — (serial + web) |
-| `esp32s2-headless` | any ESP32‑S2 board | — (serial + web) |
-| `esp32c3-headless` | any ESP32‑C3 board | — (serial + web) |
+| Family | Boards |
+|---|---|
+| M5Stack ESP32 | M5StickC Plus2, StickC/Plus, Core/Core2, Tough, Atom, Stamp Pico |
+| M5Stack ESP32-S3 | Cardputer/ADV, StickS3, CoreS3, AtomS3, Dial, DinMeter, StampS3 |
+| LilyGO | T-Display, T-Display-S3 |
+| Other ESP32 | Cheap Yellow Display; headless ESP32, S2, S3 and C3 |
+| ASIC — experimental | [Bitaxe Gamma 601 (BM1370)](docs/hardware/bitaxe-gamma-601.md), [NerdNOS (BM1397)](docs/hardware/nerdnos.md) |
 
-The [board SHA review](docs/audits/2026-11-02-resumable-sha.md) distinguishes chip
-families, the classic ESP32 revision requirement and pending S2/S3/C3 measurements.
-Gamma 601 has owner-operated V2 measurements around 1.07 TH/s; NerdNOS has no
-physical validation recorded here. Both use an ASIC. Read their guides first:
-[Gamma 601](docs/hardware/bitaxe-gamma-601.md) (replaces AxeOS; 5 V ≥4 A barrel supply
-and active cooling) and [NerdNOS](docs/hardware/nerdnos.md).
+[Full board/environment list](docs/hardware/supported-boards.md) ·
+[Measured comparison](https://bdlglua.github.io/boards.html) ·
+[Hardware validation and limits](docs/v2/hardware-validation.md)
 
-## Install
+M5StickC Plus2 and Gamma 601 have owner-operated V2 measurements. Physical V2
+measurements for S2/S3/C3 and NerdNOS, and tests on the new BSV/XEC/DGB pools,
+remain pending. Hashrate depends on the board; 1 MH/s is not a rating for every ESP32.
+Solo mining is educational: a payout requires finding a valid block.
 
-Open **https://bdlglua.github.io/flash.html** in Chrome or Edge on a computer, plug the
-board in with a data USB cable, pick it in the list and click **Flash** (**Flasher**
-in French). The flasher installs the latest stable release; the first installation
-erases the board. Each
-[release](https://github.com/bdlglua/BDLMinerV2/releases) also has a
-`<board>-factory.bin` (first install, at 0x0) and a `<board>-firmware.bin` (update): see
-[Install a release](docs/guide.md#install-a-release-no-build-tools). To build it
-yourself, see [development.md](docs/development.md).
+## Documentation
 
-## First-time setup
-
-1. On first boot the board opens a Wi‑Fi access point **`BDLMinerV2-XXXX`**, password
-   **`MineYourCoins`** (boards with a display show a QR code to scan).
-2. Open **http://192.168.4.1**, pick your Wi‑Fi network and enter your **pool**
-   (see below), your **Bitcoin address** (optionally `address.worker`) and a **web
-   password** (optional; protects changes from the dashboard when set).
-3. The board restarts and mines. Its dashboard is at **http://bdlminer-xxxx.local/** or
-   the IP shown on the Network screen.
-
-Every portal field is described in the [user guide](docs/guide.md#first-time-setup).
-Hold the main button during boot to reopen the portal, or 5 s while running to erase
-everything.
+- [User guide](docs/guide.md) · [V2 hub and setup](docs/v2/README.md)
+- [Troubleshooting FAQ](https://bdlglua.github.io/faq.html) · [Shares explained](docs/guide.md#pool-shares-and-local-records)
+- [2.2.0 changes](docs/releases/v2.2.0.md) / [Français](docs/releases/v2.2.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
+- [Build from source](docs/development.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ### Pools for ESP32
 
-For visible feedback at ESP32 hashrates, start with a pool that accepts low-difficulty
-shares. These are solo pools: accepted shares track your work; a payout requires
-finding a valid Bitcoin block.
+For BTC, start with a low-difficulty pool.
+[Endpoints, protocols and user agents](docs/pools.md).
+For other coins, follow the [coin-specific requirements](docs/mining-coins.md).
 
-| Pool | Host | Port | Protocol / setup |
-|---|---|---|---|
-| [Nerdminers.org](https://pool.nerdminers.org/) | `pool.nerdminers.org` | `3333` | V1; designed for NerdMiner and similar ESP32 devices. Select the `NerdMinerV2` user agent. |
-| [NerdMiner.io](https://nerdminer.io/) | `pool.nerdminer.io` | `3333` | V1; announces adaptive difficulty for small miners. Use your valid Bitcoin address as the worker. |
-| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `3333` | V1. |
-| [Public Pool solo](https://web.public-pool.io/) | `public-pool.io` | `23330` | V2, with the authority key below. |
-
-For Nerdminers.org, use `YOUR_BTC_ADDRESS.worker1`; for NerdMiner.io, follow its
-published worker instructions and use your Bitcoin address. Password `x` is the
-usual V1 setting. Check the pool's linked setup page if its connection details
-change. The firmware's compiled default remains `public-pool.io:21496`; applying
-a preset changes the saved endpoint to the values shown above.
-
-A low suggested difficulty is a request, not a guarantee. The assigned pool
-or channel difficulty determines how often accepted shares can appear; see
-[Pool shares and local records](docs/guide.md#pool-shares-and-local-records).
-
-## Using it
-
-* **Screens and buttons**: eight pages (hashrate, clock, Bitcoin, network, device,
-  graph, records, blocks), one big number each; see
-  [Buttons and screens](docs/guide.md#buttons-and-screens).
-* **Web dashboard**: live statistics, what the pool sees, a 24-hour chart, settings
-  (most apply without a restart), backups, firmware upload and the log, plus
-  `/api/stats` and Prometheus `/metrics`; see [Web dashboard](docs/guide.md#web-dashboard).
-  The **Block candidates** card distinguishes local proofs, pool submission and
-  share acceptance; Bitcoin chain confirmation must be checked independently.
-* **Updates**: new releases install by themselves from GitHub, only with a valid
-  signature, and run on trial with automatic rollback; see
-  [Updates from GitHub](docs/guide.md#updates-from-github).
-* **Notifications**: ntfy, a webhook (Discord, Telegram…), alerts and a daily summary;
-  see [Notifications](docs/guide.md#notifications).
-* **Home Assistant**: MQTT discovery with controls; see
-  [Home Assistant](docs/guide.md#home-assistant).
-* **Safety**: mining power, heat limits, battery saver and watchdogs; see
-  [Safety, power and networks](docs/guide.md#safety-power-and-networks).
-* **Backup pool, Stratum V2, user agent**: see the [user guide](docs/guide.md).
+## Privacy
 
 ### Anonymous usage count
 
-To know how many miners run each version, 5 minutes after boot and then once a day the
-miner downloads a 2-byte file of its own version's release, `ping-<board>.txt`. GitHub
-counts the downloads of each release file, and `python3 tools/miner_stats.py` turns these
-counts into active miners per version and board. Nothing about the miner is sent (no
-address, network or identifier: only GitHub sees the download, like any other). It is on
-by default; turn it off with the *Anonymous usage count* setting (`count`).
+Enabled by default; disable **Anonymous usage count** in Network settings.
+[What is counted](docs/anonymous-statistics.md#anonymous-usage-count).
 
 ### Anonymous hashrate sharing
 
-To know the total hashrate of the BDLMiner miners, every 5 minutes (the first time 3
-minutes after boot) the miner posts its firmware version, its board, its hashrate (the
-average of the last minute, rounded to 3 digits), the selected cryptocurrency, the interval until its next report and,
-on M5Stack boards, their exact model (such as `M5Stack Core2`) to the
-[BDLMiner statistics service](https://github.com/bdlglua/BDLMiner-stats):
+Hashrate and public pool-group sharing are enabled by default; both can be disabled
+in Network settings, and saved disabled choices are kept. Reports include board,
+version and coin, but no payout address, worker, private hostname or miner identifier.
+[Data, controls and retention](docs/anonymous-statistics.md#anonymous-hashrate-sharing).
 
-```json
-{"v": "2.1.0", "coin": "BTC", "board": "m5stack-esp32", "hashrate": 1.02e6, "every": 300, "model": "M5Stack Core2", "pool": "public-pool.io"}
-```
+## Community and license
 
-**Share my pool anonymously** (`sharepool`) adds the public pool group. It is
-**on by default from 2.0.3**, requires hashrate sharing and applies without
-a restart in *Settings → Network → Anonymous statistics*. Disable it there to
-hide the group. A saved disabled choice is kept, including one saved by 2.0.2,
-where this option was introduced with a disabled default. Only the connected pool
-is reported, including the backup when active. Recognised public hosts are mapped
-to a fixed group; every other host becomes *Other / private pool* on the device.
-The configured hostname, port, Bitcoin address and worker are never sent. Older
-versions, disabled pool sharing and disconnected pools appear as *Not shared*.
-Public pool names link to a predefined official website, with its URL shown below
-the name. Private/other and undisclosed groups have no link.
+[Discord](https://discord.gg/S8kSgD6Xe9) ·
+[Report a bug](https://github.com/bdlglua/BDLMinerV2/issues/new/choose) ·
+[Support BDLMiner](https://github.com/sponsors/bdlglua)
 
-No Bitcoin address, worker, private hostname, name or identifier is sent. The service
-adds the reports up live and keeps a 5-minute sample of the total 35 days; the sender's network
-address only limits the number of reports and is never stored. The totals are public:
-**<https://bdlminer-stats.bdlminer-bot.workers.dev/>** (total hashrate, miners, 7-day
-chart, by board, version, cryptocurrency and pool). A paused miner sends
-nothing. It is on by default; turn it off with the *Share my hashrate anonymously*
-setting (`sharehr`), which applies at once.
-
-## Troubleshooting
-
-| Symptom | What to check |
-|---|---|
-| Can't find the `BDLMinerV2-XXXX` network | The portal closes after 3 minutes and the board restarts; wait for it to reopen, or hold the main button during boot. |
-| Portal saved but the board never mines | Read the serial monitor: Wi‑Fi password, pool host / port, and the `[pool]` lines. |
-| *Check payout / account* at boot | The username is not a recognized address for the selected coin. Check the address checksum, selected chain and pool instructions; account-based pools use their account name instead. |
-| Status `Auth failed: check address` | The pool rejected the user name. Reopen the portal and fix the address. |
-| Status `Pool unreachable` / `Pool silent, reconnecting` | Check the host, pool availability and the port for the selected protocol. A V1 port and a V2 port are not interchangeable; see [Pools for ESP32](#pools-for-esp32). |
-| Hashrate is visible but accepted shares stay at zero | Check the assigned pool difficulty, connection status, pending replies and activity log. Local records do not require pool acceptance; see [Shares explained](docs/guide.md#pool-shares-and-local-records). |
-| M5StickC Plus2 slows down with the local dashboard open | The dashboard uses live events, with a 10-second polling fallback. Since v1.9.12, hidden tabs close their live stream. See the [current review](docs/audits/2026-11-01.md) and [dashboard-load review](docs/audits/2026-10-27-m5-dashboard-load.md). A hardware hashrate gain has not yet been measured. |
-| `SV2 authority key missing/invalid` or `SV2 server verification failed` | Verify the pool's published authority key and V2 port. Pasting the pool's `stratum2+tcp://host:port/key` address fills both; an altered or expired server certificate is refused. |
-| `SV2 waiting for synchronized time` | Allow the miner to reach its NTP time server before certificate verification can complete. |
-| The selected user agent is refused | Choose `NerdMinerV2` or `BDLMinerV2/<version>` according to the pool instructions. The chosen identity is retained for both protocols and pools. |
-| No output in the serial monitor | Check the speed is 115200 baud. Boards with only a native USB port (ESP32‑C3 SuperMini, ESP32‑S3 / S2 mini boards) need `-DARDUINO_USB_CDC_ON_BOOT=1` in `build_flags`. |
-| `bdlminer-xxxx.local` doesn't resolve | mDNS is blocked on some networks and older Android versions: use the IP shown in the serial monitor or on the Network screen. |
-| Clock / Global screens stay empty | The board needs Internet access to `mempool.space` (HTTPS) and `pool.ntp.org`. The `[market]` serial line shows how many requests succeeded (`5/5 ok`). |
-| `hardware SHA: self-test FAILED, disabled` | The board fell back to software mining; it still works, just slower. Please report it with your board model and the `[miner]` lines. |
-
-## Development
-
-```sh
-pio run -e m5stickc-plus2 -t upload -t monitor   # build and flash the M5StickC Plus2
-./test/host/run.sh                               # host tests
-```
-
-[development.md](docs/development.md) covers building every board, the hashing engines,
-releases and the code layout; [CONTRIBUTING.md](CONTRIBUTING.md) how to contribute. Security
-problems: see [SECURITY.md](SECURITY.md).
-
-## Credits
-
-* Native Gamma 601 board configuration, BM1370 register/packet sequences and
-  TPS546/EMC2101 references derive from [ESP-Miner / AxeOS](https://github.com/bitaxeorg/ESP-Miner)
-  (GPL-3.0), revision `bb4fd0c7e589858bbeef00ec89342216c1510671`, and
-  [bitaxeGamma hardware](https://github.com/bitaxeorg/bitaxeGamma).
-* NerdNOS support: BM1397 packets, PLL calculation and start-up sequence, and the
-  board's pins, derive from ESP-Miner (above) and the NerdNOS firmware in
-  [WantClue/NerdMiner_v2](https://github.com/WantClue/NerdMiner_v2/tree/nerdnos)
-  (branch `nerdnos`, revision `22588347597d24969f41ed56fad2641678ad59c1`, GPL-3.0); the board is
-  [benjamin-wilson/NerdNOS](https://github.com/benjamin-wilson/NerdNOS).
-
-* The earlier bitmap screen design was inspired by
-  [NerdMinerV2](https://github.com/BitMaker-hub/NerdMiner_v2).
-* The original-ESP32 hardware SHA loop (`src/hw_sha_classic.S`) and the assembly
-  software kernel (`src/sw_sha_prefilter.S`) come from
-  [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded) by HenrysCat,
-  MIT License, Copyright (c) 2023 Bitmaker, (c) 2026 HenrysCat.
-* Libraries: [M5Unified / M5GFX](https://github.com/m5stack/M5Unified) (LovyanGFX),
-  [WiFiManager](https://github.com/tzapu/WiFiManager),
-  [ArduinoJson](https://arduinojson.org/).
-* V2 cryptography: [Bitcoin Core libsecp256k1](https://github.com/bitcoin-core/secp256k1)
-  (MIT, pinned source in `lib/secp256k1`) and
-  [Monocypher](https://github.com/LoupVaillant/Monocypher) (BSD-2-Clause, pinned source
-  in `lib/monocypher`). Their upstream notices and exact revisions are retained.
-* Stratum V2 protocol: [official specification](https://stratumprotocol.org/).
-* Market data: [mempool.space](https://mempool.space) public API.
-
-## License
-
-BDLMiner V2 is free software, released under the
-[GNU General Public License v3.0](LICENSE): you may use, modify and redistribute it,
-provided that modified versions you distribute are also released under the GPL‑3.0
-with their source code.
+Free software under the **[GNU GPL v3.0](LICENSE)**.
+[Credits and upstream projects](docs/credits.md).
