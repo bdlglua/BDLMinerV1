@@ -51,8 +51,11 @@ void logf(const char *fmt, ...) {
                      (unsigned)(s % 60));
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(line + n, sizeof(line) - n, fmt, ap);
+    int m = vsnprintf(line + n, sizeof(line) - n, fmt, ap);
     va_end(ap);
+    // A cut message lost its final newline: without it the next entry would
+    // continue on the same line of the log.
+    if (m >= int(sizeof(line)) - n) line[sizeof(line) - 2] = '\n';
     Serial.print(line + n);  // the serial monitor keeps its own timestamps if wanted
 #ifdef LOG_MIRROR_UART0
     // Serial is the native USB port here; DevKits show UART0 through their

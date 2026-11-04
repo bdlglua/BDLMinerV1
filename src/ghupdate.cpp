@@ -150,9 +150,8 @@ bool check() {
     }
     String fw, sig;
     release_version::Version parsed;
-    if(!release_version::parse(version,parsed)||(!channel&&parsed.pre[0])){
-        setError("beta release requires the beta channel");return false;
-    }
+    if(!release_version::parse(version,parsed)){setError("invalid release version %s",version);return false;}
+    if(!channel&&parsed.pre[0]){setError("beta release requires the beta channel");return false;}
     if(channel!=settings.updateChannel)return false; // a live channel change invalidates the response
     for (JsonObject a : doc["assets"].as<JsonArray>()) {
         String name = a["name"] | "";
