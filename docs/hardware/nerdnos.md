@@ -41,7 +41,8 @@ repository name different header pins, probably another revision.
   before it counts: the hashrate comes from these verified results, corrupted frames
   count as hardware errors and are never submitted.
 - **Heat**: *Pause mining above* defaults to **75 °C** for this board; the stock firmware
-  cuts power at 80 °C. Since v1.9.10 there are no 50 % / 25 % steps below the limit (each
+  cuts power at 80 °C. Since 2.3.4 the driver does the same whatever that setting (even
+  0 = off): the ASIC stops at **80 °C** on the NTC and restarts once it reads 70 °C or less. Since v1.9.10 there are no 50 % / 25 % steps below the limit (each
   power change restarts the ASIC), and once hot it stays paused at least two minutes.
   The NTC reads with the ASIC off as well. A broken sensor limits mining to 25 %.
 - **Watchdog**: no verified result for a minute restarts the chip.

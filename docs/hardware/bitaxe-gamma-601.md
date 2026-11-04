@@ -131,7 +131,8 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   setup is tried again every 5 seconds. Before powering the ASIC, the firmware waits
   for an input of at least **4.8 V** and a turning fan, then clears the regulator's
   latched faults (an undervoltage from the missing supply).
-* The user thermal limit (default 65°C) pauses mining. Since v1.9.10 an ASIC board has
+* The user thermal limit (default 65°C, at most 68°C since 2.3.4 so that it pauses
+  before the latching 70°C stop; a higher saved value is lowered to 68°C) pauses mining. Since v1.9.10 an ASIC board has
   no 50% / 25% steps below it (each power change restarted the ASIC, which then cooled
   at once: at 600 MHz a Gamma restarted every 40 s at 55 °C), and once hot it stays
   paused at least two minutes, its own sensor being silent while it is off. Independent

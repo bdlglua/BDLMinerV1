@@ -174,6 +174,7 @@ void settingsSanitize(Settings &settings) {
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
 #ifdef BOARD_GAMMA601
     if (!bm1370::validProfile(settings.asicFrequency)) settings.asicFrequency = bm1370::kStockMHz;
+    if (settings.maxTemp > bm1370::kMaxUserTempC) settings.maxTemp = bm1370::kMaxUserTempC;  // saved before the limit
     settings.fanPercent = std::max<uint8_t>(30, std::min<uint8_t>(100, settings.fanPercent));
 #endif
     if (settings.miningPower > 100) settings.miningPower = 100;

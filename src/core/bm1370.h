@@ -55,6 +55,9 @@ uint16_t fanRpm(uint16_t tach);
 // warnings, and some stay latched (OTHER), while the measured limits below
 // already cover what they would tell.
 constexpr float kAsicMaxC = 70;  // ASIC diode: the hard stop
+// Highest user thermal limit: that pause must come before the hard stop,
+// which latches until a restart.
+constexpr uint8_t kMaxUserTempC = uint8_t(kAsicMaxC) - 2;
 constexpr uint16_t kStatusOff = 0x0040, kStatusVinUv = 0x0008;
 constexpr uint16_t kStatusFaults = 0x0020 | 0x0010 | 0x0004;  // VOUT_OV, IOUT_OC, TEMP
 struct Health {
