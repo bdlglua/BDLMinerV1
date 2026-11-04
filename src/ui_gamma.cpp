@@ -88,6 +88,9 @@ void showMessage(const char *title, const char *line1, const char *line2) { line
 void nextScreen() { if (alertShown) return; page = display_config::nextPage(page,3,settings.screenPages); since = millis(); render(); }
 void cycleBrightness() { settingsSetBrightness(settingsBrightness()?0:80); setBacklight(settingsBrightness()); }
 void setBacklight(uint8_t value) {
+    // Called every second by the thermal policy: only a change reaches the
+    // OLED, whose I2C bus the ASIC driver shares.
+    if (value == brightness) return;
     brightness = value;
     if (oled) { if (value) static_cast<lgfx::LGFX_Device *>(oled)->wakeup(); else static_cast<lgfx::LGFX_Device *>(oled)->sleep(); }
 }

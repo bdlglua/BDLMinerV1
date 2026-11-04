@@ -56,6 +56,7 @@ g++ -std=c++17 -O2 -Wall -Wno-unused-variable -ffunction-sections -fdata-section
 .pio/host/test_block_candidate
 python3 test/host/test_block_alert.py
 python3 test/host/test_daily_summary.py
+python3 test/host/test_ui_duration.py
 g++ -std=c++17 -O2 -Wall -Itest/host/stubs/block_status -Itest/host/stubs/miner -Isrc -I"$JSON" \
     test/host/test_block_status.cpp src/core/work.cpp src/core/sha256.cpp -o .pio/host/test_block_status
 .pio/host/test_block_status

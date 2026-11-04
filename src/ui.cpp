@@ -61,13 +61,15 @@ String rateText(double rate, const char **unit) {
     return out;
 }
 
+// Each unit is truncated, like the hours: rounding showed "60min" for 59.6
+// minutes and "1d 24h" for 47.6 hours.
 String duration(double seconds) {
     if (!std::isfinite(seconds) || seconds < 0) return "-";
     char out[32];
-    if (seconds < 60) snprintf(out, sizeof(out), "%.0fs", seconds);
-    else if (seconds < 3600) snprintf(out, sizeof(out), "%.0fmin", seconds / 60);
+    if (seconds < 60) snprintf(out, sizeof(out), "%.0fs", floor(seconds));
+    else if (seconds < 3600) snprintf(out, sizeof(out), "%.0fmin", floor(seconds / 60));
     else if (seconds < 86400) snprintf(out, sizeof(out), "%uh%02u", unsigned(seconds / 3600), unsigned(seconds / 60) % 60);
-    else if (seconds < 31557600) snprintf(out, sizeof(out), tr("%.0fd %.0fh"), floor(seconds / 86400), fmod(seconds / 3600, 24));
+    else if (seconds < 31557600) snprintf(out, sizeof(out), tr("%.0fd %.0fh"), floor(seconds / 86400), floor(fmod(seconds / 3600, 24)));
     else snprintf(out, sizeof(out), tr("%s yr"), work::formatSI(seconds / 31557600, 1).c_str());
     return out;
 }
@@ -96,9 +98,9 @@ const char *limitState() {
 String shortDuration(double seconds) {
     if (!std::isfinite(seconds) || seconds < 0) return "-";
     char out[24];
-    if (seconds < 3600) snprintf(out, sizeof(out), "%.0fmin", seconds / 60);
+    if (seconds < 3600) snprintf(out, sizeof(out), "%.0fmin", floor(seconds / 60));
     else if (seconds < 86400) snprintf(out, sizeof(out), "%uh", unsigned(seconds / 3600));
-    else snprintf(out, sizeof(out), tr("%.0fd %.0fh"), floor(seconds / 86400), fmod(seconds / 3600, 24));
+    else snprintf(out, sizeof(out), tr("%.0fd %.0fh"), floor(seconds / 86400), floor(fmod(seconds / 3600, 24)));
     return out;
 }
 
