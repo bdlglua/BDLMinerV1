@@ -181,6 +181,7 @@ void mqttTask(void *) {
     bool tried = false;  // the first attempt comes at once, then one every 30 s
     for (;;) {
         if (settings.mqttHost.isEmpty() || !WiFi.isConnected()) {
+            brokerUp = false;  // the dashboard must not keep showing "connected"
             vTaskDelay(pdMS_TO_TICKS(10000));
             continue;
         }

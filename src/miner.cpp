@@ -58,6 +58,7 @@ work::Job board;
 std::atomic<bool> boardValid{false};
 std::atomic<uint32_t> boardSeq{0};
 std::atomic<uint32_t> workGeneration{0};  // only changes when earlier jobs become invalid
+std::atomic<uint32_t> lastJobTime{0};
 uint64_t extranonce2Counter = 0;
 
 struct QueuedShare {
@@ -445,6 +446,7 @@ void minerPublishJob(const work::Job &job, bool clean) {
         invalidateBlockQueue();
     }
     board = job;
+    lastJobTime = job.ntime;
     double networkDiff = work::difficultyFromBits(job.nbits);
     portENTER_CRITICAL(&statsMux);
     stats.blockHeight = job.blockHeight();
@@ -461,6 +463,8 @@ void minerPublishJob(const work::Job &job, bool clean) {
     boardSeq++;
     xSemaphoreGive(jobMutex);
 }
+
+uint32_t minerJobTime() { return lastJobTime.load(); }
 
 void minerInvalidate() {
     if (!jobMutex || !shareQueue) return;
