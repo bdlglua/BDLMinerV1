@@ -22,6 +22,7 @@ TOOLS=('bdlhub.py','calibrate_gamma.py','check_fleet.py','check_hardware.py',
 PACKAGE=('__init__.py','client.py','hub.py','calibration.py','example.json',
          'web/index.html','web/app.js','web/style.css')
 DOCS=('v2/README.md','v2/implementation.md','audits/2026-11-02-v2-beta-readiness.md',
+      'remote-access.md','remote-access.fr.md',
       'v2/hardware-validation.md','v2/hardware-validation.fr.md',
       'v2/repository-migration.md',
       'audits/2026-11-02-resumable-sha.md',

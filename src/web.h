@@ -3,6 +3,8 @@
 //   /api/stats                                        JSON
 //   /metrics                                          Prometheus
 #pragma once
+#include <stdint.h>
+uint32_t webBootId();
 
 #include <Arduino.h>
 

@@ -1042,6 +1042,8 @@ void webTask(void *) {
 
 }  // namespace
 
+uint32_t webBootId() { return bootSession; }
+
 void webStart() {
     bootSession = esp_random();
     char name[24];

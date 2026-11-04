@@ -240,6 +240,7 @@ footer a{display:inline-block;padding:6px 2px}
     <a href="faq.html" data-t="navFAQ">FAQ</a>
     <a href="releases.html" data-t="navNews">Releases</a>
     <a href="stats.html" data-t="navStats">Statistics</a>
+    <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/remote" data-t="navRemote">My miners</a>
     <a href="gallery.html" data-t="navCommunity">Community</a>
    </div></details>
    <a href="support.html" id="nav-support" data-t="navSupport">Support</a>
@@ -259,6 +260,7 @@ __PAGE_CONTENT__
   <a href="boards.html" data-t="navBoards">Boards</a><a href="flash.html" data-t="navInstall">Flash</a>
   <a href="demo.html" data-t="navDemo">Demo</a><a href="faq.html" data-t="navFAQ">FAQ</a>
   <a href="releases.html" data-t="navNews">Releases</a><a href="stats.html" data-t="navStats">Statistics</a>
+  <a href="https://bdlminer-stats.bdlminer-bot.workers.dev/remote" data-t="navRemote">My miners</a>
   <a href="gallery.html" data-t="navCommunity">Community</a><a href="support.html" data-t="navSupport">Support</a>
  </nav>
  <div class="wrap">
@@ -328,6 +330,7 @@ const STATS='https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary';
 let poolNames={},poolLinks={};try{const data=JSON.parse(document.getElementById('site-data').textContent);poolNames=data.pool_names||{};poolLinks=data.pool_links||{}}catch{}
 const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Flasher',navStats:'Statistiques',navCommunity:'Communauté',
 navHome:'Accueil',navStart:'Bien démarrer',navDemo:'Démo',navMore:'Explorer',navFAQ:'FAQ',navNews:'Nouveautés',navSupport:'Soutenir',navPages:'Toutes les pages',
+navRemote:'Mes mineurs',
 exploreTitle:'Découvrir BDLMiner',exploreLead:'Choisis ta carte, essaie l’interface ou trouve de l’aide pour la prochaine étape.',
 exploreBoards:'Compare les puces, les écrans et les hashrates mesurés.',exploreDemo:'Essaie le dashboard et le hub sans posséder de miner.',
 exploreStart:'Première installation, mises à jour et passage depuis AxeOS.',exploreFAQ:'Dépannage USB, Wi-Fi, shares et performances.',

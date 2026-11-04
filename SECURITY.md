@@ -8,7 +8,7 @@ and MQTT credentials. Reports that help keep that safe are very welcome.
 
 | Version | Supported |
 |---|---|
-| 2.0.x (latest release) | ✅ security fixes |
+| Latest stable 2.x release | ✅ security fixes |
 | older releases | ❌ — miners install the latest release by themselves (GitHub updates, setting `2`, the default) |
 
 Fixes ship as a new release; the boards marked **experimental** (Bitaxe Gamma 601,
@@ -102,6 +102,11 @@ that reports can focus on what goes beyond them:
   off with the *Share my hashrate anonymously* setting.
 - **Crash reports are memory images** and may contain secrets: downloading or erasing
   them requires the web password when one is set.
+- **Private remote monitoring is opt-in.** From 2.3.0, a paired board can send
+  selected readings over verified HTTPS to a key-isolated cloud space. Its
+  256-bit access key allows reading and erasing that space and is masked as a
+  secret setting. Personal names and pseudonymous miner IDs stay outside public
+  aggregates. See [data, retention and revocation](docs/remote-access.md).
 
 ## Keeping your miner safe
 

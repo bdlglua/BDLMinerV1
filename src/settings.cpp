@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "core/remote_data.h"
 
 #include <Preferences.h>
 #include <WiFi.h>
@@ -96,6 +97,9 @@ const SettingInfo kSettings[] = {
       "Share my hashrate anonymously: every 5 minutes, send the version, the board, the cryptocurrency and the hashrate"),
     S("sharepool", Bool, sharePool, "Network",
       "Share my pool anonymously: optional public pool group, only with hashrate sharing"),
+    S("remote", Bool, remoteEnabled, "Network", "Private remote monitoring (optional)"),
+    S("remotekey", Secret, remoteKey, "Network", "Personal remote access key (64 lowercase hexadecimal characters)"),
+    S("rname", Text, remoteName, "Network", "Name in my private remote dashboard"),
 };
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
@@ -137,6 +141,8 @@ static void poolURL(String &host, uint8_t &protocol, String &authority) {
 }
 
 void settingsSanitize(Settings &settings) {
+    if (!remote_data::validKey(settings.remoteKey.c_str())) settings.remoteEnabled = false;
+    if (settings.remoteName.length() > 48) settings.remoteName.remove(48);
     if (!coin::valid(settings.miningCoin)) settings.miningCoin = coin::BTC;
     for (size_t i = 0; i < kSettingCount; i++)
         if (kSettings[i].type == SettingType::Text) ((String *)settingValue(kSettings[i], settings))->trim();

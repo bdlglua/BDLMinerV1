@@ -7,6 +7,9 @@ const SettingInfo kSettings[] = {
     {"coin", SettingType::Number, &settings.miningCoin, 8, "", ""},
     {"addr", SettingType::Text, &settings.btcAddress, 0, "", ""},
     {"sharepool", SettingType::Bool, &settings.sharePool, 0, "", ""},
+    {"remote", SettingType::Bool, &settings.remoteEnabled, 0, "", ""},
+    {"remotekey", SettingType::Secret, &settings.remoteKey, 0, "", ""},
+    {"rname", SettingType::Text, &settings.remoteName, 0, "", ""},
     {"channel", SettingType::Number, &settings.updateChannel, 8, "", ""},
     {"customscreen", SettingType::Bool, &settings.customScreen, 0, "", ""},
     {"screen0", SettingType::Number, &settings.screenWidget0, 8, "", ""},
@@ -35,6 +38,27 @@ const SettingInfo kSettings[] = {
 const size_t kSettingCount = sizeof(kSettings) / sizeof(kSettings[0]);
 
 int main() {
+    assert(!settings.remoteEnabled && settings.remoteKey.length()==0);
+    {
+        JsonDocument value;
+        value["remote"]=true;
+        assert(settingsError(value.as<JsonObjectConst>()));
+        value["remotekey"]="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        value["rname"]="M5 bureau";
+        assert(!settingsError(value.as<JsonObjectConst>()));
+        Settings paired=settings;settingsApply(paired,value.as<JsonObjectConst>());
+        assert(paired.remoteEnabled && paired.remoteName=="M5 bureau");
+        assert(!settingsCompare(paired,settings).live); // staging a key requires restart
+        for(const char *key : {"short","ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab"}) {
+            value["remotekey"]=key;assert(settingsError(value.as<JsonObjectConst>()));
+        }
+        const Settings original=settings;settings=paired;
+        value.clear();value["remote"]=false;
+        assert(!settingsError(value.as<JsonObjectConst>()));
+        Settings disabled=settings;settingsApply(disabled,value.as<JsonObjectConst>());
+        assert(settingsCompare(disabled,settings).live && !disabled.remoteEnabled);
+        settings=original;
+    }
 
     assert(settings.miningCoin == coin::BTC);
     for(unsigned id:{unsigned(coin::BSV),unsigned(coin::XEC),unsigned(coin::DGB)}) {

@@ -16,6 +16,7 @@
 #include "notify.h"
 #include "settings.h"
 #include "share.h"
+#include "remote.h"
 #include "tls.h"
 #include "runtime.h"
 #include "block_status.h"
@@ -413,6 +414,7 @@ void marketTask(void *) {
         ghUpdatePoll();
         notifyPoll();
         sharePoll();
+        remotePoll();
         blockStatusPoll();
         bool backup = netOnBackup();
         if (backup != lastPoolBackup) {

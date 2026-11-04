@@ -51,6 +51,10 @@ async function fixture(options={}){
     Object.assign(state.settings.values,{sharehr:true,sharepool:true});
     state.settings.live=[...(state.settings.live||[]),'sharehr','sharepool'];
   }
+  if(options.remote){
+    state.settings.schema.push(['remote','bool','Network','Private remote monitoring',{}],['remotekey','secret','Network','Personal access key',{}],['rname','text','Network','Miner name',{}]);
+    Object.assign(state.settings.values,{remote:false,remotekey:'',rname:''});state.settings.live=[...(state.settings.live||[]),'remote'];
+  }
   if(options.coins){
     state.settings.schema.unshift(['coin','number','Pool','Cryptocurrency',{min:0,max:4}]);
     state.settings.values.coin=0;
@@ -753,6 +757,21 @@ check('pool sharing is on by default and can be disabled live in French',()=>run
   await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('appliqu'));
   assert.equal(JSON.parse(f.state.posts[0].body).sharepool,false);
   assert.equal(f.state.requests.some(r=>r.includes('/report')),false);
+}));
+
+check('private remote monitoring is opt-in, pairs a secret key and links to its own viewer',()=>run({remote:true,language:'fr'},async f=>{
+  await loaded(f);assert.equal(await f.page.locator('#k_remote').isChecked(),false);
+  assert.equal(await f.page.locator('#k_remotekey').getAttribute('type'),'password');
+  assert.equal(await f.page.locator('#k_remotekey').getAttribute('maxlength'),'64');
+  assert.equal(await f.page.locator('#k_rname').getAttribute('maxlength'),'48');
+  const viewer=f.page.getByRole('link',{name:'Ouvrir mon dashboard distant'});
+  assert.equal(await viewer.getAttribute('href'),'https://bdlminer-stats.bdlminer-bot.workers.dev/remote');
+  const key='0123456789abcdef'.repeat(4);
+  await f.page.fill('#k_remotekey',key);await f.page.fill('#k_rname','M5 bureau');await f.page.check('#k_remote');
+  assert.equal(await f.page.locator('#save').textContent(),'Enregistrer et redémarrer');
+  await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('redémarr'));
+  const data=JSON.parse(f.state.posts[0].body);assert.equal(data.remote,true);assert.equal(data.remotekey,key);assert.equal(data.rname,'M5 bureau');
+  assert.equal(f.state.requests.some(r=>r.includes('/api/remote')),false);
 }));
 
 check('choice controls save numbers and discarding restores the saved values',()=>run({},async f=>{

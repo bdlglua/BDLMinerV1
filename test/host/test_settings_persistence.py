@@ -11,6 +11,8 @@ save = settings[settings.index('bool settingsSave('):settings.index('String port
 apply = web[web.index('int applySettings('):web.index('void handleGetSettings()')]
 get = web[web.index('void handleGetSettings()'):web.index('// Saves the settings present')]
 post = web[web.index('void handlePostSettings()'):web.index('// GET /api/backup:')]
+# The host String is std::string: map only Arduino's empty-check spelling.
+values = web[web.index('void settingValues('):web.index('// Stage, normalize and save known keys;')].replace('secret.isEmpty()', 'secret.empty()')
 prefix = r'''
 #include <cassert>
 #include <cstdio>
@@ -29,7 +31,8 @@ const SettingInfo kSettings[] = {
  {"pool",SettingType::Text,&settings.poolHost,0,"",""},
  {"addr",SettingType::Text,&settings.btcAddress,0,"",""},
  {"power",SettingType::Number,&settings.miningPower,8,"",""},
- {"hook",SettingType::Secret,&settings.webhookUrl,0,"",""}
+ {"hook",SettingType::Secret,&settings.webhookUrl,0,"",""},
+ {"remotekey",SettingType::Secret,&settings.remoteKey,0,"Network",""}
 #ifdef BOARD_GAMMA601
  ,{"fanauto",SettingType::Bool,&settings.fanAuto,0,"",""}
  ,{"fanpct",SettingType::Number,&settings.fanPercent,8,"",""}
@@ -81,13 +84,16 @@ struct {
  void sendHeader(const char *,const char *) {}
  void send(int code,const char *,const std::string &text) { status=code;message=text; }
 } server;
-void settingValues(JsonObject values,bool){values["ua"]=settings.userAgent;}
-
 '''
 tests = r'''
 int main() {
+ settings.remoteKey="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
  handleGetSettings();assert(server.status==200);
+ assert(server.message.find(settings.remoteKey.c_str())==std::string::npos);
  JsonDocument response;assert(!deserializeJson(response,server.message));
+ assert(response["values"]["remotekey"]==kSecretMask);
+ JsonDocument backup;settingValues(backup.to<JsonObject>(),true);
+ assert(backup["remotekey"]==settings.remoteKey);
  assert(response["capabilities"]["user_agents"].size()==2);
  assert(response["capabilities"]["user_agents"][0]=="NerdMinerV2");
  assert(response["capabilities"]["user_agents"][1]==DEFAULT_USER_AGENT);
@@ -141,7 +147,7 @@ int main() {
 with tempfile.TemporaryDirectory(prefix='bdl-settings-') as temp:
     cpp = Path(temp) / 'test.cpp'
     exe = Path(temp) / 'test'
-    cpp.write_text(prefix + save + apply + get + post + tests)
+    cpp.write_text(prefix + save + values + apply + get + post + tests)
     for definitions in ([], ['-DBOARD_GAMMA601','-DBOARD_ASIC']):
         subprocess.run(['g++', '-std=c++17', '-O2', *definitions, '-Itest/host/stubs/miner', '-Isrc',
                         '-I.pio/libdeps/esp32-headless/ArduinoJson/src', str(cpp),
