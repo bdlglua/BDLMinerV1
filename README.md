@@ -7,9 +7,9 @@ with a local dashboard and a Linux/Raspberry Pi fleet hub.
 [Website](https://bdlglua.github.io/) ·
 [Interactive demos](https://bdlglua.github.io/demo.html) ·
 [Statistics](https://bdlglua.github.io/stats.html) ·
-**[Stable v2.3.4](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.3.4)**
+**[Stable v2.4.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.4.0)**
 
-Mine **BTC, BCH, BSV, eCash (XEC) or DigiByte SHA-256d (DGB)** with a matching
+Mine **BTC, BCH, BSV, eCash (XEC), DigiByte SHA-256d (DGB) or Peercoin (PPC, PoW)** with a matching
 pool and payout address/account. BTC supports Stratum V1 and native V2; the other
 profiles require V1. [Coin and pool setup](docs/mining-coins.md).
 
@@ -66,7 +66,7 @@ Already installed? Use automatic signed updates or upload the matching
 [Hardware validation and limits](docs/v2/hardware-validation.md)
 
 M5StickC Plus2 and Gamma 601 have owner-operated V2 measurements. Physical V2
-measurements for S2/S3/C3 and NerdNOS, and tests on the new BSV/XEC/DGB pools,
+measurements for S2/S3/C3 and NerdNOS, and tests on the BSV/XEC/DGB/PPC pools,
 remain pending. Hashrate depends on the board; 1 MH/s is not a rating for every ESP32.
 Solo mining is educational: a payout requires finding a valid block.
 

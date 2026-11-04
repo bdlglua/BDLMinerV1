@@ -73,5 +73,12 @@ int main(){
     job.version=0x20000000;minerPublishJob(job,true);assert(!minerAsicWork(w));
     job.version=0x20000200;job.versionMask=0x1fffe000;minerPublishJob(job,true);assert(minerAsicWork(w));
     job.versionMask=0x100;minerPublishJob(job,true);assert(!minerAsicWork(w));
+    // Peercoin's legacy coinbase timestamp must not shift the displayed or
+    // candidate height on the ASIC adapter.
+    activeMiningCoin=coin::PPC;job.version=6;job.versionMask=0;
+    job.coinb1.assign(51,0);job.coinb1[0]=2;job.coinb1[46]=3;
+    job.coinb1[47]=0xc8;job.coinb1[48]=0xb8;job.coinb1[49]=0x0d;
+    minerPublishJob(job,true);assert(minerAsicWork(w));
+    assert(w.height==899272 && stats.blockHeight==899272);
     puts("Native ASIC mining: unique work/version masks, independent SHA-256d, corrupted/stale results, no software fallback and accurate 1.2 TH/s counters/stop decay passed");
 }

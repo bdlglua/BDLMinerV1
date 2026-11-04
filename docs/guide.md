@@ -46,7 +46,7 @@ Boards without a display report everything on the serial monitor and the
 1. On first boot the board opens a Wi‑Fi access point
    **`BDLMinerV2-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
-   * **Cryptocurrency**: `0` BTC (default), `1` BCH, `2` BSV, `3` XEC or `4` DGB
+   * **Cryptocurrency**: `0` BTC (default), `1` BCH, `2` BSV, `3` XEC, `4` DGB or `5` PPC (proof of work)
      (SHA-256d) in the setup portal; the
      local Settings → Pool page has a named dropdown. Use matching main/backup
      pools and a payout address or account for that coin. Non-BTC profiles require
@@ -59,7 +59,7 @@ Boards without a display report everything on the serial monitor and the
      [Backup pool](#backup-pool);
    * **Payout address or pool account**: an address for the selected coin, optionally
      followed by `.workerName`, or the username required by an account-based pool.
-     BTC/DGB check their own Base58Check and Bech32/Bech32m prefixes; BCH/XEC
+     BTC/DGB/PPC check their own Base58Check and Bech32/Bech32m prefixes; BCH/XEC
      check their own CashAddr prefixes and legacy encodings. BSV uses legacy
      Base58Check. Unrecognized addresses
      show a warning because some pools require account names;

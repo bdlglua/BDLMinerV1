@@ -1,6 +1,6 @@
 # Bitcoin pools for ESP32
 
-These endpoints are for **BTC**. For BCH, BSV, XEC or DigiByte SHA-256d, use a
+These endpoints are for **BTC**. For BCH, BSV, XEC, DigiByte SHA-256d or Peercoin PoW, use a
 matching pool and account as described in [SHA-256d configuration](mining-coins.md).
 
 For visible feedback at ESP32 hashrates, start with a pool that accepts low-difficulty

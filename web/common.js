@@ -273,9 +273,10 @@ Object.assign(FR,{
 
 Object.assign(FR,{
  'This cryptocurrency requires Stratum V1':'Cette cryptomonnaie nécessite Stratum V1',
+ 'Peercoin (PPC) · PoW':'Peercoin (PPC) · preuve de travail',
  'DGB requires a SHA-256d pool':'DGB nécessite une pool SHA-256d',
  'SHA-256d coin setup guide':'Guide des cryptomonnaies SHA-256d',
- 'SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH, BSV, XEC and DGB use Stratum V1. DGB requires a SHA-256d port. Bitcoin market data is unavailable for other coins.':'SHA-256d uniquement. Choisis des pools principale et de secours pour la même monnaie, avec son adresse ou son compte de pool. La pool détermine la chaîne minée. BCH, BSV, XEC et DGB utilisent Stratum V1. DGB nécessite un port SHA-256d. Les données du marché Bitcoin sont indisponibles pour les autres monnaies.'
+ 'SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH, BSV, XEC, DGB and PPC use Stratum V1. Peercoin uses proof of work only. DGB requires a SHA-256d port. Bitcoin market data is unavailable for other coins.':'SHA-256d uniquement. Choisis des pools principale et de secours pour la même monnaie, avec son adresse ou son compte de pool. La pool détermine la chaîne minée. BCH, BSV, XEC, DGB et PPC utilisent Stratum V1. Peercoin utilise uniquement la preuve de travail. DGB nécessite un port SHA-256d. Les données du marché Bitcoin sont indisponibles pour les autres monnaies.'
 });
 
 Object.assign(FR,{'Public market and explorer data are not provided for this coin. Pool job data is shown.':'Les données publiques du marché et de l’explorateur ne sont pas fournies pour cette monnaie. Les données des jobs de la pool sont affichées.'});

@@ -60,14 +60,20 @@ std::string toHex(const uint8_t *data, size_t len) {
     return s;
 }
 
-uint32_t Job::blockHeight() const {
+uint32_t Job::blockHeight(unsigned selectedCoin) const {
     // coinbase tx: version(4) | vin count(1) | prevout(36) | script len(1) | script...
     // BIP34: script starts with a push of the height (little-endian).
     if (coinb1.size() < 43) return 0;
-    uint8_t n = coinb1[42];
-    if (n < 1 || n > 4 || coinb1.size() < 43u + n) return 0;
+    // Peercoin transaction versions 1/2 serialize nTime after nVersion;
+    // version 3 removes it. Hashing keeps the pool's coinbase bytes intact.
+    uint32_t txVersion = uint32_t(coinb1[0]) | uint32_t(coinb1[1]) << 8 |
+                         uint32_t(coinb1[2]) << 16 | uint32_t(coinb1[3]) << 24;
+    size_t offset = selectedCoin == coin::PPC && int32_t(txVersion) < 3 ? 46 : 42;
+    if (coinb1.size() <= offset) return 0;
+    uint8_t n = coinb1[offset];
+    if (n < 1 || n > 4 || coinb1.size() < offset + 1 + n) return 0;
     uint32_t h = 0;
-    for (int i = 0; i < n; i++) h |= (uint32_t)coinb1[43 + i] << (8 * i);
+    for (int i = 0; i < n; i++) h |= (uint32_t)coinb1[offset + 1 + i] << (8 * i);
     return h;
 }
 
