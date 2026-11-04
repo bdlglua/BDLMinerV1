@@ -157,7 +157,9 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   powered off and started again (about 9 s of *Initializing BM1370* and PLL ramp at
   each reconnection). The dashboard shows *Waiting for pool* meanwhile; a pool that
   stays away longer powers it off. Safety pauses (power 0, heat, faults, OTA, the
-  supervision lease) still stop it at once.
+  supervision lease) still stop it at once. Since 2.3.2 the main loop renews that
+  lease on every pass and it lasts 10 s (3 s before): the 2-2.5 s that a TLS
+  handshake can hold the loop no longer expires it, which also restarted the ASIC.
 * Startup waits 500 ms for core power stabilization, then ramps the PLL in
   6.25 MHz steps spaced by 100 ms, following ESP-Miner. Fan, voltage/current and
   regulator temperature are sampled throughout startup after the power-good grace

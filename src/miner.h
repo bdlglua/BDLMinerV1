@@ -172,6 +172,8 @@ bool minerStatsRestore(const StatsSnapshot &s);
 enum class Throttle : uint8_t { Full, Half, Paused, Reduced };
 // Refresh the safety lease after sampling temperature, at least once a second.
 void minerSetPower(uint8_t percent, bool batterySaver = false);
+// Called on every main-loop pass: the loop is alive, the last power stands.
+void minerRenewSafety();
 uint8_t minerPowerPercent();
 Throttle minerThrottle();
 
