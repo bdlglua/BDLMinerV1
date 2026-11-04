@@ -136,6 +136,12 @@ int main() {
     assert(saved.magic == kMultiCoinCandidateMagic && saved.coin == id);
     reboot(); assert(minerLastBlockCandidate(last) && last.previousSession && last.coin == id);
     }
+    // The software engine and dashboard use the same Peercoin height offset.
+    activeMiningCoin = coin::PPC;
+    job.coinb1.assign(51,0);job.coinb1[0]=2;job.coinb1[46]=3;
+    job.coinb1[47]=0xc8;job.coinb1[48]=0xb8;job.coinb1[49]=0x0d;
+    minerPublishJob(job,true);assert(fetchWork(miner,seq));
+    assert(miner.work.height==899272 && stats.blockHeight==899272);
     delete shareQueue;
     puts("Candidate persistence: compatible stats layout, alternating CRC slots, failure/retry, reboot state, no replay and corrupt-slot fallback passed");
     puts("Block candidates: genesis proof/hash, full share queue, priority, deduplication, original height, immediate snapshot, delayed ACK/rejection, disconnect/ID reuse, stale work and explicit overflow passed");

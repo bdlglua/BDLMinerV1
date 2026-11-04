@@ -51,6 +51,15 @@ bool parseBase58(const std::string &s, Info &info, unsigned selectedCoin = coin:
             default: return false;
         }
     }
+    if (selectedCoin == coin::PPC) {
+        switch (num[0]) {
+            case 55: info = Info(Type::P2PKH, Network::Main); return true;
+            case 117: info = Info(Type::P2SH, Network::Main); return true;
+            case 111: info = Info(Type::P2PKH, Network::Test); return true;
+            case 196: info = Info(Type::P2SH, Network::Test); return true;
+            default: return false;
+        }
+    }
     switch (num[0]) {
         case 0x00: info = Info(Type::P2PKH, Network::Main); return true;
         case 0x05: info = Info(Type::P2SH, Network::Main); return true;
@@ -89,9 +98,10 @@ bool parseSegwit(const std::string &addr, Info &info, unsigned selectedCoin = co
     if (sep == std::string::npos || sep == 0 || sep + 8 > s.size()) return false;
     std::string hrp = s.substr(0, sep);
     const bool dgb = selectedCoin == coin::DGB;
-    Network net = hrp == (dgb ? "dgb" : "bc") ? Network::Main :
-                  hrp == (dgb ? "dgbt" : "tb") ? Network::Test :
-                  hrp == (dgb ? "dgbrt" : "bcrt") ? Network::Regtest : Network::Unknown;
+    const bool ppc = selectedCoin == coin::PPC;
+    Network net = hrp == (dgb ? "dgb" : ppc ? "pc" : "bc") ? Network::Main :
+                  (hrp == (dgb ? "dgbt" : ppc ? "tpc" : "tb") || (ppc && hrp == "tb")) ? Network::Test :
+                  hrp == (dgb ? "dgbrt" : ppc ? "pcrt" : "bcrt") ? Network::Regtest : Network::Unknown;
     if (net == Network::Unknown) return false;
 
     std::vector<uint8_t> data;
@@ -201,7 +211,7 @@ Info parse(const std::string &user, unsigned selectedCoin) {
     Info info;
     if (!coin::valid(selectedCoin)) return info;
     if (coin::cashPrefix(selectedCoin) && parseCashAddr(addr, info, selectedCoin)) return info;
-    bool segwit = selectedCoin == coin::BTC || selectedCoin == coin::DGB;
+    bool segwit = selectedCoin == coin::BTC || selectedCoin == coin::DGB || selectedCoin == coin::PPC;
     if (!(segwit && parseSegwit(addr, info, selectedCoin)) && !parseBase58(addr, info, selectedCoin)) info = Info();
     return info;
 }

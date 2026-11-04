@@ -111,10 +111,10 @@ async function main(){
    await page.goto(base+'/#demo');await page.waitForURL(base+'/demo.html');await page.frameLocator('#demo-frame').locator('#m .hero').waitFor();
    assert.ok(page.frames().some(frame=>frame.url().startsWith(base+'/demo/miner/')));
   }
-  communityStats.coins=[{name:'BSV',miners:1,hashrate:1e6},{name:'XEC',miners:1,hashrate:1e6},{name:'DGB',miners:1,hashrate:5e5}];
+  communityStats.coins=[{name:'BSV',miners:1,hashrate:1e6},{name:'XEC',miners:1,hashrate:1e6},{name:'DGB',miners:1,hashrate:5e5},{name:'PPC',miners:1,hashrate:1e6}];
   await page.goto(url+'/stats.html');await page.locator('#st-coins tbody tr').first().waitFor();
-  assert.equal(await page.locator('#st-coins tbody tr').count(),3);
-  assert.match(await page.locator('#st-coins').textContent(),/BSV.*XEC.*DGB/s);
+  assert.equal(await page.locator('#st-coins tbody tr').count(),4);
+  assert.match(await page.locator('#st-coins').textContent(),/BSV.*XEC.*DGB.*PPC/s);
   delete communityStats.pools;await page.goto(url+'/stats.html');
   await page.locator('#st-pools tbody tr').first().waitFor();
   assert.equal(await page.locator('#st-pools tbody tr').count(),1);

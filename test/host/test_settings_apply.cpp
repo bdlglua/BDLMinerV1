@@ -61,7 +61,7 @@ int main() {
     }
 
     assert(settings.miningCoin == coin::BTC);
-    for(unsigned id:{unsigned(coin::BSV),unsigned(coin::XEC),unsigned(coin::DGB)}) {
+    for(unsigned id:{unsigned(coin::BSV),unsigned(coin::XEC),unsigned(coin::DGB),unsigned(coin::PPC)}) {
         JsonDocument request;request["coin"]=id;request["pool"]="custom.coin.example";request["addr"]="account.worker";request["proto"]=0;
         assert(!settingsError(request.as<JsonObjectConst>()));Settings staged=settings;settingsApply(staged,request.as<JsonObjectConst>());
         assert(staged.miningCoin==id && !settingsCompare(staged,settings).live);
@@ -87,7 +87,7 @@ int main() {
         settingsApply(staged, change.as<JsonObjectConst>());
         assert(staged.miningCoin == coin::BCH && !settingsCompare(staged, settings).live);
         settingsCopyLive(settings, staged); assert(settings.miningCoin == coin::BTC);
-        for (const char *raw : {R"({"coin":5})", R"({"coin":"BCH"})", R"({"coin":1})",
+        for (const char *raw : {R"({"coin":6})", R"({"coin":"BCH"})", R"({"coin":1})",
             R"({"coin":1,"pool":"public-pool.io"})",
             R"({"coin":1,"pool":"bch.example.org","proto":1})",
             R"({"coin":1,"pool":"stratum2+tcp://bch.example.org:3333/key"})",

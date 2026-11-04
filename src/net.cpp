@@ -128,8 +128,8 @@ void session(WiFiClient &client, stratum::Protocol &proto, uint32_t maxMs, strat
                         // updates come every ~30 s; the [stats] line counts the shares).
                         // (a clean job also follows a difficulty change, at the same height)
                         static uint32_t loggedHeight = 0;
-                        if (proto.job().clean && proto.job().blockHeight() != loggedHeight) {
-                            loggedHeight = proto.job().blockHeight();
+                        if (proto.job().clean && proto.job().blockHeight(settings.miningCoin) != loggedHeight) {
+                            loggedHeight = proto.job().blockHeight(settings.miningCoin);
                             logf("[pool] new block %u, job %s diff=%g\n", loggedHeight, proto.job().id.c_str(),
                                  proto.job().difficulty);
                         }

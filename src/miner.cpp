@@ -254,7 +254,7 @@ bool fetchWork(Miner &m, uint32_t &seq) {
         seq = boardSeq;
         work::build(board, extranonce2Counter++, m.work);
         m.work.generation = workGeneration;
-        m.work.height = board.blockHeight();
+        m.work.height = board.blockHeight(activeMiningCoin);
         if (m.useFill) {
             work::build(board, extranonce2Counter++, m.work2);
             m.work2.generation = workGeneration;
@@ -449,7 +449,7 @@ void minerPublishJob(const work::Job &job, bool clean) {
     lastJobTime = job.ntime;
     double networkDiff = work::difficultyFromBits(job.nbits);
     portENTER_CRITICAL(&statsMux);
-    stats.blockHeight = job.blockHeight();
+    stats.blockHeight = job.blockHeight(activeMiningCoin);
     if (stats.blockHeight && stats.blockHeight != blockBests[blockHead].height) {
         blockHead = (blockHead + 1) % BLOCK_BESTS;
         blockBests[blockHead] = {stats.blockHeight, 0};
@@ -1230,7 +1230,7 @@ bool minerAsicWork(AsicWork &out) {
     bool valid = boardValid;
     if (valid) {
         work::build(board, extranonce2Counter++, out);
-        out.generation = workGeneration; out.height = board.blockHeight();
+        out.generation = workGeneration; out.height = board.blockHeight(activeMiningCoin);
         // The ASIC ORs its rolling bits into the job version. Clear only negotiated bits.
         uint32_t version = board.version & ~out.versionMask;
         memcpy(out.header, &version, 4);
