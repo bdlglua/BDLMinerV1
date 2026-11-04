@@ -586,6 +586,10 @@ static void testStratumJob() {
     CHECK(p.lastError() == "Low difficulty share");
     CHECK(p.handleLine(R"({"id":11,"result":false,"error":null})") == stratum::Event::None);
     CHECK(p.pendingShares() == 0);
+    // A later bare `false` must not inherit the earlier low-difficulty reason.
+    p.submit(s);
+    CHECK(p.handleLine(R"({"id":12,"result":false,"error":null})") == stratum::Event::ShareRejected);
+    CHECK(p.acknowledgment().reason == stratum::RejectReason::Unknown && p.lastError() == "share rejected");
     for (size_t i = 0; i < stratum::Protocol::kMaxPendingShares; ++i) CHECK(!p.submit(s).empty());
     CHECK(!p.canSubmit() && p.submit(s).empty());
     CHECK(p.handleLine(R"({"id":13,"result":{},"error":null})") == stratum::Event::Error);
@@ -746,10 +750,12 @@ static void testMoreCoinAddresses() {
     assert(coin::halvingInterval(coin::DGB)==0);
     for(unsigned id=0;id<coin::Count;++id) {
         assert(coin::fromTicker(coin::ticker(id))==id);
-        assert(coin::jobCompatible(id,0x20000000,0x1fffe000));
+        uint32_t version=id==coin::DGB?0x20000200:0x20000000; // DigiByte BLOCK_VERSION_SHA256D = 2 << 8
+        assert(coin::jobCompatible(id,version,0x1fffe000));
     }
-    for(uint32_t algo=1;algo<16;++algo)assert(!coin::jobCompatible(coin::DGB,0x20000000|(algo<<8),0));
-    assert(!coin::jobCompatible(coin::DGB,0x20000000,0x100));
+    // Zero is DigiByte Scrypt; every algorithm except SHA-256d (2) is refused.
+    for(uint32_t algo=0;algo<16;++algo)assert(coin::jobCompatible(coin::DGB,0x20000000|(algo<<8),0)==(algo==2));
+    assert(!coin::jobCompatible(coin::DGB,0x20000200,0x100));
     puts("BSV/XEC/DGB: official address vectors, network isolation, checksums and SHA-256d algorithm/rolling guards passed");
 }
 

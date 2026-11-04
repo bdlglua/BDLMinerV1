@@ -31,9 +31,10 @@ inline const char *cashPrefix(unsigned id, unsigned network = 0) {
     return network < 3 ? (id == BCH ? bch[network] : id == XEC ? xec[network] : nullptr) : nullptr;
 }
 inline bool jobCompatible(unsigned id, uint32_t version, uint32_t rollingMask) {
-    // DigiByte Core BLOCK_VERSION_ALGO = 15 << 8; SHA-256d is zero.
-    // Algorithm bits must also be excluded from version rolling.
-    return valid(id) && (id != DGB || !((version | rollingMask) & 0x00000f00u));
+    // DigiByte Core: BLOCK_VERSION_ALGO = 15 << 8, BLOCK_VERSION_SHA256D =
+    // 2 << 8 (zero is Scrypt). Algorithm bits must also be excluded from
+    // version rolling.
+    return valid(id) && (id != DGB || ((version & 0x00000f00u) == 0x00000200u && !(rollingMask & 0x00000f00u)));
 }
 inline bool addressCompatible(unsigned id, std::string user) {
     user = user.substr(0, user.find('.'));
