@@ -72,6 +72,7 @@ g++ -std=c++17 -O2 -Wall -Itest/host/stubs/miner -Isrc -I"$JSON" test/host/test_
 python3 test/host/test_settings_persistence.py
 python3 test/host/test_web_upload.py
 python3 test/host/test_web_delivery.py
+python3 test/host/test_log_access.py
 python3 test/host/test_ghupdate.py
 python3 test/host/test_update_redirects.py
 
