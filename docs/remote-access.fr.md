@@ -1,6 +1,6 @@
 # Consulter ses mineurs à distance
 
-Ouvre **[Mes mineurs](https://bdlminer-stats.bdlminer-bot.workers.dev/remote)** depuis
+Ouvre **[Mes mineurs](https://bdlglua.github.io/remote/)** depuis
 ton téléphone, même hors du Wi-Fi de la maison. Les cartes envoient directement
 leurs mesures en HTTPS vérifié. Aucun PC ou Raspberry Pi à laisser allumé,
 aucun port de la box à ouvrir. Chaque carte doit utiliser **BDLMiner 2.3.0 ou

@@ -73,7 +73,7 @@ Solo mining is educational: a payout requires finding a valid block.
 ## Documentation
 
 - [User guide](docs/guide.md) · [V2 hub and setup](docs/v2/README.md)
-- [My miners remotely](https://bdlminer-stats.bdlminer-bot.workers.dev/remote) · [Private setup](docs/remote-access.md) / [Français](docs/remote-access.fr.md)
+- [My miners remotely](https://bdlglua.github.io/remote/) · [Private setup](docs/remote-access.md) / [Français](docs/remote-access.fr.md)
 - [Troubleshooting FAQ](https://bdlglua.github.io/faq.html) · [Shares explained](docs/guide.md#pool-shares-and-local-records)
 - [2.3.0 changes](docs/releases/v2.3.0.md) / [Français](docs/releases/v2.3.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
 - [Build from source](docs/development.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)

@@ -3,7 +3,7 @@
 [Français](remote-access.fr.md)
 
 View your miners from a phone or another network at the
-**[private remote dashboard](https://bdlminer-stats.bdlminer-bot.workers.dev/remote)**.
+**[private remote dashboard](https://bdlglua.github.io/remote/)**.
 The boards send readings directly over verified HTTPS: no computer, Raspberry Pi,
 VPN, port forwarding or local hub needs to stay running. The miners need Wi-Fi
 with Internet access and **BDLMiner 2.3.0 or newer**.
@@ -84,7 +84,8 @@ The same key can be used as `Authorization: Bearer <personal-key>` on:
   `hours` accepts `1`, `6`, `24` or `168`.
 - `DELETE /api/remote`: erase your space and permanently revoke its key.
 
-These endpoints are on the statistics service, require the key even when public
-statistics are open, use `Cache-Control: no-store`, and do not allow cross-origin
-browser reads. `POST /api/remote/report` is used only by paired miners and is
+These endpoints are on `https://bdlminer-stats.bdlminer-bot.workers.dev`,
+require the key even when public statistics are open, and use `Cache-Control:
+no-store`. Browser reads are allowed only from the GitHub Pages viewer origin
+(and the legacy service origin); no credentials are sent automatically. `POST /api/remote/report` is used only by paired miners and is
 strictly separated from the anonymous `/report` endpoint.
