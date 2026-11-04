@@ -7,7 +7,7 @@ with a local dashboard and a Linux/Raspberry Pi fleet hub.
 [Website](https://bdlglua.github.io/) ·
 [Interactive demos](https://bdlglua.github.io/demo.html) ·
 [Statistics](https://bdlglua.github.io/stats.html) ·
-**[Stable v2.3.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.3.1)**
+**[Stable v2.3.2](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.3.2)**
 
 Mine **BTC, BCH, BSV, eCash (XEC) or DigiByte SHA-256d (DGB)** with a matching
 pool and payout address/account. BTC supports Stratum V1 and native V2; the other
