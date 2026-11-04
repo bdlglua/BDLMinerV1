@@ -13,6 +13,7 @@
 #include "core/sv2_noise.h"
 #include "core/pool_identity.h"
 #include "core/display_config.h"
+#include "core/remote_data.h"
 
 struct SettingLimits { long minimum, maximum; };
 // Old complete backups predate coin selection and describe a BTC configuration.
@@ -60,6 +61,10 @@ inline const char *settingsError(JsonObjectConst values) {
             case SettingType::Secret:
                 if (!v.is<const char *>()) return "Invalid text setting";
                 if (!strcmp(s.key, "ua") && strlen(v.as<const char *>()) > 64) return "User agent must be at most 64 characters";
+                if (!strcmp(s.key, "remotekey") && *v.as<const char *>() && !remote_data::validKey(v.as<const char *>()))
+                    return "The remote access key must contain 64 lowercase hexadecimal characters";
+                if (!strcmp(s.key, "rname") && strlen(v.as<const char *>()) > 48)
+                    return "The remote miner name must be at most 48 bytes";
                 if (!strcmp(s.key, "hook")) {
                     const char *url = v.as<const char *>();
                     while (*url && std::isspace((unsigned char)*url)) ++url;
@@ -97,6 +102,9 @@ inline const char *settingsError(JsonObjectConst values) {
                 break;
         }
     }
+    if ((values["remote"] | settings.remoteEnabled) &&
+        !remote_data::validKey(values["remotekey"] | settings.remoteKey.c_str()))
+        return "Add a personal access key before enabling remote monitoring";
     unsigned selectedCoin = values["coin"] | unsigned(settings.miningCoin);
     const char *user = values["addr"] | settings.btcAddress.c_str();
     if (!coin::addressCompatible(selectedCoin, stratum::trimIdentity(user))) return "Use an address for the selected cryptocurrency";
@@ -151,7 +159,7 @@ inline bool settingIsLive(const char *key) {
     static const char *const kLive[] = {"bright", "rot",      "autorot",  "lang",     "theme",  "cycle",
                                         "nightfrom", "nightto", "beep",   "notify32", "alertpct", "alertmin", "summary",
                                         "maxtemp", "power",    "rebooth",  "saver",    "update", "count", "sharehr", "sharepool",
-                                        "fanauto", "fanpct", "customscreen", "screen0", "screen1", "screen2", "screen3", "pages", "channel"};
+                                        "fanauto", "fanpct", "customscreen", "screen0", "screen1", "screen2", "screen3", "pages", "channel", "remote"};
     for (const char *k : kLive)
         if (!strcmp(k, key)) return true;
     return false;

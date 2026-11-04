@@ -34,6 +34,7 @@ python3 test/host/test_net_session.py
 python3 test/host/test_market_pool.py
 python3 test/host/test_tls.py
 python3 test/host/test_share.py
+python3 test/host/test_remote.py
 python3 test/host/test_mqtt.py
 python3 test/host/test_open_dashboard.py
 python3 test/host/test_restart_ownership.py

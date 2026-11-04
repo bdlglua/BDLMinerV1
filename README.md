@@ -7,7 +7,7 @@ with a local dashboard and a Linux/Raspberry Pi fleet hub.
 [Website](https://bdlglua.github.io/) ·
 [Interactive demos](https://bdlglua.github.io/demo.html) ·
 [Statistics](https://bdlglua.github.io/stats.html) ·
-**[Stable v2.2.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.2.0)**
+**[Stable v2.3.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.3.0)**
 
 Mine **BTC, BCH, BSV, eCash (XEC) or DigiByte SHA-256d (DGB)** with a matching
 pool and payout address/account. BTC supports Stratum V1 and native V2; the other
@@ -34,6 +34,7 @@ profiles require V1. [Coin and pool setup](docs/mining-coins.md).
 - Eight physical screens, English/French, themes, rotation and night mode.
 - Signed stable/beta updates with trial boot and automatic rollback.
 - Notifications, Home Assistant/MQTT, JSON API and Prometheus metrics.
+- Optional private remote monitoring, with seven-day history and no local hub.
 
 ## Install and update
 
@@ -72,8 +73,9 @@ Solo mining is educational: a payout requires finding a valid block.
 ## Documentation
 
 - [User guide](docs/guide.md) · [V2 hub and setup](docs/v2/README.md)
+- [My miners remotely](https://bdlminer-stats.bdlminer-bot.workers.dev/remote) · [Private setup](docs/remote-access.md) / [Français](docs/remote-access.fr.md)
 - [Troubleshooting FAQ](https://bdlglua.github.io/faq.html) · [Shares explained](docs/guide.md#pool-shares-and-local-records)
-- [2.2.0 changes](docs/releases/v2.2.0.md) / [Français](docs/releases/v2.2.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
+- [2.3.0 changes](docs/releases/v2.3.0.md) / [Français](docs/releases/v2.3.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
 - [Build from source](docs/development.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ### Pools for ESP32

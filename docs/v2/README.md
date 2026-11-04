@@ -140,6 +140,12 @@ minutes, with 1.072458 TH/s across the available counter window and 46 additiona
 accepted shares / no rejection. The failure does not locate the cause of the
 interrupted read.
 
+## View your miners away from home
+
+From 2.3.0, [private remote monitoring](../remote-access.md) lets each board send
+readings directly to your own key-protected cloud space. No local computer or hub
+is needed. Monitoring is opt-in; the optional local fleet hub below remains available.
+
 ## Fleet dashboard on Linux / Raspberry Pi
 
 Python 3.10 or newer is sufficient; no pip dependencies or cloud account are

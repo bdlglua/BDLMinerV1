@@ -52,6 +52,7 @@ function settingsIcon(name){
 }
 document.querySelectorAll('[data-icon]').forEach(node=>node.replaceWith(settingsIcon(node.dataset.icon)));
 const SECTIONS={pool:'Main pool',ua:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
+SECTIONS.remote='Private remote monitoring';
 const FIELDS={
  coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH, BSV, XEC and DGB use Stratum V1. DGB requires a SHA-256d port. Bitcoin market data is unavailable for other coins.'],
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
@@ -87,6 +88,7 @@ const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Str
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
 const THEMES=['#f7931a','#38d07a','#3b9cf6','#a66bf5','#ec5aa0'];
+Object.assign(FIELDS,{remote:['Enable private remote monitoring','Optional. Sends your private readings every five minutes, independently of anonymous statistics. No computer needs to stay on.'],remotekey:['Personal access key','Create a key on the remote dashboard, keep a copy, then paste the same key on your miners. Never share it publicly.'],rname:['Miner name','A name shown only in your private dashboard. Empty uses the board model. Up to 48 bytes.']});
 CHOICES.coin=[[0,'Bitcoin (BTC)'],[1,'Bitcoin Cash (BCH)'],[2,'Bitcoin SV (BSV)'],[3,'eCash (XEC)'],[4,'DigiByte · SHA-256d (DGB)']];
 Object.assign(FIELDS,{channel:['Update channel','Beta versions receive the same signature checks and rollback protection.'],
  customscreen:['Custom mining screen','Choose the four metrics and their order on the mining screen.'],
@@ -128,6 +130,8 @@ function render(data){
    i.type=type=='secret'?'password':type=='text'?'text':'number';i.value=value??'';
    if(type=='number'||type=='decimal'){i.required=true;i.step=type=='decimal'?'any':'1';i.min=limits?.min??0;if(limits?.max!=null)i.max=limits.max;i.inputMode=type=='decimal'?'decimal':'numeric'}
    if(k==='pool'||k==='addr')i.required=true;
+  if(k==='rname')i.maxLength=48;
+  if(k==='remotekey'){i.maxLength=64;i.autocomplete='off'}
    if(type=='text'||type=='secret'){i.spellcheck=false;i.autocapitalize='off'}
   }
   i.addEventListener('input',()=>{i.setCustomValidity('');dirtyState();if(options)sync()});
@@ -158,6 +162,7 @@ function render(data){
   if(k==='fanauto')row.appendChild(help(t('Default: manual 100%. Startup, stopped ASIC, missing temperature or heat safety force full cooling.')));
   if(k==='fanpct')row.appendChild(help(t('Minimum 30%. Safety forces 100% at ASIC 60 °C or regulator 80 °C until both cool by 5 °C. A lower thermal limit raises cooling earlier. Fan-stop protection remains active.')));
   if(k==='power'){const h=document.createElement('div');h.className='field-help';h.textContent=t('At 100%, mining runs at full available speed. Temperature protection can still reduce it.');const presets=document.createElement('div');presets.className='presets';for(const [name,v]of [['Full performance',100],['Balanced',75],['Quiet',50]]){const button=document.createElement('button');button.type='button';button.className='secondary';button.id='preset-'+v;button.textContent=t(name)+' · '+v+' %';button.onclick=()=>{i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}))};presets.appendChild(button)}h.appendChild(presets);row.appendChild(h)}
+  if(k==='remote'){const link=document.createElement('a');link.href='https://bdlminer-stats.bdlminer-bot.workers.dev/remote';link.target='_blank';link.rel='noopener noreferrer';link.textContent=t('Open my remote dashboard');row.appendChild(link)}
   if(k==='maxtemp'){const h=help('');const update=()=>{const limit=Number(i.value),stepped=data.capabilities?.thermal_steps!==false;h.textContent=limit>=30?(stepped?t('Throttling starts at')+' '+(limit-10)+' °C. ':'')+t('Mining pauses at')+' '+limit+' °C.'+(stepped?'':' '+t('ASIC mining stays paused for at least 2 minutes, then resumes once cooled by 5 °C.')):limit===0?t(data.capabilities?.fan_control?'User temperature limit is disabled; hardware protection and cooling safety remain active.':'Thermal protection is disabled.'):''};i.addEventListener('input',update);update();row.appendChild(h)}
   if(k==='hook'){const h=help(t('Discord: channel settings › Integrations › Webhooks › Copy URL. Telegram: https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>. Save and restart first, then:'));const test=document.createElement('button');test.type='button';test.className='secondary';test.id='notify-test';test.textContent=t('Send a test notification');test.onclick=testNotification;const out=document.createElement('span');out.id='notify-result';out.textContent=notificationMessage;out.setAttribute('role','status');out.setAttribute('aria-live','polite');const line=document.createElement('div');line.className='presets';line.append(test,out);h.appendChild(line);row.appendChild(h)}
   section.appendChild(row);
