@@ -42,6 +42,11 @@ struct Slot {
 Slot slots[bm1397::kSlots];
 uint8_t nextSlot = 0;
 uint32_t lastResult = 0, windowGood = 0, windowBad = 0;
+// The stock firmware cuts the ASIC at 80 C. This board has no fan control and
+// its user limit can be off (0) or set higher: a hard stop of its own, with
+// 10 C of hysteresis, whatever the settings and the thermal policy.
+constexpr float kHardMaxC = 80, kHardResumeC = 70;
+bool overheated = false;
 
 void publish() { portENTER_CRITICAL(&mux); snapshot = live; portEXIT_CRITICAL(&mux); }
 bool send(const bm1397::Packet &p) { return p.size && uart.write(p.bytes.data(), p.size) == p.size; }
@@ -147,6 +152,14 @@ void result(const bm1397::Response &r, uint32_t now) {
     publish(); // make the first verified result visible without waiting for a 50-result window
 }
 
+// The NTC reading, sampled every second by the main loop (temperature()).
+bool tooHot() {
+    portENTER_CRITICAL(&mux); float t = snapshot.temperature; portEXIT_CRITICAL(&mux);
+    if (std::isfinite(t) && t >= kHardMaxC) overheated = true;
+    else if (overheated && std::isfinite(t) && t <= kHardResumeC) overheated = false;
+    return overheated;
+}
+
 void worker(void *) {
     uint32_t sent = 0;
     AsicWork next;
@@ -155,6 +168,13 @@ void worker(void *) {
         if (!minerPowerPercent()) {
             if (powered) off("Paused");
             delay(10); continue;
+        }
+        if (tooHot()) {
+            if (powered) {
+                logf("[nerdnos] ASIC at %.1f C: stopped until %.0f C\n", status().temperature, kHardResumeC);
+                off("ASIC overtemperature: cooling");
+            }
+            delay(100); continue;
         }
         if (!powered || now - sent >= kJobMs) {
             if (!minerAsicWork(next)) {

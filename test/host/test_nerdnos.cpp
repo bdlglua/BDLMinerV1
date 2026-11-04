@@ -107,6 +107,16 @@ int main() {
     result(old, testMillis); assert(windowBad == 1);
     forcedDifficulty = 0;
 
+    // Hard stop at 80 C, whatever the user limit (it can be 0 = off), until 70 C.
+    reset(); assert(initAsic(bm1397::kVersionMask) && powered);
+    auto ntc = [](float c) { portENTER_CRITICAL(&mux); snapshot.temperature = c; portEXIT_CRITICAL(&mux); };
+    ntc(79.9f); assert(!tooHot());
+    ntc(80.0f); assert(tooHot());
+    ntc(NAN); assert(tooHot());       // a lost reading never ends the cooling
+    ntc(75.0f); assert(tooHot());
+    ntc(70.0f); assert(!tooHot());
+    ntc(25.0f); overheated = false;
+
     // NTC: half the supply is 10 kOhm, 25 C; the rails are a broken sensor.
     testMilliVolts = 1650; assert(std::fabs(temperature() - 25.0f) < 0.05f && std::fabs(status().temperature - 25.0f) < 0.05f);
     testMilliVolts = 0; assert(std::isnan(temperature()));

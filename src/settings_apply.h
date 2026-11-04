@@ -44,6 +44,9 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
 #ifdef BOARD_GAMMA601
     if (!strcmp(s.key, "asicmhz")) { limits.minimum=bm1370::kStockMHz; limits.maximum=bm1370::kMaxMHz; }
     if (!strcmp(s.key, "fanpct")) { limits.minimum = 30; limits.maximum = 100; }
+    // The ASIC diode's hard stop at 70 C latches until a restart: the user
+    // limit must pause (and cool) before it, never above it.
+    if (!strcmp(s.key, "maxtemp")) limits.maximum = bm1370::kMaxUserTempC;
 #endif
     return limits;
 }

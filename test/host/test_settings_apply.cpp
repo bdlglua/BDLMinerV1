@@ -235,6 +235,11 @@ int main() {
         Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);
         assert(staged.asicFrequency==mhz&&settings.asicFrequency==525); // stock default
     }
+    // The user limit pauses before the latching 70 C diode stop; 0 (off) stays allowed.
+    for(const char *raw:{R"({"maxtemp":69})",R"({"maxtemp":70})",R"({"maxtemp":75})"}) {
+        assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
+    }
+    for(int limit:{0,30,65,68}) {changes.clear();changes["maxtemp"]=limit;assert(!settingsError(changes.as<JsonObjectConst>()));}
 #endif
     puts("V1/V2 and explicit user agent settings: validation, staged isolation and preserved manual identity passed");
 }
