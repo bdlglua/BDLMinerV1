@@ -307,10 +307,11 @@ void summary(uint32_t now, const MinerStats &stats) {
         p.end();
     }
     uint32_t ms = now - fromMs;
+    // Every counter below restarts here, sent or not: so does the period's best.
+    double best = minerTakePeriodBest();
     if (ms >= 30 * 60 * 1000) {  // nothing worth a message just after a start
         PoolUptime pool = minerPoolUptime();
         double rate = (minerTotalHashes() - hashes0) * 1000.0 / ms;
-        double best = minerTakePeriodBest();
         uint32_t blocks = stats.blocksFound - blocks0;
         char msg[192], since[32];
         if (ms >= 23 * 3600000UL) snprintf(since, sizeof(since), "24 h");
