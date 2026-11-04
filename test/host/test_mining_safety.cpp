@@ -56,14 +56,20 @@ int main() {
 
     mining::SafetyLease lease;
     assert(lease.power(1000) == 0);  // no first sample yet
+    lease.renew(500); assert(lease.power(500) == 0);  // renewing never grants a first permission
     lease.update(1000, 75);
-    assert(lease.power(4000) == 75);
-    assert(lease.power(4001) == 0);  // HTTP/main loop stopped, miners still run
-    lease.update(5000, 0);
-    assert(lease.power(5000) == 0);
+    assert(lease.power(1000 + mining::kSafetyTimeoutMs) == 75);
+    assert(lease.power(1001 + mining::kSafetyTimeoutMs) == 0);  // HTTP/main loop stopped, miners still run
+    // A 2.5 s stall right before the 1 s policy tick (TLS handshake, seen on a
+    // Gamma) keeps the permission: the loop renews it on every pass.
+    lease.update(20000, 80); lease.renew(20980); assert(lease.power(20980 + 2500) == 80);
+    lease.renew(30000); assert(lease.power(30000 + mining::kSafetyTimeoutMs) == 80);
+    lease.update(40000, 0);
+    assert(lease.power(40000) == 0);
+    lease.renew(40500); assert(lease.power(40500) == 0);  // renewing keeps a pause a pause
     lease.update(UINT32_MAX - 1000, 100);
     assert(lease.power(500) == 100);
-    assert(lease.power(2500) == 0); // timeout still works across millis wrap
+    assert(lease.power(mining::kSafetyTimeoutMs - 500) == 0); // timeout still works across millis wrap
     assert(mining::restMs(100, 75) == 34);
     assert(mining::restMs(100, 50) == 100);
     assert(mining::restMs(100, 25) == 300);

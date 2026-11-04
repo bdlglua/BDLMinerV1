@@ -8,7 +8,12 @@
 
 namespace mining {
 
-constexpr uint32_t kSafetyTimeoutMs = 3000;
+// Mining stops when the main loop (thermal policy, screen, buttons) has not
+// renewed its permission for this long. A TLS handshake can hold the loop
+// for 2-2.5 s: with 3 s, that expired the lease, and a Bitaxe Gamma powered
+// its ASIC off and repeated its 9 s start. Every board's own hard limits
+// (the ASIC drivers check theirs every 250 ms) do not depend on it.
+constexpr uint32_t kSafetyTimeoutMs = 10000;
 constexpr uint32_t kFixedFilter = 0xFFFF;
 inline bool fixedFilterSupports(uint32_t limit) { return limit <= kFixedFilter; }
 
@@ -76,6 +81,11 @@ public:
         requested.store(power > 100 ? 100 : power, std::memory_order_relaxed);
         sampledAt.store(now, std::memory_order_relaxed);
         ready.store(true, std::memory_order_release);
+    }
+    // The loop is alive: keep the last decided power. Renewed on every pass,
+    // so the timeout measures a stall, not a stall plus the 1 s policy tick.
+    void renew(uint32_t now) {
+        if (ready.load(std::memory_order_acquire)) sampledAt.store(now, std::memory_order_relaxed);
     }
     uint8_t power(uint32_t now) const {
         if (!ready.load(std::memory_order_acquire) ||

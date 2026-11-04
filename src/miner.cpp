@@ -826,6 +826,8 @@ void minerSetPower(uint8_t percent, bool batterySaver) {
     safety.update(millis(), percent);
 }
 
+void minerRenewSafety() { safety.renew(millis()); }
+
 uint8_t minerPowerPercent() { return ota::busy() ? 0 : safety.power(millis()); }
 
 Throttle minerThrottle() {

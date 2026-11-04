@@ -112,6 +112,7 @@ void loop() {
     // Screen and web server stand still while this does not run.
     if (lastPass && now - lastPass > 1000) logf("[loop] stalled %u ms\n", (unsigned)(now - lastPass));
     lastPass = now;
+    minerRenewSafety();
 
     board::Input input = board::poll();
     if (input != board::Input::None) watchWake();
