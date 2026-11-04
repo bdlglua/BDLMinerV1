@@ -67,6 +67,7 @@ struct Slot {
 Slot slots[bm1370::kSlots];
 uint8_t nextSlot = 0;
 uint32_t activeGeneration = 0, activeMask = 0, lastHashReply = 0, lastHashProgress = 0;
+uint32_t noWorkSince = 0;  // powered without pool work since then (0: has work); see step()
 
 void publish() { portENTER_CRITICAL(&mux); snapshot = live; portEXIT_CRITICAL(&mux); }
 bool read(uint8_t addr, uint8_t reg, uint8_t *out, size_t size) {
@@ -192,7 +193,7 @@ void off(const char *reason, bool fault = false) {
     bool fan = setFanDuty(63, true);
     fanPolicy.update(false, false, 100, NAN, NAN, millis()); // retain thermal hysteresis through pauses
     live.fanOverride = true; live.fanReason = "Startup or stopped ASIC";
-    powered = false; diodeReady = false; live.running = false; live.frequency = 0;
+    powered = false; diodeReady = false; live.running = false; live.frequency = 0; noWorkSince = 0;
     if (fault || !disabled || !fan) latched = true;
     live.state = !disabled || !fan ? "I2C shutdown fault; restart required" : reason;
     if (latched) saveFault(live.state);
@@ -211,7 +212,9 @@ void registerResult(const bm1370::Response &r) {
     if (r.reg==0x4c) { errorValue=r.value; lastErrorReply=now; errorSeen=true; return; }
     if (r.reg!=0x8c) return;
     uint64_t delta=counter.update(r.value,now);
-    minerAsicHashes(delta); lastHashReply=now;
+    // Hashing the last job while the pool is away is no mining: not counted.
+    if (minerAsicReady()) minerAsicHashes(delta);
+    lastHashReply=now;
     if (delta) lastHashProgress=now;
     if (errorSeen && now-lastErrorReply<=2000) {
         bool unstable=errors.update(errorValue,r.value,now);
@@ -411,39 +414,72 @@ bool configure() {
     if (tps) logf("[gamma] regulator and sensors configured\n");
     return logSetup = tps;
 }
-void worker(void *) {
-    delay(2000); // fan spin-up, ASIC held in reset and unpowered
-    uint32_t sampled = millis(), sent = 0, requested = 0, setupAt = millis();
-    AsicWork next;
-    for (;;) {
-        uint32_t now = millis();
-        if (latched) { delay(100); continue; }
-        // A regulator without its 5 V does not answer: try again until it does.
-        if (!configured) {
-            if (now - setupAt >= 5000) {
-                setupAt = now;
-                configured = configure();
-                live.state = configured ? "Ready / waiting for pool" : kNotFound; publish();
-            }
-            delay(100); continue;
+// Pool work can disappear for a few seconds (a reconnection, a failover, a
+// pool restart). Powering the ASIC off then meant its whole start again:
+// 500 ms of power settling and a 77-step PLL ramp, about 9 s of
+// "Initializing BM1370" and no hashing. Meanwhile the chip keeps running on
+// its last job, whose results are dropped by their stale generation; it is
+// only powered off once the pool stays away this long. Safety limits (power
+// 0, faults, the thermal policy and its lease) still stop it at once.
+constexpr uint32_t kNoWorkGraceMs = 60000;
+const char *miningState = "Mining (experimental)";
+uint32_t sampled = 0, sent = 0, requested = 0, setupAt = 0;
+AsicWork next;
+// Waiting for work while powered: true while the grace period lasts.
+bool keepRunningWithoutWork(uint32_t now) {
+    if (!powered) return false;
+    if (!noWorkSince) {
+        noWorkSince = now ? now : 1;
+        live.state = "Waiting for pool"; publish();
+        logf("[gamma] no pool work: ASIC kept running for up to %u s\n", (unsigned)(kNoWorkGraceMs / 1000));
+    }
+    if (now - noWorkSince < kNoWorkGraceMs) return true;
+    off("Paused / waiting for pool");
+    return false;
+}
+void workAvailable() {
+    if (!noWorkSince) return;
+    noWorkSince = 0;
+    if (powered && live.running) { live.state = miningState; publish(); }
+}
+// One pass of the worker loop.
+void step() {
+    uint32_t now = millis();
+    if (latched) { noWorkSince = 0; delay(100); return; }
+    // A regulator without its 5 V does not answer: try again until it does.
+    if (!configured) {
+        if (now - setupAt >= 5000) {
+            setupAt = now;
+            configured = configure();
+            live.state = configured ? "Ready / waiting for pool" : kNotFound; publish();
         }
-        if (minerPowerPercent() > 0 && minerPowerPercent() < 10) {
-            if (powered) off("Gamma power limit must be 10-100% or paused");
-            live.state = "Gamma power limit must be 10-100% or paused"; publish(); delay(10); continue;
-        }
-        // Keep sampling while paused so thermal hysteresis can observe cooldown.
-        if (now - sampled >= 250) { sampled = now; if (!collect(powered)) continue; }
-        if (!minerPowerPercent() || (powered && !minerAsicReady())) {
-            if (powered) off("Paused / waiting for pool");
-            delay(10); continue;
-        }
-        if (!powered || now - sent >= 100) {
-            if (!minerAsicWork(next)) { if (powered) off("Waiting for pool"); delay(10); continue; }
+        delay(100); return;
+    }
+    if (minerPowerPercent() > 0 && minerPowerPercent() < 10) {
+        if (powered) off("Gamma power limit must be 10-100% or paused");
+        live.state = "Gamma power limit must be 10-100% or paused"; publish(); delay(10); return;
+    }
+    // Keep sampling while paused so thermal hysteresis can observe cooldown.
+    if (now - sampled >= 250) { sampled = now; if (!collect(powered)) { noWorkSince = 0; return; } }
+    if (!minerPowerPercent()) {
+        noWorkSince = 0;
+        if (powered) off("Paused / waiting for pool");
+        delay(10); return;
+    }
+    bool ready = minerAsicReady();
+    if (!ready && !keepRunningWithoutWork(now)) { noWorkSince = 0; delay(10); return; }
+    if (ready && (!powered || now - sent >= 100)) {
+        // False with work available: the job board was busy for 20 ms (the
+        // network task publishing a job). Not a reason to stop: try again.
+        if (!minerAsicWork(next)) {
+            if (!powered) { delay(10); return; }
+        } else {
+            workAvailable();
             // Without enough negotiated rolling bits the chip exhausts its nonce space.
             // Refuse that pool instead of displaying a fictitious stock hashrate.
             if (__builtin_popcount(next.versionMask) < 8) {
                 if (powered) off("Pool needs version rolling");
-                live.state = "Pool needs version rolling"; publish(); delay(100); continue;
+                live.state = "Pool needs version rolling"; publish(); delay(100); return;
             }
             // Below difficulty 16 (a pool taking the miner for a NerdMiner) the ASIC
             // keeps mining, as in ESP-Miner: its filter stays at 16, so only those
@@ -462,45 +498,51 @@ void worker(void *) {
                 if (!initAsic(next)) {
                     if (!latched && powered) off("BM1370 initialization failed", true);
                     else if (!powered) delay(500);  // waiting for the supply, the fan or the pool
-                    continue;
+                    return;
                 }
+                miningState = live.state;
                 now = millis(); sampled = now;
             }
             float target = targetFrequency();
             if (std::fabs(live.frequency - target) > 3) {
                 // Power changes reset the chip: no mixing of in-flight results/PLL state.
-                off("Applying power limit"); continue;
+                off("Applying power limit"); return;
             }
             Slot &slot = slots[nextSlot];
             slot.work = next; slot.sent = now; slot.valid = true; slot.proofHead = slot.proofCount = 0;
-            if (!send(bm1370::job(nextSlot, slot.work.header))) { off("ASIC UART write failed", true); continue; }
+            if (!send(bm1370::job(nextSlot, slot.work.header))) { off("ASIC UART write failed", true); return; }
             nextSlot = (nextSlot + 1) % bm1370::kSlots; sent = now;
         }
-        bm1370::Response response;
-        size_t budget = 2048;
-        while (powered && budget-- && uart.available()) if (receiver.push(uart.read(), response)) {
-            if (!response.job) {
-                registerResult(response);
-                continue;
-            }
-            Slot &slot = slots[response.slot];
-            if (!slot.valid || now - slot.sent > 1500 || !minerAsicCurrent(slot.work.generation)) continue;
-            uint64_t proof = uint64_t(response.versionBits) << 32 | response.nonce;
-            bool duplicate = false;
-            for (int i = 0; i < slot.proofCount; ++i) if (slot.proofs[i] == proof) duplicate = true;
-            if (duplicate) continue;
-            slot.proofs[slot.proofHead] = proof; slot.proofHead = (slot.proofHead + 1) % 32;
-            if (slot.proofCount < 32) ++slot.proofCount;
-            minerAsicCandidate(slot.work, response.nonce, response.versionBits);
-        }
-        if (!powered) continue;
-        if (now - requested >= 1000) {
-            requested = now;
-            if (!request(0x4c, false) || !request(0x8c, false)) { off("ASIC counter request failed", true); continue; }
-        }
-        checkWatchdogs(millis());
-        delay(2);
     }
+    bm1370::Response response;
+    size_t budget = 2048;
+    while (powered && budget-- && uart.available()) if (receiver.push(uart.read(), response)) {
+        if (!response.job) {
+            registerResult(response);
+            continue;
+        }
+        Slot &slot = slots[response.slot];
+        if (!slot.valid || now - slot.sent > 1500 || !minerAsicCurrent(slot.work.generation)) continue;
+        uint64_t proof = uint64_t(response.versionBits) << 32 | response.nonce;
+        bool duplicate = false;
+        for (int i = 0; i < slot.proofCount; ++i) if (slot.proofs[i] == proof) duplicate = true;
+        if (duplicate) continue;
+        slot.proofs[slot.proofHead] = proof; slot.proofHead = (slot.proofHead + 1) % 32;
+        if (slot.proofCount < 32) ++slot.proofCount;
+        minerAsicCandidate(slot.work, response.nonce, response.versionBits);
+    }
+    if (!powered) return;
+    if (now - requested >= 1000) {
+        requested = now;
+        if (!request(0x4c, false) || !request(0x8c, false)) { off("ASIC counter request failed", true); return; }
+    }
+    checkWatchdogs(millis());
+    delay(2);
+}
+void worker(void *) {
+    delay(2000); // fan spin-up, ASIC held in reset and unpowered
+    sampled = setupAt = millis();
+    for (;;) step();
 }
 } // namespace
 
