@@ -246,7 +246,19 @@ Event Protocol::handleLine(const char *line) {
     bool ok = !result.isNull() && !(result.is<bool>() && !result.as<bool>()) && error.isNull();
     if (!error.isNull()) {
         lastError_.clear();
-        if (error.is<JsonArray>()) lastError_ = error[1] | "error";
+        if (error.is<JsonArray>()) {
+            lastError_ = error[1] | "error";
+            // [code, message, detail]: public-pool puts the refused values in
+            // the detail (", <address>" for an invalid payout address). Kept,
+            // bounded, so the log says which field the pool rejected.
+            const char *detail = error[2].is<const char *>() ? error[2].as<const char *>() : "";
+            while (*detail == ',' || *detail == ' ') ++detail;
+            if (*detail) {
+                std::string text(detail, strnlen(detail, 96));
+                if (text.size() == 96) text += "...";
+                lastError_ += " (" + text + ")";
+            }
+        }
         else serializeJson(error, lastError_);
     }
 

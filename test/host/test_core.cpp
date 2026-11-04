@@ -584,6 +584,18 @@ static void testStratumJob() {
     p.submit(s);
     CHECK(p.handleLine(R"({"id":11,"result":null,"error":[23,"Low difficulty share",null]})") == stratum::Event::ShareRejected);
     CHECK(p.lastError() == "Low difficulty share");
+    {
+        // public-pool's authorization refusal names the refused value in its detail.
+        stratum::Protocol a; a.setCredentials("bc1qtypo.worker", "x");
+        a.handleLine(R"({"id":1,"result":[[],"00",4],"error":null})");
+        CHECK(a.handleLine(R"({"id":2,"result":null,"error":[20,"Authorization validation error",", bc1qtypo"]})") == stratum::Event::AuthFailed);
+        CHECK(a.lastError() == "Authorization validation error (bc1qtypo)");
+        std::string longDetail(200, 'x');
+        a.handleLine(("{\"id\":2,\"result\":null,\"error\":[20,\"Refused\",\"" + longDetail + "\"]}").c_str());
+        CHECK(a.lastError() == "Refused (" + std::string(96, 'x') + "...)");
+        a.handleLine(R"({"id":2,"result":null,"error":[20,"Refused",""]})");
+        CHECK(a.lastError() == "Refused");
+    }
     CHECK(p.handleLine(R"({"id":11,"result":false,"error":null})") == stratum::Event::None);
     CHECK(p.pendingShares() == 0);
     // A later bare `false` must not inherit the earlier low-difficulty reason.
