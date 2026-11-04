@@ -4,6 +4,10 @@
   "pool_names": {"public-pool.io":"Public Pool","nerdminers.org":"Nerdminers.org","nerdminer.io":"NerdMiner.io","ckpool.org":"CKPool","ocean.xyz":"OCEAN","braiins.com":"Braiins Pool","viabtc.com":"ViaBTC","f2pool.com":"F2Pool","antpool.com":"AntPool"},
   "pool_links": {"public-pool.io":"https://web.public-pool.io/","nerdminers.org":"https://pool.nerdminers.org/","nerdminer.io":"https://nerdminer.io/","ckpool.org":"https://solo.ckpool.org/","ocean.xyz":"https://ocean.xyz/","braiins.com":"https://braiins.com/pool","viabtc.com":"https://www.viabtc.com/","f2pool.com":"https://www.f2pool.com/","antpool.com":"https://www.antpool.com/"},
   "release_notes": {
+    "2.3.3": {
+      "en": ["Works on networks that block NTP: the pool's job time sets the clock needed to verify HTTPS certificates.", "The miner registers as bdlminer-xxxx with the router; MQTT shows disconnected when WiFi drops.", "Pool refusals name the rejected value (for example the payout address); screen durations and the Gamma OLED are fixed."],
+      "fr": ["Fonctionne sur les réseaux qui bloquent NTP : l’heure des jobs de la pool règle l’horloge nécessaire à la vérification HTTPS.", "Le mineur s’annonce bdlminer-xxxx auprès du routeur ; MQTT indique déconnecté quand le WiFi tombe.", "Les refus de la pool indiquent la valeur rejetée (par exemple l’adresse de paiement) ; durées à l’écran et OLED du Gamma corrigés."]
+    },
     "2.3.2": {
       "en": ["Bitaxe Gamma 601: an HTTPS connection briefly holding the main loop no longer restarts the ASIC (Initializing BM1370).", "Mining permission is renewed on every loop pass and lasts 10 s; thermal policy and ASIC hard limits are unchanged.", "Settings, statistics and the 2.3.1 changes are preserved."],
       "fr": ["Bitaxe Gamma 601 : une connexion HTTPS qui bloque brièvement la boucle principale ne redémarre plus l’ASIC (Initializing BM1370).", "L’autorisation de miner est renouvelée à chaque passage de la boucle et dure 10 s ; politique thermique et limites matérielles de l’ASIC inchangées.", "Réglages, statistiques et changements de la 2.3.1 conservés."]
