@@ -4,10 +4,21 @@
 
 #include <WiFiClientSecure.h>
 
-// Connects `tls` (certificate checks off: only public data is fetched, or
-// notifications sent). Then use it with HTTPClient, which reuses the connection.
-// A short `timeoutSeconds` suits probes of servers that may not speak TLS.
+// Connects `tls`, verifying the server's certificate chain and name against
+// the roots of src/tls_roots.h (assets/tls/roots.pem), then use it with
+// HTTPClient, which reuses the connection. Fails while the clock is not set
+// and never falls back to an unverified connection: notification topics and
+// webhook URLs hold secrets. A short `timeoutSeconds` suits probes of
+// servers that may not speak TLS.
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port = 443, uint8_t timeoutSeconds = 12);
+// For downloads whose content carries its own signature (firmware releases)
+// only: verified like tlsConnect(), but a certificate it cannot verify (a root
+// missing from the bundle, an unset clock) falls back to an unverified
+// connection rather than stopping updates. Network failures are not retried.
+bool tlsConnectSignedContent(WiFiClientSecure &tls, const char *host, uint16_t port = 443, uint8_t timeoutSeconds = 12);
+// The last failed handshake was refused for its certificate (or the clock).
+bool tlsCertificateRejected();
+bool tlsClockSet();
 // Same miner/watchdog/heap safeguards, with CA and hostname verification.
 // Missing trust data or a certificate failure never falls back to insecure TLS.
 bool tlsConnectVerified(WiFiClientSecure &tls, const char *host, const char *rootCA,

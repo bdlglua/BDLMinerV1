@@ -81,19 +81,27 @@ that reports can focus on what goes beyond them:
   seconds at most); installing the latest **signed** GitHub release asks for it when
   one is set. Updating to 1.9.3 removes, once, a password set with an earlier version;
   one set afterwards is kept.
-- **Read-only pages need no password**: the dashboard, `/api/stats`, `/api/log`,
+- **Read-only pages need no password**: the dashboard, `/api/stats`,
   `/api/history` and the live stream show the payout address, pool and network
-  details to anyone on the local network. `/api/stats` allows cross-origin reads so
+  details to anyone on the local network. The log (`/api/log`), which also names
+  networks, hosts and every error, is protected like the settings: it asks for the
+  web password when one is set. `/api/stats` allows cross-origin reads so
   that one miner's dashboard can show the others.
 - **Firmware from GitHub is trusted by its signature, not by TLS.** Every release
   firmware is signed with an ECDSA P-256 key kept outside the repository; the miner
   checks the signature against the public key built into it (`src/update_key.h`)
   before installing anything, then runs the new version on trial and returns to the
   previous one if it fails.
-- **HTTPS connections do not verify certificates** (market data, pool statistics,
-  GitHub metadata, ntfy and webhook notifications), to fit the memory of the board.
-  An active attacker on the path could read or alter that data, including a webhook
-  URL or ntfy topic, which act as secrets. Firmware stays protected by its signature.
+- **HTTPS connections verify the server's certificate and name** (ntfy and webhook
+  notifications, market data, pool statistics, hashrate sharing, private monitoring,
+  block confirmation) against about 40 public root authorities
+  (`assets/tls/roots.pem`, packed into `src/tls_roots.h` by
+  `tools/make_tls_roots.py`). A failure never falls back to an unverified connection,
+  so a webhook URL or ntfy topic is not sent to an impostor; self-signed servers are
+  refused (use `http://` for one on the local network). Nothing is sent until NTP has
+  set the clock. **GitHub downloads** are verified the same way, but an unverifiable
+  certificate falls back to an unverified connection there, so that a root missing
+  from the list cannot stop updates: the firmware is trusted by its signature.
 - **A firmware uploaded through the web page is not signature-checked**, so that
   people can install their own builds: only the web password, when set, protects it.
 - **MQTT is plain TCP**; its user and password travel unencrypted to the broker.

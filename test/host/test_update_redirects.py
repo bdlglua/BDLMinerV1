@@ -28,7 +28,7 @@ std::map<std::string,Reply> replies;
 std::vector<std::string> requests, hosts;
 std::string deniedHost;
 struct WiFiClientSecure { void stop() {} };
-bool tlsConnect(WiFiClientSecure &, const char *host) {
+bool tlsConnectSignedContent(WiFiClientSecure &, const char *host) {
     hosts.emplace_back(host); return deniedHost!=host;
 }
 struct HTTPClient {

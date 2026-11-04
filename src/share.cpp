@@ -70,7 +70,7 @@ void sharePoll() {
     if (!settings.shareHashrate || (int32_t)(millis() - next) < 0) return;
     double rate = minerHashrate();
     // A paused miner adds nothing: it is not counted either.
-    if (!WiFi.isConnected() || !tlsMemoryOk() || !(rate > 0)) {
+    if (!WiFi.isConnected() || !tlsMemoryOk() || !tlsClockSet() || !(rate > 0)) {
         next = millis() + kWaitMs;
         return;
     }

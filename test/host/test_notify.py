@@ -27,6 +27,8 @@ struct { Text ntfyTopic = "topic", webhookUrl = "https://local.test/hook"; } set
 struct { bool connected = true; bool isConnected() { return connected; } } WiFi;
 bool memoryOk = true;
 bool tlsMemoryOk() { return memoryOk; }
+bool clockSet = true;  // certificates need the time: no delivery attempt before
+bool tlsClockSet() { return clockSet; }
 void logf(const char *, ...) {}
 String webHostName() { return "test-miner"; }
 namespace runtime { enum { Notify }; void started(bool, int, const char *) {} }
@@ -95,6 +97,14 @@ int main() {
     // returning another test's delivery status.
     for (unsigned i = 0; i < kTestResults; ++i) { assert(notifyTest()); notifyPoll(); }
     result.clear(); assert(!deserializeJson(result, notifyResult(UINT32_MAX)) && result["id"] == 0);
+    // Before NTP the certificates cannot be checked: the delivery waits, without using attempts.
+    clockSet = false; id = notifyTest(); int waiting = ntfyCalls; notifyPoll(); testMillis += 30000; notifyPoll();
+    assert(ntfyCalls == waiting); clockSet = true; testMillis += 10000; notifyPoll();
+    assert(ntfyCalls == waiting + 1);
+    // An untrusted certificate is reported as such, not as a lost connection.
+    hookCode = kUntrusted; id = notifyTest(); notifyPoll(); testMillis += 30000; notifyPoll(); testMillis += 30000; notifyPoll();
+    result.clear(); assert(!deserializeJson(result, notifyResult(id)) && result["webhook"] == "certificate not trusted");
+    hookCode = 200;
     memoryOk = false; id = notifyTest(); int before = ntfyCalls; notifyPoll();
     assert(ntfyCalls == before); testMillis += 600000; notifyPoll();
     result.clear(); assert(!deserializeJson(result, notifyResult(id)) && result["id"] == id);

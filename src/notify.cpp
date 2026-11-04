@@ -36,6 +36,10 @@ uint32_t nextTestId = 0;  // guarded by resultMux
 
 bool enabled() { return !settings.ntfyTopic.isEmpty() || !settings.webhookUrl.isEmpty(); }
 
+// A delivery result: the server's certificate could not be verified (a
+// self-signed server, or a root missing from src/tls_roots.h).
+constexpr int kUntrusted = -2;
+
 bool enqueue(const Message &m) {
     if (!queue || !enabled()) return false;
     if (xQueueSend(queue, &m, 0) == pdTRUE) return true;
@@ -83,7 +87,7 @@ int sendWebhook(const Message &m) {
     HTTPClient http;
     http.setTimeout(10000);
     if (!(secure ? http.begin(tls, settings.webhookUrl) : http.begin(tcp, settings.webhookUrl))) return -1;
-    if (secure && !tlsConnect(tls, host.c_str(), port)) return -1;
+    if (secure && !tlsConnect(tls, host.c_str(), port)) return tlsCertificateRejected() ? kUntrusted : -1;
     http.addHeader("Content-Type", "application/json");
     int code = http.POST(body);
     http.end();
@@ -104,7 +108,7 @@ int sendNtfy(const Message &m) {
     HTTPClient http;
     http.setTimeout(10000);
     if (!http.begin(tls, "https://" + settings.ntfyServer + "/" + settings.ntfyTopic)) return -1;
-    if (!tlsConnect(tls, host.c_str(), port)) return -1;
+    if (!tlsConnect(tls, host.c_str(), port)) return tlsCertificateRejected() ? kUntrusted : -1;
     http.addHeader("Title", m.title);
     http.addHeader("Priority", String(m.priority));
     if (m.tags[0]) http.addHeader("Tags", m.tags);
@@ -121,6 +125,7 @@ void describe(char *out, size_t size, bool configured, int code) {
     else if (ok(code)) strlcpy(out, "OK", size);
     else if (code > 0) snprintf(out, size, "HTTP %d", code);
     else if (code == 0) strlcpy(out, "no WiFi or memory", size);
+    else if (code == kUntrusted) strlcpy(out, "certificate not trusted", size);
     else strlcpy(out, "no connection", size);
 }
 
@@ -181,7 +186,9 @@ void notifyPoll() {
         d.nextAt = d.waitingSince = now;
     }
     if ((int32_t)(now - d.nextAt) < 0) return;
-    if (!WiFi.isConnected() || !tlsMemoryOk()) {
+    // No WiFi, memory or clock yet (certificates are checked against it):
+    // wait, without using up attempts.
+    if (!WiFi.isConnected() || !tlsMemoryOk() || !tlsClockSet()) {
         if (now - d.waitingSince < kMemoryWaitMs) d.nextAt = now + 10000;
         else finish(d);
         return;

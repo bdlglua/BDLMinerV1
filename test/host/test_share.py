@@ -38,6 +38,7 @@ uint32_t millis() { return nowMs; }
 struct { bool connected = true; bool isConnected() const { return connected; } } WiFi;
 bool memoryOk = true;
 bool tlsMemoryOk() { return memoryOk; }
+bool tlsClockSet() { return true; }
 double rate = 1.0234e6;
 double minerHashrate() { return rate; }
 struct { bool shareHashrate = true, sharePool = true; unsigned miningCoin = 0; } settings;

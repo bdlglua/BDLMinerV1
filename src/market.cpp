@@ -421,12 +421,14 @@ void marketTask(void *) {
             lastPoolBackup = backup;
             nextPool = millis();  // do not wait up to an hour after failover
         }
-        if (coin::bitcoinData(settings.miningCoin) && WiFi.isConnected() && (int32_t)(millis() - nextMarket) >= 0) {
+        // Certificates are checked against the clock: no HTTPS before NTP.
+        bool online = WiFi.isConnected() && tlsClockSet();
+        if (coin::bitcoinData(settings.miningCoin) && online && (int32_t)(millis() - nextMarket) >= 0) {
             bool ok = refresh();
             nextMarket = millis() + (ok ? kRefreshMs : retry);
             retry = ok ? kRetryMs : min<uint32_t>(retry * 2, kRefreshMs);
         }
-        if (coin::bitcoinData(settings.miningCoin) && WiFi.isConnected() && minerStats().poolConnected && (int32_t)(millis() - nextPool) >= 0) {
+        if (coin::bitcoinData(settings.miningCoin) && online && minerStats().poolConnected && (int32_t)(millis() - nextPool) >= 0) {
             bool ok = refreshPoolStats();
             nextPool = millis() + (ok ? kPoolStatsMs : kPoolStatsRetryMs);
         }
