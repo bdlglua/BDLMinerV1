@@ -152,6 +152,12 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   (70 °C or more, or no reading) must hold for **three readings in a row**, 0.75 s
   while mining, before it stops the ASIC: a real overheat takes far longer, and one
   false reading no longer stops it until restart.
+* When pool work disappears (a reconnection, a failover), the ASIC keeps running on
+  its last job for up to **60 seconds**, its results discarded, instead of being
+  powered off and started again (about 9 s of *Initializing BM1370* and PLL ramp at
+  each reconnection). The dashboard shows *Waiting for pool* meanwhile; a pool that
+  stays away longer powers it off. Safety pauses (power 0, heat, faults, OTA, the
+  supervision lease) still stop it at once.
 * Startup waits 500 ms for core power stabilization, then ramps the PLL in
   6.25 MHz steps spaced by 100 ms, following ESP-Miner. Fan, voltage/current and
   regulator temperature are sampled throughout startup after the power-good grace

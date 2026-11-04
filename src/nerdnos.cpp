@@ -35,6 +35,7 @@ struct Slot {
     uint8_t count = 0;
     uint32_t sent = 0;
     bool valid = false;
+    uint8_t maskPower = 0;  // the chip's result filter when this job was sent
     uint64_t seen[8]{};  // the chip can report a nonce twice
     uint8_t seenHead = 0;
 };
@@ -124,7 +125,11 @@ void result(const bm1397::Response &r, uint32_t now) {
     uint32_t version = slot.versions[r.midstate];
     uint32_t base;
     std::memcpy(&base, slot.work.header, 4);
-    double minimum = double(1u << maskPower) * 0.999;
+    // After a difficulty change, results of this job can still have passed the
+    // previous filter: a lower one is not a hardware error. The lower filter
+    // is also the conservative hash credit for such a result.
+    uint8_t filter = std::min(slot.maskPower, maskPower);
+    double minimum = double(1u << filter) * 0.999;
     // Verification and submission share one digest. The common adapter still
     // rejects stale generations, unnegotiated versions and corrupted proofs.
     double difficulty = minerAsicCandidate(slot.work, r.nonce, version & ~base, minimum);
@@ -133,7 +138,7 @@ void result(const bm1397::Response &r, uint32_t now) {
         ++windowBad;  // UART corruption or an ASIC hardware error
     } else {
         ++windowGood; lastResult = now; ++live.results;
-        minerAsicHashes(uint64_t(1) << (32 + maskPower));
+        minerAsicHashes(uint64_t(1) << (32 + filter));
     }
     if (windowGood + windowBad >= 50) {
         live.hardwareErrorPercent = 100.0f * windowBad / (windowGood + windowBad);
@@ -182,7 +187,7 @@ void worker(void *) {
             }
             if (std::fabs(live.frequency - targetFrequency()) > 3) { off("Applying power limit"); continue; }
             Slot &slot = slots[nextSlot];
-            slot.work = next; slot.sent = now; slot.valid = true;
+            slot.work = next; slot.sent = now; slot.valid = true; slot.maskPower = maskPower;
             std::fill(std::begin(slot.seen), std::end(slot.seen), 0);
             if (!send(bm1397::job(nextSlot, next.header, next.versionMask, slot.versions, slot.count))) {
                 off("ASIC UART write failed"); continue;

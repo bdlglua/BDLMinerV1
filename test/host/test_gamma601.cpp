@@ -12,7 +12,9 @@ uint8_t minerPowerPercent(){return testMillis < powerUntil ? power : 0;}
 bool minerAsicCurrent(uint32_t g){return g==generation;}
 static bool poolReady=true;
 bool minerAsicReady(){return poolReady;}
-bool minerAsicWork(AsicWork &){return false;}
+static bool workBusy=false;  // the job board's mutex held by the network task
+static AsicWork stubWork;
+bool minerAsicWork(AsicWork &w){if(!poolReady||workBusy)return false;w=stubWork;return true;}
 double minerAsicCandidate(AsicWork &,uint32_t,uint32_t,double){return 0;}
 void minerAsicHashes(uint64_t n){hashes+=n;}
 using namespace gamma601;
@@ -251,5 +253,31 @@ int main(){
         setFanControl(false,40);assert(!collect(true)&&latched&&!powered&&testReset==0);
         assert(status().fanPercent<0); // unknown, never report a successful 100% command after an I2C failure
     }
+    // A pool reconnection keeps the ASIC running on its last job for up to 60 s:
+    // no power cycle and no new 9 s start ("Initializing BM1370", PLL ramp).
+    auto pllSteps=[]{int n=0;for(auto &packet:testUartTx)n+=packet.size()==11&&packet[5]==0x08;return n;};
+    auto run=[](uint32_t ms){
+        for(uint32_t until=testMillis+ms;testMillis<until;){lastHashReply=lastHashProgress=lastErrorReply=testMillis;step();}
+    };
+    reset();begin();sampled=sent=requested=setupAt=0;noWorkSince=0;workBusy=false;
+    stubWork=AsicWork();stubWork.generation=1;stubWork.versionMask=bm1370::kVersionMask;stubWork.shareDifficulty=1024;
+    run(100);assert(powered&&live.running&&!strcmp(live.state,"Mining (experimental)"));
+    int ramp=pllSteps();assert(ramp==77);
+    poolReady=false;run(30000);
+    assert(powered&&live.running&&!latched&&testReset==1&&!strcmp(status().state,"Waiting for pool")&&pllSteps()==ramp);
+    size_t jobs=testUartTx.size();run(1000);
+    for(size_t i=jobs;i<testUartTx.size();++i)assert(testUartTx[i][2]!=0x21); // no job of stale work is sent
+    generation=2;stubWork.generation=2;poolReady=true;run(500);
+    assert(powered&&live.running&&activeGeneration==2&&pllSteps()==ramp&&!strcmp(status().state,"Mining (experimental)"));
+    // A pool that stays away: powered off after the grace period, without a fault.
+    poolReady=false;run(61000);
+    assert(!powered&&!live.running&&!latched&&testReset==0&&!strcmp(status().state,"Paused / waiting for pool"));
+    poolReady=true;run(100);assert(powered&&live.running&&pllSteps()==2*ramp); // the next start is a full one
+    // A busy job board (20 ms mutex timeout) is not a reason to power off.
+    workBusy=true;run(5000);assert(powered&&live.running&&pllSteps()==2*ramp);
+    workBusy=false;run(200);assert(powered&&live.running);
+    // Safety still acts at once while waiting for the pool: power 0 stops the ASIC.
+    poolReady=false;run(1000);assert(powered);power=0;run(20);assert(!powered&&!latched);
+    puts("Gamma pool reconnection: ASIC kept running for 60 s without work, no re-initialization, busy job board ignored, safety pause immediate");
     puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, relative VOUT limits, supervised PLL ramp, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
 }

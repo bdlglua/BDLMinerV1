@@ -13,6 +13,7 @@ static int candidates = 0;
 static int verifications = 0;
 static uint32_t candidateBits = 99;
 static bool poolReady = true;
+static double forcedDifficulty = 0;  // > 0: the digest's difficulty, without searching for such a nonce
 uint8_t minerPowerPercent() { return power; }
 bool minerAsicCurrent(uint32_t g) { return g == generation; }
 bool minerAsicReady() { return poolReady; }
@@ -22,7 +23,7 @@ double minerAsicCandidate(AsicWork &w, uint32_t nonce, uint32_t bits, double min
     uint8_t header[80],hash[32];uint32_t version;
     std::memcpy(header,w.header,80);std::memcpy(&version,header,4);version|=bits;
     std::memcpy(header,&version,4);std::memcpy(header+76,&nonce,4);
-    sha::sha256d(header,80,hash);double difficulty=work::hashDifficulty(hash);
+    sha::sha256d(header,80,hash);double difficulty=forcedDifficulty>0?forcedDifficulty:work::hashDifficulty(hash);
     if(difficulty>=minimum){++candidates;candidateBits=bits;}
     return difficulty;
 }
@@ -73,7 +74,7 @@ int main() {
                          "29ab5f49" "ffff001d" "00000000", genesis));
     Slot &slot = slots[3];
     std::memcpy(slot.work.header, genesis.data(), 80);
-    slot.work.generation = 1; slot.versions[0] = 1; slot.count = 1; slot.sent = testMillis; slot.valid = true;
+    slot.work.generation = 1; slot.versions[0] = 1; slot.count = 1; slot.sent = testMillis; slot.valid = true; slot.maskPower = 6;
     bm1397::Response r; r.slot = 3; r.midstate = 0; r.nonce = 0x7c2bac1d;
     result(r, testMillis);
     assert(candidates == 1 && candidateBits == 0 && hashes == uint64_t(1) << 38 && live.results == 1);
@@ -88,6 +89,23 @@ int main() {
     generation = 2; r.midstate = 0; slot.seenHead = 0; std::fill(std::begin(slot.seen), std::end(slot.seen), 0);
     result(r, testMillis);  // a new block made the job stale
     assert(candidates == 1);
+
+    // Pool difficulty raised (filter 16 -> 64): a result of a job sent before the
+    // change may still have passed the old filter. It is not a hardware error.
+    reset(); assert(initAsic(bm1397::kVersionMask));
+    Slot &before = slots[5];
+    std::memcpy(before.work.header, genesis.data(), 80);
+    before.work.generation = 1; before.versions[0] = 1; before.count = 1; before.sent = testMillis; before.valid = true;
+    before.maskPower = 4; maskPower = 6; windowBad = windowGood = 0;
+    // A result of difficulty 20, as the chip reports under filter 16.
+    forcedDifficulty = 20;
+    bm1397::Response old; old.slot = 5; old.midstate = 0; old.nonce = 1234;
+    hashes = 0; result(old, testMillis);
+    assert(windowBad == 0 && windowGood == 1 && hashes == uint64_t(1) << 36);
+    // A job sent under the new filter: the same result would be an error.
+    before.maskPower = 6; std::fill(std::begin(before.seen), std::end(before.seen), 0);
+    result(old, testMillis); assert(windowBad == 1);
+    forcedDifficulty = 0;
 
     // NTC: half the supply is 10 kOhm, 25 C; the rails are a broken sensor.
     testMilliVolts = 1650; assert(std::fabs(temperature() - 25.0f) < 0.05f && std::fabs(status().temperature - 25.0f) < 0.05f);

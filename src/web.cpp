@@ -176,6 +176,14 @@ const char *accentCss() {
     return kAccent[settings.theme % 5];
 }
 
+// The log names networks, pools, hosts and every error: protected like the
+// settings (the web password when one is set, from the miner's own pages).
+void handleLog() {
+    if (!authorized()) return;
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "text/plain", logText());
+}
+
 void buildPoolDiagnostics(JsonObject out,const MinerStats &stats) {
     pool_diagnostics::Input input;
     input.connected=stats.poolConnected;input.work=stats.workAvailable;input.mask=stats.versionMask;
@@ -1072,10 +1080,7 @@ void webStart() {
     server.on("/api/history", HTTP_GET, handleHistory);
     server.on("/api/diagnostics", HTTP_GET, handleDiagnostics);
     server.on("/api/pool/diagnostics", HTTP_GET, handlePoolDiagnostics);
-    server.on("/api/log", HTTP_GET, []() {
-        server.sendHeader("Cache-Control", "no-store");
-        server.send(200, "text/plain", logText());
-    });
+    server.on("/api/log", HTTP_GET, handleLog);
     server.on("/api/settings", HTTP_GET, handleGetSettings);
     server.on("/api/settings", HTTP_POST, handlePostSettings);
     server.on("/api/backup", HTTP_GET, handleGetBackup);

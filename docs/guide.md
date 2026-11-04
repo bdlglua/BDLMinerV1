@@ -349,7 +349,8 @@ HTTPS; *Add to Home screen* works on the local address.
   record. Export a JSON backup before downgrading: older firmware reads legacy keys.
 * **Log**: the last few KB of the serial log, refreshed every 5 s, with filtering,
   pause/resume and a download of the original unfiltered text.
-* **/api/stats** (JSON), **/api/log** (text) and **/metrics** (Prometheus).
+* **/api/stats** (JSON), **/api/log** (text, asks for the web password when one is
+  set) and **/metrics** (Prometheus).
 
 All styles and scripts are served by the miner itself: no CDN, external font or
 JavaScript framework is required. `tools/make_web.py` packs the sources in `web/`
@@ -473,12 +474,19 @@ span, 5 or more rejected shares making at least 10 % of the shares send *Shares 
 (Home Assistant, n8n, Gotify proxies...). ntfy and the webhook work alone or together.
 For Discord, use *Channel settings › Integrations › Webhooks › Copy URL*. After saving,
 **Send a test notification** (under the webhook field) shows the result of each
-destination: OK, an HTTP code, or no connection.
+destination: OK, an HTTP code, no connection, or *certificate not trusted*.
+
+HTTPS servers must present a certificate from a public authority: the miner checks it
+against the roots of `assets/tls/roots.pem` (Let's Encrypt, Google, DigiCert, Sectigo,
+GoDaddy, Amazon, GlobalSign, SSL.com, Microsoft and a few more), so a self-signed ntfy
+server or webhook is refused (*certificate not trusted*). On a home network, use an
+`http://` webhook URL for such a server instead.
 
 Notifications are sent from the task that already fetches market data, so they cost
 no memory of their own. Each one is tried up to 3 times, 30 seconds apart; while there
-is not enough free memory for a TLS connection (54 KB, with a 24 KB block) or no WiFi,
-it waits up to 10 minutes without using up those tries.
+is not enough free memory for a TLS connection (54 KB, with a 24 KB block), no WiFi,
+or no time from NTP yet (certificates are checked against it), it waits up to 10 minutes
+without using up those tries.
 
 ## Home Assistant
 

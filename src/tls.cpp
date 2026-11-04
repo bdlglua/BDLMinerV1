@@ -6,9 +6,15 @@
 
 #include <atomic>
 #include <cstdint>
+#include <ctime>
 
 #include "hw_sha.h"
 #include "log.h"
+#include "tls_roots.h"
+
+// A certificate is valid between two dates: before NTP has set the clock,
+// none can be checked (and none is accepted unchecked).
+bool tlsClockSet() { return time(nullptr) >= 1700000000; }
 
 // One handshake at a time. A binary semaphore, not a mutex: FreeRTOS only
 // gives a task its own priority back once it holds no mutex at all, so with
@@ -38,6 +44,11 @@ void *tlsCalloc(size_t n, size_t size) {
 }
 
 static std::atomic<int> wdtPauses{0};
+static std::atomic<bool> certificateRejected{false};
+// mbedTLS: a chain that does not verify (expired, wrong name...), or one the
+// certificate bundle rejects (no trusted root signed it).
+constexpr int kCertificateVerifyFailed = -0x2700, kX509FatalError = -0x3000;
+bool tlsCertificateRejected() { return certificateRejected.load(); }
 static TlsProfile profile;
 static portMUX_TYPE profileMux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -58,15 +69,27 @@ void core0WdtResume() {
 
 bool tlsMemoryOk() { return ESP.getFreeHeap() >= kTlsMinFree && ESP.getMaxAllocHeap() >= kTlsMinBlock; }
 
-static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds, const char *rootCA) {
-    if (rootCA) tls.setCACert(rootCA);
-    else tls.setInsecure();
+enum class Trust : uint8_t { Bundle, Root, None };
+
+static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds,
+                           Trust trust, const char *rootCA = nullptr) {
+    certificateRejected = false;
+    if (trust != Trust::None && !tlsClockSet()) {
+        certificateRejected = true;
+        logf("[tls] %s: clock not set yet, its certificate cannot be checked\n", host);
+        return false;
+    }
+    if (trust == Trust::Root) tls.setCACert(rootCA);
+    else if (trust == Trust::None) tls.setInsecure();
     tls.setHandshakeTimeout(timeoutSeconds);
     if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);  // the TCP connect too
     if (!lock || xSemaphoreTake(lock, portMAX_DELAY) != pdTRUE) {
         logf("[tls] handshake unavailable: TLS lock missing\n");
         return false;
     }
+    // The bundle's lookup table is global to the TLS library: only set while
+    // holding the lock, for the handshake that uses it.
+    if (trust == Trust::Bundle) tls.setCACertBundle(kTlsRootBundle);
     static bool allocSet = false;
     if (!allocSet) {
         allocSet = true;
@@ -91,7 +114,8 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     char why[80] = "";
     if (!ok) {
         why[0] = ' ';
-        tls.lastError(why + 1, sizeof(why) - 1);
+        int error = tls.lastError(why + 1, sizeof(why) - 1);
+        certificateRejected = trust != Trust::None && (error == kCertificateVerifyFailed || error == kX509FatalError);
     }
     // A probe (short timeout) failing is an expected answer: its caller reports the outcome.
     if (ok || timeoutSeconds >= 12)
@@ -104,8 +128,17 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
 }
 
 bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds) {
-    return tlsConnectImpl(tls, host, port, timeoutSeconds, nullptr);
+    return tlsConnectImpl(tls, host, port, timeoutSeconds, Trust::Bundle);
 }
 bool tlsConnectVerified(WiFiClientSecure &tls, const char *host, const char *rootCA, uint16_t port, uint8_t timeoutSeconds) {
-    return rootCA && *rootCA && tlsConnectImpl(tls, host, port, timeoutSeconds, rootCA);
+    return rootCA && *rootCA && tlsConnectImpl(tls, host, port, timeoutSeconds, Trust::Root, rootCA);
+}
+bool tlsConnectSignedContent(WiFiClientSecure &tls, const char *host, uint16_t port, uint8_t timeoutSeconds) {
+    if (tlsConnectImpl(tls, host, port, timeoutSeconds, Trust::Bundle)) return true;
+    if (!tlsCertificateRejected()) return false;  // a network failure: no second handshake
+    // Only for content whose own signature is checked (firmware releases): a
+    // root missing from the bundle, or an unset clock, must not stop updates.
+    logf("[tls] %s: certificate not verified; continuing, the firmware signature is checked\n", host);
+    tls.stop();
+    return tlsConnectImpl(tls, host, port, timeoutSeconds, Trust::None);
 }
