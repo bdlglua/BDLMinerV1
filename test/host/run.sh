@@ -43,6 +43,7 @@ python3 test/host/test_trial.py
 python3 test/host/test_notify.py
 python3 test/host/test_sv2.py
 python3 test/host/test_hw_resume.py
+python3 test/host/test_hw_overlap_s3.py
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_line_buffer.cpp $CORE -o .pio/host/test_line_buffer
 .pio/host/test_line_buffer
 g++ -std=c++17 -O2 -Wall -Isrc -I"$JSON" test/host/test_web_validation.cpp -o .pio/host/test_web_validation

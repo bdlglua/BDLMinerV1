@@ -29,6 +29,9 @@ static std::atomic<bool> held{false};
 static int holds = 0;  // hold() nests (an update download around tlsConnect())
 static bool sparseTextWrites = true;  // selected by selfTest(), before workers start
 static bool directTransfers = true;   // correctness and speed checked before workers start
+#if CONFIG_IDF_TARGET_ESP32S3
+static bool overlappedTransfers = true;  // S3 only: checked and timed at boot like the others
+#endif
 
 void hold() {
     holds++;
@@ -135,10 +138,59 @@ static __attribute__((noinline)) uint32_t scanWithPadding(
     return count;
 }
 
+#if CONFIG_IDF_TARGET_ESP32S3
+// ESP32-S3: every register access crosses the slow peripheral bus, which
+// costs more than the block computation itself. The engine latches TEXT when
+// a block starts (measured on the chip by NerdMiner Modded, MIT, its
+// PIPELINED_S3_MINING loop: ~740 instead of ~1080 cycles per nonce), so the
+// next nonce's header block is written while the second hash computes, and
+// only its words that the second block changed: 0..8 and 15 (9..14 stay 0).
+// After a hit the whole block is written again, whatever the callback did.
+// selfTest() checks every digest and the exact set of hits, then times it
+// against the other kernels; any failure falls back to them.
+static __attribute__((noinline)) uint32_t scanOverlapped(
+    Job &job, uint32_t first, uint32_t count, uint32_t limit,
+    void (*hit)(uint32_t, const uint8_t *, void *), void *ctx) {
+    volatile uint32_t *text = (volatile uint32_t *)SHA_TEXT_BASE;
+    volatile uint32_t *digest = (volatile uint32_t *)SHA_H_BASE;
+    volatile uint32_t *h7 = (volatile uint32_t *)(SHA_H_BASE + 28);
+    if (held || !count) return 0;
+    esp_sha_acquire_hardware();
+    uint32_t nonce = first;
+    job.tail[3] = nonce;
+    writeWords<16>(text, job.tail);
+    for (uint32_t i = 0; i < count; i++, nonce++) {
+        writeWords<8>(digest, job.mid);
+        sha_ll_continue_block(SHA2_256);
+        waitIdle();
+        digestToText(text, digest);
+        REG_WRITE(text + 8, 0x00000080);   // padding byte 0x80
+        REG_WRITE(text + 15, 0x00010000);  // 256 bits, big-endian length
+        sha_ll_start_block(SHA2_256);
+        // While it computes: the next nonce's header block, changed words only.
+        job.tail[3] = nonce + 1;
+        writeWords<9>(text, job.tail);
+        REG_WRITE(text + 15, job.tail[15]);
+        waitIdle();
+        if (*h7 <= limit) {
+            uint8_t hash[32];
+            sha_ll_read_digest(SHA2_256, hash, 8);
+            hit(nonce, hash, ctx);
+            writeWords<16>(text, job.tail);
+        }
+    }
+    esp_sha_release_hardware();
+    return count;
+}
+#endif
+
 uint32_t scan(Job &job, uint32_t first, uint32_t count, uint32_t limit,
               void (*hit)(uint32_t, const uint8_t *, void *), void *ctx, Fill *) {
     // Specialize outside the nonce loop: no per-nonce mode checks. The old
     // sparse and complete-block paths remain available for boot fallback.
+#if CONFIG_IDF_TARGET_ESP32S3
+    if (overlappedTransfers) return scanOverlapped(job, first, count, limit, hit, ctx);
+#endif
     if (directTransfers && sparseTextWrites)
         return scanWithPadding<true, true>(job, first, count, limit, hit, ctx);
     return sparseTextWrites ? scanWithPadding<true>(job, first, count, limit, hit, ctx)
@@ -169,6 +221,74 @@ static bool preferDirectTransfers(Job &job) {
     logf("[miner] resumable SHA transfers: %s (buffered %.1f, direct %.1f kH/s, boot scan)\n",
          faster ? "direct" : "buffered", count * 1000.0 / best[0], count * 1000.0 / best[1]);
     return faster;
+}
+
+#if CONFIG_IDF_TARGET_ESP32S3
+// The overlapped kernel against the best other one, timed like
+// preferDirectTransfers(): kept only when at least 1% faster.
+static bool preferOverlapped(Job &job) {
+    constexpr uint32_t count = 4096;
+    int64_t best[2] = {INT64_MAX, INT64_MAX};
+    auto discard = [](uint32_t, const uint8_t *, void *) {};
+    for (int run = 0; run < 3; ++run) {
+        for (int turn = 0; turn < 2; ++turn) {
+            int overlapped = (run + turn) & 1;
+            int64_t start = esp_timer_get_time();
+            uint32_t done = overlapped ? scanOverlapped(job, 0, count, 0, discard, nullptr)
+                : directTransfers && sparseTextWrites ? scanWithPadding<true, true>(job, 0, count, 0, discard, nullptr)
+                : sparseTextWrites ? scanWithPadding<true>(job, 0, count, 0, discard, nullptr)
+                                   : scanWithPadding<false>(job, 0, count, 0, discard, nullptr);
+            int64_t elapsed = esp_timer_get_time() - start;
+            if (done != count || elapsed <= 0) return false;
+            if (elapsed < best[overlapped]) best[overlapped] = elapsed;
+        }
+    }
+    bool faster = best[1] * 100 < best[0] * 99;
+    logf("[miner] overlapped SHA transfers: %s (%.1f against %.1f kH/s, boot scan)\n",
+         faster ? "kept" : "not faster", count * 1000.0 / best[1], count * 1000.0 / best[0]);
+    return faster;
+}
+#endif
+
+// With every nonce a hit, the kernels write whole blocks after each one. Here
+// about one nonce in eight is a hit: the hashes between them come from the
+// fast path, and the exact set of hits must match the software digests.
+static bool verifyHitSet() {
+    struct Check {
+        alignas(4) uint8_t header[80];
+        uint32_t hits;
+        bool correct;
+    } check{};
+    constexpr uint32_t count = 256, limit = UINT32_MAX / 8;
+    static constexpr uint32_t starts[] = {0, 0xff80, UINT32_MAX - 127};  // carries and wrap
+    uint32_t seed = 0x3c5a7e91;
+    for (uint32_t first : starts) {
+        for (auto &byte : check.header) byte = (seed = seed * 1664525u + 1013904223u) >> 24;
+        check.hits = 0;
+        check.correct = true;
+        Job job;
+        prepare(job, check.header);
+        uint32_t done = scan(job, first, count, limit,
+            [](uint32_t nonce, const uint8_t *digest, void *ctx) {
+                Check &check = *(Check *)ctx;
+                uint8_t ref[32];
+                memcpy(check.header + 76, &nonce, 4);
+                sha::sha256d(check.header, 80, ref);
+                if (memcmp(ref, digest, 32)) check.correct = false;
+                ++check.hits;
+            }, &check);
+        uint32_t expected = 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            uint32_t nonce = first + i, top;
+            uint8_t ref[32];
+            memcpy(check.header + 76, &nonce, 4);
+            sha::sha256d(check.header, 80, ref);
+            memcpy(&top, ref + 28, 4);
+            if (top <= limit) ++expected;
+        }
+        if (done != count || !check.correct || check.hits != expected) return false;
+    }
+    return true;
 }
 
 // A single rare genesis candidate cannot detect every missed/misordered
@@ -749,7 +869,14 @@ bool selfTest() {
     sha::sha256d(header, 80, ref);
     bool correct = t.hits == 1 && t.nonce == kNonce && memcmp(ref, t.hash, 32) == 0;
 #if SOC_SHA_SUPPORT_RESUME
-    if (correct) correct = verifyResumeTransfers();
+    if (correct) correct = verifyResumeTransfers() && verifyHitSet();
+#if CONFIG_IDF_TARGET_ESP32S3
+    if (!correct && overlappedTransfers) {
+        overlappedTransfers = false;
+        logf("[miner] overlapped SHA transfers failed their self-test; using the other kernels\n");
+        return selfTest();
+    }
+#endif
     if (!correct && directTransfers) {
         directTransfers = false;
         logf("[miner] direct SHA transfers failed their self-test; retrying buffered transfers\n");
@@ -762,6 +889,18 @@ bool selfTest() {
         logf("[miner] SHA padding reuse failed its self-test; retrying full block writes\n");
         return selfTest();
     }
+#if CONFIG_IDF_TARGET_ESP32S3
+    // Time the others first (their choice is the fallback), then this one.
+    if (correct && overlappedTransfers) {
+        overlappedTransfers = false;
+        bool others = selfTest();
+        overlappedTransfers = true;
+        if (!others) return true;  // this one passed every check on its own
+        if (preferOverlapped(job)) return true;
+        overlappedTransfers = false;
+        return true;  // the other kernels were just validated
+    }
+#endif
     if (correct && directTransfers && !preferDirectTransfers(job)) {
         directTransfers = false;
         return selfTest();  // validate the selected buffered path as well

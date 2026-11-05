@@ -3,7 +3,9 @@
 * Native Gamma 601 board configuration, BM1370 register/packet sequences and
   TPS546/EMC2101 references derive from [ESP-Miner / AxeOS](https://github.com/bitaxeorg/ESP-Miner)
   (GPL-3.0), revision `bb4fd0c7e589858bbeef00ec89342216c1510671`, and
-  [bitaxeGamma hardware](https://github.com/bitaxeorg/bitaxeGamma).
+  [bitaxeGamma hardware](https://github.com/bitaxeorg/bitaxeGamma). The Gamma's core
+  voltage options and the 690 MHz highest profile (since 2.4.2) follow ESP-Miner
+  revision `a591f0d` (2026-11-02).
 * NerdNOS support: BM1397 packets, PLL calculation and start-up sequence, and the
   board's pins, derive from ESP-Miner (above) and the NerdNOS firmware in
   [WantClue/NerdMiner_v2](https://github.com/WantClue/NerdMiner_v2/tree/nerdnos)
@@ -15,7 +17,10 @@
 * The original-ESP32 hardware SHA loop (`src/hw_sha_classic.S`) and the assembly
   software kernel (`src/sw_sha_prefilter.S`) come from
   [NerdMiner Modded](https://github.com/HenrysCat/NerdMiner-Modded) by HenrysCat,
-  MIT License, Copyright (c) 2023 Bitmaker, (c) 2026 HenrysCat.
+  MIT License, Copyright (c) 2023 Bitmaker, (c) 2026 HenrysCat. The ESP32-S3 overlapped
+  transfers in `src/hw_sha.cpp` (since 2.4.2) follow its `PIPELINED_S3_MINING` loop
+  (revision `522764d`, V1.6.2): the next header block is written while the engine
+  computes, and only its changed words.
 * Libraries: [M5Unified / M5GFX](https://github.com/m5stack/M5Unified) (LovyanGFX),
   [WiFiManager](https://github.com/tzapu/WiFiManager),
   [ArduinoJson](https://arduinojson.org/).
