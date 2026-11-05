@@ -336,6 +336,7 @@ static bool verifyResumeTransfers() {
 #include "core/fill.h"
 #include "driver/periph_ctrl.h"
 #include "esp_chip_info.h"
+#include "esp_idf_version.h"
 #include "sha/sha_parallel_engine.h"
 #include "soc/hwcrypto_reg.h"
 
@@ -658,9 +659,15 @@ bool pickLoop() {
     // die within seconds, which no self-test can see.
     esp_chip_info_t chip;
     esp_chip_info(&chip);
-    if (chip.full_revision / 100 < 3) {
+    // Major * 100 + minor: `full_revision` in ESP-IDF 4, `revision` since 5.
+#if ESP_IDF_VERSION_MAJOR >= 5
+    unsigned revision = chip.revision;
+#else
+    unsigned revision = chip.full_revision;
+#endif
+    if (revision / 100 < 3) {
         logf("[miner] ESP32 revision %u.%u: the hardware SHA loop needs revision 3\n",
-             chip.full_revision / 100, chip.full_revision % 100);
+             revision / 100, revision % 100);
         return false;
     }
 
