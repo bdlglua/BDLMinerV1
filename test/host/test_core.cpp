@@ -772,6 +772,73 @@ static void testMoreCoinAddresses() {
 }
 
 
+// Peercoin Core 44f5adac80c891a3f215562d69e1b1579873600e:
+// src/test/data/key_io_valid.json and src/kernel/chainparams.cpp.
+static void testPeercoin() {
+    using address::Type; using address::Network;
+    struct Case { const char *text; Type type; Network network; };
+    const Case cases[] = {
+        {"PGWPnLCWjUMNfGSSu9zpLLnrbBfoXrkhmB", Type::P2PKH, Network::Main},
+        {"p77CZFn9jvg9waCzKBzkQfSvBBzPH1nRre", Type::P2SH, Network::Main},
+        {"mzK2FFDEhxqHcmrJw1ysqFkVyhUULo45hZ", Type::P2PKH, Network::Test},
+        {"2NC2hEhe28ULKAJkW5MjZ3jtTMJdvXmByvK", Type::P2SH, Network::Test},
+        {"pc1qvzvkjn4q3nszqxrv3nraga2r822xjty36ylgu7", Type::P2WPKH, Network::Main},
+        {"pc1qwqdg6squsna38e46795at95yu9atm8azzmyvckulcc7kytlcckxsu3esav", Type::P2WSH, Network::Main},
+        // BIP173/BIP350 reference encoding, with Peercoin's network HRPs.
+        {"tpc1qvzvkjn4q3nszqxrv3nraga2r822xjty3qzdpq4", Type::P2WPKH, Network::Test},
+        {"pcrt1qvzvkjn4q3nszqxrv3nraga2r822xjty3h5fumu", Type::P2WPKH, Network::Regtest},
+        {"tb1qvzvkjn4q3nszqxrv3nraga2r822xjty3wsh98a", Type::P2WPKH, Network::Test},
+        {"pc1pqqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6f7fhu", Type::P2TR, Network::Main},
+    };
+    for (const auto &v : cases) {
+        auto parsed = address::parse(std::string(v.text) + ".worker", coin::PPC);
+        CHECK(parsed.type == v.type && parsed.network == v.network);
+        std::string broken = v.text; broken.back() = broken.back() == 'q' ? 'p' : 'q';
+        CHECK(!address::parse(broken, coin::PPC).valid());
+        if (v.network == Network::Main) CHECK(!address::parse(v.text, coin::BTC).valid());
+        if (!std::strncmp(v.text, "pc1", 3)) {
+            std::string upper = v.text;
+            for (char &c : upper) c = std::toupper(static_cast<unsigned char>(c));
+            CHECK(address::parse(upper, coin::PPC).type == v.type);
+            CHECK(!coin::addressCompatible(coin::BTC, v.text));
+        }
+    }
+    CHECK(!address::parse("1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu", coin::PPC).valid());
+    CHECK(!address::parse("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", coin::PPC).valid());
+    CHECK(coin::poolCompatible(coin::PPC, "stratum+tcp://peermining.org:3333"));
+    CHECK(!coin::poolCompatible(coin::BTC, "peermining.org"));
+    CHECK(coin::poolError(coin::PPC, "peermining.org", 1));
+    CHECK(coin::halvingInterval(coin::PPC) == 0 && !coin::bitcoinData(coin::PPC));
+
+    // Independent official genesis vector: legacy timestamped coinbase and
+    // standard 80-byte SHA-256d header (nFlags is not part of its hash).
+    work::Job job; job.version = 1; job.ntime = 1345084287;
+    job.nbits = 0x1d00ffff; job.extranonce2Size = 0;
+    CHECK(work::fromHex("01000000a2592c50010000000000000000000000000000000000000000000000000000000000000000ffffffff5404ffff001d020f274b4d61746f6e69732030372d4155472d3230313220506172616c6c656c2043757272656e6369657320416e642054686520526f61646d617020546f204d6f6e65746172792046726565646f6dffffffff0100000000000000000000000000", job.coinb1));
+    work::Work built; work::build(job, 0, built);
+    uint8_t merkle[32], hash[32];
+    std::memcpy(merkle, built.header + 36, 32);
+    CHECK(reversedHex(merkle) == "3c2d8f85fab4d17aac558cc648a1a58acff0de6deb890c29985690052c5993c2");
+    uint32_t nonce = 2179302059u;
+    for (unsigned i = 0; i < 4; ++i) built.header[76 + i] = nonce >> (8 * i);
+    sha::sha256d(built.header, 80, hash);
+    CHECK(reversedHex(hash) == "0000000032fe677166d54963b62a4677d8957e87c508eaa4fd7eb1c880cd27e3");
+    CHECK(work::meetsTarget(hash, built.networkTarget));
+
+    // BIP34 height in timestamped v1/v2 versus timestamp-free v3 coinbases.
+    for (unsigned version : {1u, 2u, 3u}) {
+        job.coinb1.assign(version < 3 ? 51 : 47, 0);
+        job.coinb1[0] = version;
+        size_t offset = version < 3 ? 46 : 42;
+        job.coinb1[offset] = 3;
+        job.coinb1[offset + 1] = 0xc8; job.coinb1[offset + 2] = 0xb8; job.coinb1[offset + 3] = 0x0d;
+        CHECK(job.blockHeight(coin::PPC) == 899272);
+        job.coinb1.resize(offset + 3);
+        CHECK(job.blockHeight(coin::PPC) == 0);
+    }
+    puts("Peercoin: official addresses, genesis header/coinbase, timestamped height and pool guards passed");
+}
+
 int main() {
     testSha();
     testHashDifficulty();
@@ -784,6 +851,7 @@ int main() {
     testAddress();
     testCashAddr();
     testMoreCoinAddresses();
+    testPeercoin();
     printf(failures ? "\n%d FAILURE(S)\n" : "\nALL TESTS PASSED\n", failures);
     return failures ? 1 : 0;
 }

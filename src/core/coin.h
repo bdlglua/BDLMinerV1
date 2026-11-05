@@ -9,14 +9,14 @@
 
 namespace coin {
 // Append IDs: existing records keep BTC=0 and BCH=1.
-enum Id : uint8_t { BTC = 0, BCH = 1, BSV = 2, XEC = 3, DGB = 4, Count };
+enum Id : uint8_t { BTC = 0, BCH = 1, BSV = 2, XEC = 3, DGB = 4, PPC = 5, Count };
 inline bool valid(unsigned id) { return id < Count; }
 inline const char *ticker(unsigned id) {
-    static const char *const values[] = {"BTC", "BCH", "BSV", "XEC", "DGB"};
+    static const char *const values[] = {"BTC", "BCH", "BSV", "XEC", "DGB", "PPC"};
     return valid(id) ? values[id] : "unknown";
 }
 inline const char *name(unsigned id) {
-    static const char *const values[] = {"Bitcoin", "Bitcoin Cash", "Bitcoin SV", "eCash", "DigiByte"};
+    static const char *const values[] = {"Bitcoin", "Bitcoin Cash", "Bitcoin SV", "eCash", "DigiByte", "Peercoin"};
     return valid(id) ? values[id] : "Unknown";
 }
 inline unsigned fromTicker(const char *value) {
@@ -24,7 +24,7 @@ inline unsigned fromTicker(const char *value) {
     return Count;
 }
 inline bool bitcoinData(unsigned id) { return id == BTC; }
-inline unsigned halvingInterval(unsigned id) { return valid(id) && id != DGB ? 210000 : 0; }
+inline unsigned halvingInterval(unsigned id) { return valid(id) && id != DGB && id != PPC ? 210000 : 0; }
 inline const char *cashPrefix(unsigned id, unsigned network = 0) {
     static const char *const bch[] = {"bitcoincash", "bchtest", "bchreg"};
     static const char *const xec[] = {"ecash", "ectest", "ecregtest"};
@@ -43,8 +43,11 @@ inline bool addressCompatible(unsigned id, std::string user) {
         std::string prefix = std::string(cashPrefix(cash, net)) + ":";
         if (!user.compare(0, prefix.size(), prefix)) return id == cash;
     }
-    for (const char *prefix : {"bc1", "tb1", "bcrt1"}) if (!user.compare(0, std::strlen(prefix), prefix)) return id == BTC;
+    // Peercoin signet shares Bitcoin's tb HRP, like its legacy test encodings.
+    if (!user.compare(0, 3, "tb1")) return id == BTC || id == PPC;
+    for (const char *prefix : {"bc1", "bcrt1"}) if (!user.compare(0, std::strlen(prefix), prefix)) return id == BTC;
     for (const char *prefix : {"dgb1", "dgbt1", "dgbrt1"}) if (!user.compare(0, std::strlen(prefix), prefix)) return id == DGB;
+    for (const char *prefix : {"pc1", "tpc1", "pcrt1"}) if (!user.compare(0, std::strlen(prefix), prefix)) return id == PPC;
     return valid(id); // Legacy encodings can overlap; pools may use account names.
 }
 
@@ -63,7 +66,8 @@ inline bool poolCompatible(unsigned id, const char *endpoint) {
     static const Endpoint endpoints[] = {
         {"b4c.f2pool.com", BCH}, {"bch.hmpool.io", BCH}, {"xec.hmpool.io", XEC},
         {"bch.solopool.org", BCH}, {"xec.solopool.org", XEC}, {"bsv.solopool.org", BSV},
-        {"dgb.solopool.org", DGB}, {"bsv.molepool.com", BSV}, {"xec.molepool.com", XEC}};
+        {"dgb.solopool.org", DGB}, {"bsv.molepool.com", BSV}, {"xec.molepool.com", XEC},
+        {"peermining.org", PPC}};
     for (const auto &endpoint : endpoints) if (host == endpoint.host) return id == endpoint.id;
     if (id == BTC) return true;
     const char *group = publicPoolGroup(host.c_str());

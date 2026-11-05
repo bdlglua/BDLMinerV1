@@ -56,7 +56,7 @@ async function fixture(options={}){
     Object.assign(state.settings.values,{remote:false,remotekey:'',rname:''});state.settings.live=[...(state.settings.live||[]),'remote'];
   }
   if(options.coins){
-    state.settings.schema.unshift(['coin','number','Pool','Cryptocurrency',{min:0,max:4}]);
+    state.settings.schema.unshift(['coin','number','Pool','Cryptocurrency',{min:0,max:5}]);
     state.settings.values.coin=0;
   }
   if(options.v2){
@@ -1113,10 +1113,10 @@ check('coin selection and compatibility guidance are translated into French',()=
  assert.match(await f.page.locator('[data-key=coin]').innerText(),/La pool détermine/);
 }));
 
-for(const [id,ticker,name,address]of [[2,'BSV','Bitcoin SV','1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu'],[3,'XEC','eCash','ecash:qpm2qsznhks23z7629mms6s4cwef74vcwva87rkuu2'],[4,'DGB','DigiByte','DSC6tGC2NvN6AHio2p8pU4seTbPKDi7KZb']]){
+for(const [id,ticker,name,address]of [[2,'BSV','Bitcoin SV','1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu'],[3,'XEC','eCash','ecash:qpm2qsznhks23z7629mms6s4cwef74vcwva87rkuu2'],[4,'DGB','DigiByte','DSC6tGC2NvN6AHio2p8pU4seTbPKDi7KZb'],[5,'PPC','Peercoin','PGWPnLCWjUMNfGSSu9zpLLnrbBfoXrkhmB']]){
  check('new SHA-256d coin '+ticker+' can be saved with V1 and its payout identity',()=>run({coins:true},async f=>{
   await loaded(f);await f.page.selectOption('#k_proto','1');await f.page.selectOption('#k_coin',String(id));
-  assert.equal(await f.page.locator('#k_coin option').count(),5);
+  assert.equal(await f.page.locator('#k_coin option').count(),6);
   assert.equal(await f.page.locator('#k_proto').inputValue(),'0');assert.equal(await f.page.locator('#k_proto option[value="1"]').isDisabled(),true);
   await f.page.fill('#k_pool',ticker.toLowerCase()+'.pool.example');await f.page.fill('#k_addr',address);
   await f.page.click('#save');await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('restarting'));

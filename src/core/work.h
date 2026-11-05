@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "sha256.h"
+#include "coin.h"
 
 namespace work {
 
@@ -31,7 +32,7 @@ struct Job {
     bool exactShareTarget = false; // SV2 supplies a full U256 target
     uint8_t shareTarget[32] = {};
 
-    uint32_t blockHeight() const;  // BIP34 height parsed from coinb1, 0 if unknown
+    uint32_t blockHeight(unsigned selectedCoin = coin::BTC) const; // BIP34 height, 0 if unknown
 };
 
 // Ready-to-hash work unit derived from a Job and one extranonce2 value.

@@ -54,7 +54,7 @@ document.querySelectorAll('[data-icon]').forEach(node=>node.replaceWith(settings
 const SECTIONS={pool:'Main pool',ua:'Identity',pool2:'Backup pool',bright:'Screen',nightfrom:'Night mode',tz:'Clock and price',ntfy:'ntfy',hook:'Webhook',alertpct:'Alerts',maxtemp:'Heat and power',fanauto:'Cooling',rebooth:'Recovery',wifi2:'Fallback WiFi',mqtt:'Home Assistant (MQTT)',peers:'Web pages',update:'Updates',count:'Anonymous statistics'};
 SECTIONS.remote='Private remote monitoring';
 const FIELDS={
- coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH, BSV, XEC and DGB use Stratum V1. DGB requires a SHA-256d port. Bitcoin market data is unavailable for other coins.'],
+ coin:['Cryptocurrency','SHA-256d only. Choose main and backup pools for the same coin and use its payout address or pool account. The pool determines which chain is mined. BCH, BSV, XEC, DGB and PPC use Stratum V1. Peercoin uses proof of work only. DGB requires a SHA-256d port. Bitcoin market data is unavailable for other coins.'],
  pool:['Pool host','A pasted stratum+tcp:// or stratum2+tcp:// address is split for you.'],port:['Pool port'],
  addr:['Payout address or pool account','Use the selected coin\'s address or the account name required by your pool. A worker name can follow: address.worker'],pass:['Pool password','Usually x.'],
  diff:['Suggested difficulty','Share difficulty asked of the pool; it may choose another.'],proto:['Protocol'],
@@ -89,7 +89,7 @@ const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Str
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
 const THEMES=['#f7931a','#38d07a','#3b9cf6','#a66bf5','#ec5aa0'];
 Object.assign(FIELDS,{remote:['Enable private remote monitoring','Optional. Sends your private readings every five minutes, independently of anonymous statistics. No computer needs to stay on.'],remotekey:['Personal access key','Create a key on the remote dashboard, keep a copy, then paste the same key on your miners. Never share it publicly.'],rname:['Miner name','A name shown only in your private dashboard. Empty uses the board model. Up to 48 bytes.']});
-CHOICES.coin=[[0,'Bitcoin (BTC)'],[1,'Bitcoin Cash (BCH)'],[2,'Bitcoin SV (BSV)'],[3,'eCash (XEC)'],[4,'DigiByte · SHA-256d (DGB)']];
+CHOICES.coin=[[0,'Bitcoin (BTC)'],[1,'Bitcoin Cash (BCH)'],[2,'Bitcoin SV (BSV)'],[3,'eCash (XEC)'],[4,'DigiByte · SHA-256d (DGB)'],[5,'Peercoin (PPC) · PoW']];
 Object.assign(FIELDS,{channel:['Update channel','Beta versions receive the same signature checks and rollback protection.'],
  customscreen:['Custom mining screen','Choose the four metrics and their order on the mining screen.'],
  screen0:['First screen metric'],screen1:['Second screen metric'],screen2:['Third screen metric'],screen3:['Fourth screen metric'],pages:['Enabled screens','The mining screen remains available.']});
