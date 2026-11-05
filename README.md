@@ -10,8 +10,10 @@ with a local dashboard and a Linux/Raspberry Pi fleet hub.
 **[Stable v2.4.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.4.0)**
 
 Mine **BTC, BCH, BSV, eCash (XEC), DigiByte SHA-256d (DGB) or Peercoin (PPC, PoW)** with a matching
-pool and payout address/account. BTC supports Stratum V1 and native V2; the other
-profiles require V1. [Coin and pool setup](docs/mining-coins.md).
+pool and payout address or account. BTC supports Stratum V1 and native Stratum V2.
+All other profiles use Stratum V1. Match the primary and backup pools to the
+selected chain. DGB requires a SHA-256d endpoint, and PPC supports proof-of-work
+mining only. [Coin and pool setup](docs/mining-coins.md).
 
 ![BDLMiner V2 local dashboard with mining statistics and hashrate, temperature and power charts](docs/images/dashboard-v2.png)
 
@@ -34,7 +36,11 @@ profiles require V1. [Coin and pool setup](docs/mining-coins.md).
 - Eight physical screens, English/French, themes, rotation and night mode.
 - Signed stable/beta updates with trial boot and automatic rollback.
 - Notifications, Home Assistant/MQTT, JSON API and Prometheus metrics.
-- Optional private remote monitoring, with seven-day history and no local hub.
+- Optional, read-only [private remote monitoring](docs/remote-access.md), off by
+  default and independent of public statistics. Paired miners report about every
+  five minutes over verified HTTPS, with seven days of history and no local hub.
+- Outbound HTTPS verifies the server certificate chain and hostname. Signed
+  GitHub updates have a limited transport exception. See [Security](SECURITY.md).
 
 ## Install and update
 
@@ -75,7 +81,8 @@ Solo mining is educational: a payout requires finding a valid block.
 - [User guide](docs/guide.md) · [V2 hub and setup](docs/v2/README.md)
 - [My miners remotely](https://bdlglua.github.io/remote/) · [Private setup](docs/remote-access.md) / [Français](docs/remote-access.fr.md)
 - [Troubleshooting FAQ](https://bdlglua.github.io/faq.html) · [Shares explained](docs/guide.md#pool-shares-and-local-records)
-- [2.3.0 changes](docs/releases/v2.3.0.md) / [Français](docs/releases/v2.3.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
+- [Coin and pool setup](docs/mining-coins.md)
+- [Stable v2.4.0 release notes](docs/releases/v2.4.0.md) / [Français](docs/releases/v2.4.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
 - [Build from source](docs/development.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ### Pools for ESP32

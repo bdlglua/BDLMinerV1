@@ -15,6 +15,18 @@ confirmed that dashboard gaps and settings icons are fixed on both boards.
 | Rollback/network recovery | M5 USB reset, rollback, normal beta.4 confirmation, short check and same-boot blacklist recovery passed (1.0052 MH/s over 10 s after recovery). First pool-mode failure retained. |
 | S2/S3/C3 and NerdNOS | [External benchmark research](../audits/2026-11-02-board-hashrate-research.md) complete; no test boards available to the owner, so physical BDLMiner measurements remain pending. |
 
+## Later feature validation
+
+- **BSV, XEC, DGB and PPC pool profiles.** The release evidence covers address
+  vectors, persistence and protocol-specific checks. Physical measurements
+  on these pools remain pending. See the [v2.2.0](../releases/v2.2.0.md) and
+  [v2.4.0](../releases/v2.4.0.md) release notes.
+- **Private remote monitoring.** [PR #8](https://github.com/bdlglua/BDLMinerV2/pull/8)
+  reports firmware, browser and collector tests. Report delivery after pairing
+  on an M5StickC Plus2 and Gamma 601 remains to be measured on hardware.
+- **Verified HTTPS and protected log.** [PR #11](https://github.com/bdlglua/BDLMinerV2/pull/11)
+  reports host tests and board builds. Its hardware test was left open.
+
 ## Gamma hour result
 
 The owner's initial beta.3 report recorded at 10:55:03 UTC contains 713 successful readings and

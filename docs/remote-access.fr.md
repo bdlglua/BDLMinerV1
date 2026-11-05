@@ -8,8 +8,9 @@ ultérieur** et avoir accès à Internet.
 
 ## Configuration
 
-1. Mets chaque mineur à jour depuis ses réglages locaux ou avec le firmware
-   adapté de la [dernière version stable](https://github.com/bdlglua/BDLMinerV2/releases/latest).
+1. Utilise la [dernière version stable](https://github.com/bdlglua/BDLMinerV2/releases/latest).
+   Installe la mise à jour signée depuis le tableau de bord local ou téléverse
+   le firmware correspondant à ta carte.
 2. Sur **Mes mineurs**, clique sur **Créer ma clé**, puis **Copier la clé**.
    Conserve-la dans ton gestionnaire de mots de passe : elle donne accès aux
    mesures privées et ne peut pas être récupérée en cas de perte.
