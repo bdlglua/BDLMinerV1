@@ -9,8 +9,19 @@
 namespace bm1370 {
 constexpr uint32_t kVersionMask = 0x1fffe000;
 constexpr size_t kSlots = 16;
-constexpr uint16_t kStockMHz = 525, kMaxMHz = 800;
-inline bool validProfile(unsigned mhz) { return mhz >= kStockMHz && mhz <= kMaxMHz && (mhz-kStockMHz)%25 == 0; }
+// Profiles as in ESP-Miner, whose highest BM1370 preset is 690 MHz: 525 to
+// 675 MHz in 25 MHz steps, and 690. A higher frequency usually needs a
+// higher core voltage, chosen among ESP-Miner's BM1370 values (stock 1150 mV).
+constexpr uint16_t kStockMHz = 525, kMaxMHz = 690, kPllMaxMHz = 800;
+inline bool validProfile(unsigned mhz) {
+    return mhz == kMaxMHz || (mhz >= kStockMHz && mhz < kMaxMHz && (mhz - kStockMHz) % 25 == 0);
+}
+constexpr uint16_t kStockMv = 1150, kMinMv = 1000, kMaxMv = 1250;
+constexpr uint16_t kVoltageOptions[] = {1000, 1060, 1100, 1150, 1200, 1250};
+inline bool validVoltage(unsigned mv) {
+    for (uint16_t option : kVoltageOptions) if (mv == option) return true;
+    return false;
+}
 // Compare cumulative ASIC error/total counters in ten-second windows.
 struct ErrorMonitor {
     uint32_t errors = 0, total = 0, at = 0;
@@ -63,6 +74,9 @@ constexpr uint16_t kStatusFaults = 0x0020 | 0x0010 | 0x0004;  // VOUT_OV, IOUT_O
 struct Health {
     float temperature, regulatorTemperature, inputVoltage, coreVoltage, current;
     uint16_t rpm, status;
+    // The core voltage asked of the regulator; 0 (left out): the stock 1150 mV.
+    // No default member initializer: the firmware's C++11 keeps Health an aggregate.
+    float coreTarget;
     // A fault stops the ASIC until restart (null: none).
     const char *fault(bool powered, bool requireDiode = true) const;
     // Before power-on: why the ASIC cannot start yet (null: ready). Waiting,

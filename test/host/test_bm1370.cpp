@@ -92,8 +92,18 @@ int main() {
     // Whole numbers as ESP-Miner encodes them.
     assert(encodeLinear11Int(0)==0&&encodeLinear11Int(3)==3&&encodeLinear11Int(105)==105&&encodeLinear11Int(650)==650);
     assert(encodeLinear11Int(2000)==(1<<11|1000)&&linear11(encodeLinear11Int(2000))==2000);
-    for(unsigned mhz=525;mhz<=800;mhz+=25)assert(validProfile(mhz));
-    assert(!validProfile(524)&&!validProfile(801)&&!validProfile(825)&&!validProfile(601)&&!validProfile(526));
+    // ESP-Miner's range: 525-675 MHz in 25 MHz steps, and its 690 MHz preset.
+    for(unsigned mhz=525;mhz<=675;mhz+=25)assert(validProfile(mhz));
+    assert(validProfile(690));
+    assert(!validProfile(524)&&!validProfile(700)&&!validProfile(800)&&!validProfile(691)&&!validProfile(601)&&!validProfile(526));
+    for(unsigned mv:{1000,1060,1100,1150,1200,1250})assert(validVoltage(mv));
+    assert(!validVoltage(999)&&!validVoltage(1050)&&!validVoltage(1251)&&!validVoltage(1300)&&!validVoltage(0));
+    // The core voltage window follows the chosen voltage: 1.00-1.25 V at 1150 mV.
+    {Health v=healthy;v.coreVoltage=1.0f;assert(!v.fault(true));v.coreVoltage=1.24f;assert(!v.fault(true));
+     v.coreVoltage=1.26f;assert(v.fault(true));v.coreVoltage=0.98f;assert(v.fault(true));
+     v.coreTarget=1.25f;v.coreVoltage=1.25f;assert(!v.fault(true));v.coreVoltage=1.34f;assert(!v.fault(true));
+     v.coreVoltage=1.36f;assert(v.fault(true));v.coreVoltage=1.09f;assert(v.fault(true));
+     v.coreTarget=1.0f;v.coreVoltage=0.9f;assert(!v.fault(true));v.coreVoltage=0.84f;assert(v.fault(true));}
     ErrorMonitor guard;assert(!guard.update(100,1000,0));
     assert(!guard.update(110,1300,1000)); // short samples do not count as windows
     assert(!guard.update(200,4000,10000)&&guard.percent>3);

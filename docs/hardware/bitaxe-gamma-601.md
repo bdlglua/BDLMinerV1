@@ -97,10 +97,13 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 
 * Since v1.9.7, the firmware defaults to the **stock 525 MHz profile** at
   **1150 mV**, as ESP-Miner (v1.6.1 to v1.9.6 defaulted to an experimental 600 MHz).
-  Local Settings > Safety offers **525–800 MHz in 25 MHz steps**; changes apply
-  after restart and are included in backups. A profile saved earlier is kept. Invalid
-  stored profile values fall back to 525 MHz; API requests outside the available
-  profiles are rejected.
+  Local Settings > Safety offers **525–675 MHz in 25 MHz steps, and 690 MHz**, ESP-Miner's
+  highest BM1370 preset (up to 2.4.1: 525–800 MHz). Since 2.4.2 it also offers the
+  **core voltage** among ESP-Miner's BM1370 values: **1000, 1060, 1100, 1150 (stock),
+  1200 and 1250 mV**. As in ESP-Miner, a higher frequency usually needs a higher voltage;
+  more voltage means more heat and power. Changes apply after restart and are included
+  in backups. Invalid stored values (a profile above 690 MHz saved earlier included)
+  fall back to 525 MHz and 1150 mV; API requests outside the options are rejected.
 * Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
   Values 1–9 keep the ASIC off with an explanatory status. Fan speed defaults to
   **100%**; fan controls introduced in v1.9.13 are described below.
@@ -108,7 +111,10 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 * Three consecutive ten-second hardware-error windows at **>=2%**, a missing/stalled
   hash counter, or unavailable hardware-error telemetry trigger a reset/power-off and
   one restart at **525 MHz** when running above stock. The fallback stays active across
-  pool reconnects and ordinary pauses until the next reboot; it never raises voltage.
+  pool reconnects, pauses and (since 2.4.2) restarts and updates, as long as the profile
+  that failed stays selected at the same core voltage; choosing another frequency or
+  voltage clears it (to retry the same pair, select another value, save, then select it
+  again). The fallback never changes the voltage.
   At stock, an ASIC that stops answering or whose counter stalls is reset and started
   again automatically, up to **3 times an hour** (the reading at each one is kept as the
   last fault); a fourth failure within the hour stops mining until restart.
@@ -117,9 +123,9 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 * The dashboard shows requested/actual frequency, measured hardware-error percentage
   (unavailable until a complete window), fallback state and its reason. Rates still
   come from the physical hash counter, not from clock settings. **Overclock profiles,
-  including 600 and 800 MHz, have not been validated on a physical Gamma 601.**
-  The 800 MHz setting does not guarantee stability at the fixed 1150 mV; no voltage,
-  current, temperature or fan limits are raised to reach the requested frequency.
+  and core voltages other than 1150 mV, have not been validated on a physical Gamma
+  601.** A user's Gamma at 600 MHz and 1150 mV fell back to 525 MHz. No current,
+  temperature or fan limit is raised to reach the requested frequency.
 * BOOT short press cycles the three compact OLED pages; a long press follows the
   existing reset/setup behavior. OLED rotation maps 0/1 to normal and 2/3 to 180°.
 * No ASIC power during provisioning. Startup checks device identities and verifies
@@ -142,7 +148,8 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   hard interlocks stop at **70°C ASIC**, **90°C regulator**, lost sensors, fan
   <500 RPM, input below **4.6 V** while mining (a 5 V supply sags under load; the
   regulator itself stops at 4.5 V) or above **5.5 V**, core voltage outside
-  **1.0–1.25 V** while powered, output current >=30 A, or a regulator fault. As in
+  **1.0–1.25 V** while powered (since 2.4.2: from 0.15 V below to 0.10 V above the chosen
+  core voltage, the same window at 1150 mV), output current >=30 A, or a regulator fault. As in
   ESP-Miner, the regulator faults are `STATUS_WORD` OFF (while powered), VOUT_OV,
   IOUT_OC, VIN_UV and TEMP; its other bits also report warnings or stay latched
   (OTHER) and do not stop mining, the measured limits covering them. Hard limits

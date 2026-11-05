@@ -67,8 +67,8 @@ async function fixture(options={}){
     state.settings.capabilities={display_pages:8,...state.settings.capabilities};
   }
   if(options.gamma){
-    state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}],['fanauto','bool','Safety','Fan control',{}],['fanpct','number','Safety','Manual fan speed (%)',{min:30,max:100}]);
-    Object.assign(state.settings.values,{asicmhz:525,fanauto:false,fanpct:100});state.settings.live=[...(state.settings.live||[]),'fanauto','fanpct'];
+    state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:690}],['asicmv','number','Safety','Gamma ASIC core voltage (mV)',{min:1000,max:1250}],['fanauto','bool','Safety','Fan control',{}],['fanpct','number','Safety','Manual fan speed (%)',{min:30,max:100}]);
+    Object.assign(state.settings.values,{asicmhz:525,asicmv:1150,fanauto:false,fanpct:100});state.settings.live=[...(state.settings.live||[]),'fanauto','fanpct'];
     state.settings.capabilities={...state.settings.capabilities,fan_control:true,asic:true,thermal_steps:false,...(options.v2?{display_pages:3}:{})};
   }
   const server=http.createServer(async(req,res)=>{
@@ -657,6 +657,23 @@ check('a failing pool statistics API is reported with the share estimate',()=>ru
   assert.match(await f.page.locator('#device-grid').textContent(),/Integrations⚠ check/);
 }));
 
+check('the browser reads a TLS 1.3-only public-pool API the miner cannot',()=>run({stats:{uptime_s:3600,hashrate:1.2e12,shares:{accepted:20,rejected:0,work:20},pool:{host:'public-pool.io',port:3333,connected:true,status:'Mining',difficulty:1024},address:'bc1qexampleaddressforbrowserpoolstatstest0000000000000000000000.gamma',pool_view:{updated_s:-1,supported:false}}},async f=>{
+  const asked=[];
+  await f.page.route('https://public-pool.io:40557/api/client/**',route=>{asked.push(route.request().url());
+   route.fulfill({status:200,headers:{'access-control-allow-origin':'*'},contentType:'application/json',body:JSON.stringify({bestDifficulty:'15388278.28',workersCount:1,workers:[{sessionId:'a',name:'gamma',hashRate:'1180000000000'}],accounting:{totalAcceptedShares:1331}})})});
+  await f.page.goto(f.url);
+  await f.page.waitForFunction(()=>/read by this browser/.test(document.getElementById('pool-grid')?.textContent||''),null,{timeout:8000});
+  const pool=await f.page.locator('#pool-grid').textContent();
+  assert.match(pool,/1\.18 TH\/s/);assert.match(pool,/15\.4 M/);assert.match(pool,/public-pool\.io:40557\/api\/client\//);
+  assert.deepEqual(asked,['https://public-pool.io:40557/api/client/bc1qexampleaddressforbrowserpoolstatstest0000000000000000000000']); // worker name not sent, asked once
+}));
+
+check('the browser does not ask the pool when the miner reads its API',()=>run({stats:{pool:{host:'public-pool.io',port:3333,connected:true,status:'Mining',difficulty:1},address:'bc1qexampleaddressforbrowserpoolstatstest0000000000000000000000',pool_view:{updated_s:60,supported:true,hashrate:1e6,best:2,workers:1,source:'public-pool.io:40557/api/client/'}}},async f=>{
+  let asked=0;await f.page.route('https://public-pool.io:40557/**',route=>{asked++;route.abort()});
+  await f.page.goto(f.url);await f.page.waitForSelector('#pool-grid .t');await f.page.waitForTimeout(300);
+  assert.equal(asked,0);assert.doesNotMatch(await f.page.locator('#pool-grid').textContent(),/read by this browser/);
+}));
+
 check('NerdNOS ASIC tile shows only the readings the board has',()=>run({stats:{board:'NerdNOS',hashrate:2.1e11,engines:[{name:'BM1397',rate:2.1e11}],temperature_source:'asic',asic:{model:'BM1397',experimental:true,running:true,state:'Mining (experimental)',frequency_mhz:300,results:1234,hardware_error_percent:0.4}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');
   const text=await f.page.locator('#device-grid').textContent();
@@ -1003,21 +1020,25 @@ check('NerdNOS settings do not expose a Gamma fan controller',()=>run({capabilit
   await loaded(f);assert.equal(await f.page.locator('#k_fanauto,#k_fanpct').count(),0);
 }));
 
-check('Gamma profile defaults to 525 MHz (stock) and saves the selected 800 MHz numeric frequency',()=>run({gamma:true},async f=>{
+check('Gamma profile and core voltage default to ESP-Miner stock and save the selected values',()=>run({gamma:true},async f=>{
  await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_asicmhz');
  assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'525');
- assert.deepEqual(await f.page.locator('#k_asicmhz option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[525,550,575,600,625,650,675,700,725,750,775,800]);
- assert.match(await f.page.locator('#performance').textContent(),/1150 mV.*525 MHz fallback/s);
- await f.page.selectOption('#k_asicmhz','800');await f.page.click('#save');
+ assert.deepEqual(await f.page.locator('#k_asicmhz option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[525,550,575,600,625,650,675,690]);
+ assert.equal(await f.page.locator('#k_asicmv').inputValue(),'1150');
+ assert.deepEqual(await f.page.locator('#k_asicmv option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[1000,1060,1100,1150,1200,1250]);
+ assert.match(await f.page.locator('#performance').textContent(),/up to 690 MHz.*higher core voltage.*525 MHz fallback.*Default: 1150 mV/s);
+ await f.page.selectOption('#k_asicmhz','600');await f.page.selectOption('#k_asicmv','1200');await f.page.click('#save');
  await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('Saved'));
- assert.equal(JSON.parse(f.state.posts.find(p=>p.url==='/api/settings').body).asicmhz,800);
+ const body=JSON.parse(f.state.posts.find(p=>p.url==='/api/settings').body);
+ assert.equal(body.asicmhz,600);assert.equal(body.asicmv,1200);
 }));
-check('Gamma saved 800 MHz profile stays selected and explained in French',()=>run({gamma:true,language:'fr'},async f=>{
- f.state.settings.values.asicmhz=800;
+check('Gamma saved 690 MHz and 1250 mV stay selected and are explained in French',()=>run({gamma:true,language:'fr'},async f=>{
+ Object.assign(f.state.settings.values,{asicmhz:690,asicmv:1250});
  await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_asicmhz');
- assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'800');
+ assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'690');assert.equal(await f.page.locator('#k_asicmv').inputValue(),'1250');
  assert.equal(await f.page.locator('label[for="k_asicmhz"]').textContent(),'Fréquence ASIC Gamma (MHz)');
- assert.match(await f.page.locator('#performance').textContent(),/jusqu’à 800 MHz.*Par défaut : 525 MHz.*1 150 mV.*525 MHz/s);
+ assert.equal(await f.page.locator('label[for="k_asicmv"]').textContent(),'Tension de cœur ASIC Gamma (mV)');
+ assert.match(await f.page.locator('#performance').textContent(),/jusqu’à 690 MHz.*Par défaut : 525 MHz.*tension de cœur plus haute.*Par défaut : 1 150 mV/s);
 }));
 check('Gamma overclock fallback remains visible with requested clock and measured errors',()=>run({stats:{asic:{model:'BM1370',running:true,state:'Mining (525 MHz fallback profile)',frequency_mhz:525,profile_mhz:600,stock_fallback:true,fallback_reason:'High ASIC hardware error rate',hardware_error_percent:3.5,fan_rpm:5000,core_v:1.15,current_a:15,input_v:5.1,regulator_temp_c:55}}},async f=>{
  await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');

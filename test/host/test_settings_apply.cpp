@@ -16,6 +16,7 @@ const SettingInfo kSettings[] = {
     {"pages", SettingType::Number, &settings.screenPages, 8, "", ""},
 #ifdef BOARD_GAMMA601
     {"asicmhz", SettingType::Number, &settings.asicFrequency, 16, "", ""},
+    {"asicmv", SettingType::Number, &settings.asicVoltage, 16, "", ""},
     {"fanauto", SettingType::Bool, &settings.fanAuto, 0, "", ""},
     {"fanpct", SettingType::Number, &settings.fanPercent, 8, "", ""},
 #endif
@@ -226,10 +227,17 @@ int main() {
     assert(settingsCompare(fanSettings,settings).live&&settingsCompare(fanSettings,settings).count==2);
     Settings active=settings;settingsCopyLive(active,fanSettings);
     assert(active.fanAuto&&active.fanPercent==40&&!settings.fanAuto&&settings.fanPercent==100);
-    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":801})",R"({"asicmhz":825})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":800.5})",R"({"asicmhz":"800"})"}) {
+    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":700})",R"({"asicmhz":800})",R"({"asicmhz":691})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":600.5})",R"({"asicmhz":"600"})",
+                         R"({"asicmv":999})",R"({"asicmv":1050})",R"({"asicmv":1251})",R"({"asicmv":1300})",R"({"asicmv":"1200"})",R"({"asicmv":1200.5})"}) {
         assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
     }
-    for(int mhz=525;mhz<=800;mhz+=25) {
+    for(int mv:{1000,1060,1100,1150,1200,1250}) {
+        changes.clear();changes["asicmv"]=mv;
+        assert(!settingsError(changes.as<JsonObjectConst>()));
+        Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);
+        assert(staged.asicVoltage==mv&&settings.asicVoltage==1150); // stock default
+    }
+    for(int mhz:{525,550,575,600,625,650,675,690}) {
         changes.clear();changes["asicmhz"]=mhz;
         assert(!settingsError(changes.as<JsonObjectConst>()));
         Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);

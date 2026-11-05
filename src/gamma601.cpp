@@ -133,14 +133,18 @@ bool voltage(uint8_t reg, float value, float tolerance = 0.004f) {
         return unset(kTps, reg, "reads back another value");
     return true;
 }
-constexpr float kVout = 1.15f;
+// The core voltage chosen in the settings (ESP-Miner's BM1370 values), read
+// while the regulator is configured with its output off.
+float coreVolts() {
+    return (bm1370::validVoltage(settings.asicVoltage) ? settings.asicVoltage : bm1370::kStockMv) / 1000.0f;
+}
 // The margin and OV/UV limits, as a fraction of VOUT_COMMAND. The TPS546
 // keeps them relative by default (VOUT_MODE bit 7, as on the Bitaxe), else
 // in volts. Its hardware rounds them to steps of 1 to 10% (the OV fault
 // limit: 10% while the output is off): compared within 6%.
 bool limit(uint8_t reg, float fraction) {
     bool relative = voltageMode & 0x80;
-    return relative ? voltage(reg, fraction, 0.06f) : voltage(reg, fraction * kVout, 0.06f * kVout);
+    return relative ? voltage(reg, fraction, 0.06f) : voltage(reg, fraction * coreVolts(), 0.06f * coreVolts());
 }
 // PIN_DETECT_OVERRIDE (EEh) only matters when the regulator restores itself at
 // power-on; written as ESP-Miner does (FFFFh). Some of its bits are reserved:
@@ -199,6 +203,33 @@ void off(const char *reason, bool fault = false) {
     if (latched) saveFault(live.state);
     invalidate(); publish();
 }
+// The 525 MHz fallback is kept across restarts while the requested profile is
+// the one that failed, at the same core voltage: each restart, update or
+// power cut otherwise went back to that profile and to its failure. Choosing
+// another frequency or voltage clears it.
+struct SavedFallback { uint16_t mhz, mv; char reason[60]; };
+char fallbackText[sizeof(SavedFallback::reason)] = "";
+void saveFallback(uint16_t mhz, const char *reason) {
+    SavedFallback saved{mhz, settings.asicVoltage, ""};
+    snprintf(saved.reason, sizeof(saved.reason), "%s", reason);
+    Preferences p;
+    if (p.begin("gamma", false)) { p.putBytes("fallback", &saved, sizeof(saved)); p.end(); }
+}
+void loadFallback(uint16_t mhz) {
+    SavedFallback saved{};
+    Preferences p;
+    if (!p.begin("gamma", false)) return;
+    bool found = p.getBytesLength("fallback") == sizeof(saved) && p.getBytes("fallback", &saved, sizeof(saved)) == sizeof(saved);
+    bool same = found && saved.mhz == mhz && saved.mv == settings.asicVoltage;
+    if (found && !same) p.remove("fallback");  // another frequency or voltage was chosen since
+    p.end();
+    if (!same || mhz <= bm1370::kStockMHz) return;
+    saved.reason[sizeof(saved.reason) - 1] = 0;
+    memcpy(fallbackText, saved.reason, sizeof(fallbackText));
+    forceStock = true; live.stockFallback = true; live.fallbackReason = fallbackText;
+    logf("[gamma] %u MHz at %u mV failed before (%s): mining at 525 MHz; choose another frequency or voltage "
+         "to clear it\n", (unsigned)mhz, (unsigned)saved.mv, fallbackText);
+}
 // A BM1370 that stops answering on its UART, or whose hash counter stops, is
 // reset and started again, as NerdNOS does: no safety limit is involved, the
 // regulator, sensor, fan and temperature interlocks are separate and still
@@ -217,6 +248,7 @@ void instability(const char *reason) {
     if (!forceStock && live.frequency > bm1370::kStockMHz) {
         logf("[gamma] %s at %.2f MHz; falling back to 525 MHz\n", reason, live.frequency);
         forceStock=true; live.stockFallback=true; live.fallbackReason=reason;
+        saveFallback(live.requestedMHz, reason);
         off("Restarting at 525 MHz (fallback)");
     } else if (autoRestart(millis())) {
         // Kept as the last fault, with every reading, for the log and the dashboard.
@@ -258,7 +290,7 @@ bool request(uint8_t address, bool broadcast = true) {
 }
 bm1370::Health readings() {
     return {live.temperature, live.regulatorTemperature, live.inputVoltage,
-            live.coreVoltage, live.current, live.rpm, live.regulatorStatus};
+            live.coreVoltage, live.current, live.rpm, live.regulatorStatus, coreVolts()};
 }
 bool updateFan(float diode) {
     uint32_t command = fanSetting.load();
@@ -388,7 +420,8 @@ bool initAsic(const AsicWork &first) {
     if (!reg(0x10, hcn) || !collect(true)) return false;
     counter.reset(); lastHashReply = lastHashProgress = lastErrorReply = millis();
     live.running = true; live.state = forceStock ? "Mining (525 MHz fallback profile)" : "Mining (experimental)";
-    logf("[gamma] BM1370 %.2f MHz, requested profile %u MHz%s\n", live.frequency, live.requestedMHz, forceStock ? " (stock fallback)" : "");
+    logf("[gamma] BM1370 %.2f MHz at %u mV, requested profile %u MHz%s\n", live.frequency,
+         (unsigned)std::lround(coreVolts() * 1000), live.requestedMHz, forceStock ? " (stock fallback)" : "");
     publish(); return true;
 }
 // The regulator and sensor setup, volatile and verified; false if anything
@@ -421,7 +454,7 @@ bool configure() {
     bool tps = verify8(kTps,0x02,0x1b) && verify16(0xec,0) && verify8(kTps,0xe4,0x10) &&
         verify8(kTps,0x04,0) && linearInt(0x33,650) && linear(0x35,4.8) && linear(0x36,4.5) &&
         linear(0x55,6.5) && verify8(kTps,0x56,0xb7) && linear(0x29,0.25) &&
-        voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,kVout) &&
+        voltage(0x24,2.0) && voltage(0x2b,1.0) && voltage(0x21,coreVolts()) &&
         limit(0x40,1.25) && limit(0x42,1.16) && limit(0x25,1.1) &&
         limit(0x26,0.9) && limit(0x43,0.9) && limit(0x44,0.75) &&
         // Current limits: the hardware rounds them up to 2 A steps.
@@ -580,6 +613,7 @@ bool start() {
     setFanControl(settings.fanAuto, settings.fanPercent, settings.maxTemp);
     live.fanAutomatic = settings.fanAuto; live.requestedFanPercent = settings.fanPercent;
     live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
+    loadFallback(live.requestedMHz);
     publish();
     // Started even when the setup failed: the task tries it again.
     bool ok = runtime::started(xTaskCreatePinnedToCore(worker, "bm1370", 8192, nullptr, 3, nullptr, 1) == pdPASS,

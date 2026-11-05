@@ -71,6 +71,7 @@ const SettingInfo kSettings[] = {
     N("maxtemp", maxTemp, "Safety", "Pause mining above this temperature in C (0 = off)"),
 #ifdef BOARD_GAMMA601
     N("asicmhz", asicFrequency, "Safety", "Gamma ASIC frequency (MHz)"),
+    N("asicmv", asicVoltage, "Safety", "Gamma ASIC core voltage (mV)"),
 #endif
     N("power", miningPower, "Safety", "Mining power on USB and battery (0-100%, 0 = paused)"),
 #ifdef BOARD_GAMMA601
@@ -174,6 +175,7 @@ void settingsSanitize(Settings &settings) {
     if (settings.maxTemp && settings.maxTemp < 30) settings.maxTemp = 30;  // resumes 5 C below
 #ifdef BOARD_GAMMA601
     if (!bm1370::validProfile(settings.asicFrequency)) settings.asicFrequency = bm1370::kStockMHz;
+    if (!bm1370::validVoltage(settings.asicVoltage)) settings.asicVoltage = bm1370::kStockMv;
     if (settings.maxTemp > bm1370::kMaxUserTempC) settings.maxTemp = bm1370::kMaxUserTempC;  // saved before the limit
     settings.fanPercent = std::max<uint8_t>(30, std::min<uint8_t>(100, settings.fanPercent));
 #endif

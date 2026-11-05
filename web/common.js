@@ -38,7 +38,7 @@ Object.assign(FR,{
  'Choose a pool for the selected cryptocurrency':'Choisis une pool pour la cryptomonnaie sélectionnée',
  'Use an address for the selected cryptocurrency':'Utilise une adresse de la cryptomonnaie sélectionnée'
 });
-const FR_SET={asicmhz:'Fréquence ASIC Gamma (MHz)',pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
+const FR_SET={asicmhz:'Fréquence ASIC Gamma (MHz)',asicmv:'Tension de cœur ASIC Gamma (mV)',pool:'Hôte de la pool',port:'Port de la pool',addr:'Adresse BTC (éventuellement adresse.worker)',pass:'Mot de passe de la pool',
 diff:'Difficulté de share suggérée',pool2:'Pool de secours (vide = aucune)',port2:'Port de la pool de secours',
 proto:'Protocole du pool principal',proto2:'Protocole du pool de secours',sv2key:'Clé d’autorité V2 du pool principal',sv2key2:'Clé d’autorité V2 du pool de secours',uaauto:'Mode du user agent',ua:'User agent manuel',
 rotateh:'Alterner pool principale / secours toutes les N heures (0 = seulement en cas de panne)',bright:'Luminosité (%)',rot:'Rotation (0-3)',
@@ -79,7 +79,11 @@ const COLON=LANG=='fr'?'\u00a0: ':': ',LOCALE=LANG=='fr'?'fr-FR':'en-US';
 
 Object.assign(FR,{
  '525 MHz (stock)':'525 MHz (origine)',
- 'Profiles above 525 MHz are experimental, up to 800 MHz. Default: 525 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.':'Les profils au-dessus de 525 MHz sont expérimentaux, jusqu’à 800 MHz. Par défaut : 525 MHz. La tension reste à 1 150 mV. En cas d’instabilité, repli à 525 MHz jusqu’au redémarrage.',
+ 'Profiles above 525 MHz are experimental, up to 690 MHz as in ESP-Miner. Default: 525 MHz. A higher frequency usually needs a higher core voltage. Instability triggers a 525 MHz fallback, kept until the frequency or voltage changes.':'Les profils au-dessus de 525 MHz sont expérimentaux, jusqu’à 690 MHz comme dans ESP-Miner. Par défaut : 525 MHz. Une fréquence plus haute demande en général une tension de cœur plus haute. En cas d’instabilité, repli à 525 MHz, gardé jusqu’à un changement de fréquence ou de tension.',
+ 'Default: 1150 mV, as ESP-Miner. Raise it in small steps with the frequency and watch the temperature; higher voltage means more heat and power. Safety stops still apply.':'Par défaut : 1 150 mV, comme ESP-Miner. Monte-la par petits pas avec la fréquence et surveille la température : plus de tension, c’est plus de chaleur et de consommation. Les arrêts de sécurité restent actifs.',
+ '1150 mV (stock)':'1150 mV (origine)',
+ 'Gamma frequency must be 525-675 MHz in 25 MHz steps, or 690 MHz':'La fréquence du Gamma doit être de 525 à 675 MHz par pas de 25 MHz, ou 690 MHz',
+ 'Gamma core voltage must be 1000, 1060, 1100, 1150, 1200 or 1250 mV':'La tension de cœur du Gamma doit être 1000, 1060, 1100, 1150, 1200 ou 1250 mV',
  'Requested profile':'Profil demandé','ASIC hardware errors':'Erreurs matérielles ASIC','Stock fallback':'Repli à la fréquence d’origine',
  'Overclock fallback: mining at the stock profile.':'Repli de l’overclock : minage à la fréquence d’origine.',
  'Mining (525 MHz fallback profile)':'Minage à 525 MHz (repli)',
@@ -97,6 +101,7 @@ Object.assign(FR,{
  'ASIC not responding; restart required':'L’ASIC ne répond plus ; redémarrage nécessaire',
  'ASIC counter stalled; restart required':'Compteur de l’ASIC bloqué ; redémarrage nécessaire',
  'Restarting the ASIC':'Redémarrage de l’ASIC',
+ 'read by this browser':'lu par ce navigateur',
  'Pool needs version rolling':'Le pool doit accepter le version rolling',
  'Paused / waiting for pool':'En pause / en attente du pool',
  'Ready / waiting for pool':'Prêt / en attente du pool',

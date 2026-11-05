@@ -78,6 +78,7 @@ struct Settings {
     uint8_t summaryHour = 20;   // daily summary notification at this local hour, HOUR_OFF = none
 #ifdef BOARD_GAMMA601
     uint16_t asicFrequency = 525; // requested Gamma profile (stock, as ESP-Miner); automatic stock fallback
+    uint16_t asicVoltage = 1150;  // Gamma core voltage (mV), one of ESP-Miner's BM1370 values
     bool fanAuto = false;       // preserve full cooling until the owner changes it
     uint8_t fanPercent = 100;    // manual EMC2101 command, 30..100%
 #endif
