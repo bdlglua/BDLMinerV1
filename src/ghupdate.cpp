@@ -7,6 +7,18 @@
 #include <esp_ota_ops.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/version.h>
+
+// mbedTLS 3 (ESP-IDF 5) renamed the *_ret SHA-256 calls of mbedTLS 2.
+#if MBEDTLS_VERSION_MAJOR >= 3
+#define sha256Starts mbedtls_sha256_starts
+#define sha256Update mbedtls_sha256_update
+#define sha256Finish mbedtls_sha256_finish
+#else
+#define sha256Starts mbedtls_sha256_starts_ret
+#define sha256Update mbedtls_sha256_update_ret
+#define sha256Finish mbedtls_sha256_finish_ret
+#endif
 
 #include "hw_sha.h"
 #include "log.h"
@@ -247,7 +259,7 @@ GithubInstallResult install() {
             setError("cannot start the update: %s", Update.errorString());
             break;
         }
-        mbedtls_sha256_starts_ret(&sha, 0);
+        sha256Starts(&sha, 0);
         WiFiClient *stream = http.getStreamPtr();
         if (!stream) {
             Update.abort();
@@ -264,7 +276,7 @@ GithubInstallResult install() {
                 continue;
             }
             lastData = millis();
-            mbedtls_sha256_update_ret(&sha, buf, n);
+            sha256Update(&sha, buf, n);
             if (Update.write(buf, n) != (size_t)n) break;
             done += n;
             portENTER_CRITICAL(&stateMux);
@@ -279,7 +291,7 @@ GithubInstallResult install() {
             break;
         }
         uint8_t hash[32];
-        mbedtls_sha256_finish_ret(&sha, hash);
+        sha256Finish(&sha, hash);
         if (verifySignature(hash, sig, sigLen)) {
             Update.abort();
             setError("bad signature: update refused");

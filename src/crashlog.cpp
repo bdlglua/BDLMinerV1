@@ -2,7 +2,7 @@
 
 #include <esp_core_dump.h>
 #include <esp_ota_ops.h>
-#include <esp_spi_flash.h>
+#include <esp_flash.h>
 #include <Preferences.h>
 
 #include <ctime>
@@ -145,7 +145,8 @@ size_t crashSize() { return present ? imageSize : 0; }
 
 bool crashRead(size_t offset, uint8_t *out, size_t length) {
     if (!present || offset > imageSize || length > imageSize - offset) return false;
-    return spi_flash_read(imageAddress + offset, out, length) == ESP_OK;
+    // esp_flash_read: spi_flash_read is gone from ESP-IDF 5, this exists in 4.4 too.
+    return esp_flash_read(esp_flash_default_chip, out, imageAddress + offset, length) == ESP_OK;
 }
 
 bool crashErase() {
