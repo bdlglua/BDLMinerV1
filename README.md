@@ -7,7 +7,7 @@ with a local dashboard and a Linux/Raspberry Pi fleet hub.
 [Website](https://bdlglua.github.io/) ·
 [Interactive demos](https://bdlglua.github.io/demo.html) ·
 [Statistics](https://bdlglua.github.io/stats.html) ·
-**[Stable v2.4.0](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.4.0)**
+**[Stable v2.4.1](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.4.1)**
 
 Mine **BTC, BCH, BSV, eCash (XEC), DigiByte SHA-256d (DGB) or Peercoin (PPC, PoW)** with a matching
 pool and payout address or account. BTC supports Stratum V1 and native Stratum V2.
@@ -82,7 +82,7 @@ Solo mining is educational: a payout requires finding a valid block.
 - [My miners remotely](https://bdlglua.github.io/remote/) · [Private setup](docs/remote-access.md) / [Français](docs/remote-access.fr.md)
 - [Troubleshooting FAQ](https://bdlglua.github.io/faq.html) · [Shares explained](docs/guide.md#pool-shares-and-local-records)
 - [Coin and pool setup](docs/mining-coins.md)
-- [Stable v2.4.0 release notes](docs/releases/v2.4.0.md) / [Français](docs/releases/v2.4.0.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
+- [Stable v2.4.1 release notes](docs/releases/v2.4.1.md) / [Français](docs/releases/v2.4.1.fr.md) · [All releases](https://github.com/bdlglua/BDLMinerV2/releases)
 - [Build from source](docs/development.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ### Pools for ESP32

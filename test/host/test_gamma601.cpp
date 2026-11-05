@@ -32,7 +32,7 @@ static void health(){
 // Three readings in a row confirm an ASIC diode fault.
 static bool confirmed(bool requireDiode){return collect(requireDiode)&&collect(requireDiode)&&!collect(requireDiode);}
 static void reset(){
-    latched=powered=configured=forceStock=false;diodeStrikes=0;lastDiode=NAN;lastFaultText[0]=0;lastFaultTime=0;Preferences::data.clear();settings=Settings();settings.asicFrequency=525;
+    latched=powered=configured=forceStock=false;autoRestarts=0;autoRestartSince=0;diodeStrikes=0;lastDiode=NAN;lastFaultText[0]=0;lastFaultTime=0;Preferences::data.clear();settings=Settings();settings.asicFrequency=525;
     live={NAN,NAN,NAN,NAN,NAN,0,0,0,false,"Starting",525,false,"",-1,-1,100,false,true,"Startup or stopped ASIC"};publish();
     fanSetting=100|(65u<<16);fanPolicy=mining::FanControl();appliedFanDuty=255;testFanWriteIgnored=false;
     testI2c.clear();testI2cWrites.clear();testI2cFail=testUartFail=false;testFailRegister=-1;
@@ -196,7 +196,22 @@ int main(){
     assert(!strcmp(live.fallbackReason,"High ASIC hardware error rate"));
     assert(targetFrequency()==525&&initAsic(w)&&live.frequency==525);
     off("Pool reconnect");assert(forceStock&&targetFrequency()==525); // no automatic OC retry
-    assert(initAsic(w));instability("ASIC counter stalled; restart required");assert(latched&&!powered);
+    // At stock, a silent or stalled chip is restarted three times an hour, then stops.
+    for(int i=1;i<=3;++i){
+        assert(initAsic(w));instability("ASIC counter stalled; restart required");
+        assert(!latched&&!powered&&testReset==0&&autoRestarts==i&&!strcmp(live.state,"Restarting the ASIC"));
+        assert(strstr(lastFaultText,"ASIC counter stalled")&&strstr(lastFaultText,"regulator status"));
+        testMillis+=60000;
+    }
+    assert(initAsic(w));instability("ASIC not responding; restart required");assert(latched&&!powered);
+    assert(!strcmp(live.state,"ASIC not responding; restart required"));
+    // An hour later the budget is whole again.
+    reset();begin();assert(initAsic(w));
+    for(int i=0;i<3;++i){instability("ASIC not responding; restart required");assert(!latched);testMillis+=1000;assert(initAsic(w));}
+    testMillis+=kAutoRestartWindowMs;instability("ASIC not responding; restart required");assert(!latched&&autoRestarts==1);
+    // A restart whose shutdown fails still latches.
+    reset();begin();assert(initAsic(w));testI2cFail=true;instability("ASIC not responding; restart required");
+    assert(latched&&!powered);
     reset();settings.asicFrequency=600;begin();assert(initAsic(w));
     instability("ASIC not responding; restart required");assert(forceStock&&!latched&&testReset==0);
     reset();settings.asicFrequency=600;begin();assert(initAsic(w));

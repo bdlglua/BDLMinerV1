@@ -199,11 +199,31 @@ void off(const char *reason, bool fault = false) {
     if (latched) saveFault(live.state);
     invalidate(); publish();
 }
+// A BM1370 that stops answering on its UART, or whose hash counter stops, is
+// reset and started again, as NerdNOS does: no safety limit is involved, the
+// regulator, sensor, fan and temperature interlocks are separate and still
+// latch. Only a chip that keeps failing stops until the board restarts.
+constexpr uint8_t kAutoRestarts = 3;
+constexpr uint32_t kAutoRestartWindowMs = 60UL * 60 * 1000;
+uint8_t autoRestarts = 0;
+uint32_t autoRestartSince = 0;
+bool autoRestart(uint32_t now) {
+    if (!autoRestarts || now - autoRestartSince >= kAutoRestartWindowMs) { autoRestarts = 0; autoRestartSince = now; }
+    if (autoRestarts >= kAutoRestarts) return false;
+    ++autoRestarts;
+    return true;
+}
 void instability(const char *reason) {
     if (!forceStock && live.frequency > bm1370::kStockMHz) {
         logf("[gamma] %s at %.2f MHz; falling back to 525 MHz\n", reason, live.frequency);
         forceStock=true; live.stockFallback=true; live.fallbackReason=reason;
         off("Restarting at 525 MHz (fallback)");
+    } else if (autoRestart(millis())) {
+        // Kept as the last fault, with every reading, for the log and the dashboard.
+        saveFault(reason);
+        logf("[gamma] %s at %.2f MHz: ASIC restarted automatically (%u of %u this hour)\n", reason,
+             live.frequency, (unsigned)autoRestarts, (unsigned)kAutoRestarts);
+        off("Restarting the ASIC");
     } else off(reason, true);
 }
 void registerResult(const bm1370::Response &r) {
