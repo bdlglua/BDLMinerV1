@@ -217,6 +217,8 @@ double parseRate(const char *s, double previous = 0) {
     return std::isfinite(v) ? v : previous;
 }
 
+// Why the last fetchJson() failed, for the log.
+char fetchFailure[112] = "";  // "TLS: " and the TLS error
 // GET http(s)://host:port/path, the body as JSON through `filter`. Returns the
 // HTTP code or a negative error.
 int fetchJson(bool secure, const String &host, uint16_t port, const String &path, JsonDocument &doc,
@@ -227,11 +229,24 @@ int fetchJson(bool secure, const String &host, uint16_t port, const String &path
     http.setTimeout(timeoutSeconds * 1000UL);
     http.setConnectTimeout(timeoutSeconds < 5 ? timeoutSeconds * 1000 : 5000);
     String url = String(secure ? "https://" : "http://") + host + ":" + port + path;
-    if (!(secure ? http.begin(tls, url) : http.begin(tcp, url))) return -2;
-    if (secure && !tlsConnect(tls, host.c_str(), port, timeoutSeconds)) return -4;
+    fetchFailure[0] = 0;
+    if (!(secure ? http.begin(tls, url) : http.begin(tcp, url))) {
+        snprintf(fetchFailure, sizeof(fetchFailure), "invalid URL");
+        return -2;
+    }
+    if (secure && !tlsConnect(tls, host.c_str(), port, timeoutSeconds)) {
+        snprintf(fetchFailure, sizeof(fetchFailure), "TLS: %s", tlsLastError());
+        return -4;
+    }
     int code = http.GET();
-    if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter)))
+    if (code == HTTP_CODE_OK && deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter))) {
+        snprintf(fetchFailure, sizeof(fetchFailure), "HTTP 200, not JSON");
         code = -3;
+    } else if (code < 0) {
+        snprintf(fetchFailure, sizeof(fetchFailure), "%s", HTTPClient::errorToString(code).c_str());
+    } else if (code != HTTP_CODE_OK) {
+        snprintf(fetchFailure, sizeof(fetchFailure), "HTTP %d", code);
+    }
     http.end();
     return code;
 }
@@ -306,7 +321,7 @@ constexpr uint8_t kProbeSeconds = 6;
 int queryApi(int i, const String &host, const String &addr, PoolStats &p, bool probe = false) {
     const PoolApi &api = kPoolApis[i];
     String target = api.parent ? parentDomain(host) : host;
-    if (target.isEmpty()) return -1;
+    if (target.isEmpty()) { fetchFailure[0] = 0; return -1; }
     JsonDocument filter, doc;
     poolFilter(filter);
     int code = fetchJson(api.secure, target, api.port, String(api.path) + addr, doc, filter, probe ? kProbeSeconds : 12);
@@ -379,6 +394,12 @@ bool refreshPoolStats() {
         for (int i = 0; i < kPoolApiCount && code != HTTP_CODE_OK; i++) {
             if (!tlsMemoryOk()) return false;  // continue at the next attempt
             code = queryApi(i, host, addr, p, true);
+            if (code != HTTP_CODE_OK && (code == kUnknownJson || fetchFailure[0])) {  // nothing to say when there was no parent domain
+                const PoolApi &api = kPoolApis[i];
+                String target = api.parent ? parentDomain(host) : host;
+                logf("[market] pool stats probe %s%s:%u%s: %s\n", api.secure ? "" : "http://", target.c_str(),
+                     api.port, api.path, code == kUnknownJson ? "JSON of an unknown API" : fetchFailure);
+            }
             if (code == HTTP_CODE_OK) {
                 apiIndex[backup] = i;
                 saveApi(backup, host, i);

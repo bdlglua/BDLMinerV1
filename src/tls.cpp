@@ -49,6 +49,8 @@ static std::atomic<bool> certificateRejected{false};
 // certificate bundle rejects (no trusted root signed it).
 constexpr int kCertificateVerifyFailed = -0x2700, kX509FatalError = -0x3000;
 bool tlsCertificateRejected() { return certificateRejected.load(); }
+static char lastError[96] = "";  // the 80 of mbedTLS text, plus its code
+const char *tlsLastError() { return lastError; }
 static TlsProfile profile;
 static portMUX_TYPE profileMux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -77,6 +79,7 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     if (trust != Trust::None && !tlsClockSet()) {
         certificateRejected = true;
         logf("[tls] %s: clock not set yet, its certificate cannot be checked\n", host);
+        snprintf(lastError, sizeof(lastError), "clock not set");
         return false;
     }
     if (trust == Trust::Root) tls.setCACert(rootCA);
@@ -116,6 +119,9 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
         why[0] = ' ';
         int error = tls.lastError(why + 1, sizeof(why) - 1);
         certificateRejected = trust != Trust::None && (error == kCertificateVerifyFailed || error == kX509FatalError);
+        snprintf(lastError, sizeof(lastError), "%s (-0x%04x)", why[1] ? why + 1 : "connection failed", (unsigned)-error);
+    } else {
+        lastError[0] = 0;
     }
     // A probe (short timeout) failing is an expected answer: its caller reports the outcome.
     if (ok || timeoutSeconds >= 12)

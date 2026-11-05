@@ -18,6 +18,8 @@ bool tlsConnect(WiFiClientSecure &tls, const char *host, uint16_t port = 443, ui
 bool tlsConnectSignedContent(WiFiClientSecure &tls, const char *host, uint16_t port = 443, uint8_t timeoutSeconds = 12);
 // The last failed handshake was refused for its certificate (or the clock).
 bool tlsCertificateRejected();
+// Why the last handshake failed, as mbedTLS says it ("" after a success).
+const char *tlsLastError();
 bool tlsClockSet();
 // Same miner/watchdog/heap safeguards, with CA and hostname verification.
 // Missing trust data or a certificate failure never falls back to insecure TLS.
