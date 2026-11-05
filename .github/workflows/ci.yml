@@ -71,13 +71,16 @@ jobs:
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
       - run: pip install platformio==6.2.0
-      - name: Build and package USB images from a clean checkout
-        run: python3 tools/make_release.py --unsigned "${{ matrix.env }}"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: unsigned-ci-${{ matrix.env }}
-          path: release/
-          if-no-files-found: error
+      # C++23 study: compile only (the release packaging needs esptool 5
+      # changes), then report the firmware against its update slot.
+      - name: Study build (Arduino-ESP32 3.x, gnu++23)
+        run: |
+          set -o pipefail
+          pio run -e "${{ matrix.env }}" 2>&1 | tee build.log
+          python3 -c "import sys; sys.path.insert(0, 'tools'); import make_release as m; e = '${{ matrix.env }}'; m.slot_report(e, f'.pio/build/{e}/firmware.bin', f'.pio/build/{e}/partitions.bin')"
+      - name: Errors summary
+        if: failure()
+        run: grep -E "error:|Error [0-9]|undefined reference|exceeds|overflow" build.log | head -60 || true
           retention-days: 7
       - name: Physical display rendering regressions
         if: matrix.env == 'm5stickc-plus2'
