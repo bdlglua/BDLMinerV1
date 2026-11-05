@@ -74,7 +74,9 @@ constexpr uint16_t kStatusFaults = 0x0020 | 0x0010 | 0x0004;  // VOUT_OV, IOUT_O
 struct Health {
     float temperature, regulatorTemperature, inputVoltage, coreVoltage, current;
     uint16_t rpm, status;
-    float coreTarget = kStockMv / 1000.0f;  // the core voltage asked of the regulator
+    // The core voltage asked of the regulator; 0 (left out): the stock 1150 mV.
+    // No default member initializer: the firmware's C++11 keeps Health an aggregate.
+    float coreTarget;
     // A fault stops the ASIC until restart (null: none).
     const char *fault(bool powered, bool requireDiode = true) const;
     // Before power-on: why the ASIC cannot start yet (null: ready). Waiting,

@@ -147,7 +147,8 @@ const char *Health::fault(bool powered, bool requireDiode) const {
     if (powered && rpm < 500) return "Fan stopped; restart required";
     if (!std::isfinite(current) || current < -1 || current >= 30) return "ASIC current fault; restart required";
     // Around the chosen voltage: 1.00-1.25 V at the stock 1150 mV (0.5 mV for float rounding).
-    if (powered && (!std::isfinite(coreVoltage) || coreVoltage < coreTarget - 0.1505f || coreVoltage > coreTarget + 0.1005f))
+    float target = coreTarget > 0 ? coreTarget : kStockMv / 1000.0f;
+    if (powered && (!std::isfinite(coreVoltage) || coreVoltage < target - 0.1505f || coreVoltage > target + 0.1005f))
         return "ASIC voltage fault; restart required";
     if (status & (powered ? kStatusFaults | kStatusOff | kStatusVinUv : kStatusFaults))
         return "Regulator reports a fault; restart required";
