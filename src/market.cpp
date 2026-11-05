@@ -275,6 +275,10 @@ uint32_t searchAfter[2] = {0, 0};
 // A pool usually creates an address's page with its first accepted share: a
 // share after a fruitless search is worth a new one, without waiting 6 hours.
 uint32_t sharesAtSearch[2] = {0, 0};
+// Only when a probe reached the API and the address was not known (HTTP 404):
+// a server refusing the connection (TLS, timeout) is not cured by a share,
+// and a miner finding shares every minute would search again at every pass.
+bool retryOnShare[2] = {true, true};
 
 // "eu.pool.example" -> "pool.example"; empty for two-label names and IP addresses.
 String parentDomain(const String &host) {
@@ -385,15 +389,18 @@ bool refreshPoolStats() {
         }
     }
     if (apiIndex[backup] < 0) {
-        bool newShare = minerStats().accepted != sharesAtSearch[backup];
+        bool newShare = retryOnShare[backup] && minerStats().accepted != sharesAtSearch[backup];
         if (searchAfter[backup] && (int32_t)(millis() - searchAfter[backup]) < 0 && !newShare) {
             p.supported = false;
             storePool(p, backup);
             return true;
         }
+        bool addressUnknown = false, refusedTls12 = false;
         for (int i = 0; i < kPoolApiCount && code != HTTP_CODE_OK; i++) {
             if (!tlsMemoryOk()) return false;  // continue at the next attempt
             code = queryApi(i, host, addr, p, true);
+            addressUnknown |= code == HTTP_CODE_NOT_FOUND;
+            refusedTls12 |= code == -4 && tlsLastErrorCode() == kTlsPeerAlert;
             if (code != HTTP_CODE_OK && (code == kUnknownJson || fetchFailure[0])) {  // nothing to say when there was no parent domain
                 const PoolApi &api = kPoolApis[i];
                 String target = api.parent ? parentDomain(host) : host;
@@ -408,12 +415,16 @@ bool refreshPoolStats() {
         }
         if (code != HTTP_CODE_OK) {
             sharesAtSearch[backup] = minerStats().accepted;
+            retryOnShare[backup] = addressUnknown;
             searchAfter[backup] = millis() + kApiSearchMs;
             if (!searchAfter[backup]) searchAfter[backup] = 1;
             p.supported = false;
             storePool(p, backup);
-            logf("[market] no pool stats API found for %s; searched again after its next accepted share, or in 6 h\n",
-                 host.c_str());
+            if (refusedTls12)
+                logf("[market] %s refused the TLS 1.2 handshake: its stats API likely requires TLS 1.3, which this "
+                     "firmware cannot use\n", host.c_str());
+            logf("[market] no pool stats API found for %s; searched again %s\n", host.c_str(),
+                 addressUnknown ? "after its next accepted share, or in 6 h" : "in 6 h");
             return true;
         }
     }

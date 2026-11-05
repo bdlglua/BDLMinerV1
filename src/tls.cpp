@@ -51,6 +51,8 @@ constexpr int kCertificateVerifyFailed = -0x2700, kX509FatalError = -0x3000;
 bool tlsCertificateRejected() { return certificateRejected.load(); }
 static char lastError[96] = "";  // the 80 of mbedTLS text, plus its code
 const char *tlsLastError() { return lastError; }
+static int lastErrorCode = 0;
+int tlsLastErrorCode() { return lastErrorCode; }
 static TlsProfile profile;
 static portMUX_TYPE profileMux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -80,6 +82,7 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
         certificateRejected = true;
         logf("[tls] %s: clock not set yet, its certificate cannot be checked\n", host);
         snprintf(lastError, sizeof(lastError), "clock not set");
+        lastErrorCode = 0;
         return false;
     }
     if (trust == Trust::Root) tls.setCACert(rootCA);
@@ -120,8 +123,10 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
         int error = tls.lastError(why + 1, sizeof(why) - 1);
         certificateRejected = trust != Trust::None && (error == kCertificateVerifyFailed || error == kX509FatalError);
         snprintf(lastError, sizeof(lastError), "%s (-0x%04x)", why[1] ? why + 1 : "connection failed", (unsigned)-error);
+        lastErrorCode = error;
     } else {
         lastError[0] = 0;
+        lastErrorCode = 0;
     }
     // A probe (short timeout) failing is an expected answer: its caller reports the outcome.
     if (ok || timeoutSeconds >= 12)

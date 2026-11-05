@@ -20,6 +20,11 @@ bool tlsConnectSignedContent(WiFiClientSecure &tls, const char *host, uint16_t p
 bool tlsCertificateRejected();
 // Why the last handshake failed, as mbedTLS says it ("" after a success).
 const char *tlsLastError();
+// Its mbedTLS code (0 after a success). kTlsPeerAlert: the server refused the
+// handshake, typically a server that only accepts TLS 1.3 (this firmware's
+// mbedTLS 2.28 speaks TLS 1.2).
+int tlsLastErrorCode();
+constexpr int kTlsPeerAlert = -0x7780;
 bool tlsClockSet();
 // Same miner/watchdog/heap safeguards, with CA and hostname verification.
 // Missing trust data or a certificate failure never falls back to insecure TLS.

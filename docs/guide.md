@@ -437,11 +437,17 @@ host, on its parent domain (`eu.pool.example` → `pool.example`) and on the usu
 ports (443, 40557; 3334 and 80 over plain HTTP for a pool on the local network), and
 recognises the answer by its JSON. The address that answered is kept, across restarts,
 and shown under the *Seen by the pool* tile; if it stops answering, the search starts
-again. Most pools only publish an address once it has an accepted share, so a fruitless
-search runs again after the miner's next accepted share (otherwise every 6 hours); meanwhile the tile
-estimates the hashrate from the accepted shares. When a known API stops answering
-(an outage on the pool's side), the tile says so, shows the estimate, and the miner
+again. Most pools only publish an address once it has an accepted share, so a search
+that found an API not knowing the address yet (HTTP 404) runs again after the miner's
+next accepted share; any other fruitless search runs again every 6 hours. Each failed
+attempt is logged with its cause. Meanwhile the tile estimates the hashrate from the
+accepted shares. When a known API stops answering (an outage on the pool's side), the tile says so, shows the estimate, and the miner
 asks again every 10 minutes.
+
+The firmware's TLS (mbedTLS 2.28, ESP32 Arduino 2.0.17) speaks TLS 1.2 only.
+public-pool.io now serves its statistics API (port 40557) over **TLS 1.3 only**: the
+miner cannot read it, logs `refused the TLS 1.2 handshake`, and the tile shows the
+estimate. Mining and shares are not affected; the pool's own site still shows them.
 
 A pool may list no worker at all for this miner: public-pool, for one, now imposes a
 minimum difficulty of 1 (it ignores the suggested difficulty) and lists a worker only
