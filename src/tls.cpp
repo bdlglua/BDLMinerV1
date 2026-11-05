@@ -95,7 +95,12 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     }
     // The bundle's lookup table is global to the TLS library: only set while
     // holding the lock, for the handshake that uses it.
+    // Arduino-ESP32 3.x takes the size too (ESP-IDF 5 checks the bundle).
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    if (trust == Trust::Bundle) tls.setCACertBundle(kTlsRootBundle, sizeof(kTlsRootBundle));
+#else
     if (trust == Trust::Bundle) tls.setCACertBundle(kTlsRootBundle);
+#endif
     static bool allocSet = false;
     if (!allocSet) {
         allocSet = true;
