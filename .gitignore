@@ -11,3 +11,11 @@ src/web_assets.generated.h
 *.sqlite-shm
 *.sqlite-wal
 bdlhub.local.json
+
+# pioarduino hybrid compile (custom_sdkconfig) work files
+/.dummy/
+/CMakeLists.txt
+/dependencies.lock
+/managed_components/
+/sdkconfig.defaults
+/sdkconfig.*

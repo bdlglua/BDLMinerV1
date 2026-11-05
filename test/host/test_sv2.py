@@ -19,9 +19,20 @@ root = Path(__file__).resolve().parents[2]
 build = root / '.pio/host/sv2'
 build.mkdir(parents=True, exist_ok=True)
 pio = Path(os.environ.get('PLATFORMIO_CORE_DIR', Path.home() / '.platformio'))
-sodium_headers = pio / 'packages/framework-arduinoespressif32/tools/sdk/esp32/include/libsodium/libsodium/src/libsodium/include'
-if not sodium_headers.exists():
+def find_sodium_headers():
+    # Arduino-ESP32 2.x keeps them in the framework, 3.x in its -libs package.
+    for package in ('framework-arduinoespressif32', 'framework-arduinoespressif32-libs'):
+        for header in sorted((pio / 'packages' / package).glob('**/sodium/randombytes.h')):
+            return header.parent.parent
+    return None
+
+
+sodium_headers = find_sodium_headers()
+if not sodium_headers:
     subprocess.run(['pio', 'pkg', 'install', '-e', 'esp32-headless'], cwd=root, check=True, stdout=subprocess.DEVNULL)
+    sodium_headers = find_sodium_headers()
+if not sodium_headers:
+    raise SystemExit('Native SV2 tests need the libsodium headers of the ESP32 framework package.')
 library = ctypes.util.find_library('sodium')
 if not library:
     raise SystemExit('Native SV2 tests require libsodium (Ubuntu: sudo apt-get install libsodium23).')

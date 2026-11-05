@@ -14,7 +14,8 @@ and code are all welcome. By taking part you agree to the
 
 ## Building
 
-Install [PlatformIO](https://platformio.org/) (Core 6.1.19, as the CI uses), then:
+Install [PlatformIO](https://platformio.org/) (Core 6.2.0, as the CI uses; see
+[development.md](docs/development.md#build-and-flash) for the first build), then:
 
 ```sh
 pio run -e m5stickc-plus2                 # build one board

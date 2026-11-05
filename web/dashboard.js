@@ -152,10 +152,11 @@ async function peer(u){
   return p;
  }catch(e){return null}
 }
-// public-pool serves its statistics API over TLS 1.3 only, which the miner's
-// TLS (1.2) cannot speak. The browser can, and the API allows any origin: when
-// the miner found no API, this page asks public-pool's usual one itself, at
-// most every 10 minutes, and shows the answer as soon as it arrives.
+// public-pool serves its statistics API over TLS 1.3 only, which firmware up to
+// 2.4.2 (TLS 1.2) cannot speak; 2.5.0 can. The browser can too, and the API
+// allows any origin: when the miner found no API, this page asks public-pool's
+// usual one itself, at most every 10 minutes, and shows the answer as soon as
+// it arrives.
 const browserPool={key:'',at:0,busy:false,view:null};
 function browserPoolView(j){
  const host=String(j.pool?.host||'').toLowerCase(),addr=String(j.address||'').split('.')[0];

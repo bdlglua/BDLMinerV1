@@ -70,9 +70,10 @@ bool fetch(int endpoint, WiFiClientSecure &tls, HTTPClient &http, const char *pa
     bool ok = false;
     if (code == HTTP_CODE_OK) {
         // Parsed as it arrives when the length is known (the block list is
-        // ~30 KB); a chunked body is read whole first.
+        // ~30 KB, several TLS records); a chunked body is read whole first.
+        TlsBodyReader body(tls);
         DeserializationError err =
-            http.getSize() > 0 ? deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter))
+            http.getSize() > 0 ? deserializeJson(doc, body, DeserializationOption::Filter(filter))
                                : deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter));
         ok = !err;
         if (err) logf("[market] %s: %s\n", path, err.c_str());
@@ -421,8 +422,8 @@ bool refreshPoolStats() {
             p.supported = false;
             storePool(p, backup);
             if (refusedTls12)
-                logf("[market] %s refused the TLS 1.2 handshake: its stats API likely requires TLS 1.3, which this "
-                     "firmware cannot use\n", host.c_str());
+                logf("[market] %s refused the TLS handshake (alert from the server): its stats API asks for TLS "
+                     "settings this firmware does not offer\n", host.c_str());
             logf("[market] no pool stats API found for %s; searched again %s\n", host.c_str(),
                  addressUnknown ? "after its next accepted share, or in 6 h" : "in 6 h");
             return true;
@@ -472,6 +473,13 @@ void marketTask(void *) {
         }
         // Certificates are checked against the clock: no HTTPS before NTP.
         bool online = WiFi.isConnected() && tlsClockSet();
+        // Said once: without it a miner waiting for the clock shows no market
+        // data and logs nothing about why.
+        static bool waitLogged = false;
+        if (!online && !waitLogged && millis() > 90000) {
+            waitLogged = true;
+            logf("[market] waiting for %s\n", WiFi.isConnected() ? "the clock (NTP has not answered yet)" : "WiFi");
+        }
         if (coin::bitcoinData(settings.miningCoin) && online && (int32_t)(millis() - nextMarket) >= 0) {
             bool ok = refresh();
             nextMarket = millis() + (ok ? kRefreshMs : retry);

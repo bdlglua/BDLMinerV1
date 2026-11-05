@@ -11,10 +11,48 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import make_tls_roots  # noqa: E402
 
 
-def bundle_bytes():
+def bundle_bytes(v2=False):
+    """The legacy array (ESP-IDF up to 5.3) or the 5.4+ one (`v2`)."""
     text = (ROOT / 'src/tls_roots.h').read_text()
-    body = text[text.index('{') + 1:text.rindex('}')]
+    arrays = re.findall(r'kTlsRootBundle\[\d+\] = \{(.*?)\};', text, re.S)
+    assert len(arrays) == 2, 'expected the ESP-IDF 5.4+ and the legacy bundle'
+    body = arrays[0] if v2 else arrays[1]
     return bytes(int(value, 16) for value in re.findall(r'0x([0-9a-f]{2})', body))
+
+
+def entries_v2(data):
+    """esp_crt_check_bundle() of ESP-IDF 5.5: offsets consistent with the roots."""
+    first = struct.unpack('<L', data[:4])[0]
+    assert first and first % 4 == 0 and first < len(data)
+    offsets = struct.unpack('<%dL' % (first // 4), data[:first])
+    out = []
+    for i, at in enumerate(offsets):
+        name_length, key_length = struct.unpack('<HH', data[at:at + 4])
+        end = at + 4 + name_length + key_length
+        if i + 1 < len(offsets):
+            assert offsets[i + 1] == end and end < len(data), 'offset table inconsistent'
+        else:
+            assert end == len(data), 'trailing bytes in the bundle'
+        out.append((data[at + 4:at + 4 + name_length], data[at + 4 + name_length:end]))
+    return out
+
+
+def lookup_v2(crts, issuer):
+    """esp_crt_find_cert() of ESP-IDF 5.5, byte for byte (memcmp over the shorter length)."""
+    start, end = 0, len(crts) - 1
+    middle = (start + end) // 2
+    while start <= end:
+        name = crts[middle][0]
+        n = min(len(issuer), len(name))
+        a, b = issuer[:n], name[:n]
+        if a == b:
+            return crts[middle][1]
+        if a < b:
+            end = middle - 1
+        else:
+            start = middle + 1
+        middle = (start + end) // 2
+    return None
 
 
 def entries(data):
@@ -63,6 +101,15 @@ class TlsRoots(unittest.TestCase):
         # A name absent from the bundle (a self-signed server) finds nothing.
         self.assertIsNone(lookup(crts, b'\x30\x13\x31\x11\x30\x0f\x06\x03\x55\x04\x03\x0c\x08selfsign'))
 
+    def test_every_root_is_found_by_the_esp_idf_5_4_lookup(self):
+        crts = entries_v2(bundle_bytes(v2=True))
+        self.assertEqual(len(crts), len(self.roots))
+        self.assertEqual([name for name, _ in crts], sorted(name for name, _ in crts))
+        self.assertEqual(sorted(crts), sorted(entries(bundle_bytes())))  # the same roots in both formats
+        for label, name, key, _ in self.roots:
+            self.assertEqual(lookup_v2(crts, name), key, label)
+        self.assertIsNone(lookup_v2(crts, b'\x30\x13\x31\x11\x30\x0f\x06\x03\x55\x04\x03\x0c\x08selfsign'))
+
     def test_roots_outlive_the_firmware(self):
         soon = datetime.datetime(2027, 12, 31, tzinfo=datetime.timezone.utc)
         for label, _, _, expires in self.roots:
@@ -87,6 +134,7 @@ class TlsRoots(unittest.TestCase):
     def test_bundle_fits_the_flash_budget(self):
         # m5stack-esp32 had 66 KB left in its update slot before the bundle.
         self.assertLess(len(bundle_bytes()), 20 * 1024)
+        self.assertLess(len(bundle_bytes(v2=True)), 20 * 1024)  # only one of them is compiled
 
     def test_parser_rejects_damaged_input(self):
         _, der = make_tls_roots.certificates(self.text)[0]

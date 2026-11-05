@@ -23,10 +23,14 @@ bool available() { return true; }
 
 uint32_t nonceAt(uint32_t position) { return position; }
 
-// The SHA/AES lock is recursive, so mbedtls can still take it from the task
-// that holds it here, while the miner sees `held` and hashes in software.
+// While held, the miner starts no hardware batch (it sees `held` and hashes
+// in software) and mbedtls takes the engine through its own lock, waiting at
+// most for the batch in progress. hold() must not take that lock itself:
+// ESP-IDF 5 made the SHA/AES lock non-recursive, so mbedtls, taking it again
+// from the same task during the handshake, would wait forever (the TLS task,
+// then every SHA user after it, such as the update's image check).
 static std::atomic<bool> held{false};
-static int holds = 0;  // hold() nests (an update download around tlsConnect())
+static std::atomic<int> holds{0};  // hold() nests (TLS tasks may overlap)
 static bool sparseTextWrites = true;  // selected by selfTest(), before workers start
 static bool directTransfers = true;   // correctness and speed checked before workers start
 #if CONFIG_IDF_TARGET_ESP32S3
@@ -36,11 +40,9 @@ static bool overlappedTransfers = true;  // S3 only: checked and timed at boot l
 void hold() {
     holds++;
     held = true;
-    esp_sha_acquire_hardware();  // waits for the batch in progress
 }
 
 void release() {
-    esp_sha_release_hardware();
     if (--holds == 0) held = false;
 }
 
@@ -336,6 +338,7 @@ static bool verifyResumeTransfers() {
 #include "core/fill.h"
 #include "driver/periph_ctrl.h"
 #include "esp_chip_info.h"
+#include "esp_idf_version.h"
 #include "sha/sha_parallel_engine.h"
 #include "soc/hwcrypto_reg.h"
 
@@ -658,9 +661,15 @@ bool pickLoop() {
     // die within seconds, which no self-test can see.
     esp_chip_info_t chip;
     esp_chip_info(&chip);
-    if (chip.full_revision / 100 < 3) {
+    // Major * 100 + minor: `full_revision` in ESP-IDF 4, `revision` since 5.
+#if ESP_IDF_VERSION_MAJOR >= 5
+    unsigned revision = chip.revision;
+#else
+    unsigned revision = chip.full_revision;
+#endif
+    if (revision / 100 < 3) {
         logf("[miner] ESP32 revision %u.%u: the hardware SHA loop needs revision 3\n",
-             chip.full_revision / 100, chip.full_revision % 100);
+             revision / 100, revision % 100);
         return false;
     }
 

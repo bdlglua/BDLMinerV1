@@ -3,6 +3,10 @@
 #include <esp_heap_caps.h>
 #include <freertos/semphr.h>
 #include <mbedtls/platform.h>
+#include <sdkconfig.h>
+#if defined(CONFIG_MBEDTLS_SSL_PROTO_TLS1_3)
+#include <psa/crypto.h>
+#endif
 
 #include <atomic>
 #include <cstdint>
@@ -88,14 +92,26 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     if (trust == Trust::Root) tls.setCACert(rootCA);
     else if (trust == Trust::None) tls.setInsecure();
     tls.setHandshakeTimeout(timeoutSeconds);
-    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);  // the TCP connect too
+    // The TCP connect and reads too. Arduino-ESP32 3.x takes milliseconds
+    // here (2.x took seconds): 4 would have meant 4 ms, and every short probe
+    // gave up before the server could answer.
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds * 1000UL);
+#else
+    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);
+#endif
     if (!lock || xSemaphoreTake(lock, portMAX_DELAY) != pdTRUE) {
         logf("[tls] handshake unavailable: TLS lock missing\n");
         return false;
     }
     // The bundle's lookup table is global to the TLS library: only set while
     // holding the lock, for the handshake that uses it.
+    // Arduino-ESP32 3.x takes the size too (ESP-IDF 5 checks the bundle).
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    if (trust == Trust::Bundle) tls.setCACertBundle(kTlsRootBundle, sizeof(kTlsRootBundle));
+#else
     if (trust == Trust::Bundle) tls.setCACertBundle(kTlsRootBundle);
+#endif
     static bool allocSet = false;
     if (!allocSet) {
         allocSet = true;
@@ -108,6 +124,19 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     // meanwhile, hence the watchdog pause.
     hwsha::hold();
     core0WdtPause();
+#if defined(CONFIG_MBEDTLS_SSL_PROTO_TLS1_3)
+    // mbedTLS runs TLS 1.3 key exchange on PSA crypto, which must be set up
+    // first: ESP-IDF's esp-tls does it before each handshake, Arduino's
+    // ssl_client never does, and a server choosing TLS 1.3 then fails the
+    // handshake. Initialised once (here, so the hardware SHA is held and the
+    // PSRAM allocator above is in place); TLS 1.2 servers never needed it.
+    static bool psaReady = false;
+    if (!psaReady) {
+        psa_status_t psa = psa_crypto_init();
+        psaReady = psa == PSA_SUCCESS;
+        if (!psaReady) logf("[tls] PSA crypto setup failed (%d): TLS 1.3 servers will refuse\n", (int)psa);
+    }
+#endif
     uint32_t t0 = millis();
     bool ok = tls.connect(host, port);
     uint32_t elapsed = millis() - t0;

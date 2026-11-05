@@ -41,7 +41,7 @@ jobs:
             ~/.cache/pip
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-
-      - run: pip install platformio==6.1.19
+      - run: pip install platformio==6.2.0
       - run: python3 -m unittest discover -s test/tools -v
       - name: Native SV2 crypto test dependency
         run: |
@@ -70,7 +70,14 @@ jobs:
             ~/.cache/pip
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
-      - run: pip install platformio==6.1.19
+      - run: pip install platformio==6.2.0
+      # pioarduino hybrid compile: the first run rebuilds ESP-IDF
+      # with custom_sdkconfig and copies it into the framework. Its own child
+      # build may be refused (pioarduino's penv can carry PlatformIO
+      # 6.2.0.post1, read as 6.2.0-post.1 < 6.2.0); the libraries are in place
+      # by then, so the packaging below builds against them as usual.
+      - name: Rebuild ESP-IDF for this board (custom_sdkconfig)
+        run: pio run -e "${{ matrix.env }}" > build-idf.log 2>&1 || tail -40 build-idf.log
       - name: Build and package USB images from a clean checkout
         run: python3 tools/make_release.py --unsigned "${{ matrix.env }}"
       - uses: actions/upload-artifact@v7
