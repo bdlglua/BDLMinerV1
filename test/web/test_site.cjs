@@ -133,6 +133,9 @@ async function main(){
   assert.equal(await page.locator('#st-pools a').count(),Object.keys(poolSites).length);
   for(const destination of Object.values(poolSites))assert.equal(await page.locator('#st-pools a[href="'+destination+'"]').count(),1);
   assert.doesNotMatch(await page.locator('#st-pools').innerHTML(),/attacker\.example/);
+  // The image credits are full of unbreakable revision hashes and long links.
+  await page.setViewportSize({width:375,height:812});await page.goto(url+'/assets/boards/CREDITS.html');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'CREDITS.html should fit mobile');
   for(const name of Object.values(pages)){
    await page.setViewportSize({width:375,height:812});await page.goto(url+'/'+name);
    await page.locator('main h1').first().waitFor();

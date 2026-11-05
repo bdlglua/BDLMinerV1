@@ -525,10 +525,10 @@ function breakdowns(){
 
 function stats(){if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}
- set('st-hashrate',rate(summary.hashrate));set('st-miners',summary.miners.toLocaleString(lang=='fr'?'fr-FR':'en-US'));
+ set('st-hashrate',rate(summary.hashrate||0));set('st-miners',(summary.miners||0).toLocaleString(lang=='fr'?'fr-FR':'en-US'));
  set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
  chart();
- if(!summary.miners&&!summary.history.length)document.getElementById('st-status').textContent=T('noStats')}
+ if(!summary.miners&&!summary.history?.length)document.getElementById('st-status').textContent=T('noStats')}
 async function refresh(){if(!document.getElementById('stats'))return;try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
  catch(e){if(!summary){chart();document.getElementById('st-status').textContent=T('statsDown')}}}
 
