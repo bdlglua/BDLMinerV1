@@ -128,8 +128,9 @@ bool fetchRelease(const char *url, JsonDocument &doc, String &error) {
     filter["name"] = true;
     filter["assets"][0]["name"] = true;
     filter["assets"][0]["browser_download_url"] = true;
+    TlsBodyReader body(tls);
     DeserializationError err =
-        http.getSize() > 0 ? deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter))
+        http.getSize() > 0 ? deserializeJson(doc, body, DeserializationOption::Filter(filter))
                            : deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter));
     http.end();
     if (err) {
@@ -244,7 +245,7 @@ GithubInstallResult install() {
             setError("invalid signature response length");
             break;
         }
-        sigLen = http.getStream().readBytes(sig, signatureSize);
+        sigLen = TlsBodyReader(tls).readBytes(sig, signatureSize);
         http.end();
         if (sigLen != size_t(signatureSize)) {
             setError("signature download interrupted");

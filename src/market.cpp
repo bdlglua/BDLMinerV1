@@ -70,9 +70,10 @@ bool fetch(int endpoint, WiFiClientSecure &tls, HTTPClient &http, const char *pa
     bool ok = false;
     if (code == HTTP_CODE_OK) {
         // Parsed as it arrives when the length is known (the block list is
-        // ~30 KB); a chunked body is read whole first.
+        // ~30 KB, several TLS records); a chunked body is read whole first.
+        TlsBodyReader body(tls);
         DeserializationError err =
-            http.getSize() > 0 ? deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter))
+            http.getSize() > 0 ? deserializeJson(doc, body, DeserializationOption::Filter(filter))
                                : deserializeJson(doc, http.getString(), DeserializationOption::Filter(filter));
         ok = !err;
         if (err) logf("[market] %s: %s\n", path, err.c_str());

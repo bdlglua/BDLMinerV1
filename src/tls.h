@@ -21,8 +21,7 @@ bool tlsCertificateRejected();
 // Why the last handshake failed, as mbedTLS says it ("" after a success).
 const char *tlsLastError();
 // Its mbedTLS code (0 after a success). kTlsPeerAlert: the server refused the
-// handshake, typically a server that only accepts TLS 1.3 (this firmware's
-// mbedTLS 2.28 speaks TLS 1.2).
+// handshake (up to 2.4.2, typically a server that only accepted TLS 1.3).
 int tlsLastErrorCode();
 constexpr int kTlsPeerAlert = -0x7780;
 bool tlsClockSet();
@@ -30,6 +29,25 @@ bool tlsClockSet();
 // Missing trust data or a certificate failure never falls back to insecure TLS.
 bool tlsConnectVerified(WiFiClientSecure &tls, const char *host, const char *rootCA,
                         uint16_t port = 443, uint8_t timeoutSeconds = 12);
+
+// Reads a response body over TLS without stopping between records.
+// Arduino-ESP32 3.x's NetworkClient::readBytes() gives up at the first read()
+// that finds no data, which on TLS is any moment the next record has not
+// arrived yet: a body spread over several records (mempool.space's block
+// list, GitHub's release list) came out truncated. This waits up to
+// `timeoutMs` without data, and stops early once the connection is closed.
+// Usable as an ArduinoJson reader (read() and readBytes()).
+class TlsBodyReader {
+public:
+    TlsBodyReader(WiFiClientSecure &client, uint32_t timeoutMs = 10000) : client(client), timeoutMs(timeoutMs) {}
+    int read();
+    size_t readBytes(char *buffer, size_t length);
+    size_t readBytes(uint8_t *buffer, size_t length) { return readBytes((char *)buffer, length); }
+
+private:
+    WiFiClientSecure &client;
+    uint32_t timeoutMs;
+};
 
 // Enough free memory for one session: two 16 KB record buffers and the
 // handshake, with some left for the other tasks. Below it, wait.

@@ -53,7 +53,15 @@ uint32_t millis() { return nowMs; }
 struct { bool connected=true; bool isConnected() const { return connected; } } WiFi;
 struct { uint32_t heap=100000; uint32_t getFreeHeap() const { return heap; } } ESP;
 struct { int githubUpdate=1; bool usageCount=false; uint8_t updateChannel=0; } settings;
-struct WiFiClientSecure {};
+struct WiFiClientSecure { std::istream *body=nullptr; };
+// The firmware parses the body through TlsBodyReader(tls): read the response
+// that httpsGet() attached to the connection.
+struct TlsBodyReader {
+    std::istream &in;
+    explicit TlsBodyReader(WiFiClientSecure &tls) : in(*tls.body) {}
+    int read() { return in.get(); }
+    size_t readBytes(char *buffer, size_t length) { in.read(buffer, length); return in.gcount(); }
+};
 struct HTTPClient {
     std::string body;
     std::istringstream stream;
@@ -65,10 +73,10 @@ struct HTTPClient {
 };
 struct Response { int code=200; std::string body; bool chunked=false; } manifest, api;
 std::vector<std::string> requests;
-bool httpsGet(String url, WiFiClientSecure &, HTTPClient &http, int *code) {
+bool httpsGet(String url, WiFiClientSecure &tls, HTTPClient &http, int *code) {
     requests.push_back(url);
     const auto &r=(url.find("update.json")!=std::string::npos || url.find("beta.json")!=std::string::npos)?manifest:api;
-    http.body=r.body; http.chunked=r.chunked; *code=r.code; return *code==200;
+    http.body=r.body; http.chunked=r.chunked; *code=r.code; tls.body=&http.getStream(); return *code==200;
 }
 int installs=0, pings=0;
 GithubInstallResult installResult=GithubInstallResult::Done;

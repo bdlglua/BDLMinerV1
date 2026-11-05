@@ -92,7 +92,14 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     if (trust == Trust::Root) tls.setCACert(rootCA);
     else if (trust == Trust::None) tls.setInsecure();
     tls.setHandshakeTimeout(timeoutSeconds);
-    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);  // the TCP connect too
+    // The TCP connect and reads too. Arduino-ESP32 3.x takes milliseconds
+    // here (2.x took seconds): 4 would have meant 4 ms, and every short probe
+    // gave up before the server could answer.
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds * 1000UL);
+#else
+    if (timeoutSeconds < 12) tls.setTimeout(timeoutSeconds);
+#endif
     if (!lock || xSemaphoreTake(lock, portMAX_DELAY) != pdTRUE) {
         logf("[tls] handshake unavailable: TLS lock missing\n");
         return false;
