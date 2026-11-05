@@ -97,6 +97,7 @@ Object.assign(FR,{
  'ASIC not responding; restart required':'L’ASIC ne répond plus ; redémarrage nécessaire',
  'ASIC counter stalled; restart required':'Compteur de l’ASIC bloqué ; redémarrage nécessaire',
  'Restarting the ASIC':'Redémarrage de l’ASIC',
+ 'read by this browser':'lu par ce navigateur',
  'Pool needs version rolling':'Le pool doit accepter le version rolling',
  'Paused / waiting for pool':'En pause / en attente du pool',
  'Ready / waiting for pool':'Prêt / en attente du pool',

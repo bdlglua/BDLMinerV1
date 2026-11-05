@@ -657,6 +657,23 @@ check('a failing pool statistics API is reported with the share estimate',()=>ru
   assert.match(await f.page.locator('#device-grid').textContent(),/Integrations⚠ check/);
 }));
 
+check('the browser reads a TLS 1.3-only public-pool API the miner cannot',()=>run({stats:{uptime_s:3600,hashrate:1.2e12,shares:{accepted:20,rejected:0,work:20},pool:{host:'public-pool.io',port:3333,connected:true,status:'Mining',difficulty:1024},address:'bc1qylqnpfxp90xqxzcfe3u7dnfxlp9754e2rkg6k8lsavhaf2c5hv0sluxxhy.gamma',pool_view:{updated_s:-1,supported:false}}},async f=>{
+  const asked=[];
+  await f.page.route('https://public-pool.io:40557/api/client/**',route=>{asked.push(route.request().url());
+   route.fulfill({status:200,headers:{'access-control-allow-origin':'*'},contentType:'application/json',body:JSON.stringify({bestDifficulty:'15388278.28',workersCount:1,workers:[{sessionId:'a',name:'gamma',hashRate:'1180000000000'}],accounting:{totalAcceptedShares:1331}})})});
+  await f.page.goto(f.url);
+  await f.page.waitForFunction(()=>/read by this browser/.test(document.getElementById('pool-grid')?.textContent||''),null,{timeout:8000});
+  const pool=await f.page.locator('#pool-grid').textContent();
+  assert.match(pool,/1\.18 TH\/s/);assert.match(pool,/15\.4 M/);assert.match(pool,/public-pool\.io:40557\/api\/client\//);
+  assert.deepEqual(asked,['https://public-pool.io:40557/api/client/bc1qylqnpfxp90xqxzcfe3u7dnfxlp9754e2rkg6k8lsavhaf2c5hv0sluxxhy']); // worker name not sent, asked once
+}));
+
+check('the browser does not ask the pool when the miner reads its API',()=>run({stats:{pool:{host:'public-pool.io',port:3333,connected:true,status:'Mining',difficulty:1},address:'bc1qylqnpfxp90xqxzcfe3u7dnfxlp9754e2rkg6k8lsavhaf2c5hv0sluxxhy',pool_view:{updated_s:60,supported:true,hashrate:1e6,best:2,workers:1,source:'public-pool.io:40557/api/client/'}}},async f=>{
+  let asked=0;await f.page.route('https://public-pool.io:40557/**',route=>{asked++;route.abort()});
+  await f.page.goto(f.url);await f.page.waitForSelector('#pool-grid .t');await f.page.waitForTimeout(300);
+  assert.equal(asked,0);assert.doesNotMatch(await f.page.locator('#pool-grid').textContent(),/read by this browser/);
+}));
+
 check('NerdNOS ASIC tile shows only the readings the board has',()=>run({stats:{board:'NerdNOS',hashrate:2.1e11,engines:[{name:'BM1397',rate:2.1e11}],temperature_source:'asic',asic:{model:'BM1397',experimental:true,running:true,state:'Mining (experimental)',frequency_mhz:300,results:1234,hardware_error_percent:0.4}}},async f=>{
   await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');
   const text=await f.page.locator('#device-grid').textContent();

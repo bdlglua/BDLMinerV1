@@ -446,8 +446,11 @@ asks again every 10 minutes.
 
 The firmware's TLS (mbedTLS 2.28, ESP32 Arduino 2.0.17) speaks TLS 1.2 only.
 public-pool.io now serves its statistics API (port 40557) over **TLS 1.3 only**: the
-miner cannot read it, logs `refused the TLS 1.2 handshake`, and the tile shows the
-estimate. Mining and shares are not affected; the pool's own site still shows them.
+miner cannot read it and logs `refused the TLS 1.2 handshake`. The dashboard then asks
+`https://<pool host>:40557/api/client/<address>` itself, from your browser (which
+speaks TLS 1.3; the API allows any origin), at most every 10 minutes: the tile shows
+the pool's figures marked *read by this browser*, or the estimate if that fails too.
+Only the address is sent, not the worker name. Mining and shares are not affected.
 
 A pool may list no worker at all for this miner: public-pool, for one, now imposes a
 minimum difficulty of 1 (it ignores the suggested difficulty) and lists a worker only

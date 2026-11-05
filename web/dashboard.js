@@ -152,6 +152,26 @@ async function peer(u){
   return p;
  }catch(e){return null}
 }
+// public-pool serves its statistics API over TLS 1.3 only, which the miner's
+// TLS (1.2) cannot speak. The browser can, and the API allows any origin: when
+// the miner found no API, this page asks public-pool's usual one itself, at
+// most every 10 minutes. The next snapshot shows the answer.
+const browserPool={key:'',at:0,busy:false,view:null};
+function browserPoolView(j){
+ const host=String(j.pool?.host||'').toLowerCase(),addr=String(j.address||'').split('.')[0];
+ if(j.pool_view.supported!==false||!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)||!/^[A-Za-z0-9]{20,100}$/.test(addr))return null;
+ const key=host+'|'+addr,source=host+':40557/api/client/';
+ if(browserPool.key!==key)Object.assign(browserPool,{key,at:0,view:null});
+ if(!browserPool.busy&&Date.now()-browserPool.at>=600000){
+  Object.assign(browserPool,{busy:true,at:Date.now()});
+  request('https://'+source+addr,{timeout:10000,credentials:'omit'}).then(d=>{
+   const best=Number(d?.bestDifficulty),workers=Array.isArray(d?.workers)?d.workers:[];
+   if(browserPool.key!==key||!Number.isFinite(best)||!Number.isFinite(d?.workersCount))return;
+   browserPool.view={hashrate:workers.reduce((s,w)=>s+(Number(w?.hashRate)||0),0),best,workers:d.workersCount,source,at:Date.now()};
+  }).catch(()=>{}).finally(()=>{browserPool.busy=false});
+ }
+ return browserPool.view;
+}
 // Renders one statistics snapshot, from the live stream or a poll.
 function show(j){
  {const m=j?.market,pv=j?.pool_view;
@@ -187,7 +207,9 @@ function show(j){
    tile(t('Block height'),j.network.height||'-',t('net diff')+' '+diff(j.network.difficulty)),
    tile(t('Lifetime'),si(j.lifetime.hashes)+' '+t('hashes'),j.lifetime.shares+' '+t('shares')+' · '+t('running')+' '+dur(j.lifetime.seconds))];
   renderUpdate(j.github_update);
-  if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')+(pv.error?'\n⚠ '+apiError(pv.error):'')+workerNote(j,pv)));
+  const bv=pv.updated_s<0?browserPoolView(j):null;
+  if(bv)T.push(tile(t('Seen by the pool'),si(bv.hashrate,'H/s'),t('best')+' '+diff(bv.best)+' · '+bv.workers+' '+t('worker(s)')+' · '+Math.round((Date.now()-bv.at)/60000)+' '+t('min ago')+'\n'+t('via')+' '+bv.source+' ('+t('read by this browser')+')'+workerNote(j,bv)));
+  else if(pv.updated_s>=0)T.push(tile(t('Seen by the pool'),si(pv.hashrate,'H/s'),t('best')+' '+diff(pv.best)+' · '+pv.workers+' '+t('worker(s)')+' · '+Math.round(pv.updated_s/60)+' '+t('min ago')+(pv.source?'\n'+t('via')+' '+pv.source:'')+(pv.error?'\n⚠ '+apiError(pv.error):'')+workerNote(j,pv)));
   // Without a readable pool API, show what the pool credits: accepted share
   // difficulty x 2^32 over the session, the way pools estimate a worker.
   else if(!pv.supported||pv.error){const work=j.shares.work,since=j.uptime_s,note=pv.error?'\n⚠ '+apiError(pv.error):'';
