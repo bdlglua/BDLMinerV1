@@ -76,6 +76,11 @@ jobs:
       - name: Study build (Arduino-ESP32 3.x, gnu++23)
         run: |
           set -o pipefail
+          # Hybrid compile: the first run rebuilds ESP-IDF with custom_sdkconfig and
+          # copies it into the framework; its own child build is refused by the
+          # platform (pioarduino's penv reports PlatformIO 6.2.0-post.1 < 6.2.0).
+          # A second run then builds the firmware against the rebuilt libraries.
+          pio run -e "${{ matrix.env }}" 2>&1 | tee build-idf.log || true
           pio run -e "${{ matrix.env }}" 2>&1 | tee build.log
           python3 -c "import sys; sys.path.insert(0, 'tools'); import make_release as m; e = '${{ matrix.env }}'; m.slot_report(e, f'.pio/build/{e}/firmware.bin', f'.pio/build/{e}/partitions.bin')"
       - name: Errors summary
