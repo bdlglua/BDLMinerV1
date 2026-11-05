@@ -41,7 +41,7 @@ jobs:
             ~/.cache/pip
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-
-      - run: pip install platformio==6.1.19
+      - run: pip install platformio==6.2.0
       - run: python3 -m unittest discover -s test/tools -v
       - name: Native SV2 crypto test dependency
         run: |
@@ -70,7 +70,7 @@ jobs:
             ~/.cache/pip
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
-      - run: pip install platformio==6.1.19
+      - run: pip install platformio==6.2.0
       - name: Build and package USB images from a clean checkout
         run: python3 tools/make_release.py --unsigned "${{ matrix.env }}"
       - uses: actions/upload-artifact@v7
