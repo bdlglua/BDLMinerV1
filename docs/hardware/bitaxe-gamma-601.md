@@ -57,7 +57,7 @@ Gamma Turbo, Hex, Supra, another Gamma revision, or a generic ESP32-S3.
    [latest release](https://github.com/bdlglua/BDLMinerV2/releases/latest) and
    flash it at **0x0** over USB, or select **Bitaxe Gamma 601 (experimental)** in
    the [web flasher](https://bdlglua.github.io/flash.html).
-   Alternatively, build with PlatformIO 6.1.19:
+   Alternatively, build with PlatformIO 6.2.0:
 
    ```sh
    pio run -e bitaxe-gamma-601

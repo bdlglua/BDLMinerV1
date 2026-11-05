@@ -5,7 +5,23 @@ Building the firmware, how it hashes, making a release, and the code layout. See
 
 ## Build and flash
 
-Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio==6.1.19`).
+Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio==6.2.0`).
+Since 2.5.0 the firmware builds on Arduino-ESP32 3.3.12 (pioarduino platform 55.03.312,
+ESP-IDF 5.5, GCC 14.2, C++23).
+
+The first build of each board rebuilds ESP-IDF with the project's configuration
+(`custom_sdkconfig` in `platformio.ini`: TLS 1.3, our certificate roots, unused parts
+left out) and takes several minutes; later builds are quick. Two quirks of the platform:
+
+* Its Python environment may install `pioarduino` 6.2.0.post1, which it then reads as
+  older than 6.2.0 and refuses (`IncompatiblePlatform`) at the end of that first build.
+  Pin it once, then build again:
+  `~/.platformio/penv/bin/uv pip install --python ~/.platformio/penv/bin/python pioarduino==6.2.0`.
+* The rebuilt libraries are shared by the boards of one chip. Building, one after the
+  other, two boards of the same chip whose flash modes differ (`dio`/`qio`) can reuse the
+  first one's and fail to compile (`network_provisioning/network_config.h`); delete
+  `~/.platformio/packages/framework-arduinoespressif32-libs` and build again. CI builds
+  each board from a clean framework.
 
 ```sh
 pio run -e m5stickc-plus2 -t upload -t monitor   # M5StickC Plus2

@@ -421,8 +421,8 @@ bool refreshPoolStats() {
             p.supported = false;
             storePool(p, backup);
             if (refusedTls12)
-                logf("[market] %s refused the TLS 1.2 handshake: its stats API likely requires TLS 1.3, which this "
-                     "firmware cannot use\n", host.c_str());
+                logf("[market] %s refused the TLS handshake (alert from the server): its stats API asks for TLS "
+                     "settings this firmware does not offer\n", host.c_str());
             logf("[market] no pool stats API found for %s; searched again %s\n", host.c_str(),
                  addressUnknown ? "after its next accepted share, or in 6 h" : "in 6 h");
             return true;

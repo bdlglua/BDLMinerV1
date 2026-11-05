@@ -444,9 +444,10 @@ attempt is logged with its cause. Meanwhile the tile estimates the hashrate from
 accepted shares. When a known API stops answering (an outage on the pool's side), the tile says so, shows the estimate, and the miner
 asks again every 10 minutes.
 
-The firmware's TLS (mbedTLS 2.28, ESP32 Arduino 2.0.17) speaks TLS 1.2 only.
-public-pool.io now serves its statistics API (port 40557) over **TLS 1.3 only**: the
-miner cannot read it and logs `refused the TLS 1.2 handshake`. The dashboard then asks
+public-pool.io serves its statistics API (port 40557) over **TLS 1.3 only**. Since
+2.5.0 the firmware speaks TLS 1.2 and 1.3 and reads it itself; up to 2.4.2 (TLS 1.2
+only) it logged `refused the TLS 1.2 handshake`. When the miner finds no statistics
+API, whatever the cause, the dashboard asks
 `https://<pool host>:40557/api/client/<address>` itself, from your browser (which
 speaks TLS 1.3; the API allows any origin), at most every 10 minutes: the tile shows
 the pool's figures marked *read by this browser*, or the estimate if that fails too.
@@ -717,4 +718,5 @@ switching from V1 to V2 does not make hashes stronger or force a lower share dif
 * The all-time best difficulty is saved to flash (at most once per minute), the lifetime
   totals (hashes, accepted shares, blocks) every 10 minutes, and a found block at once.
   A factory reset keeps them.
-* ESP32‑C6/H2: not supported by the `espressif32@6.9.0` platform (Arduino 2.x) used here.
+* ESP32‑C6/H2: no build yet (Arduino-ESP32 3.x supports them since 2.5.0, but no
+  environment is defined or tested).
