@@ -84,8 +84,8 @@ that reports can focus on what goes beyond them:
 - **Read-only pages need no password**: the dashboard, `/api/stats`,
   `/api/history` and the live stream show the payout address, pool and network
   details to anyone on the local network. The log (`/api/log`), which also names
-  networks, hosts and every error, is protected like the settings: it asks for the
-  web password when one is set. `/api/stats` allows cross-origin reads so
+  networks, hosts and every error, uses the same host and origin checks as
+  Settings and asks for the web password when one is set. `/api/stats` allows cross-origin reads so
   that one miner's dashboard can show the others.
 - **Firmware from GitHub is trusted by its signature, not by TLS.** Every release
   firmware is signed with an ECDSA P-256 key kept outside the repository; the miner
@@ -98,10 +98,12 @@ that reports can focus on what goes beyond them:
   (`assets/tls/roots.pem`, packed into `src/tls_roots.h` by
   `tools/make_tls_roots.py`). A failure never falls back to an unverified connection,
   so a webhook URL or ntfy topic is not sent to an impostor; self-signed servers are
-  refused (use `http://` for one on the local network). Nothing is sent until NTP has
-  set the clock. **GitHub downloads** are verified the same way, but an unverifiable
-  certificate falls back to an unverified connection there, so that a root missing
-  from the list cannot stop updates: the firmware is trusted by its signature.
+  refused (use an explicit `http://` URL for a webhook on a trusted local network).
+  Verified HTTPS requires a synchronized clock. Since 2.3.3, after one minute
+  without NTP, the miner can set the clock from a pool job. NTP corrects it when
+  it responds. **Signed GitHub firmware updates** can retry without server
+  verification if the certificate check fails or the clock is unset. The firmware
+  signature is still checked before installation.
 - **A firmware uploaded through the web page is not signature-checked**, so that
   people can install their own builds: only the web password, when set, protects it.
 - **MQTT is plain TCP**; its user and password travel unencrypted to the broker.

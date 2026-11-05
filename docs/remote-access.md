@@ -10,8 +10,9 @@ with Internet access and **BDLMiner 2.3.0 or newer**.
 
 ## Pair your miners
 
-1. Install the latest signed stable update from the local dashboard, or upload
-   the matching board firmware from [Releases](https://github.com/bdlglua/BDLMinerV2/releases).
+1. Use the [latest stable release](https://github.com/bdlglua/BDLMinerV2/releases/latest).
+   Install the signed update from the local dashboard or upload the matching
+   board firmware.
 2. Open the remote dashboard and choose **Create my key**. Keep a copy in your
    password manager. **Copy key** copies the 64-character monitoring key.
 3. Open each miner's local page. In **Settings → Network → Private remote

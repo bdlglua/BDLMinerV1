@@ -46,11 +46,13 @@ Boards without a display report everything on the serial monitor and the
 1. On first boot the board opens a Wi‑Fi access point
    **`BDLMinerV2-XXXX`**, password **`MineYourCoins`** (boards with a display show a QR code to scan).
 2. Open **http://192.168.4.1**, pick your Wi‑Fi network and fill in:
-   * **Cryptocurrency**: `0` BTC (default), `1` BCH, `2` BSV, `3` XEC, `4` DGB or `5` PPC (proof of work)
-     (SHA-256d) in the setup portal; the
-     local Settings → Pool page has a named dropdown. Use matching main/backup
-     pools and a payout address or account for that coin. Non-BTC profiles require
-     V1; DGB requires a SHA-256d pool port. See [SHA-256d setup](mining-coins.md);
+   * **Cryptocurrency**: the setup portal uses `0` BTC (default), `1` BCH,
+     `2` BSV, `3` XEC, `4` DGB (SHA-256d) and `5` PPC (proof of work).
+     The local Settings → Pool page has a named dropdown. Use pool endpoints
+     for the same chain for both the primary and backup, and a compatible
+     payout address or pool account. The pool serves the chain configured on
+     its side. DGB requires a SHA-256d port, and PPC is mining only.
+     See [coin and pool setup](mining-coins.md);
    * **Pool host / port**: `public-pool.io` / `21496` is the compiled default.
      For low-hashrate ESP32 feedback, see [Pools for ESP32](pools.md),
      or use your own pool. A pasted
@@ -67,8 +69,9 @@ Boards without a display report everything on the serial monitor and the
    * **Suggested difficulty (V1)**: share difficulty requested from the pool,
      `0.0002` by default; the pool may enforce a higher minimum. V2 uses the target
      assigned to its mining channel;
-   * **Main / backup protocol**: Stratum V1 by default, or Stratum V2 with Noise
-     and a pool authority key (see [Stratum V1 and Stratum V2](#stratum-v1-and-stratum-v2));
+   * **Main / backup protocol**: Stratum V1 by default and for all non-BTC
+     profiles. BTC can also use native Stratum V2 with Noise and a pool
+     authority key. See [Stratum V1 and Stratum V2](#stratum-v1-and-stratum-v2);
    * **User agent**: select `NerdMinerV2` or `BDLMinerV2/<version>` from the two-option
      menu. The selected identity is sent on both main and backup pools;
    * **Beep on a 32-bit share**: `1` (default) beeps when a hash with 32 leading zero
@@ -349,8 +352,9 @@ HTTPS; *Add to Home screen* works on the local address.
   record. Export a JSON backup before downgrading: older firmware reads legacy keys.
 * **Log**: the last few KB of the serial log, refreshed every 5 s, with filtering,
   pause/resume and a download of the original unfiltered text.
-* **/api/stats** (JSON), **/api/log** (text, asks for the web password when one is
-  set) and **/metrics** (Prometheus).
+* **/api/stats** (JSON), **/api/log** (text) and **/metrics** (Prometheus).
+  The log uses the same host and origin checks as Settings. Open it from the
+  miner's own page and enter the web password if one is set.
 
 All styles and scripts are served by the miner itself: no CDN, external font or
 JavaScript framework is required. `tools/make_web.py` packs the sources in `web/`
@@ -476,17 +480,27 @@ For Discord, use *Channel settings › Integrations › Webhooks › Copy URL*. 
 **Send a test notification** (under the webhook field) shows the result of each
 destination: OK, an HTTP code, no connection, or *certificate not trusted*.
 
-HTTPS servers must present a certificate from a public authority: the miner checks it
-against the roots of `assets/tls/roots.pem` (Let's Encrypt, Google, DigiCert, Sectigo,
-GoDaddy, Amazon, GlobalSign, SSL.com, Microsoft and a few more), so a self-signed ntfy
-server or webhook is refused (*certificate not trusted*). On a home network, use an
-`http://` webhook URL for such a server instead.
+For HTTPS notifications, the miner verifies the server's hostname and certificate
+chain against the roots in `assets/tls/roots.pem`. Self-signed ntfy and webhook
+certificates are refused (*certificate not trusted*). For a webhook on a trusted
+local network, you can explicitly configure an `http://` URL. See the
+[security model](../SECURITY.md#security-model-and-known-limitations) for the
+separate transport exception for signed GitHub firmware updates.
 
 Notifications are sent from the task that already fetches market data, so they cost
 no memory of their own. Each one is tried up to 3 times, 30 seconds apart; while there
 is not enough free memory for a TLS connection (54 KB, with a 24 KB block), no WiFi,
-or no time from NTP yet (certificates are checked against it), it waits up to 10 minutes
-without using up those tries.
+or no synchronized clock yet for certificate validation, it waits up to 10
+minutes without using up those tries. Since 2.3.3, after one minute without
+NTP, a pool job can supply the time. NTP corrects the clock when it responds.
+
+## Private remote monitoring
+
+Starting with 2.3.0, a paired miner can send selected readings over verified
+HTTPS to a private, read-only dashboard. Pairing is off by default and works
+independently of anonymous statistics. The remote dashboard keeps seven days
+of history and works without a local hub or port forwarding. See the
+[setup, data and revocation guide](remote-access.md).
 
 ## Home Assistant
 
