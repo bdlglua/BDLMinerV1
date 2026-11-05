@@ -3,6 +3,10 @@
 #include <esp_heap_caps.h>
 #include <freertos/semphr.h>
 #include <mbedtls/platform.h>
+#include <sdkconfig.h>
+#if defined(CONFIG_MBEDTLS_SSL_PROTO_TLS1_3)
+#include <psa/crypto.h>
+#endif
 
 #include <atomic>
 #include <cstdint>
@@ -113,6 +117,19 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     // meanwhile, hence the watchdog pause.
     hwsha::hold();
     core0WdtPause();
+#if defined(CONFIG_MBEDTLS_SSL_PROTO_TLS1_3)
+    // mbedTLS runs TLS 1.3 key exchange on PSA crypto, which must be set up
+    // first: ESP-IDF's esp-tls does it before each handshake, Arduino's
+    // ssl_client never does, and a server choosing TLS 1.3 then fails the
+    // handshake. Initialised once (here, so the hardware SHA is held and the
+    // PSRAM allocator above is in place); TLS 1.2 servers never needed it.
+    static bool psaReady = false;
+    if (!psaReady) {
+        psa_status_t psa = psa_crypto_init();
+        psaReady = psa == PSA_SUCCESS;
+        if (!psaReady) logf("[tls] PSA crypto setup failed (%d): TLS 1.3 servers will refuse\n", (int)psa);
+    }
+#endif
     uint32_t t0 = millis();
     bool ok = tls.connect(host, port);
     uint32_t elapsed = millis() - t0;
