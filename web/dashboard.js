@@ -155,7 +155,7 @@ async function peer(u){
 // public-pool serves its statistics API over TLS 1.3 only, which the miner's
 // TLS (1.2) cannot speak. The browser can, and the API allows any origin: when
 // the miner found no API, this page asks public-pool's usual one itself, at
-// most every 10 minutes. The next snapshot shows the answer.
+// most every 10 minutes, and shows the answer as soon as it arrives.
 const browserPool={key:'',at:0,busy:false,view:null};
 function browserPoolView(j){
  const host=String(j.pool?.host||'').toLowerCase(),addr=String(j.address||'').split('.')[0];
@@ -164,10 +164,13 @@ function browserPoolView(j){
  if(browserPool.key!==key)Object.assign(browserPool,{key,at:0,view:null});
  if(!browserPool.busy&&Date.now()-browserPool.at>=600000){
   Object.assign(browserPool,{busy:true,at:Date.now()});
-  request('https://'+source+addr,{timeout:10000,credentials:'omit'}).then(d=>{
+  request('https://'+source+addr,{timeout:12000,credentials:'omit'}).then(d=>{
    const best=Number(d?.bestDifficulty),workers=Array.isArray(d?.workers)?d.workers:[];
    if(browserPool.key!==key||!Number.isFinite(best)||!Number.isFinite(d?.workersCount))return;
    browserPool.view={hashrate:workers.reduce((s,w)=>s+(Number(w?.hashRate)||0),0),best,workers:d.workersCount,source,at:Date.now()};
+   browserPool.busy=false;
+   // Shown at once, without waiting for the next snapshot.
+   if(latestStats)try{show(latestStats)}catch(e){}
   }).catch(()=>{}).finally(()=>{browserPool.busy=false});
  }
  return browserPool.view;
