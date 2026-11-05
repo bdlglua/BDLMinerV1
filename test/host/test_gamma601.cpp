@@ -294,5 +294,22 @@ int main(){
     // Safety still acts at once while waiting for the pool: power 0 stops the ASIC.
     poolReady=false;run(1000);assert(powered);power=0;run(20);assert(!powered&&!latched);
     puts("Gamma pool reconnection: ASIC kept running for 60 s without work, no re-initialization, busy job board ignored, safety pause immediate");
+    // The fallback survives a restart while the failed profile stays selected.
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    instability("ASIC not responding; restart required");assert(forceStock&&Preferences::data.count("fallback"));
+    {auto saved=Preferences::data;reset();Preferences::data=saved;}
+    settings.asicFrequency=600;begin();loadFallback(600);
+    assert(forceStock&&live.stockFallback&&!strcmp(live.fallbackReason,"ASIC not responding; restart required"));
+    assert(targetFrequency()==525&&initAsic(w)&&live.frequency==525);
+    // Another profile clears it, for good.
+    {auto saved=Preferences::data;reset();Preferences::data=saved;}
+    settings.asicFrequency=650;begin();loadFallback(650);
+    assert(!forceStock&&!live.stockFallback&&!Preferences::data.count("fallback"));
+    {auto saved=Preferences::data;reset();Preferences::data=saved;}
+    settings.asicFrequency=600;begin();loadFallback(600);assert(!forceStock);
+    // A stock profile never stores or restores one.
+    reset();begin();assert(initAsic(w));instability("ASIC not responding; restart required");
+    assert(!Preferences::data.count("fallback"));
+    puts("Gamma 525 MHz fallback: kept across restarts for the profile that failed, cleared by another profile passed");
     puts("Gamma hardware backend: volatile regulator configuration, native BM1370 startup, relative VOUT limits, supervised PLL ramp, fan/temperature/I2C faults, reset-before-shutdown, pause/cooldown, OTA/supervision lease and stale jobs passed");
 }

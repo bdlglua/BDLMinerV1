@@ -199,6 +199,31 @@ void off(const char *reason, bool fault = false) {
     if (latched) saveFault(live.state);
     invalidate(); publish();
 }
+// The 525 MHz fallback is kept across restarts while the requested profile is
+// the one that failed: each restart, update or power cut otherwise went back
+// to that profile and to its failure. Choosing another profile clears it.
+struct SavedFallback { uint16_t mhz; char reason[62]; };
+char fallbackText[sizeof(SavedFallback::reason)] = "";
+void saveFallback(uint16_t mhz, const char *reason) {
+    SavedFallback saved{mhz, ""};
+    snprintf(saved.reason, sizeof(saved.reason), "%s", reason);
+    Preferences p;
+    if (p.begin("gamma", false)) { p.putBytes("fallback", &saved, sizeof(saved)); p.end(); }
+}
+void loadFallback(uint16_t mhz) {
+    SavedFallback saved{};
+    Preferences p;
+    if (!p.begin("gamma", false)) return;
+    bool found = p.getBytesLength("fallback") == sizeof(saved) && p.getBytes("fallback", &saved, sizeof(saved)) == sizeof(saved);
+    if (found && saved.mhz != mhz) p.remove("fallback");  // another profile was chosen since
+    p.end();
+    if (!found || saved.mhz != mhz || mhz <= bm1370::kStockMHz) return;
+    saved.reason[sizeof(saved.reason) - 1] = 0;
+    memcpy(fallbackText, saved.reason, sizeof(fallbackText));
+    forceStock = true; live.stockFallback = true; live.fallbackReason = fallbackText;
+    logf("[gamma] %u MHz failed before (%s): mining at 525 MHz; choose another frequency to clear it\n",
+         (unsigned)mhz, fallbackText);
+}
 // A BM1370 that stops answering on its UART, or whose hash counter stops, is
 // reset and started again, as NerdNOS does: no safety limit is involved, the
 // regulator, sensor, fan and temperature interlocks are separate and still
@@ -217,6 +242,7 @@ void instability(const char *reason) {
     if (!forceStock && live.frequency > bm1370::kStockMHz) {
         logf("[gamma] %s at %.2f MHz; falling back to 525 MHz\n", reason, live.frequency);
         forceStock=true; live.stockFallback=true; live.fallbackReason=reason;
+        saveFallback(live.requestedMHz, reason);
         off("Restarting at 525 MHz (fallback)");
     } else if (autoRestart(millis())) {
         // Kept as the last fault, with every reading, for the log and the dashboard.
@@ -580,6 +606,7 @@ bool start() {
     setFanControl(settings.fanAuto, settings.fanPercent, settings.maxTemp);
     live.fanAutomatic = settings.fanAuto; live.requestedFanPercent = settings.fanPercent;
     live.requestedMHz = bm1370::validProfile(settings.asicFrequency) ? settings.asicFrequency : bm1370::kStockMHz;
+    loadFallback(live.requestedMHz);
     publish();
     // Started even when the setup failed: the task tries it again.
     bool ok = runtime::started(xTaskCreatePinnedToCore(worker, "bm1370", 8192, nullptr, 3, nullptr, 1) == pdPASS,

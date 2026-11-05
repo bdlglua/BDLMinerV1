@@ -20,6 +20,7 @@ struct Preferences {
         const auto *p = static_cast<const uint8_t *>(in);
         data[key].assign(p, p + n); return n;
     }
+    bool remove(const char *key) { return data.erase(key) > 0; }
     bool isKey(const char *) { return false; }
     double getDouble(const char *, double d) { return d; }
     uint64_t getULong64(const char *, uint64_t d) { return d; }
