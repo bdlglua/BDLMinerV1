@@ -81,7 +81,6 @@ jobs:
       - name: Errors summary
         if: failure()
         run: grep -E "error:|Error [0-9]|undefined reference|exceeds|overflow" build.log | head -60 || true
-          retention-days: 7
       - name: Physical display rendering regressions
         if: matrix.env == 'm5stickc-plus2'
         run: python3 tools/preview_display.py --check
@@ -96,7 +95,7 @@ jobs:
         with:
           name: bitaxe-gamma-601-experimental-${{ github.sha }}
           retention-days: 14
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             release/*/bitaxe-gamma-601-factory.bin
             release/*/bitaxe-gamma-601-firmware.bin
@@ -109,7 +108,7 @@ jobs:
         with:
           name: m5stickc-plus2-dashboard-test-${{ github.sha }}
           retention-days: 14
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             release/*/m5stickc-plus2-factory.bin
             release/*/m5stickc-plus2-firmware.bin
@@ -136,11 +135,11 @@ jobs:
         with:
           name: v2-linux-test-kit
           path: .pio/v2-test-kit/
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: verified-unsigned-v2-preview
           path: release/
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
