@@ -109,8 +109,11 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   hash counter, or unavailable hardware-error telemetry trigger a reset/power-off and
   one restart at **525 MHz** when running above stock. The fallback stays active across
   pool reconnects and ordinary pauses until the next reboot; it never raises voltage.
-  A failure at stock still stops mining. Temperature/fan/supply/sensor faults keep
-  their latched shutdown behavior and never use this retry path.
+  At stock, an ASIC that stops answering or whose counter stalls is reset and started
+  again automatically, up to **3 times an hour** (the reading at each one is kept as the
+  last fault); a fourth failure within the hour stops mining until restart.
+  Temperature/fan/supply/sensor faults keep their latched shutdown behavior and never
+  use this retry path.
 * The dashboard shows requested/actual frequency, measured hardware-error percentage
   (unavailable until a complete window), fallback state and its reason. Rates still
   come from the physical hash counter, not from clock settings. **Overclock profiles,
