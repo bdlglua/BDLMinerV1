@@ -71,21 +71,21 @@ jobs:
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-${{ matrix.env }}-
       - run: pip install platformio==6.2.0
-      # C++23 study: compile only (the release packaging needs esptool 5
-      # changes), then report the firmware against its update slot.
-      - name: Study build (Arduino-ESP32 3.x, gnu++23)
-        run: |
-          set -o pipefail
-          # Hybrid compile: the first run rebuilds ESP-IDF with custom_sdkconfig and
-          # copies it into the framework; its own child build is refused by the
-          # platform (pioarduino's penv reports PlatformIO 6.2.0-post.1 < 6.2.0).
-          # A second run then builds the firmware against the rebuilt libraries.
-          pio run -e "${{ matrix.env }}" 2>&1 | tee build-idf.log || true
-          pio run -e "${{ matrix.env }}" 2>&1 | tee build.log
-          python3 -c "import sys; sys.path.insert(0, 'tools'); import make_release as m; e = '${{ matrix.env }}'; m.slot_report(e, f'.pio/build/{e}/firmware.bin', f'.pio/build/{e}/partitions.bin')"
-      - name: Errors summary
-        if: failure()
-        run: grep -E "error:|Error [0-9]|undefined reference|exceeds|overflow" build.log | head -60 || true
+      # C++23 study (pioarduino hybrid compile): the first run rebuilds ESP-IDF
+      # with custom_sdkconfig and copies it into the framework. Its own child
+      # build may be refused (pioarduino's penv can carry PlatformIO
+      # 6.2.0.post1, read as 6.2.0-post.1 < 6.2.0); the libraries are in place
+      # by then, so the packaging below builds against them as usual.
+      - name: Rebuild ESP-IDF for this board (custom_sdkconfig)
+        run: pio run -e "${{ matrix.env }}" > build-idf.log 2>&1 || tail -40 build-idf.log
+      - name: Build and package USB images from a clean checkout
+        run: python3 tools/make_release.py --unsigned "${{ matrix.env }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-ci-${{ matrix.env }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
       - name: Physical display rendering regressions
         if: matrix.env == 'm5stickc-plus2'
         run: python3 tools/preview_display.py --check
@@ -100,7 +100,7 @@ jobs:
         with:
           name: bitaxe-gamma-601-experimental-${{ github.sha }}
           retention-days: 14
-          if-no-files-found: ignore
+          if-no-files-found: error
           path: |
             release/*/bitaxe-gamma-601-factory.bin
             release/*/bitaxe-gamma-601-firmware.bin
@@ -113,7 +113,7 @@ jobs:
         with:
           name: m5stickc-plus2-dashboard-test-${{ github.sha }}
           retention-days: 14
-          if-no-files-found: ignore
+          if-no-files-found: error
           path: |
             release/*/m5stickc-plus2-factory.bin
             release/*/m5stickc-plus2-firmware.bin
@@ -140,11 +140,11 @@ jobs:
         with:
           name: v2-linux-test-kit
           path: .pio/v2-test-kit/
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: verified-unsigned-v2-preview
           path: release/
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7

@@ -105,10 +105,15 @@ def flash_layout(env):
     mode = get("BOARD_FLASH_MODE")
     mode = "dio" if mode in ("qio", "qout") else mode  # what PlatformIO passes to esptool
     freq = "%dm" % (int(get("BOARD_F_FLASH").rstrip("L")) // 1000000)
-    size = re.search(r"'--flash_size',\s*'([^']+)'", dump).group(1)
+    # esptool 4 spells it --flash_size, esptool 5 (Arduino-ESP32 3.x) --flash-size.
+    size = re.search(r"'--flash[_-]size',\s*'([^']+)'", dump).group(1)
     extra = re.search(r"'FLASH_EXTRA_IMAGES': \[(.*?)\]", dump, re.S).group(1)
     images = re.findall(r"\(\s*'(0x[0-9a-fA-F]+)',\s*'([^']+)'\)", extra)
-    images.append((get("ESP32_APP_OFFSET"), os.path.join(ROOT, ".pio", "build", env, "firmware.bin")))
+    # pioarduino leaves ESP32_APP_OFFSET unset (None): the first app partition
+    # of every table in partitions/ starts at 0x10000.
+    offset = re.search(r"'ESP32_APP_OFFSET': '([^']*)'", dump)
+    images.append((offset.group(1) if offset else "0x10000",
+                   os.path.join(ROOT, ".pio", "build", env, "firmware.bin")))
     return mcu, mode, freq, size, images
 
 
