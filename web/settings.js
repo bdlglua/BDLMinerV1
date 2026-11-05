@@ -83,7 +83,8 @@ const FIELDS={
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],
  fanauto:[['false','Manual'],['true','Automatic']],
- asicmhz:Array.from({length:12},(_,n)=>{const mhz=525+n*25;return[mhz,n?mhz+' MHz':'525 MHz (stock)']}),
+ asicmhz:[525,550,575,600,625,650,675,690].map(mhz=>[mhz,mhz===525?'525 MHz (stock)':mhz+' MHz']),
+ asicmv:[1000,1060,1100,1150,1200,1250].map(mv=>[mv,mv===1150?'1150 mV (stock)':mv+' mV']),
  lang:[[0,'English'],[1,'Français']],rot:[[0,'Portrait'],[1,'Landscape'],[2,'Portrait, upside down'],[3,'Landscape, upside down']],
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
@@ -122,9 +123,9 @@ function render(data){
   const l=document.createElement('label'),i=document.createElement(options?'select':'input');l.textContent=t(title);i.id='k_'+k;l.htmlFor=i.id;
   if(options){
    for(const[v,name]of options){const option=document.createElement('option');option.value=String(v);option.textContent=t(name);i.appendChild(option)}
-   const current=String(k==='ua'?(value==='NerdMinerV2'?value:agents[1]):value??(k==='asicmhz'?525:k==='fanauto'?false:0));
+   const current=String(k==='ua'?(value==='NerdMinerV2'?value:agents[1]):value??(k==='asicmhz'?525:k==='asicmv'?1150:k==='fanauto'?false:0));
    if(![...i.options].some(o=>o.value===current)){const option=document.createElement('option');option.value=current;option.textContent=current;i.appendChild(option)}
-   i.value=current;if(k==='asicmhz')i.required=true;
+   i.value=current;if(k==='asicmhz'||k==='asicmv')i.required=true;
   }else if(type=='bool'){i.type='checkbox';i.className='switch';i.setAttribute('role','switch');i.checked=value}
   else{
    i.type=type=='secret'?'password':type=='text'?'text':'number';i.value=value??'';
@@ -158,7 +159,8 @@ function render(data){
    const note=help('');note.appendChild(guide);row.appendChild(note);
   }
   if(k==='proto'||k==='proto2')row.appendChild(help(t('Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.')));
-  if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental, up to 800 MHz. Default: 525 MHz. Voltage stays at 1150 mV. Instability triggers a 525 MHz fallback until restart.')));
+  if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental, up to 690 MHz as in ESP-Miner. Default: 525 MHz. A higher frequency usually needs a higher core voltage. Instability triggers a 525 MHz fallback, kept until the frequency or voltage changes.')));
+  if(k==='asicmv')row.appendChild(help(t('Default: 1150 mV, as ESP-Miner. Raise it in small steps with the frequency and watch the temperature; higher voltage means more heat and power. Safety stops still apply.')));
   if(k==='fanauto')row.appendChild(help(t('Default: manual 100%. Startup, stopped ASIC, missing temperature or heat safety force full cooling.')));
   if(k==='fanpct')row.appendChild(help(t('Minimum 30%. Safety forces 100% at ASIC 60 °C or regulator 80 °C until both cool by 5 °C. A lower thermal limit raises cooling earlier. Fan-stop protection remains active.')));
   if(k==='power'){const h=document.createElement('div');h.className='field-help';h.textContent=t('At 100%, mining runs at full available speed. Temperature protection can still reduce it.');const presets=document.createElement('div');presets.className='presets';for(const [name,v]of [['Full performance',100],['Balanced',75],['Quiet',50]]){const button=document.createElement('button');button.type='button';button.className='secondary';button.id='preset-'+v;button.textContent=t(name)+' · '+v+' %';button.onclick=()=>{i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}))};presets.appendChild(button)}h.appendChild(presets);row.appendChild(h)}

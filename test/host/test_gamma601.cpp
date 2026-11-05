@@ -179,13 +179,22 @@ int main(){
     reset();begin();testUartFail=true;assert(!initAsic(w));off("UART failed",true);assert(latched&&testReset==0);
     reset();begin();testTaskFailAt=testTaskStarts;assert(!start()&&latched&&testReset==0);
     assert(Settings().asicFrequency==525); // stock, as ESP-Miner
-    for(unsigned profile=525;profile<=800;profile+=25){
+    assert(Settings().asicVoltage==1150); // stock, as ESP-Miner
+    for(unsigned profile:{525u,550u,575u,600u,625u,650u,675u,690u}){
         reset();settings.asicFrequency=profile;begin();
-        assert(initAsic(w)&&live.running&&live.frequency==profile&&live.requestedMHz==profile);
-        assert(storedWord(0x21)==589); // 1150 mV, including at 800 MHz
+        // The PLL lands on 690.625 MHz for 690, as in ESP-Miner.
+        assert(initAsic(w)&&live.running&&std::fabs(live.frequency-profile)<1&&live.requestedMHz==profile);
+        assert(storedWord(0x21)==589); // 1150 mV unless chosen otherwise
         assert(testI2c[std::make_pair(0x4c,0x4c)][0]==63); // full fan
     }
-    reset();settings.asicFrequency=800;begin();assert(initAsic(w)&&live.frequency==800);
+    // The chosen core voltage is what the regulator is asked for (exponent -9).
+    for(unsigned mv:{1000u,1060u,1100u,1150u,1200u,1250u}){
+        reset();settings.asicVoltage=mv;begin();assert(configured);
+        assert(storedWord(0x21)==unsigned(std::lround(mv/1000.0*512)));
+        assert(std::fabs(readings().coreTarget-mv/1000.0f)<0.0001f);
+    }
+    reset();settings.asicVoltage=1300;begin();assert(storedWord(0x21)==589); // invalid: stock
+    reset();settings.asicFrequency=690;begin();assert(initAsic(w)&&std::fabs(live.frequency-690)<1);
     // Error/total register values are independent cumulative counters, paired by time.
     bm1370::Response totalReply{};totalReply.reg=0x8c;
     bm1370::Response errorReply{};errorReply.reg=0x4c;
@@ -229,10 +238,10 @@ int main(){
     assert(latched&&!powered&&testReset==0); // failed shutdown cannot auto-restart
     reset();settings.asicFrequency=600;begin();assert(initAsic(w));
     bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered); // hard limits still stop
-    reset();settings.asicFrequency=800;begin();assert(initAsic(w));
+    reset();settings.asicFrequency=690;begin();assert(initAsic(w));
     testMillis+=3100;checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
     assert(initAsic(w)&&live.frequency==525); // highest profile still falls back to stock
-    reset();settings.asicFrequency=800;begin();assert(initAsic(w));
+    reset();settings.asicFrequency=690;begin();assert(initAsic(w));
     bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered);
     // Fan settings are live: no ASIC reset, PLL ramp or job invalidation.
     reset();begin();setFanControl(false,30);
@@ -301,6 +310,12 @@ int main(){
     settings.asicFrequency=600;begin();loadFallback(600);
     assert(forceStock&&live.stockFallback&&!strcmp(live.fallbackReason,"ASIC not responding; restart required"));
     assert(targetFrequency()==525&&initAsic(w)&&live.frequency==525);
+    // Another voltage clears it too: the same profile may hold with more volts.
+    {auto saved=Preferences::data;reset();Preferences::data=saved;}
+    settings.asicFrequency=600;settings.asicVoltage=1200;begin();loadFallback(600);
+    assert(!forceStock&&!Preferences::data.count("fallback"));
+    reset();settings.asicFrequency=600;begin();assert(initAsic(w));
+    instability("ASIC not responding; restart required");assert(forceStock&&Preferences::data.count("fallback"));
     // Another profile clears it, for good.
     {auto saved=Preferences::data;reset();Preferences::data=saved;}
     settings.asicFrequency=650;begin();loadFallback(650);

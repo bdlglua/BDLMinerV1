@@ -61,7 +61,7 @@ Packet job(uint8_t slot, const uint8_t header[80]) {
     return command(0x21, payload, sizeof(payload));
 }
 Packet frequency(float target, float *actual) {
-    if (!std::isfinite(target) || target < 50 || target > kMaxMHz) return {};
+    if (!std::isfinite(target) || target < 50 || target > kPllMaxMHz) return {};
     float best = 0, error = std::numeric_limits<float>::max(), vcoBest = error;
     int productBest = 65535, fbBest = 0, refBest = 0, p1Best = 0, p2Best = 0;
     for (int ref = 2; ref >= 1; --ref) for (int p1 = 7; p1 >= 1; --p1) for (int p2 = 7; p2 >= 1; --p2) {
@@ -146,7 +146,8 @@ const char *Health::fault(bool powered, bool requireDiode) const {
         return "5V supply fault; restart required";
     if (powered && rpm < 500) return "Fan stopped; restart required";
     if (!std::isfinite(current) || current < -1 || current >= 30) return "ASIC current fault; restart required";
-    if (powered && (!std::isfinite(coreVoltage) || coreVoltage < 1.0f || coreVoltage > 1.25f))
+    // Around the chosen voltage: 1.00-1.25 V at the stock 1150 mV (0.5 mV for float rounding).
+    if (powered && (!std::isfinite(coreVoltage) || coreVoltage < coreTarget - 0.1505f || coreVoltage > coreTarget + 0.1005f))
         return "ASIC voltage fault; restart required";
     if (status & (powered ? kStatusFaults | kStatusOff | kStatusVinUv : kStatusFaults))
         return "Regulator reports a fault; restart required";
