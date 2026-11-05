@@ -472,6 +472,13 @@ void marketTask(void *) {
         }
         // Certificates are checked against the clock: no HTTPS before NTP.
         bool online = WiFi.isConnected() && tlsClockSet();
+        // Said once: without it a miner waiting for the clock shows no market
+        // data and logs nothing about why.
+        static bool waitLogged = false;
+        if (!online && !waitLogged && millis() > 90000) {
+            waitLogged = true;
+            logf("[market] waiting for %s\n", WiFi.isConnected() ? "the clock (NTP has not answered yet)" : "WiFi");
+        }
         if (coin::bitcoinData(settings.miningCoin) && online && (int32_t)(millis() - nextMarket) >= 0) {
             bool ok = refresh();
             nextMarket = millis() + (ok ? kRefreshMs : retry);
