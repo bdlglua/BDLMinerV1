@@ -37,6 +37,16 @@ static bool directTransfers = true;   // correctness and speed checked before wo
 static bool overlappedTransfers = true;  // S3 only: checked and timed at boot like the others
 #endif
 
+// ESP-IDF 5 resets the engine each time it is acquired, and its start and
+// continue helpers no longer write the mode register (sha_ll_set_mode() does,
+// separately): left at 0 after the reset, the engine computed SHA-1, every
+// boot self-test failed and the S2, S3 and C3 mined in software only (2.5.0:
+// 66 instead of 288 kH/s on an S3). Select SHA-256 after every acquire.
+static inline void acquire() {
+    esp_sha_acquire_hardware();
+    REG_WRITE(SHA_MODE_REG, SHA2_256);
+}
+
 void hold() {
     holds++;
     held = true;
@@ -61,7 +71,7 @@ void prepare(Job &job, const uint8_t header[80]) {
     ((uint8_t *)job.tail)[62] = 0x02;  // 640 bits, big-endian length
     ((uint8_t *)job.tail)[63] = 0x80;
 
-    esp_sha_acquire_hardware();
+    acquire();
     sha_ll_fill_text_block(header, 16);
     sha_ll_start_block(SHA2_256);
     waitIdle();
@@ -99,7 +109,7 @@ static __attribute__((noinline)) uint32_t scanWithPadding(
     volatile uint32_t *h7 = (volatile uint32_t *)(SHA_H_BASE + 28);
 
     if (held) return 0;
-    esp_sha_acquire_hardware();
+    acquire();
     // Words 9..14 are zero in both padded blocks. The peripheral reads TEXT
     // without changing it; initialize these once while owning the engine.
     // Reinitialize for every batch because TLS may have used it in between.
@@ -157,7 +167,7 @@ static __attribute__((noinline)) uint32_t scanOverlapped(
     volatile uint32_t *digest = (volatile uint32_t *)SHA_H_BASE;
     volatile uint32_t *h7 = (volatile uint32_t *)(SHA_H_BASE + 28);
     if (held || !count) return 0;
-    esp_sha_acquire_hardware();
+    acquire();
     uint32_t nonce = first;
     job.tail[3] = nonce;
     writeWords<16>(text, job.tail);

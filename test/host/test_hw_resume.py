@@ -29,12 +29,17 @@ int64_t ticks = 0;
 int directReadCost = 1, bufferedOverhead = 40;
 int64_t esp_timer_get_time() { return frozenTimer ? 0 : ticks; }
 void logf(const char *format, ...) { if (strstr(format, "failed")) ++fallbacks; }
-constexpr int SHA2_256 = 0;
+constexpr int SHA2_256 = 2;  // esp_sha_type: SHA1 is 0
+// ESP-IDF 5: acquiring the engine resets it (mode back to 0, SHA-1), and
+// start/continue no longer write the mode: the firmware must select SHA-256.
+uint32_t modeRegister = 0;
+#define SHA_MODE_REG (uintptr_t(&modeRegister))
 #define SHA_TEXT_BASE (uintptr_t(textRegisters))
 #define SHA_H_BASE (uintptr_t(digestRegisters))
 void writeRegister(volatile uint32_t *address, uint32_t value) {
     assert(locks > 0 && busyPolls == 0);
     uintptr_t addr = uintptr_t(address);
+    if (addr == SHA_MODE_REG) { *address = value; return; }
     if (addr >= uintptr_t(textRegisters) && addr < uintptr_t(textRegisters + 16)) ++textWrites;
     else {
         assert(addr >= uintptr_t(digestRegisters) && addr < uintptr_t(digestRegisters + 8));
@@ -43,7 +48,7 @@ void writeRegister(volatile uint32_t *address, uint32_t value) {
     *address = value;
     ++ticks;
 }
-#define REG_WRITE(address, value) writeRegister(address, value)
+#define REG_WRITE(address, value) writeRegister((volatile uint32_t *)(address), value)
 uint32_t readRegister(volatile uint32_t *address) {
     assert(locks > 0 && busyPolls == 0);
     assert(address >= digestRegisters && address < digestRegisters + 8);
@@ -52,7 +57,7 @@ uint32_t readRegister(volatile uint32_t *address) {
     return *address ^ uint32_t(badDirectRead || (badDirectAtFive && textRegisters[3] == 5));
 }
 #define REG_READ(address) readRegister(address)
-void esp_sha_acquire_hardware() { ++locks; }
+void esp_sha_acquire_hardware() { ++locks; modeRegister = 0; }
 void esp_sha_release_hardware() { assert(locks > 0); --locks; }
 bool sha_ll_busy() { if (busyPolls) { --busyPolls; return true; } return false; }
 void sha_ll_fill_text_block(const void *data, size_t words) {
@@ -73,6 +78,7 @@ void compress(bool start) {
     for (int i = 0; i < 8; ++i) state[i] = start ? sha::IV[i] : __builtin_bswap32(digestRegisters[i]);
     sha::transform(state, (const uint8_t *)textRegisters);
     if (badEngine) state[0] ^= 1;
+    if (modeRegister != SHA2_256) state[0] ^= 0x5a5a5a5a;  // another algorithm
     for (int i = 0; i < 8; ++i) digestRegisters[i] = __builtin_bswap32(state[i]);
     if (clobberText) for (int i = 9; i < 15; ++i) textRegisters[i] = 0xdeadbeef;
     busyPolls = 1;
