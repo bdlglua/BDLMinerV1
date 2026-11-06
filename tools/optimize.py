@@ -40,9 +40,19 @@ def without_std(flags):
     return [f for f in flags if not str(f).startswith("-std=")]
 
 
-# One middleware: PlatformIO hands a file to the next one only while the
-# previous ones returned it unchanged.
+# One middleware for both, and it must be the last one: PlatformIO hands each
+# middleware's result to the next, and a rebuilt object is no longer a file.
+# During pioarduino's ESP-IDF rebuild (custom_sdkconfig), ESP-IDF registers its
+# own middleware after this one (it drops the project's sources, which that
+# pass builds itself): files are then left as they are.
+def last_middleware(env):
+    middlewares = env.get("__PIO_BUILD_MIDDLEWARES", [])
+    return bool(middlewares) and middlewares[-1][0] is build_flags
+
+
 def build_flags(env, node):
+    if not last_middleware(env):
+        return node
     path = os.path.realpath(node.srcnode().get_abspath())
     if not path.startswith(PROJECT):
         return node  # framework sources: Espressif's flags
