@@ -7,7 +7,11 @@ Building the firmware, how it hashes, making a release, and the code layout. See
 
 Requirement: [PlatformIO](https://platformio.org/) (`pip install platformio==6.2.0`).
 Since 2.5.0 the firmware builds on Arduino-ESP32 3.3.12 (pioarduino platform 55.03.312,
-ESP-IDF 5.5, GCC 14.2, C++23).
+ESP-IDF 5.5, GCC 14.2). Its own C++ is C++23 (`-std=gnu++23`) and its own C (`src/`,
+`lib/`) C23 (`-std=gnu23`), set by `tools/optimize.py` over the framework's flags, which
+end in C++20 and C17; the C files of downloaded libraries keep C17, and the framework
+its own flags. `src/lang_check.cpp` and `src/lang_check.c` stop the build if another
+standard comes back.
 
 The first build of each board rebuilds ESP-IDF with the project's configuration
 (`custom_sdkconfig` in `platformio.ini`: TLS 1.3, our certificate roots, unused parts
