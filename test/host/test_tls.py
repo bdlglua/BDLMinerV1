@@ -29,6 +29,8 @@ int xSemaphoreTake(SemaphoreHandle_t s,unsigned) { assert(s);if(failTake)return 
 void *heap_caps_calloc(size_t n,size_t size,int) { ++allocations; return calloc(n,size); }
 void heap_caps_free(void *p) { free(p); }
 size_t heap_caps_get_free_size(int) { return 0; }
+size_t heap_caps_get_total_size(int) { return 0; }
+size_t heap_caps_get_largest_free_block(int) { return 0; }
 void mbedtls_platform_set_calloc_free(void *(*)(size_t,size_t),void(*)(void*)) {}
 void disableCore0WDT() { ++pauses; }
 void enableCore0WDT() { --pauses; }

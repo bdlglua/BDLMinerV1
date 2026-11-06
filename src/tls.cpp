@@ -115,7 +115,8 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
     static bool allocSet = false;
     if (!allocSet) {
         allocSet = true;
-        if (heap_caps_get_free_size(MALLOC_CAP_SPIRAM)) mbedtls_platform_set_calloc_free(tlsCalloc, heap_caps_free);
+        // The board has PSRAM (its total size, not what is free right now).
+        if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM)) mbedtls_platform_set_calloc_free(tlsCalloc, heap_caps_free);
     }
     // hwsha::hold() pauses the hardware SHA loop on the chips that need it
     // (the original ESP32 keeps mining and leaves TLS the software SHA), and
@@ -158,9 +159,17 @@ static bool tlsConnectImpl(WiFiClientSecure &tls, const char *host, uint16_t por
         lastErrorCode = 0;
     }
     // A probe (short timeout) failing is an expected answer: its caller reports the outcome.
-    if (ok || timeoutSeconds >= 12)
-        logf("[tls] %s: handshake %s in %u ms%s (heap %u, largest block %u)\n", host, ok ? "done" : "failed",
-             (unsigned)(millis() - t0), why, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+    if (ok || timeoutSeconds >= 12) {
+        // Large TLS allocations go to PSRAM on boards that have it
+        // (tlsCalloc()): an allocation failure there needs both heaps.
+        char psram[48] = "";
+        if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
+            snprintf(psram, sizeof(psram), "; PSRAM %u, largest block %u",
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+        logf("[tls] %s: handshake %s in %u ms%s (heap %u, largest block %u%s)\n", host, ok ? "done" : "failed",
+             (unsigned)(millis() - t0), why, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), psram);
+    }
     core0WdtResume();
     hwsha::release();
     xSemaphoreGive(lock);
