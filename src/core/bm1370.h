@@ -9,18 +9,25 @@
 namespace bm1370 {
 constexpr uint32_t kVersionMask = 0x1fffe000;
 constexpr size_t kSlots = 16;
-// Profiles as in ESP-Miner, whose highest BM1370 preset is 690 MHz: 525 to
-// 675 MHz in 25 MHz steps, and 690. A higher frequency usually needs a
-// higher core voltage, chosen among ESP-Miner's BM1370 values (stock 1150 mV).
-constexpr uint16_t kStockMHz = 525, kMaxMHz = 690, kPllMaxMHz = 800;
+// Profiles: 525 to 800 MHz in 25 MHz steps, and 690 (ESP-Miner's highest
+// BM1370 preset; above it, the overclocking range AxeOS leaves to custom
+// values, up to the 800 MHz the PLL table covers). A higher frequency needs a
+// higher core voltage: ESP-Miner's BM1370 values (stock 1150 mV), and 1300 mV
+// for the top profiles. recommendedMv() pairs each profile with its voltage.
+constexpr uint16_t kStockMHz = 525, kMaxMHz = 800, kPllMaxMHz = 800, kEspMinerMaxMHz = 690;
 inline bool validProfile(unsigned mhz) {
-    return mhz == kMaxMHz || (mhz >= kStockMHz && mhz < kMaxMHz && (mhz - kStockMHz) % 25 == 0);
+    return mhz == kEspMinerMaxMHz || (mhz >= kStockMHz && mhz <= kMaxMHz && (mhz - kStockMHz) % 25 == 0);
 }
-constexpr uint16_t kStockMv = 1150, kMinMv = 1000, kMaxMv = 1250;
-constexpr uint16_t kVoltageOptions[] = {1000, 1060, 1100, 1150, 1200, 1250};
+constexpr uint16_t kStockMv = 1150, kMinMv = 1000, kMaxMv = 1300;
+constexpr uint16_t kVoltageOptions[] = {1000, 1060, 1100, 1150, 1200, 1250, 1300};
 inline bool validVoltage(unsigned mv) {
     for (uint16_t option : kVoltageOptions) if (mv == option) return true;
     return false;
+}
+// The core voltage that goes with a profile, as Gamma 601 overclocking
+// guides pair them: stock up to 600 MHz, then one 50 mV step per range.
+inline uint16_t recommendedMv(unsigned mhz) {
+    return mhz <= 600 ? kStockMv : mhz <= 675 ? 1200 : mhz <= 725 ? 1250 : 1300;
 }
 // Compare cumulative ASIC error/total counters in ten-second windows.
 struct ErrorMonitor {
@@ -65,7 +72,10 @@ uint16_t fanRpm(uint16_t tach);
 // powered), VOUT_OV, IOUT_OC, VIN_UV and TEMP. The other bits also report
 // warnings, and some stay latched (OTHER), while the measured limits below
 // already cover what they would tell.
-constexpr float kAsicMaxC = 70;  // ASIC diode: the hard stop
+// ASIC diode: the hard stop, ESP-Miner's (THROTTLE_TEMP, 75 C). And the
+// regulator's, ESP-Miner's TPS546_THROTTLE_TEMP (the regulator's own OT warn
+// limit, programmed at 105 C too; it shuts down at 145 C).
+constexpr float kAsicMaxC = 75, kRegulatorMaxC = 105;
 // Highest user thermal limit: that pause must come before the hard stop,
 // which latches until a restart.
 constexpr uint8_t kMaxUserTempC = uint8_t(kAsicMaxC) - 2;

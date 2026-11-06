@@ -72,7 +72,7 @@ int main() {
     assert(fanRpm(1800)==3000&&fanRpm(0)==0&&fanRpm(0xffff)==0&&fanRpm(1)==0);
     Health h{55,60,5.0,1.15,15,3000,0};assert(!h.fault(true));
     auto healthy=h;
-    h.temperature=70;assert(h.fault(true));h=healthy;h.temperature=NAN;assert(h.fault(true));
+    h.temperature=74.9f;assert(!h.fault(true));h.temperature=75;assert(h.fault(true));h=healthy;h.temperature=NAN;assert(h.fault(true));
     assert(!h.fault(false,false)&&!h.notReady());
     // A stopped fan stops mining; before power-on, the ASIC waits for it.
     h=healthy;h.rpm=0;assert(h.fault(true)&&!h.fault(false,false)&&h.notReady());
@@ -80,7 +80,7 @@ int main() {
     h=healthy;h.inputVoltage=4.7;assert(!h.fault(true)&&h.notReady()&&!h.fault(false,false));
     h.inputVoltage=4.55;assert(h.fault(true));h.inputVoltage=0;assert(!h.fault(false,false)&&h.notReady());
     h.inputVoltage=5.6;assert(h.fault(true)&&h.fault(false,false));
-    h=healthy;h.regulatorTemperature=90;assert(h.fault(true));
+    h=healthy;h.regulatorTemperature=104.9f;assert(!h.fault(true));h.regulatorTemperature=105;assert(h.fault(true));
     h=healthy;h.coreVoltage=1.3;assert(h.fault(true));h=healthy;h.current=30;assert(h.fault(true));
     // Regulator status: the faults ESP-Miner stops on, not warnings or latched flags.
     for(uint16_t flag:{0x0020,0x0010,0x0004}){h=healthy;h.status=flag;assert(h.fault(true)&&h.fault(false,false));}
@@ -92,12 +92,17 @@ int main() {
     // Whole numbers as ESP-Miner encodes them.
     assert(encodeLinear11Int(0)==0&&encodeLinear11Int(3)==3&&encodeLinear11Int(105)==105&&encodeLinear11Int(650)==650);
     assert(encodeLinear11Int(2000)==(1<<11|1000)&&linear11(encodeLinear11Int(2000))==2000);
-    // ESP-Miner's range: 525-675 MHz in 25 MHz steps, and its 690 MHz preset.
-    for(unsigned mhz=525;mhz<=675;mhz+=25)assert(validProfile(mhz));
+    // 525-800 MHz in 25 MHz steps, and ESP-Miner's 690 MHz preset.
+    for(unsigned mhz=525;mhz<=800;mhz+=25)assert(validProfile(mhz));
     assert(validProfile(690));
-    assert(!validProfile(524)&&!validProfile(700)&&!validProfile(800)&&!validProfile(691)&&!validProfile(601)&&!validProfile(526));
-    for(unsigned mv:{1000,1060,1100,1150,1200,1250})assert(validVoltage(mv));
-    assert(!validVoltage(999)&&!validVoltage(1050)&&!validVoltage(1251)&&!validVoltage(1300)&&!validVoltage(0));
+    assert(!validProfile(524)&&!validProfile(825)&&!validProfile(801)&&!validProfile(691)&&!validProfile(601)&&!validProfile(526)&&!validProfile(790));
+    for(unsigned mv:{1000,1060,1100,1150,1200,1250,1300})assert(validVoltage(mv));
+    assert(!validVoltage(999)&&!validVoltage(1050)&&!validVoltage(1251)&&!validVoltage(1301)&&!validVoltage(1350)&&!validVoltage(0));
+    // The voltage that goes with each profile: never below stock, rising with the frequency.
+    unsigned previous=0;
+    for(unsigned mhz=525;mhz<=800;mhz+=25){unsigned mv=recommendedMv(mhz);assert(validVoltage(mv)&&mv>=kStockMv&&mv>=previous);previous=mv;}
+    assert(recommendedMv(525)==1150&&recommendedMv(600)==1150&&recommendedMv(625)==1200&&recommendedMv(690)==1250&&recommendedMv(750)==1300&&recommendedMv(800)==1300);
+    assert(kMaxUserTempC==73);
     // The core voltage window follows the chosen voltage: 1.00-1.25 V at 1150 mV.
     {Health v=healthy;v.coreVoltage=1.0f;assert(!v.fault(true));v.coreVoltage=1.24f;assert(!v.fault(true));
      v.coreVoltage=1.26f;assert(v.fault(true));v.coreVoltage=0.98f;assert(v.fault(true));

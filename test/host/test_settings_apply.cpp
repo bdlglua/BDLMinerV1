@@ -227,27 +227,27 @@ int main() {
     assert(settingsCompare(fanSettings,settings).live&&settingsCompare(fanSettings,settings).count==2);
     Settings active=settings;settingsCopyLive(active,fanSettings);
     assert(active.fanAuto&&active.fanPercent==40&&!settings.fanAuto&&settings.fanPercent==100);
-    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":700})",R"({"asicmhz":800})",R"({"asicmhz":691})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":600.5})",R"({"asicmhz":"600"})",
-                         R"({"asicmv":999})",R"({"asicmv":1050})",R"({"asicmv":1251})",R"({"asicmv":1300})",R"({"asicmv":"1200"})",R"({"asicmv":1200.5})"}) {
+    for(const char *raw:{R"({"asicmhz":524})",R"({"asicmhz":825})",R"({"asicmhz":810})",R"({"asicmhz":691})",R"({"asicmhz":601})",R"({"asicmhz":526})",R"({"asicmhz":600.5})",R"({"asicmhz":"600"})",
+                         R"({"asicmv":999})",R"({"asicmv":1050})",R"({"asicmv":1251})",R"({"asicmv":1350})",R"({"asicmv":1301})",R"({"asicmv":"1200"})",R"({"asicmv":1200.5})"}) {
         assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
     }
-    for(int mv:{1000,1060,1100,1150,1200,1250}) {
+    for(int mv:{1000,1060,1100,1150,1200,1250,1300}) {
         changes.clear();changes["asicmv"]=mv;
         assert(!settingsError(changes.as<JsonObjectConst>()));
         Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);
         assert(staged.asicVoltage==mv&&settings.asicVoltage==1150); // stock default
     }
-    for(int mhz:{525,550,575,600,625,650,675,690}) {
+    for(int mhz:{525,550,575,600,625,650,675,690,700,725,750,775,800}) {
         changes.clear();changes["asicmhz"]=mhz;
         assert(!settingsError(changes.as<JsonObjectConst>()));
         Settings staged=settings;assert(settingsApply(staged,changes.as<JsonObjectConst>())==1);
         assert(staged.asicFrequency==mhz&&settings.asicFrequency==525); // stock default
     }
     // The user limit pauses before the latching 70 C diode stop; 0 (off) stays allowed.
-    for(const char *raw:{R"({"maxtemp":69})",R"({"maxtemp":70})",R"({"maxtemp":75})"}) {
+    for(const char *raw:{R"({"maxtemp":74})",R"({"maxtemp":75})",R"({"maxtemp":80})"}) {
         assert(!deserializeJson(changes,raw));assert(settingsError(changes.as<JsonObjectConst>()));
     }
-    for(int limit:{0,30,65,68}) {changes.clear();changes["maxtemp"]=limit;assert(!settingsError(changes.as<JsonObjectConst>()));}
+    for(int limit:{0,30,65,68,73}) {changes.clear();changes["maxtemp"]=limit;assert(!settingsError(changes.as<JsonObjectConst>()));}
 #endif
     puts("V1/V2 and explicit user agent settings: validation, staged isolation and preserved manual identity passed");
 }

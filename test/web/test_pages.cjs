@@ -67,7 +67,7 @@ async function fixture(options={}){
     state.settings.capabilities={display_pages:8,...state.settings.capabilities};
   }
   if(options.gamma){
-    state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:690}],['asicmv','number','Safety','Gamma ASIC core voltage (mV)',{min:1000,max:1250}],['fanauto','bool','Safety','Fan control',{}],['fanpct','number','Safety','Manual fan speed (%)',{min:30,max:100}]);
+    state.settings.schema.push(['asicmhz','number','Safety','Gamma ASIC frequency (MHz)',{min:525,max:800}],['asicmv','number','Safety','Gamma ASIC core voltage (mV)',{min:1000,max:1300}],['fanauto','bool','Safety','Fan control',{}],['fanpct','number','Safety','Manual fan speed (%)',{min:30,max:100}]);
     Object.assign(state.settings.values,{asicmhz:525,asicmv:1150,fanauto:false,fanpct:100});state.settings.live=[...(state.settings.live||[]),'fanauto','fanpct'];
     state.settings.capabilities={...state.settings.capabilities,fan_control:true,asic:true,thermal_steps:false,...(options.v2?{display_pages:3}:{})};
   }
@@ -1023,14 +1023,27 @@ check('NerdNOS settings do not expose a Gamma fan controller',()=>run({capabilit
 check('Gamma profile and core voltage default to ESP-Miner stock and save the selected values',()=>run({gamma:true},async f=>{
  await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_asicmhz');
  assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'525');
- assert.deepEqual(await f.page.locator('#k_asicmhz option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[525,550,575,600,625,650,675,690]);
+ assert.deepEqual(await f.page.locator('#k_asicmhz option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[525,550,575,600,625,650,675,690,700,725,750,775,800]);
  assert.equal(await f.page.locator('#k_asicmv').inputValue(),'1150');
- assert.deepEqual(await f.page.locator('#k_asicmv option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[1000,1060,1100,1150,1200,1250]);
- assert.match(await f.page.locator('#performance').textContent(),/up to 690 MHz.*higher core voltage.*525 MHz fallback.*Default: 1150 mV/s);
+ assert.deepEqual(await f.page.locator('#k_asicmv option').evaluateAll(nodes=>nodes.map(n=>Number(n.value))),[1000,1060,1100,1150,1200,1250,1300]);
+ assert.match(await f.page.locator('#performance').textContent(),/up to 690 MHz.*up to 800 MHz.*core voltage to the one that goes with it.*525 MHz fallback.*Default: 1150 mV.*1300 mV up to 800/s);
  await f.page.selectOption('#k_asicmhz','600');await f.page.selectOption('#k_asicmv','1200');await f.page.click('#save');
  await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('Saved'));
  const body=JSON.parse(f.state.posts.find(p=>p.url==='/api/settings').body);
  assert.equal(body.asicmhz,600);assert.equal(body.asicmv,1200);
+}));
+check('Gamma profile raises the core voltage to the one that goes with it, never lowers it',()=>run({gamma:true},async f=>{
+ await f.page.goto(f.url+'/settings');await f.page.waitForSelector('#k_asicmhz');
+ for(const [mhz,mv] of [['600','1150'],['650','1200'],['690','1250'],['800','1300']]){
+  await f.page.selectOption('#k_asicmhz',mhz);assert.equal(await f.page.locator('#k_asicmv').inputValue(),mv);
+ }
+ await f.page.selectOption('#k_asicmhz','525');assert.equal(await f.page.locator('#k_asicmv').inputValue(),'1300');
+ await f.page.selectOption('#k_asicmv','1200');await f.page.selectOption('#k_asicmhz','550');
+ assert.equal(await f.page.locator('#k_asicmv').inputValue(),'1200');
+ await f.page.selectOption('#k_asicmhz','775');await f.page.click('#save');
+ await f.page.waitForFunction(()=>document.querySelector('#msg').textContent.includes('Saved'));
+ const body=JSON.parse(f.state.posts.find(p=>p.url==='/api/settings').body);
+ assert.equal(body.asicmhz,775);assert.equal(body.asicmv,1300);
 }));
 check('Gamma saved 690 MHz and 1250 mV stay selected and are explained in French',()=>run({gamma:true,language:'fr'},async f=>{
  Object.assign(f.state.settings.values,{asicmhz:690,asicmv:1250});
@@ -1038,7 +1051,7 @@ check('Gamma saved 690 MHz and 1250 mV stay selected and are explained in French
  assert.equal(await f.page.locator('#k_asicmhz').inputValue(),'690');assert.equal(await f.page.locator('#k_asicmv').inputValue(),'1250');
  assert.equal(await f.page.locator('label[for="k_asicmhz"]').textContent(),'Fréquence ASIC Gamma (MHz)');
  assert.equal(await f.page.locator('label[for="k_asicmv"]').textContent(),'Tension de cœur ASIC Gamma (mV)');
- assert.match(await f.page.locator('#performance').textContent(),/jusqu’à 690 MHz.*Par défaut : 525 MHz.*tension de cœur plus haute.*Par défaut : 1 150 mV/s);
+ assert.match(await f.page.locator('#performance').textContent(),/jusqu’à 690 MHz.*jusqu’à 800 MHz.*Par défaut : 525 MHz.*tension de cœur à celle qui va avec.*Par défaut : 1 150 mV/s);
 }));
 check('Gamma overclock fallback remains visible with requested clock and measured errors',()=>run({stats:{asic:{model:'BM1370',running:true,state:'Mining (525 MHz fallback profile)',frequency_mhz:525,profile_mhz:600,stock_fallback:true,fallback_reason:'High ASIC hardware error rate',hardware_error_percent:3.5,fan_rpm:5000,core_v:1.15,current_a:15,input_v:5.1,regulator_temp_c:55}}},async f=>{
  await f.page.goto(f.url);await f.page.waitForSelector('#device-grid .t');

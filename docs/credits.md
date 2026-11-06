@@ -4,8 +4,9 @@
   TPS546/EMC2101 references derive from [ESP-Miner / AxeOS](https://github.com/bitaxeorg/ESP-Miner)
   (GPL-3.0), revision `bb4fd0c7e589858bbeef00ec89342216c1510671`, and
   [bitaxeGamma hardware](https://github.com/bitaxeorg/bitaxeGamma). The Gamma's core
-  voltage options and the 690 MHz highest profile (since 2.4.2) follow ESP-Miner
-  revision `a591f0d` (2026-11-02).
+  voltage options and the 690 MHz highest preset (since 2.4.2) follow ESP-Miner
+  revision `a591f0d` (2026-11-02), and so do the 75 °C ASIC and 105 °C regulator stops
+  (since 2.5.3, `THROTTLE_TEMP` and `TPS546_THROTTLE_TEMP` of its power management task).
 * NerdNOS support: BM1397 packets, PLL calculation and start-up sequence, and the
   board's pins, derive from ESP-Miner (above) and the NerdNOS firmware in
   [WantClue/NerdMiner_v2](https://github.com/WantClue/NerdMiner_v2/tree/nerdnos)

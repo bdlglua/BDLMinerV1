@@ -79,11 +79,11 @@ const COLON=LANG=='fr'?'\u00a0: ':': ',LOCALE=LANG=='fr'?'fr-FR':'en-US';
 
 Object.assign(FR,{
  '525 MHz (stock)':'525 MHz (origine)',
- 'Profiles above 525 MHz are experimental, up to 690 MHz as in ESP-Miner. Default: 525 MHz. A higher frequency usually needs a higher core voltage. Instability triggers a 525 MHz fallback, kept until the frequency or voltage changes.':'Les profils au-dessus de 525 MHz sont expérimentaux, jusqu’à 690 MHz comme dans ESP-Miner. Par défaut : 525 MHz. Une fréquence plus haute demande en général une tension de cœur plus haute. En cas d’instabilité, repli à 525 MHz, gardé jusqu’à un changement de fréquence ou de tension.',
- 'Default: 1150 mV, as ESP-Miner. Raise it in small steps with the frequency and watch the temperature; higher voltage means more heat and power. Safety stops still apply.':'Par défaut : 1 150 mV, comme ESP-Miner. Monte-la par petits pas avec la fréquence et surveille la température : plus de tension, c’est plus de chaleur et de consommation. Les arrêts de sécurité restent actifs.',
+ 'Profiles above 525 MHz are experimental: up to 690 MHz as in ESP-Miner, then overclocking up to 800 MHz. Default: 525 MHz. Choosing a profile raises the core voltage to the one that goes with it. Instability triggers a 525 MHz fallback, kept until the frequency or voltage changes.':'Les profils au-dessus de 525 MHz sont expérimentaux : jusqu’à 690 MHz comme dans ESP-Miner, puis overclocking jusqu’à 800 MHz. Par défaut : 525 MHz. Choisir un profil monte la tension de cœur à celle qui va avec. En cas d’instabilité, repli à 525 MHz, gardé jusqu’à un changement de fréquence ou de tension.',
+ 'Default: 1150 mV, as ESP-Miner. Goes with the frequency: 1150 mV up to 600 MHz, 1200 mV up to 675, 1250 mV up to 725, 1300 mV up to 800. Higher voltage means more heat and power; watch the temperature. Safety stops still apply.':'Par défaut : 1 150 mV, comme ESP-Miner. Va avec la fréquence : 1 150 mV jusqu’à 600 MHz, 1 200 mV jusqu’à 675, 1 250 mV jusqu’à 725, 1 300 mV jusqu’à 800. Plus de tension, c’est plus de chaleur et de consommation : surveille la température. Les arrêts de sécurité restent actifs.',
  '1150 mV (stock)':'1150 mV (origine)',
- 'Gamma frequency must be 525-675 MHz in 25 MHz steps, or 690 MHz':'La fréquence du Gamma doit être de 525 à 675 MHz par pas de 25 MHz, ou 690 MHz',
- 'Gamma core voltage must be 1000, 1060, 1100, 1150, 1200 or 1250 mV':'La tension de cœur du Gamma doit être 1000, 1060, 1100, 1150, 1200 ou 1250 mV',
+ 'Gamma frequency must be 525-800 MHz in 25 MHz steps, or 690 MHz':'La fréquence du Gamma doit être de 525 à 800 MHz par pas de 25 MHz, ou 690 MHz',
+ 'Gamma core voltage must be 1000, 1060, 1100, 1150, 1200, 1250 or 1300 mV':'La tension de cœur du Gamma doit être 1000, 1060, 1100, 1150, 1200, 1250 ou 1300 mV',
  'Requested profile':'Profil demandé','ASIC hardware errors':'Erreurs matérielles ASIC','Stock fallback':'Repli à la fréquence d’origine',
  'Overclock fallback: mining at the stock profile.':'Repli de l’overclock : minage à la fréquence d’origine.',
  'Mining (525 MHz fallback profile)':'Minage à 525 MHz (repli)',
