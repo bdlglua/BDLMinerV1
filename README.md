@@ -1,5 +1,10 @@
 # BDLMiner V2
 
+[![Install BDLMinerV2](https://img.shields.io/badge/INSTALL-BDLMinerV2-f7931a?style=for-the-badge&logo=espressif&logoColor=white)](https://bdlglua.github.io/flash.html)
+[![Stable v2.5.3](https://img.shields.io/badge/STABLE-v2.5.3-2ea44f?style=for-the-badge)](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.5.3)
+
+**[Install in your browser (Chrome / Edge)](https://bdlglua.github.io/flash.html)** · **[Stable v2.5.3 release](https://github.com/bdlglua/BDLMinerV2/releases/tag/v2.5.3)** · [Installation guide](docs/guide.md#install-a-release-no-build-tools)
+
 Solo SHA-256d mining firmware for ESP32 boards and experimental ASIC boards,
 with a local dashboard and a Linux/Raspberry Pi fleet hub.
 
@@ -30,6 +35,21 @@ mining only. [Coin and pool setup](docs/mining-coins.md).
 
 </details>
 
+## BDLMinerV2 vs NerdMiner
+
+Both projects make solo Bitcoin mining approachable on small ESP32 devices. Choose based on the features and hardware you need, not an unverified hashrate comparison.
+
+| | BDLMinerV2 | NerdMiner |
+|---|---|---|
+| Main use | ESP32 solo mining with local dashboard, fleet tools and additional coin profiles | ESP32 educational Bitcoin lottery mining |
+| Installation | Browser flasher and board-specific firmware | Follow the installation instructions for your NerdMiner version |
+| Monitoring | Local web dashboard, optional fleet hub, MQTT and Prometheus | Depends on the NerdMiner firmware/version |
+| Protocols | BTC Stratum V1 and native Stratum V2; other supported coins via V1 | Check the protocol support of the specific NerdMiner release |
+| Hardware | Multiple ESP32/M5Stack boards; experimental Gamma 601 and NerdNOS | Supported ESP32 boards depend on NerdMiner version |
+| Hashrate | Board-dependent; only published physical measurements should be compared | No directly comparable measurement established here |
+
+**No performance winner is claimed.** Results depend on board, clock, firmware, pool settings and measurement method. See [BDLMiner hardware validation](docs/v2/hardware-validation.md). Neither project makes ESP32 Bitcoin solo mining a reliable source of income.
+
 ## Features
 
 - Live dashboard, charts, settings, backups, pool diagnostics and multi-miner hub.
@@ -43,6 +63,9 @@ mining only. [Coin and pool setup](docs/mining-coins.md).
   GitHub updates have a limited transport exception. See [Security](SECURITY.md).
 
 ## Install and update
+
+**Recommended: [Install BDLMinerV2 stable v2.5.3 with the Web Flasher](https://bdlglua.github.io/flash.html).** Do not use older v1.x releases for a new V2 installation.
+
 
 1. Open the **[Flasher](https://bdlglua.github.io/flash.html)** in Chrome or Edge
    on a computer. Connect your board with a data USB cable and select **Flash**.
@@ -71,7 +94,7 @@ Already installed? Use automatic signed updates or upload the matching
 [Measured comparison](https://bdlglua.github.io/boards.html) ·
 [Hardware validation and limits](docs/v2/hardware-validation.md)
 
-M5StickC Plus2 and Gamma 601 have owner-operated V2 measurements. Physical V2
+**Physically measured with BDLMinerV2:** M5StickC Plus2 and Bitaxe Gamma 601 (owner-operated tests). Physical V2
 measurements for S2/S3/C3 and NerdNOS, and tests on the BSV/XEC/DGB/PPC pools,
 remain pending. Hashrate depends on the board; 1 MH/s is not a rating for every ESP32.
 Solo mining is educational: a payout requires finding a valid block.
