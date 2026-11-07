@@ -38,6 +38,10 @@ inline bool legacyManualAgent(const char *agent) {
 #endif
 #define HOUR_OFF 255  // nightFrom / nightTo: no night mode
 
+// Default thermal limit of the boards that read the chip's own sensor (2.5.3;
+// 65 C before, see raiseChipThermalDefaultOnce() in settings.cpp).
+constexpr uint8_t kChipSensorMaxTemp = 75, kOldMaxTempDefault = 65;
+
 struct Settings {
     // Pool
     uint8_t miningCoin = coin::BTC; // absent from older records: retain Bitcoin
@@ -85,8 +89,14 @@ struct Settings {
     // Safety
 #ifdef BOARD_NERDNOS
     uint8_t maxTemp = 75;    // NTC next to the BM1397; the stock firmware cuts power at 80 C
+#elif defined(BOARD_ASIC) || defined(DISPLAY_M5UNIFIED)
+    uint8_t maxTemp = 65;    // 0 disables thermal limiting; M5 devices may read their IMU, next to the battery
 #else
-    uint8_t maxTemp = 65;    // 0 disables thermal limiting; existing choices are kept
+    // The chip's own sensor (T-Display, T-Display-S3, CYD, boards without a
+    // screen) reads the die, which runs warmer than the board: at 65 C, an
+    // ESP32-S3 at full speed sat on the 50 % step from 55 C (176 instead of
+    // 351 kH/s on a T-Display-S3). Reduction now starts at 65 C.
+    uint8_t maxTemp = kChipSensorMaxTemp;
 #endif
     uint8_t miningPower = 100; // full available speed; saved user limits are preserved
     uint8_t rebootHours = 0; // > 0: restart after N hours without an accepted share

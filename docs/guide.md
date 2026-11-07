@@ -603,9 +603,14 @@ crash still leaves a trace; **Erase** clears this history too.
   earlier 75% default, choose **Full performance** and save. Around 1 MH/s is a
   hardware-dependent target on compatible ESP32 revision 3 boards, not a guaranteed
   sustained rate: temperature, power, pool availability and sensor health still apply.
-* **Too hot**: *Pause mining above this temperature* defaults to **65 °C** for new
-  configurations (0 = off). Existing saved thresholds, including 0, are preserved;
-  check this setting after upgrading. Within 10 °C of the threshold, mining is
+* **Too hot**: *Pause mining above this temperature* defaults to **75 °C** on the
+  boards that read the chip's own sensor (T-Display, T-Display-S3, Cheap Yellow
+  Display, boards without a screen) and **65 °C** on M5Stack devices, whose IMU can
+  read the board next to the battery, and on ASIC boards (0 = off). Since 2.5.3 a
+  chip-sensor board still at the former 65 °C default is raised once to 75 °C:
+  its die runs warmer than the board, and at 65 °C an ESP32-S3 mining at full speed
+  stayed on the 50 % step (176 instead of 351 kH/s on a T-Display-S3). Any other
+  saved threshold, including 0, is preserved; check this setting after upgrading. Within 10 °C of the threshold, mining is
   limited to 50 %; within 5 °C, to 25 %. At the threshold, miners pause until at
   least 5 °C below. These limits never increase a lower user-selected duty cycle.
   IMU and chip sensors measure different components: choose a threshold for the
