@@ -80,8 +80,9 @@ int main(){
     bytes(0x4c,1,{0x7f});bytes(0x4c,0x10,{0xe0});assert(collect(true)&&!latched&&powered);
     bytes(0x4c,1,{52});bytes(0x4c,0x10,{0});assert(collect(true)&&diodeStrikes==0);
     // A real overheat, three readings in a row: stopped, and the fault kept across a restart.
-    bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!powered&&testReset==0);
-    assert(strstr(lastFaultText,"ASIC overtemperature")&&strstr(lastFaultText,"ASIC 70.0 C"));
+    bytes(0x4c,1,{74});for(int i=0;i<3;++i)assert(collect(true)&&!latched&&powered); // below the 75 C hard stop
+    bytes(0x4c,1,{75});assert(confirmed(true)&&latched&&!powered&&testReset==0);
+    assert(strstr(lastFaultText,"ASIC overtemperature")&&strstr(lastFaultText,"ASIC 75.0 C"));
     {std::string saved=lastFaultText;lastFaultText[0]=0;loadFault();assert(saved==lastFaultText);
      char out[192];lastFault(out,sizeof(out));assert(saved==out);}
     assert(testI2c[std::make_pair(0x24,1)][0]==0&&testI2c[std::make_pair(0x4c,0x4c)][0]==63);
@@ -138,9 +139,9 @@ int main(){
     reset();begin();
     testDelayHook=[](uint32_t){
         int pll=0;for(auto &p:testUartTx)if(p.size()==11&&p[5]==8)++pll;
-        if(pll>=20)bytes(0x4c,1,{70});
+        if(pll>=20)bytes(0x4c,1,{75});
     };
-    assert(!initAsic(w)&&latched&&!powered&&testReset==0&&temperature()==70);
+    assert(!initAsic(w)&&latched&&!powered&&testReset==0&&temperature()==75);
     reset();begin();
     testDelayHook=[](uint32_t){
         int pll=0;for(auto &p:testUartTx)if(p.size()==11&&p[5]==8)++pll;
@@ -180,7 +181,7 @@ int main(){
     reset();begin();testTaskFailAt=testTaskStarts;assert(!start()&&latched&&testReset==0);
     assert(Settings().asicFrequency==525); // stock, as ESP-Miner
     assert(Settings().asicVoltage==1150); // stock, as ESP-Miner
-    for(unsigned profile:{525u,550u,575u,600u,625u,650u,675u,690u}){
+    for(unsigned profile:{525u,550u,575u,600u,625u,650u,675u,690u,700u,725u,750u,775u,800u}){
         reset();settings.asicFrequency=profile;begin();
         // The PLL lands on 690.625 MHz for 690, as in ESP-Miner.
         assert(initAsic(w)&&live.running&&std::fabs(live.frequency-profile)<1&&live.requestedMHz==profile);
@@ -188,12 +189,13 @@ int main(){
         assert(testI2c[std::make_pair(0x4c,0x4c)][0]==63); // full fan
     }
     // The chosen core voltage is what the regulator is asked for (exponent -9).
-    for(unsigned mv:{1000u,1060u,1100u,1150u,1200u,1250u}){
+    for(unsigned mv:{1000u,1060u,1100u,1150u,1200u,1250u,1300u}){
         reset();settings.asicVoltage=mv;begin();assert(configured);
         assert(storedWord(0x21)==unsigned(std::lround(mv/1000.0*512)));
         assert(std::fabs(readings().coreTarget-mv/1000.0f)<0.0001f);
     }
-    reset();settings.asicVoltage=1300;begin();assert(storedWord(0x21)==589); // invalid: stock
+    reset();settings.asicVoltage=1350;begin();assert(storedWord(0x21)==589); // invalid: stock
+    reset();settings.asicFrequency=800;settings.asicVoltage=1300;begin();assert(initAsic(w)&&std::fabs(live.frequency-800)<1&&storedWord(0x21)==666);
     reset();settings.asicFrequency=690;begin();assert(initAsic(w)&&std::fabs(live.frequency-690)<1);
     // Error/total register values are independent cumulative counters, paired by time.
     bm1370::Response totalReply{};totalReply.reg=0x8c;
@@ -237,12 +239,12 @@ int main(){
     testI2cFail=true;instability("High ASIC hardware error rate");
     assert(latched&&!powered&&testReset==0); // failed shutdown cannot auto-restart
     reset();settings.asicFrequency=600;begin();assert(initAsic(w));
-    bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered); // hard limits still stop
+    bytes(0x4c,1,{75});assert(confirmed(true)&&latched&&!forceStock&&!powered); // hard limits still stop
     reset();settings.asicFrequency=690;begin();assert(initAsic(w));
     testMillis+=3100;checkWatchdogs(testMillis);assert(forceStock&&!latched&&!powered);
     assert(initAsic(w)&&live.frequency==525); // highest profile still falls back to stock
     reset();settings.asicFrequency=690;begin();assert(initAsic(w));
-    bytes(0x4c,1,{70});assert(confirmed(true)&&latched&&!forceStock&&!powered);
+    bytes(0x4c,1,{75});assert(confirmed(true)&&latched&&!forceStock&&!powered);
     // Fan settings are live: no ASIC reset, PLL ramp or job invalidation.
     reset();begin();setFanControl(false,30);
     testDelayHook=[](uint32_t){assert(testI2c[std::make_pair(0x4c,0x4c)][0]==63);};

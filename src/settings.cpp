@@ -187,6 +187,31 @@ void settingsSanitize(Settings &settings) {
     if (settings.nightTo > 23) settings.nightTo = HOUR_OFF;
 }
 
+// 2.5.3 raised the default thermal limit from 65 to 75 C on the boards that
+// read the chip's own sensor. Every save stores every value, so a miner still
+// at the old default is raised once ("tmp75" marks it done, after a
+// successful save); any other saved choice, 0 included, is kept.
+static void raiseChipThermalDefaultOnce() {
+#if !defined(BOARD_ASIC) && !defined(DISPLAY_M5UNIFIED)
+    Preferences p;
+    if (!p.begin(kNamespace, true)) return;
+    bool done = p.isKey("tmp75");
+    p.end();
+    if (done) return;
+    if (settings.maxTemp == kOldMaxTempDefault) {
+        Settings copy = settings;
+        copy.maxTemp = kChipSensorMaxTemp;
+        if (!settingsSave(copy)) return;  // tried again at the next start
+        settings.maxTemp = kChipSensorMaxTemp;
+        logf("[cfg] thermal limit raised to the new default: %u C (chip sensor)\n", (unsigned)kChipSensorMaxTemp);
+    }
+    if (p.begin(kNamespace, false)) {
+        p.putBool("tmp75", true);
+        p.end();
+    }
+#endif
+}
+
 // From 1.9.3 the dashboard asks for no password unless its owner sets one: a
 // password saved by an earlier version is removed once ("pwopen" marks it
 // done, after a successful save), so that no sign-in is ever asked after the
@@ -218,6 +243,7 @@ void settingsLoad() {
         settingsSanitize();
         liveBrightness = settings.brightness;
         openDashboardOnce();
+        raiseChipThermalDefaultOnce();
         return;
     }
     for (size_t i = 0; i < kSettingCount; i++) {
@@ -245,6 +271,7 @@ void settingsLoad() {
     settingsSanitize();
     liveBrightness = settings.brightness;
     openDashboardOnce();
+    raiseChipThermalDefaultOnce();
 }
 
 uint8_t settingsBrightness() { return liveBrightness.load(); }

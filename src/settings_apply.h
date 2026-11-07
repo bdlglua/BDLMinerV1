@@ -45,7 +45,7 @@ inline SettingLimits settingLimits(const SettingInfo &s) {
     if (!strcmp(s.key, "asicmhz")) { limits.minimum=bm1370::kStockMHz; limits.maximum=bm1370::kMaxMHz; }
     if (!strcmp(s.key, "asicmv")) { limits.minimum=bm1370::kMinMv; limits.maximum=bm1370::kMaxMv; }
     if (!strcmp(s.key, "fanpct")) { limits.minimum = 30; limits.maximum = 100; }
-    // The ASIC diode's hard stop at 70 C latches until a restart: the user
+    // The ASIC diode's hard stop at 75 C latches until a restart: the user
     // limit must pause (and cool) before it, never above it.
     if (!strcmp(s.key, "maxtemp")) limits.maximum = bm1370::kMaxUserTempC;
 #endif
@@ -89,9 +89,9 @@ inline const char *settingsError(JsonObjectConst values) {
                 if(!strcmp(s.key,"pages")&&!(n&1))return "The mining screen must remain enabled";
 #ifdef BOARD_GAMMA601
                 if (!strcmp(s.key, "asicmhz") && !bm1370::validProfile(unsigned(n)))
-                    return "Gamma frequency must be 525-675 MHz in 25 MHz steps, or 690 MHz";
+                    return "Gamma frequency must be 525-800 MHz in 25 MHz steps, or 690 MHz";
                 if (!strcmp(s.key, "asicmv") && !bm1370::validVoltage(unsigned(n)))
-                    return "Gamma core voltage must be 1000, 1060, 1100, 1150, 1200 or 1250 mV";
+                    return "Gamma core voltage must be 1000, 1060, 1100, 1150, 1200, 1250 or 1300 mV";
 #endif
                 if (!strcmp(s.key, "maxtemp") && n && n < 30) return "Temperature must be 0 or at least 30 C";
                 if ((!strcmp(s.key, "nightfrom") || !strcmp(s.key, "nightto")) && n > 23 && n != 255)

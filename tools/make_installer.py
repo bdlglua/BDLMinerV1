@@ -3,7 +3,7 @@
 release directory:
 
   <out>/index.html            the site: presentation, boards, "Install" button,
-                              live statistics (installer/index.html)
+                              live statistics (site/, exported to installer/site/)
   <out>/assets/               its images (installer/assets/)
   <out>/manifest-<env>.json   one ESP Web Tools manifest per board
   <out>/<env>-factory.bin     the images it flashes at 0x0

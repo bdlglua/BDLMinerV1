@@ -21,7 +21,16 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: test/web/package-lock.json
+          cache-dependency-path: |
+            test/web/package-lock.json
+            site/package-lock.json
+      # The public pages are React components (site/) exported to installer/site/:
+      # the committed export must match the sources.
+      - run: npm ci --prefix site
+      - run: npm run build --prefix site
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      - run: git diff --exit-code -- installer/site
       - run: npm ci --prefix test/web
       - run: test/web/node_modules/.bin/playwright install --with-deps chromium
       - run: npm test --prefix test/web

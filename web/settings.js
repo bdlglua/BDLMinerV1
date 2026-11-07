@@ -80,11 +80,12 @@ const FIELDS={
  webpass:['Web password','Optional. Asked before changing settings or installing firmware from these pages. Empty = no password: anyone on your network can.'],
  update:['Updates from GitHub','Signed releases of this firmware.'],count:['Anonymous usage count','Once a day, downloads a 2-byte file of this version\'s release. Nothing is sent.'],sharehr:['Share my hashrate anonymously','Every 5 minutes, sends the firmware version, the board, the cryptocurrency and the hashrate, to count the total of all BDLMiner miners live. No address, name or identifier.'],
  sharepool:['Share my pool anonymously','On by default. Turn off to hide your pool group. Requires hashrate sharing. Other pools are grouped as private/other. Never sends the hostname, port, Bitcoin address or worker.']};
+const recommendedMv=mhz=>mhz<=600?1150:mhz<=675?1200:mhz<=725?1250:1300;
 const hours=[[255,'Off'],...Array.from({length:24},(_,h)=>[h,String(h).padStart(2,'0')+':00'])];
 const CHOICES={proto:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],proto2:[[0,'Stratum V1'],[1,'Stratum V2 (Noise)']],
  fanauto:[['false','Manual'],['true','Automatic']],
- asicmhz:[525,550,575,600,625,650,675,690].map(mhz=>[mhz,mhz===525?'525 MHz (stock)':mhz+' MHz']),
- asicmv:[1000,1060,1100,1150,1200,1250].map(mv=>[mv,mv===1150?'1150 mV (stock)':mv+' mV']),
+ asicmhz:[525,550,575,600,625,650,675,690,700,725,750,775,800].map(mhz=>[mhz,mhz===525?'525 MHz (stock)':mhz+' MHz']),
+ asicmv:[1000,1060,1100,1150,1200,1250,1300].map(mv=>[mv,mv===1150?'1150 mV (stock)':mv+' mV']),
  lang:[[0,'English'],[1,'Français']],rot:[[0,'Portrait'],[1,'Landscape'],[2,'Portrait, upside down'],[3,'Landscape, upside down']],
  theme:[[0,'Orange'],[1,'Green'],[2,'Blue'],[3,'Purple'],[4,'Pink']],nightfrom:hours,nightto:hours,
  summary:hours,update:[[0,'Off'],[1,'Check and offer'],[2,'Install automatically']],fiat:['USD','EUR','GBP','CAD','CHF','AUD','JPY'].map(c=>[c,c])};
@@ -138,6 +139,8 @@ function render(data){
   i.addEventListener('input',()=>{i.setCustomValidity('');dirtyState();if(options)sync()});
   if(options)i.addEventListener('change',()=>{dirtyState();sync()});
   if(k==='pool'||k==='pool2')i.addEventListener('change',()=>poolURLChanged(k));
+  // The voltage that goes with a profile (bm1370::recommendedMv): raised, never lowered.
+  if(k==='asicmhz')i.addEventListener('change',()=>{const mv=$('k_asicmv'),need=recommendedMv(Number(i.value));if(mv&&Number(mv.value)<need){mv.value=String(need);dirtyState();sync()}});
   if(k==='coin')i.addEventListener('change',()=>{
    if(i.value!=='0')for(const key of ['proto','proto2'])if($('k_'+key))$('k_'+key).value='0';
    dirtyState();sync();
@@ -159,8 +162,8 @@ function render(data){
    const note=help('');note.appendChild(guide);row.appendChild(note);
   }
   if(k==='proto'||k==='proto2')row.appendChild(help(t('Stratum V2 needs the pool\'s V2 port and authority key. It does not change share difficulty.')));
-  if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental, up to 690 MHz as in ESP-Miner. Default: 525 MHz. A higher frequency usually needs a higher core voltage. Instability triggers a 525 MHz fallback, kept until the frequency or voltage changes.')));
-  if(k==='asicmv')row.appendChild(help(t('Default: 1150 mV, as ESP-Miner. Raise it in small steps with the frequency and watch the temperature; higher voltage means more heat and power. Safety stops still apply.')));
+  if(k==='asicmhz')row.appendChild(help(t('Profiles above 525 MHz are experimental: up to 690 MHz as in ESP-Miner, then overclocking up to 800 MHz. Default: 525 MHz. Choosing a profile raises the core voltage to the one that goes with it. Instability triggers a 525 MHz fallback, kept until the frequency or voltage changes.')));
+  if(k==='asicmv')row.appendChild(help(t('Default: 1150 mV, as ESP-Miner. Goes with the frequency: 1150 mV up to 600 MHz, 1200 mV up to 675, 1250 mV up to 725, 1300 mV up to 800. Higher voltage means more heat and power; watch the temperature. Safety stops still apply.')));
   if(k==='fanauto')row.appendChild(help(t('Default: manual 100%. Startup, stopped ASIC, missing temperature or heat safety force full cooling.')));
   if(k==='fanpct')row.appendChild(help(t('Minimum 30%. Safety forces 100% at ASIC 60 °C or regulator 80 °C until both cool by 5 °C. A lower thermal limit raises cooling earlier. Fan-stop protection remains active.')));
   if(k==='power'){const h=document.createElement('div');h.className='field-help';h.textContent=t('At 100%, mining runs at full available speed. Temperature protection can still reduce it.');const presets=document.createElement('div');presets.className='presets';for(const [name,v]of [['Full performance',100],['Balanced',75],['Quiet',50]]){const button=document.createElement('button');button.type='button';button.className='secondary';button.id='preset-'+v;button.textContent=t(name)+' · '+v+' %';button.onclick=()=>{i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}))};presets.appendChild(button)}h.appendChild(presets);row.appendChild(h)}

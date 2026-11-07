@@ -1,343 +1,21 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>__PAGE_TITLE__</title>
-<meta name="description" content="BDLMinerV2: free open-source ESP32 solo Bitcoin miner firmware for M5StickC Plus2 and other supported boards. Install with the browser flasher, explore the live dashboard and stable releases.">
-<meta property="og:title" content="BDLMinerV2 | ESP32 Solo Bitcoin Miner for M5StickC Plus2">
-<meta property="og:description" content="Open-source ESP32 solo Bitcoin miner firmware for M5StickC Plus2 and other supported boards. Browser installation, live dashboard and stable updates.">
-<meta property="og:image" content="assets/screen-mining.png">
-<meta name="theme-color" content="#0b0d12">
-<link rel="stylesheet" href="assets/discovery.css">
-<script id="site-data" type="application/json">__SITE_DATA__</script>
-<script defer src="assets/discovery.js"></script>
-<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
-<style>
-:root{--bg:#0b0d12;--panel:#141922;--panel2:#10141c;--border:#262e3d;--label:#8c96aa;--fg:#eceef2;--accent:#f7931a;--good:#3ddc84}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
-a{color:var(--accent)}
-.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:#000;padding:8px 12px;border-radius:6px;z-index:10}
-.skip:focus{left:8px}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
-/* Navigation */
-nav{position:sticky;top:0;z-index:5;background:rgba(11,13,18,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
-nav .wrap{display:flex;align-items:center;gap:18px;height:58px}
-.brand{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;font-weight:800;font-size:18px}
-.brand b{color:var(--accent)}
-.links{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap}
-.links a{color:var(--label);text-decoration:none;font-size:14px;padding:8px 2px}
-.links a:hover{color:var(--fg)}
-#lang{background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit;font-size:14px}
-#menu{display:none;background:none;border:1px solid var(--border);color:var(--fg);border-radius:6px;width:40px;height:36px;cursor:pointer;font-size:18px;line-height:1}
-/* Phones: the links fold into a menu under the bar. */
-@media (max-width:760px){#lang{margin-left:auto}#menu{display:block}
- .links{display:none;position:absolute;top:58px;left:0;right:0;flex-direction:column;gap:0;margin:0;background:var(--bg);border-bottom:1px solid var(--border);padding:6px 20px 12px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
- .links.open{display:flex}
- .links a{padding:12px 4px;font-size:16px;border-bottom:1px solid var(--border)}
- .links a:last-child{border-bottom:0}}
-/* Hero */
-.hero{padding-block:56px 40px;display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
-@media (max-width:860px){.hero{grid-template-columns:1fr;padding-block-start:36px}}
-.hero h1{font-size:clamp(32px,5vw,50px);line-height:1.1;margin:0 0 16px}
-.hero h1 b{color:var(--accent)}
-.hero p{color:#c4cad6;font-size:18px;margin:0 0 24px}
-.buttons{display:flex;gap:12px;flex-wrap:wrap}
-.hero .s{margin:14px 0 0}
-@media (max-width:520px){.buttons .btn{flex:1 1 0;text-align:center;padding-inline:12px}.buttons .btn:first-child{flex-basis:100%}}
-.btn{display:inline-block;background:var(--accent);color:#000;border:0;border-radius:8px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
-.btn.ghost{background:none;color:var(--fg);border:1px solid var(--border)}
-.btn.ghost:hover{border-color:var(--label)}
-.device{background:#1b1f27;border:1px solid #2f3747;border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.device img{display:block;width:100%;height:auto;border-radius:6px;image-rendering:pixelated;background:#000}
-.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
-.thumbs img{width:100%;border-radius:4px;border:1px solid #2f3747;image-rendering:pixelated;cursor:pointer;opacity:.7;background:#000;padding:0}
-.thumbs button{padding:0;border:0;background:none;cursor:pointer}
-.thumbs button[aria-pressed=true] img{opacity:1;border-color:var(--accent)}
-/* Sections */
-section{padding:48px 0;border-top:1px solid var(--border);scroll-margin-top:58px}
-h2{font-size:28px;margin:0 0 8px}
-.lead{color:var(--label);margin:0 0 28px;max-width:720px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
-.card h3{margin:0 0 6px;font-size:17px}
-.card p{margin:0;color:#b9c0cc;font-size:15px}
-.card .icon{font-size:22px;margin-bottom:8px}
-.boards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;list-style:none;padding:0;margin:0}
-.boards li{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
-.boards li.exp{border-style:dashed}
-/* Installer */
-.install{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:760px){.install{grid-template-columns:1fr}}
-label{display:block;color:var(--label);font-size:13px;margin-bottom:6px}
-select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font:inherit}
-esp-web-install-button{display:block;margin:14px 0 12px}
-ol{padding-left:20px;margin:0}li{margin:6px 0}
-.s{color:var(--label);font-size:13px}
-/* Statistics */
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
-.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
-.tile .label{color:var(--label);font-size:13px}
-.tile .value{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
-.tile .value.accent{color:var(--accent)}
-/* Phones: two by two, each value on one line. */
-@media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tile{padding:12px;min-width:0}.tile .label{font-size:12px}.tile .value{font-size:clamp(17px,5.6vw,22px);white-space:nowrap}}
-.chart{width:100%;height:200px;display:block}
-.chart-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.chart-head .live{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:#3ddc84}
-.chart-head .live .dot{width:9px;height:9px}
-.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px}
-.pool-breakdown,.coin-breakdown{margin-top:12px}
-.split h3,.pool-breakdown h3,.coin-breakdown h3{font-size:13px;font-weight:600;color:var(--label);margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em}
-table.by{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
-table.by th,table.by td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--border)}
-table.by th{color:var(--label);font-weight:500;font-size:13px}
-table.by .num{text-align:right}
-table.by .empty{color:var(--label)}
-.range{margin-left:auto;display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.range button{background:none;border:0;color:var(--label);font:inherit;font-size:13px;padding:8px 14px;cursor:pointer}
-.range button[aria-pressed=true]{background:var(--accent);color:#000;font-weight:700}
-.chart text{fill:var(--label);font-size:11px}
-.fleet-head{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:22px 0 10px}
-.fleet-head h3{margin:0;font-size:18px;margin-right:auto}
-.fleet{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;list-style:none;padding:0;margin:0 0 14px}
-.fleet li{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
-.fleet .name{flex:1;min-width:0}
-.fleet-more{background:none;border:1px dashed var(--border);color:var(--label);border-radius:10px;padding:10px 14px;font:inherit;font-size:14px;cursor:pointer;width:100%;margin:0 0 14px}
-.fleet-more:hover{color:var(--fg);border-color:var(--label)}
-.fleet .models{display:block;color:var(--label);font-size:12px;margin-top:2px}
-.fleet .count{color:var(--label);font-size:13px;white-space:nowrap;text-align:right}
-.fleet .count b{color:var(--fg);font-variant-numeric:tabular-nums}
-.dot{flex:none;width:12px;height:12px;border-radius:50%;display:inline-block}
-.dot.on{background:#3ddc84;box-shadow:0 0 6px 2px rgba(61,220,132,.75),0 0 14px 4px rgba(61,220,132,.35);animation:glow 2.4s ease-in-out infinite}
-.dot.off{background:#ff4d4f;box-shadow:0 0 6px 2px rgba(255,77,79,.65),0 0 14px 4px rgba(255,77,79,.25)}
-.dot.none{background:#3a4252}
-.fleet li.none .name{color:var(--label)}
-.legend{display:flex;align-items:center;gap:8px;color:var(--label);font-size:14px}
-.legend b{color:var(--fg)}
-@keyframes glow{50%{box-shadow:0 0 9px 3px rgba(61,220,132,.9),0 0 22px 7px rgba(61,220,132,.45)}}
-@media (prefers-reduced-motion:reduce){.dot.on{animation:none}}
-.note{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;color:#c4cad6}
-/* Footer */
-footer{border-top:1px solid var(--border);padding:28px 0 40px;color:var(--label);font-size:14px}
-/* Live chat: a round bubble at the bottom right, opening a panel */
-.chat-bubble{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:20;width:60px;height:60px;border-radius:50%;border:0;
- background:var(--accent);color:#000;cursor:pointer;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 4px rgba(247,147,26,.18);transition:transform .15s}
-.chat-bubble:hover{transform:scale(1.06)}
-.chat-bubble svg{width:28px;height:28px}
-@media (max-width:520px){.chat-bubble{width:52px;height:52px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px))}.chat-bubble svg{width:24px;height:24px}}
-.chat-bubble .badge{position:absolute;top:-2px;right:-2px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#ff4d4f;color:#fff;font:700 12px/22px system-ui,sans-serif;box-shadow:0 0 0 2px var(--bg)}
-.chat-bubble .badge:not([hidden]){animation:unread 2s ease-in-out infinite}
-@keyframes unread{50%{box-shadow:0 0 0 2px var(--bg),0 0 0 7px rgba(255,77,79,.35)}}
-@media (prefers-reduced-motion:reduce){.chat-bubble .badge:not([hidden]){animation:none}}
-.chat{position:fixed;right:20px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:min(380px,calc(100vw - 40px));height:min(580px,calc(100vh - 130px));
- display:flex;flex-direction:column;padding:0;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
-.chat[hidden]{display:none}
-.chat header{display:flex;align-items:center;gap:8px;padding:12px 12px 12px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
-.chat header h2{font-size:16px;margin:0}
-.chat-online{display:flex;align-items:center;gap:6px;color:var(--label);font:inherit;font-size:13px;margin-right:auto;background:none;border:0;border-radius:8px;padding:4px 8px;cursor:pointer}
-.chat-online:hover,.chat-online[aria-pressed=true]{background:var(--border);color:var(--fg)}
-.chat-online .caret{font-size:10px;opacity:.7}
-.chat-members{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px}
-.chat-members[hidden]{display:none}
-.chat-members h3{margin:0;font-size:15px}
-.chat-members ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
-.chat-members li{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:8px;font-size:14px}
-.chat-members li:hover{background:var(--panel2)}
-.chat-members li .dot{width:9px;height:9px}
-.chat-members li .me{color:var(--label);font-size:12px}
-.chat-members .team{background:var(--accent);color:#000;border-radius:4px;padding:0 5px;font-size:10px;font-weight:800;text-transform:uppercase}
-.chat-members .hint{color:var(--label);font-size:13px;margin:0}
-.chat-online .dot{width:8px;height:8px}
-.chat-online b{color:var(--fg)}
-.chat-icon{background:none;border:0;color:var(--label);cursor:pointer;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:18px;line-height:1}
-.chat-icon:hover,.chat-icon[aria-pressed=true]{background:var(--border);color:var(--fg)}
-.chat-icon svg{width:18px;height:18px}
-.chat-log{flex:1;overflow-y:auto;list-style:none;margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
-.chat-log .meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--label);flex-wrap:wrap}
-.chat-log .who{font-weight:700;font-size:13px}
-.chat-log .team{background:var(--accent);color:#000;border-radius:4px;padding:0 5px;font-size:10px;font-weight:800;text-transform:uppercase}
-.chat-log .edited{font-style:italic}
-.chat-log .text{margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.45}
-.chat-log .acts{margin-left:auto;display:flex;gap:4px}
-.chat-log .acts button{background:none;border:1px solid var(--border);color:var(--label);border-radius:4px;font-size:11px;cursor:pointer;padding:1px 6px}
-.chat-log .acts button.danger{color:#ff7a6b;border-color:#5a2a2a}
-.chat-log .empty{color:var(--label);text-align:center;margin:auto 0;font-size:14px}
-.chat-log .media{margin-top:6px}
-.chat-log .media img,.chat-log .media video{display:block;max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--border);background:#000}
-.voice{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:999px;padding:5px 14px 5px 5px;max-width:320px}
-.voice .vplay{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:#000;cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 3px rgba(247,147,26,.15)}
-.voice .vplay svg{width:14px;height:14px}
-.voice .vwave{flex:1;min-width:0;height:30px;display:flex;align-items:center;gap:2px;cursor:pointer;border-radius:4px}
-.voice .vwave i{flex:1;min-height:3px;border-radius:2px;background:#3a4252;transition:background .1s}
-.voice .vwave i.on{background:var(--accent)}
-.voice .vtime{flex:none;font-size:12px;color:var(--label);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
-.voice.playing .vtime{color:var(--fg)}
-.chat-attach .voice{flex:1;max-width:none;background:none;border:0;padding:0}
-.chat-log .editing textarea{width:100%;margin-top:4px}
-.chat-log .editing .row{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}
-.chat-note{margin:0;padding:6px 14px;font-size:13px;color:#ffb36b}
-.chat-note:empty{display:none}
-.chat-settings{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:14px}
-.chat-settings[hidden],.chat .chat-log[hidden],.chat form[hidden],.chat-rules[hidden]{display:none}
-.chat-settings h3{margin:0;font-size:15px}
-.chat-settings .field{display:flex;flex-direction:column;gap:6px}
-.chat-settings label{color:var(--label);font-size:13px;margin:0}
-.chat-settings .row{display:flex;gap:8px;min-width:0}
-.chat-settings .row input{flex:1;min-width:0}
-.chat-settings .hint{color:var(--label);font-size:12px;margin:0}
-.chat-qr{display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px}
-.chat-qr[hidden]{display:none}
-.chat-qr svg{width:200px;height:200px;border-radius:8px;display:block}
-.chat input,.chat textarea{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
-.chat input[readonly]{background:var(--panel2);color:var(--accent);font-weight:700;border-color:transparent}
-.chat .btn-s{flex:none;background:var(--accent);color:#000;border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-.chat .btn-s.ghost{background:none;color:var(--fg);border:1px solid var(--border);font-weight:500}
-.chat .btn-s:disabled{opacity:.5;cursor:default}
-.chat form{border-top:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:8px}
-.chat textarea{resize:none;max-height:120px}
-.chat .compose{display:flex;gap:6px;align-items:flex-end}
-.chat .compose .chat-icon{flex:none;height:38px;width:36px;border:1px solid var(--border)}
-.chat .compose .send{flex:none;width:42px;height:38px;border:0;border-radius:8px;background:var(--accent);color:#000;font-size:18px;cursor:pointer}
-.chat .compose .send:disabled{opacity:.5;cursor:default}
-.chat .rec[aria-pressed=true]{background:#ff4d4f;color:#fff;border-color:#ff4d4f;animation:rec 1.2s ease-in-out infinite}
-@keyframes rec{50%{opacity:.6}}
-.chat-attach{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px}
-.chat-attach[hidden]{display:none}
-.chat-attach img,.chat-attach video{width:44px;height:44px;object-fit:cover;border-radius:6px}
-.chat-attach>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label)}
-.chat-attach>span:empty{display:none}
-.chat-rules{margin:0;padding:0 12px 10px;color:var(--label);font-size:11px}
-/* Phones: a sheet from the bottom, sized to the visible screen (the browser's
-   bars and keyboard excluded, see chatFit()), with a close button easy to see and touch. */
-@media (max-width:520px){.chat{right:0;left:0;bottom:0;width:100%;height:85vh;height:85dvh;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
- .chat header{padding:8px 8px 8px 14px}
- #chat-close{width:44px;height:44px;font-size:22px;color:var(--fg);background:var(--border);border-radius:50%}
- .chat-icon{width:40px;height:40px}}
-@media (prefers-reduced-motion:reduce){.chat-bubble{transition:none}.chat .rec[aria-pressed=true]{animation:none}}
-footer .wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
-footer a{display:inline-block;padding:6px 2px}
-</style>
-</head>
-<body data-page="__PAGE_KEY__">
-<a class="skip" href="#main" data-t="skip">Skip to content</a>
-<nav aria-label="Main">
- <div class="wrap">
-  <a class="brand" href="index.html" aria-label="BDLMiner V2">
-   <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><g fill="#f7931a"><rect x="24" y="24" width="52" height="52" rx="10"/><g id="pins"><rect x="31" y="8" width="6" height="12" rx="2"/><rect x="47" y="8" width="6" height="12" rx="2"/><rect x="63" y="8" width="6" height="12" rx="2"/></g><use href="#pins" transform="translate(0 72)"/><use href="#pins" transform="rotate(90 50 50)"/><use href="#pins" transform="rotate(90 50 50) translate(0 72)"/></g><text x="50" y="64" text-anchor="middle" font-size="42" font-weight="900" font-family="system-ui,sans-serif" fill="#15100a">B</text></svg>
-   <span>BDLMiner <b>V2</b></span>
-  </a>
-  <div class="links" id="site-links">
-   <a href="boards.html" data-t="navBoards">Boards</a>
-   <a href="flash.html" data-t="navInstall" class="nav-flash">Flash</a>
-   <a href="demo.html" data-t="navDemo">Demo</a>
-   <details class="site-more" id="nav-more"><summary data-t="navMore">Explore</summary><div class="site-more-menu">
-    <a href="start.html" id="nav-discover" data-t="navStart">Get started</a>
-    <a href="faq.html" data-t="navFAQ">FAQ</a>
-    <a href="releases.html" data-t="navNews">Releases</a>
-    <a href="stats.html" data-t="navStats">Statistics</a>
-    <a href="https://bdlglua.github.io/remote/" data-t="navRemote">My miners</a>
-    <a href="gallery.html" data-t="navCommunity">Community</a>
-   </div></details>
-   <a href="support.html" id="nav-support" data-t="navSupport">Support</a>
-  </div>
-  <button id="lang" type="button">Français</button>
-  <button id="menu" type="button" aria-expanded="false" aria-controls="site-links" data-al="menu" aria-label="Menu">☰</button>
- </div>
-</nav>
-
-<main id="main" class="page-content">
-__PAGE_CONTENT__
-</main>
-
-<footer>
- <nav class="footer-nav wrap" aria-label="All pages" data-al="navPages">
-  <a href="index.html" data-t="navHome">Home</a><a href="start.html" data-t="navStart">Get started</a>
-  <a href="boards.html" data-t="navBoards">Boards</a><a href="flash.html" data-t="navInstall">Flash</a>
-  <a href="demo.html" data-t="navDemo">Demo</a><a href="faq.html" data-t="navFAQ">FAQ</a>
-  <a href="releases.html" data-t="navNews">Releases</a><a href="stats.html" data-t="navStats">Statistics</a>
-  <a href="https://bdlglua.github.io/remote/" data-t="navRemote">My miners</a>
-  <a href="gallery.html" data-t="navCommunity">Community</a><a href="support.html" data-t="navSupport">Support</a>
- </nav>
- <div class="wrap">
-  <span data-t="license">BDLMiner V2 is free software under the GNU GPL v3.0.</span>
-  <span><a href="https://github.com/bdlglua/BDLMinerV2/blob/main/SECURITY.md" data-t="security">Security</a> · <a href="https://github.com/bdlglua/BDLMinerV2/blob/main/ACCESSIBILITY.md" data-t="accessibility">Accessibility</a> · <a href="https://github.com/bdlglua/BDLMinerV2/releases" data-t="releases">Releases</a></span>
- </div>
-</footer>
-
-<button type="button" class="chat-bubble" id="chat-bubble" aria-controls="chat" aria-expanded="false" data-al="chatOpen" aria-label="Open the chat">
- <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.2 1.1 4.2 2.9 5.6L4 21l4.4-2.3c1.1.3 2.3.5 3.6.5 5.5 0 10-3.6 10-8.1S17.5 3 12 3zm-5 9.3a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm5 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm5 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z"/></svg>
- <span class="badge" id="chat-unread" hidden></span>
-</button>
-<section class="chat" id="chat" role="dialog" aria-labelledby="chat-title" hidden>
- <header>
-  <h2 id="chat-title" data-t="chatTitle">Chat</h2>
-  <button type="button" class="chat-online" id="chat-people" aria-pressed="false" aria-controls="chat-members" data-al="chatMembers" aria-label="Members online"><span class="dot on" aria-hidden="true"></span><b id="chat-online">–</b> <span data-t="online">online</span> <span class="caret" aria-hidden="true">▾</span></button>
-  <button type="button" class="chat-icon" id="chat-gear" aria-pressed="false" aria-controls="chat-settings" data-al="chatSettings" aria-label="Settings">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-  </button>
-  <button type="button" class="chat-icon" id="chat-close" data-al="chatClose" aria-label="Close the chat">✕</button>
- </header>
- <ol class="chat-log" id="chat-log" aria-live="polite" aria-relevant="additions"></ol>
- <div class="chat-settings" id="chat-settings" hidden>
-  <h3 data-t="chatSettings">Settings</h3>
-  <div class="field">
-   <label for="chat-name" data-t="chatName">Name</label>
-   <div class="row"><input id="chat-name" maxlength="24" autocomplete="nickname" data-ph="chatNamePh" placeholder="Your name">
-    <button type="button" class="btn-s" id="chat-save" data-t="chatSave">Save</button></div>
-   <p class="hint" id="chat-when" data-t="chatNameHint">Changeable every 30 days</p>
-  </div>
-  <div class="field">
-   <label data-t="chatCodeTitle">Other device</label>
-   <div class="row"><button type="button" class="btn-s ghost" id="chat-qr-show" aria-expanded="false" aria-controls="chat-qr" data-t="chatQrShow">📱 My QR code</button></div>
-   <div class="chat-qr" id="chat-qr" hidden>
-    <div id="chat-qr-img" role="img" data-al="chatQrAlt" aria-label="QR code to open the chat with your name"></div>
-    <p class="hint" data-t="chatCodeHint">🔒 Scan it with your phone. Show it to no one.</p>
-    <button type="button" class="btn-s ghost" id="chat-link" data-t="chatLink">Copy the link</button>
-   </div>
-  </div>
-  <button type="button" class="btn-s" id="chat-back" data-t="chatBack">Back to the chat</button>
- </div>
- <div class="chat-members" id="chat-members" hidden>
-  <h3 data-t="chatMembers">Members online</h3>
-  <ul id="chat-member-list"></ul>
-  <p class="hint" id="chat-guests"></p>
-  <button type="button" class="btn-s" id="chat-members-back" data-t="chatBack">Back to the chat</button>
- </div>
- <p class="chat-note" id="chat-note" role="status"></p>
- <form id="chat-form" autocomplete="off">
-  <div class="chat-attach" id="chat-attach" hidden><span id="chat-attach-name"></span>
-   <button type="button" class="chat-icon" id="chat-attach-drop" data-al="chatRemove" aria-label="Remove">✕</button></div>
-  <div class="compose">
-   <button type="button" class="chat-icon" id="chat-file" data-al="chatAttach" aria-label="Photo or video">📎</button>
-   <input type="file" id="chat-file-input" accept="image/*,video/*" hidden>
-   <button type="button" class="chat-icon rec" id="chat-rec" aria-pressed="false" data-al="chatRecord" aria-label="Voice message">🎤</button>
-   <label class="skip" for="chat-text" data-t="chatMessage">Message</label>
-   <textarea id="chat-text" rows="1" maxlength="500" data-ph="chatTextPh" placeholder="Message…"></textarea>
-   <button type="submit" class="send" id="chat-send" data-al="chatSend" aria-label="Send">➤</button>
-  </div>
- </form>
- <p class="chat-rules" data-t="chatRules">Public messages, photos and videos, kept 7 days. Never share a seed phrase, a private key or a password.</p>
-</section>
-
-<script>
-const BOARDS=__BOARDS__;
+// Site behaviour: language, flasher, live statistics, chat. The page sets
+// window.BDL_BOARDS and window.BDL_VERSION (filled in by tools/make_site_pages.py).
+const BOARDS=window.BDL_BOARDS||[],VERSION=window.BDL_VERSION||'';
 const STATS='https://bdlminer-stats.bdlminer-bot.workers.dev/api/summary';
 let poolNames={},poolLinks={};try{const data=JSON.parse(document.getElementById('site-data').textContent);poolNames=data.pool_names||{};poolLinks=data.pool_links||{}}catch{}
 const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Flasher',navStats:'Statistiques',navCommunity:'Communauté',
 navHome:'Accueil',navStart:'Bien démarrer',navDemo:'Démo',navMore:'Explorer',navFAQ:'FAQ',navNews:'Nouveautés',navSupport:'Soutenir',navPages:'Toutes les pages',
 navRemote:'Mes mineurs',
+heroPill:'Open source · mises à jour signées',famAll:'Toutes les cartes',famEsp32:'ESP32',famS3:'ESP32-S3',famS2c3:'S2 / C3',famAsic:'ASIC',famGroup:'Famille de cartes',searchLabel:'Rechercher une carte',searchBoard:'Rechercher une carte',cardMiners:'{n} miners',cardMiner:'{n} miner',check1:'SHA-256 matériel sur ESP32, S2, S3 et C3',check2:'Stratum V1 et V2 chiffré (Noise)',check3:'Bitaxe Gamma jusqu’à 800 MHz',
+worksWith:'Fonctionne avec les pools solo',marketTitle:'Le parc BDLMiner en direct',marketLead:'Les miners qui partagent anonymement leur hashrate, par carte. Mis à jour toutes les 20 secondes.',
+marketAll:'Toutes les statistiques',colShare:'Part des miners',liveFleet:'Parc en direct',heroMiners:'miners en ligne',heroRecord:'Meilleure heure',
 exploreTitle:'Découvrir BDLMiner',exploreLead:'Choisis ta carte, essaie l’interface ou trouve de l’aide pour la prochaine étape.',
 exploreBoards:'Compare les puces, les écrans et les hashrates mesurés.',exploreDemo:'Essaie le dashboard et le hub sans posséder de miner.',
 exploreStart:'Première installation, mises à jour et passage depuis AxeOS.',exploreFAQ:'Dépannage USB, Wi-Fi, shares et performances.',
 exploreNews:'Derniers changements et canaux stable et bêta.',exploreCommunity:'Partage ton installation et retrouve les autres miners.',
 title:'Le minage Bitcoin solo sur un ESP32 <b>de poche</b>',
 tagline:'BDLMiner V2 est un firmware libre et gratuit qui transforme un M5StickC Plus2 ou une autre carte ESP32 en mineur Bitcoin solo « loterie », avec un écran en direct, un tableau de bord web et des mises à jour signées automatiques.',
-ctaInstall:'Flasher',ctaHub:'Hub Linux / Raspberry Pi',version:'Firmware proposé : __VERSION__.',
+ctaInstall:'Flasher',ctaHub:'Hub Linux / Raspberry Pi',version:'Firmware proposé : '+VERSION+'.',
 featTitle:'Ce qu\'il fait',featLead:'Le mineur tourne sur la carte. Un hub facultatif sur Linux ou Raspberry Pi regroupe tes mineurs dans un même tableau de bord.',
 f1t:'SHA-256 matériel',f1:'Utilise le moteur SHA de l\'ESP32 : environ 1 MH/s sur un M5StickC Plus2, avec le minage logiciel en secours.',
 f2t:'Stratum V1 et V2',f2:'N\'importe quelle pool solo, Stratum V2 natif chiffré avec Noise, une pool de secours et la bascule automatique.',
@@ -348,10 +26,10 @@ f6t:'Home Assistant',f6:'Découverte MQTT avec commandes, et métriques Promethe
 f7t:'Écrans configurables',f7:'Choisis tes métriques, leur ordre et les pages actives, en français ou anglais. Les cartes sans écran fonctionnent aussi.',
 f9t:'Hub multi-mineurs',f9:'Suis plusieurs mineurs, garde un historique local et lance la calibration supervisée du Gamma depuis Linux ou Raspberry Pi.',
 f8t:'Les cartes ASIC aussi',f8:'Prise en charge expérimentale du Bitaxe Gamma 601 et du NerdNOS, de quelques centaines de GH/s à environ 1 TH/s.',
-boardsTitle:'Cartes compatibles',boardsLead:'Un firmware par famille. Les cartes en pointillés sont expérimentales : les retours sur du vrai matériel sont les bienvenus.',
+boardsTitle:'Cartes compatibles',boardsLead:'Un firmware par famille. Les cartes marquées expérimentales attendent encore des retours sur du vrai matériel : ils sont les bienvenus.',
 installTitle:'Flasher ta carte',installLead:'Aucun logiciel à installer : Chrome ou Edge sur un ordinateur flashe la carte par USB.',
 board:'Ta carte',install:'Flasher',unsupported:'Ce navigateur ne peut pas installer : utilise Chrome ou Edge sur un ordinateur.',
-notallowed:'La page doit être ouverte en HTTPS.',erase:'Version __VERSION__. La première installation efface la carte (réglages et statistiques).',
+notallowed:'La page doit être ouverte en HTTPS.',erase:'Version '+VERSION+'. La première installation efface la carte (réglages et statistiques).',
 s1:'Branche la carte à cet ordinateur avec un câble USB qui transmet les données.',
 s2:'Choisis la carte, clique sur Flasher et sélectionne son port série.',
 s3:'Au redémarrage, connecte-toi au WiFi BDLMinerV2-XXXX (mot de passe MineYourCoins) et entre ton WiFi, la pool et ton adresse BTC.',
@@ -361,7 +39,7 @@ poolOther:'Autre / pool privée',poolUnknown:'Pool non renseignée',byPool:'Par 
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
-chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatUnread:'non lus',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
+chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',themeLight:'Thème clair',chatUnread:'non lus',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
 chatSave:'Enregistrer',chatNameHint:'Modifiable tous les 30 jours',chatWhen:'Modifiable le {d}',chatNow:'Modifiable maintenant',
 chatCodeTitle:'Autre appareil',chatQrShow:'📱 Mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'🔒 Scanne-le avec ton téléphone. Ne le montre à personne.',
 chatBack:'Retour à la discussion',chatMembers:'Membres en ligne',chatYou:'(toi)',chatGuests:'+ {n} visiteur(s) sans pseudo',chatNobody:'Personne avec un pseudo pour l\'instant.',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
@@ -390,7 +68,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={colCoin:'Cryptocurrency',coinsTitle:'By cryptocurrency',poolOther:'Other / private pool',poolUnknown:'Not shared',colPool:'Pool',chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={cardMiners:'{n} miners',cardMiner:'{n} miner',colCoin:'Cryptocurrency',coinsTitle:'By cryptocurrency',poolOther:'Other / private pool',poolUnknown:'Not shared',colPool:'Pool',chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -441,26 +119,25 @@ function chart(){const svg=document.getElementById('st-chart');if(!svg)return;
  const max=Math.max(...points.map(p=>p.hashrate))*1.15||1;
  const x=t=>(W-right)*Math.max(0,t-t0)/span,y=v=>top+(H-top-bottom)*(1-v/max);
  const line=points.filter(p=>p.at>=t0).map((p,i)=>(i?'L':'M')+x(p.at).toFixed(1)+' '+y(p.hashrate).toFixed(1)).join(' ');
- let grid='';for(let i=1;i<=3;i++){const v=max*i/4;grid+='<line x1="0" x2="'+W+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" stroke="#262e3d"/><text x="4" y="'+(y(v)-4).toFixed(1)+'">'+rate(v)+'</text>'}
+ let grid='';for(let i=1;i<=3;i++){const v=max*i/4;grid+='<line x1="0" x2="'+W+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" class="grid-h"/><text x="4" y="'+(y(v)-4).toFixed(1)+'">'+rate(v)+'</text>'}
  // Time marks: every 6 hours over a day, every day over a week.
  const step=range=='day'?6*36e5:864e5,locale=lang=='fr'?'fr-FR':'en-US';
  for(let t=Math.ceil(t0/step)*step;t<t1-step/3;t+=step){const d=new Date(t);
   const label=range=='day'?d.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString(locale,{weekday:'short',day:'numeric'});
   // Centred under its line; none too close to the edge or to "now".
   const px=x(t);if(px<30||px>W-right-90)continue;
-  grid+='<line x1="'+px.toFixed(1)+'" x2="'+px.toFixed(1)+'" y1="'+top+'" y2="'+(H-bottom)+'" stroke="#1b212c"/><text x="'+px.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+label+'</text>'}
+  grid+='<line x1="'+px.toFixed(1)+'" x2="'+px.toFixed(1)+'" y1="'+top+'" y2="'+(H-bottom)+'" class="grid-v"/><text x="'+px.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+label+'</text>'}
  grid+='<text x="'+(W-right)+'" y="'+(H-6)+'" text-anchor="end">'+T('now')+'</text>';
  const last=points.at(-1),lx=x(last.at).toFixed(1),ly=y(last.hashrate).toFixed(1);
- svg.innerHTML=grid+'<path d="'+line+' L'+lx+' '+(H-bottom)+' L'+x(Math.max(points[0].at,t0)).toFixed(1)+' '+(H-bottom)+' Z" fill="#f7931a" fill-opacity=".15"/>'+
-  '<path d="'+line+'" fill="none" stroke="#f7931a" stroke-width="2" stroke-linejoin="round"/>'+
-  '<circle cx="'+lx+'" cy="'+ly+'" r="9" fill="#f7931a" fill-opacity=".25">'+(matchMedia('(prefers-reduced-motion: reduce)').matches?'':'<animate attributeName="r" values="5;11;5" dur="2.4s" repeatCount="indefinite"/>')+'</circle>'+
-  '<circle cx="'+lx+'" cy="'+ly+'" r="4" fill="#f7931a"/>'}
+ svg.innerHTML=grid+'<path d="'+line+' L'+lx+' '+(H-bottom)+' L'+x(Math.max(points[0].at,t0)).toFixed(1)+' '+(H-bottom)+' Z" class="area"/>'+
+  '<path d="'+line+'" class="line"/>'+
+  '<circle cx="'+lx+'" cy="'+ly+'" r="3.5" class="last"/>'}
 document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{range=b.dataset.range;
  document.querySelectorAll('[data-range]').forEach(o=>o.setAttribute('aria-pressed',o==b));chart()});
 addEventListener('resize',()=>chart());
 let fetchedAt=0;
-setInterval(()=>{if(!fetchedAt)return;const s=Math.round((Date.now()-fetchedAt)/1000);
- document.getElementById('st-updated').textContent=T('updated').replace('{s}',s)},1000);
+setInterval(()=>{const el=document.getElementById('st-updated');if(!fetchedAt||!el)return;const s=Math.round((Date.now()-fetchedAt)/1000);
+ el.textContent=T('updated').replace('{s}',s)},1000);
 
 // Every supported board: green when some are online now, red when the only
 // ones seen went offline (the service estimates them: reports carry no
@@ -523,14 +200,65 @@ function breakdowns(){
  table('st-pools',pools,'colPool',key=>key==='unknown'?T('poolUnknown'):Object.hasOwn(poolNames,key)?poolNames[key]:T('poolOther'),
   key=>Object.hasOwn(poolNames,key)&&Object.hasOwn(poolLinks,key)?poolLinks[key]:null)}
 
-function stats(){if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
+// A small line of points (the total hashrate) for the cards of the home page.
+function sparkline(points){const values=points.map(p=>p.hashrate).filter(v=>v>=0);if(values.length<2)return'';
+ const W=120,H=36,max=Math.max(...values),min=Math.min(...values),span=max-min||1;
+ const d=values.map((v,i)=>(i?'L':'M')+(W*i/(values.length-1)).toFixed(1)+' '+(H-3-(H-6)*(v-min)/span).toFixed(1)).join(' ');
+ return '<path class="spark-area" d="'+d+' L'+W+' '+H+' L0 '+H+' Z"/><path class="spark-line" d="'+d+'"/>'}
+// Home: the live fleet by board, as exchange-style cards and a market table,
+// both filtered by board family (tabs), the table also by name (search).
+const FAMILY={'m5stickc-plus2':'esp32','m5stack-esp32':'esp32','lilygo-t-display':'esp32','esp32-2432s028r':'esp32','esp32-headless':'esp32',
+ 'm5stack-s3':'s3','lilygo-t-display-s3':'s3','esp32s3-headless':'s3','esp32s2-headless':'s2c3','esp32c3-headless':'s2c3','bitaxe-gamma-601':'asic','nerdnos':'asic'};
+const familyOf=env=>FAMILY[env]||(/gamma|bitaxe|nerdnos/.test(env)?'asic':/s3/.test(env)?'s3':/s2|c3/.test(env)?'s2c3':'esp32');
+const homeFilter={cards:'all',table:'all',query:''};
+function homeMarket(){const table=document.getElementById('home-market');if(!table)return;
+ const locale=lang=='fr'?'fr-FR':'en-US',set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+ set('hm-total',summary?rate(summary.hashrate||0):'–');set('hm-miners',summary?(summary.miners||0).toLocaleString(locale):'–');
+ const spark=document.getElementById('hm-spark');if(spark)spark.innerHTML=sparkline(summary?.recent||[]);
+ const name=env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env};
+ const famLabel=f=>T({esp32:'famEsp32',s3:'famS3',s2c3:'famS2c3',asic:'famAsic'}[f]);
+ const minerTotal=summary?.miners||0,pct=x=>(x*100).toLocaleString(locale,{maximumFractionDigits:x<.1?2:1})+' %';
+ const all=(summary?.boards||[]).filter(b=>b.miners>0).map(b=>({...b,family:familyOf(b.name),label:name(b.name)})).sort((a,b)=>b.hashrate-a.hashrate);
+ const icon=r=>{const c=document.createElement('span');c.className='chip-icon';c.dataset.family=r.family;c.setAttribute('aria-hidden','true');
+  c.textContent=r.label.replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();return c};
+ // Cards: the four busiest boards of the chosen family.
+ const cards=document.getElementById('hm-cards');
+ if(cards){cards.innerHTML='';const list=all.filter(r=>homeFilter.cards==='all'||r.family===homeFilter.cards).slice(0,4);
+  if(!list.length){const p=document.createElement('p');p.className='ticker-empty';p.textContent=summary?T('noneNow'):'–';cards.appendChild(p)}
+  list.forEach((r,i)=>{const a=document.createElement('a'),head=document.createElement('span'),title=document.createElement('span'),tag=document.createElement('span');
+   a.className='ticker'+(i===1?' active':'');a.href=BOARDS.some(b=>b.env===r.name)?'flash.html?board='+encodeURIComponent(r.name):'stats.html';
+   head.className='ticker-head';title.className='ticker-name';title.textContent=r.label;tag.className='ticker-tag';tag.textContent=famLabel(r.family);
+   head.append(icon(r),title,tag);
+   const value=document.createElement('strong');value.className='ticker-value';value.textContent=rate(r.hashrate);
+   const foot=document.createElement('span'),count=document.createElement('span'),badge=document.createElement('span');foot.className='ticker-foot';
+   count.textContent=T(r.miners===1?'cardMiner':'cardMiners').replace('{n}',r.miners.toLocaleString(locale));badge.className='chg up';badge.textContent=pct(minerTotal?r.miners/minerTotal:0);
+   foot.append(count,badge);a.append(head,value,foot);cards.appendChild(a)})}
+ // Table: every board online in the chosen family that matches the search.
+ const q=homeFilter.query.trim().toLowerCase();
+ const rows=all.filter(r=>(homeFilter.table==='all'||r.family===homeFilter.table)&&(!q||r.label.toLowerCase().includes(q)||r.name.includes(q)));
+ const body=table.tBodies[0];body.innerHTML='';
+ if(!rows.length){const td=body.insertRow().insertCell();td.colSpan=6;td.className='empty';td.textContent=summary?T('noneNow'):'–';return}
+ rows.forEach((r,i)=>{const tr=body.insertRow(),share=minerTotal?r.miners/minerTotal:0;
+  const rank=tr.insertCell();rank.className='rank';rank.textContent=i+1;
+  const cell=tr.insertCell(),wrap=document.createElement('span'),label=document.createElement('span'),tag=document.createElement('small');
+  label.textContent=r.label;tag.textContent=famLabel(r.family);wrap.className='board';wrap.append(icon(r),label,tag);cell.appendChild(wrap);
+  const hash=tr.insertCell();hash.className='num strong';hash.textContent=rate(r.hashrate);
+  const miners=tr.insertCell();miners.className='num col-miners';miners.textContent=r.miners.toLocaleString(locale);
+  const part=tr.insertCell(),bar=document.createElement('span'),fill=document.createElement('i'),value=document.createElement('span');
+  part.className='share col-share';bar.className='bar';fill.style.width=Math.max(2,share*100).toFixed(1)+'%';bar.appendChild(fill);value.textContent=pct(share);part.append(bar,value);
+  const act=tr.insertCell();act.className='act';
+  if(BOARDS.some(b=>b.env===r.name)){const a=document.createElement('a');a.className='btn-sm';a.href='flash.html?board='+encodeURIComponent(r.name);a.textContent=T('navInstall');act.appendChild(a)}})}
+document.querySelectorAll('.family-tabs').forEach(group=>group.addEventListener('click',e=>{const b=e.target.closest('button[data-family]');if(!b)return;
+ homeFilter[group.dataset.target]=b.dataset.family;group.querySelectorAll('button').forEach(o=>o.setAttribute('aria-pressed',o===b));homeMarket()}));
+if(document.getElementById('hm-search'))document.getElementById('hm-search').addEventListener('input',e=>{homeFilter.query=e.target.value;homeMarket()});
+function stats(){homeMarket();if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}
  set('st-hashrate',rate(summary.hashrate||0));set('st-miners',(summary.miners||0).toLocaleString(lang=='fr'?'fr-FR':'en-US'));
  set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
  chart();
  if(!summary.miners&&!summary.history?.length)document.getElementById('st-status').textContent=T('noStats')}
-async function refresh(){if(!document.getElementById('stats'))return;try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
- catch(e){if(!summary){chart();document.getElementById('st-status').textContent=T('statsDown')}}}
+async function refresh(){if(!document.getElementById('stats')&&!document.getElementById('home-market'))return;try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
+ catch(e){if(!summary&&document.getElementById('stats')){chart();document.getElementById('st-status').textContent=T('statsDown')}}}
 
 function apply(){document.documentElement.lang=lang;
  document.querySelectorAll('[data-t]').forEach(e=>e.textContent=T(e.dataset.t));
@@ -549,6 +277,9 @@ function apply(){document.documentElement.lang=lang;
  document.addEventListener('click',e=>{if(!e.target.closest('nav'))set(false);if(more&&!more.contains(e.target))more.open=false});
  document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(more?.open){more.open=false;more.querySelector('summary').focus();return}if(links.classList.contains('open')){set(false);menu.focus()}})}
 if(document.getElementById('st-more'))document.getElementById('st-more').onclick=()=>{fleetAll=!fleetAll;fleet()};
+{const theme=document.getElementById('theme'),root=document.documentElement;theme.setAttribute('aria-pressed',root.dataset.theme==='light');
+ theme.onclick=()=>{const light=root.dataset.theme!=='light';if(light)root.dataset.theme='light';else delete root.dataset.theme;theme.setAttribute('aria-pressed',light);
+  try{light?localStorage.setItem('theme','light'):localStorage.removeItem('theme')}catch(e){}}}
 document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
 
 const sel=document.getElementById('board'),btn=document.getElementById('installer');
@@ -806,6 +537,3 @@ chatConnect();
 
 apply();refresh();setInterval(()=>{if(!document.hidden)refresh()},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
-</script>
-</body>
-</html>

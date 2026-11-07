@@ -19,3 +19,9 @@ bdlhub.local.json
 /managed_components/
 /sdkconfig.defaults
 /sdkconfig.*
+
+# Public site (React/Next.js): dependencies and build output; the exported pages are in installer/site/.
+site/node_modules/
+site/.next/
+site/out/
+site/next-env.d.ts

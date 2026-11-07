@@ -1,0 +1,13 @@
+{
+  "name": "bdlminer-site",
+  "private": true,
+  "description": "BDLMiner V2 public website, written in React with Next.js and exported as static pages",
+  "scripts": {
+    "build": "next build && node scripts/export.mjs"
+  },
+  "dependencies": {
+    "next": "15.5.28",
+    "react": "19.1.10",
+    "react-dom": "19.1.10"
+  }
+}

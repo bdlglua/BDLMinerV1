@@ -7,7 +7,8 @@ Gamma 601** at the stock 525 MHz: about 1.07 TH/s, core 1.145 V and 13 A, ASIC n
 hours. Since v1.9.10, the 550, 600 and 625 MHz profiles are verified too, three minutes
 each on the same board at 1150 mV: 1.126, 1.225 and 1.267 TH/s, ASIC up to 58 °C,
 regulator up to 71.5 °C, 16.9 A, hardware errors 0.2 %. Profiles above 625 MHz (the
-highest ESP-Miner offers at this voltage) are still untested.
+highest ESP-Miner offers at this voltage), and the overclocking profiles up to 800 MHz
+of 2.5.3, are still untested.
 
 ### OLED preview (development interface)
 
@@ -97,13 +98,17 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 
 * Since v1.9.7, the firmware defaults to the **stock 525 MHz profile** at
   **1150 mV**, as ESP-Miner (v1.6.1 to v1.9.6 defaulted to an experimental 600 MHz).
-  Local Settings > Safety offers **525–675 MHz in 25 MHz steps, and 690 MHz**, ESP-Miner's
-  highest BM1370 preset (up to 2.4.1: 525–800 MHz). Since 2.4.2 it also offers the
-  **core voltage** among ESP-Miner's BM1370 values: **1000, 1060, 1100, 1150 (stock),
-  1200 and 1250 mV**. As in ESP-Miner, a higher frequency usually needs a higher voltage;
-  more voltage means more heat and power. Changes apply after restart and are included
-  in backups. Invalid stored values (a profile above 690 MHz saved earlier included)
-  fall back to 525 MHz and 1150 mV; API requests outside the options are rejected.
+  Local Settings > Safety offers **525–800 MHz in 25 MHz steps, and 690 MHz**,
+  ESP-Miner's highest BM1370 preset (2.4.2 to 2.5.2: up to 690 MHz; since 2.5.3 the
+  overclocking range AxeOS leaves to custom values comes back, up to the 800 MHz of the
+  PLL table). Since 2.4.2 it also offers the **core voltage** among ESP-Miner's BM1370
+  values, and since 2.5.3 **1300 mV** for the top profiles: **1000, 1060, 1100, 1150
+  (stock), 1200, 1250 and 1300 mV**. The voltage goes with the frequency: choosing a
+  profile in the settings page raises the voltage to **1150 mV up to 600 MHz, 1200 mV up
+  to 675 MHz, 1250 mV up to 725 MHz and 1300 mV up to 800 MHz** (never lowers it; it can
+  still be changed by hand). More voltage means more heat and power. Changes apply after
+  restart and are included in backups. Invalid stored values fall back to 525 MHz and
+  1150 mV; API requests outside the options are rejected.
 * Mining power 10–100% scales the selected profile (minimum 50 MHz); 0 pauses.
   Values 1–9 keep the ASIC off with an explanatory status. Fan speed defaults to
   **100%**; fan controls introduced in v1.9.13 are described below.
@@ -124,8 +129,9 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   (unavailable until a complete window), fallback state and its reason. Rates still
   come from the physical hash counter, not from clock settings. **Overclock profiles,
   and core voltages other than 1150 mV, have not been validated on a physical Gamma
-  601.** A user's Gamma at 600 MHz and 1150 mV fell back to 525 MHz. No current,
-  temperature or fan limit is raised to reach the requested frequency.
+  601.** A user's Gamma at 600 MHz and 1150 mV fell back to 525 MHz. The current and
+  fan limits are not raised to reach the requested frequency; the temperature stops
+  follow ESP-Miner's since 2.5.3 (below).
 * BOOT short press cycles the three compact OLED pages; a long press follows the
   existing reset/setup behavior. OLED rotation maps 0/1 to normal and 2/3 to 180°.
 * No ASIC power during provisioning. Startup checks device identities and verifies
@@ -140,12 +146,14 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
   setup is tried again every 5 seconds. Before powering the ASIC, the firmware waits
   for an input of at least **4.8 V** and a turning fan, then clears the regulator's
   latched faults (an undervoltage from the missing supply).
-* The user thermal limit (default 65°C, at most 68°C since 2.3.4 so that it pauses
-  before the latching 70°C stop; a higher saved value is lowered to 68°C) pauses mining. Since v1.9.10 an ASIC board has
+* The user thermal limit (default 65°C, at most 73°C since 2.5.3 — 68°C from 2.3.4 to
+  2.5.2 — so that it pauses before the latching 75°C stop; a higher saved value is
+  lowered to 73°C) pauses mining. Since v1.9.10 an ASIC board has
   no 50% / 25% steps below it (each power change restarted the ASIC, which then cooled
   at once: at 600 MHz a Gamma restarted every 40 s at 55 °C), and once hot it stays
   paused at least two minutes, its own sensor being silent while it is off. Independent
-  hard interlocks stop at **70°C ASIC**, **90°C regulator**, lost sensors, fan
+  hard interlocks stop at **75°C ASIC** and **105°C regulator** (since 2.5.3, ESP-Miner's
+  `THROTTLE_TEMP` and `TPS546_THROTTLE_TEMP`; 70 and 90°C before), lost sensors, fan
   <500 RPM, input below **4.6 V** while mining (a 5 V supply sags under load; the
   regulator itself stops at 4.5 V) or above **5.5 V**, core voltage outside
   **1.0–1.25 V** while powered (since 2.4.2: from 0.15 V below to 0.10 V above the chosen
@@ -160,7 +168,7 @@ partition layout; do not try to upload an AxeOS app through BDLMiner's OTA form.
 * The ASIC diode only reads once the BM1370 routes it (analog mux, register 54h):
   from power-on until then it is ignored (a real Gamma read 106 °C there on a 25 °C
   board) and the board's EMC2101 temperature stands in. Afterwards, a diode fault
-  (70 °C or more, or no reading) must hold for **three readings in a row**, 0.75 s
+  (75 °C or more, or no reading) must hold for **three readings in a row**, 0.75 s
   while mining, before it stops the ASIC: a real overheat takes far longer, and one
   false reading no longer stops it until restart.
 * When pool work disappears (a reconnection, a failover), the ASIC keeps running on

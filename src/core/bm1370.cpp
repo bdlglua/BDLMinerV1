@@ -138,7 +138,7 @@ uint16_t fanRpm(uint16_t tach) { return tach < 83 || tach >= 0xfff0 ? 0 : 540000
 const char *Health::fault(bool powered, bool requireDiode) const {
     if (requireDiode && !std::isfinite(temperature)) return "ASIC temperature sensor fault; restart required";
     if (std::isfinite(temperature) && temperature >= kAsicMaxC) return "ASIC overtemperature; restart required";
-    if (!std::isfinite(regulatorTemperature) || regulatorTemperature < -20 || regulatorTemperature >= 90)
+    if (!std::isfinite(regulatorTemperature) || regulatorTemperature < -20 || regulatorTemperature >= kRegulatorMaxC)
         return "Regulator temperature fault; restart required";
     // Mining needs 4.8 V to start (notReady); a 5 V supply then sags under
     // load, and the regulator itself stops at 4.5 V (VIN_OFF).

@@ -4,14 +4,29 @@
 update pointers. The same files are published at both the project Pages address
 and the account root. No firmware release is needed for website changes.
 
-`index.html` is the shared layout. Independent content templates live in
-`pages/`; `tools/make_site_pages.py` renders the home page and separate
-`start.html`, `boards.html`, `flash.html`, `demo.html`, `faq.html`,
-`releases.html`, `stats.html`, `gallery.html` and `support.html` documents for
-both stable and beta. Each document contains only its own main content.
-The header/footer navigation and language preference are shared. Old home-page
-section links redirect to their matching page. The board comparison links to
-`flash.html?board=<profile>`, where only known profiles can be selected.
+The pages are written in React with Next.js, in `site/` (pages router, static
+export). `site/components/Layout.js` holds the shared navigation, footer and chat;
+`site/pages/` holds one component per page. The pages ship no Next.js runtime
+(`unstable_runtimeJS:false`): the behaviour stays in `assets/site.js` (language,
+flasher, live statistics and the home page's fleet table, chat) and
+`assets/discovery.js`, and the styles in `assets/site.css` and
+`assets/discovery.css`. After changing `site/`:
+
+```
+npm ci --prefix site
+npm run build --prefix site
+```
+
+The build exports the complete pages to `installer/site/`, which is committed and
+checked by CI. `tools/make_site_pages.py` fills their placeholders (`__VERSION__`,
+`__BOARDS__`, `__SITE_DATA__`, page key and title) for each channel and writes
+`index.html`, `start.html`, `boards.html`, `flash.html`, `demo.html`, `faq.html`,
+`releases.html`, `stats.html`, `gallery.html` and `support.html`. Links stay
+relative, so the same files work at the account root, under `/BDLMinerV2` and
+under `/beta`. The header/footer navigation and language preference are shared.
+Old home-page section links redirect to their matching page. The board comparison
+links to `flash.html?board=<profile>`, where only known profiles can be selected.
+The site opens in the dark theme; a button in the bar selects the light theme.
 
 ## Discovery content
 
