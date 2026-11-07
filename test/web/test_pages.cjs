@@ -77,7 +77,7 @@ async function fixture(options={}){
     if(req.method==='POST')state.posts.push({url:req.url,body});
     if(req.url==='/site'){
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
-      return res.end(fs.readFileSync(path.join(__dirname,'../../installer/index.html'),'utf8').replace('__PAGE_CONTENT__',fs.readFileSync(path.join(__dirname,'../../installer/pages/home.html'),'utf8')).replaceAll('__PAGE_KEY__','home').replaceAll('__PAGE_TITLE__','BDLMiner V2: demo').replace('__BOARDS__',JSON.stringify([{env:'m5stickc-plus2',name:'M5StickC Plus2'}])).replaceAll('__VERSION__','test'));
+      return res.end(fs.readFileSync(path.join(__dirname,'../../installer/site/index.html'),'utf8').replaceAll('__PAGE_KEY__','home').replaceAll('__PAGE_TITLE__','BDLMiner V2: demo').replace('__BOARDS__',JSON.stringify([{env:'m5stickc-plus2',name:'M5StickC Plus2'}])).replaceAll('__VERSION__','test'));
     }
     if(['/', '/settings', '/log'].includes(req.url)){
       const page=req.url==='/'?'dashboard':req.url==='/settings'?'settings':'log';
@@ -86,6 +86,10 @@ async function fixture(options={}){
     }
     if(req.url.startsWith('/assets/')){
       const name=req.url.slice('/assets/'.length).split('?')[0];
+      if(['site.js','site.css','discovery.js','discovery.css'].includes(name)){
+        res.writeHead(200,{'Content-Type':name.endsWith('.css')?'text/css':'text/javascript'});
+        return res.end(fs.readFileSync(path.join(__dirname,'../../installer/assets',name)));
+      }
       if(!['style.css','common.js','dashboard.js','settings.js','log.js'].includes(name)){res.writeHead(404);return res.end()}
       res.writeHead(200,{'Content-Type':name.endsWith('.css')?'text/css':'text/javascript','Content-Encoding':'gzip'});
       return res.end(zlib.gzipSync(read(name)));

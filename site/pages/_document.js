@@ -1,0 +1,26 @@
+// One document for every page. The __PLACEHOLDERS__ are filled per release
+// channel by tools/make_site_pages.py; the pages ship no Next.js runtime.
+import {Html,Head,Main,NextScript} from 'next/document';
+
+const description='BDLMinerV2: free open-source ESP32 solo Bitcoin miner firmware for M5StickC Plus2 and other supported boards. Install with the browser flasher, explore the live dashboard and stable releases.';
+const themeBoot="try{if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}";
+
+export default function Document(){
+ return <Html lang="en">
+  <Head>
+   <meta name="description" content={description}/>
+   <meta property="og:title" content="BDLMinerV2 | ESP32 Solo Bitcoin Miner for M5StickC Plus2"/>
+   <meta property="og:description" content="Open-source ESP32 solo Bitcoin miner firmware for M5StickC Plus2 and other supported boards. Browser installation, live dashboard and stable updates."/>
+   <meta property="og:image" content="assets/screen-mining.png"/>
+   <meta name="theme-color" content="#0b0e1a"/>
+   <script dangerouslySetInnerHTML={{__html:themeBoot}}/>
+   <link rel="stylesheet" href="assets/site.css"/>
+   <link rel="stylesheet" href="assets/discovery.css"/>
+   <script id="site-data" type="application/json" dangerouslySetInnerHTML={{__html:'__SITE_DATA__'}}/>
+   <script dangerouslySetInnerHTML={{__html:"window.BDL_BOARDS=__BOARDS__;window.BDL_VERSION='__VERSION__';"}}/>
+   <script defer src="assets/site.js"/>
+   <script defer src="assets/discovery.js"/>
+  </Head>
+  <body data-page="__PAGE_KEY__"><Main/><NextScript/></body>
+ </Html>;
+}
