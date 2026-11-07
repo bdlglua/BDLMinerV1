@@ -24,29 +24,28 @@ const explore=[
  ['gallery.html','navCommunity','Community','exploreCommunity','Share your setup and meet other miners.'],
 ];
 const pools=['Public Pool','CKPool','OCEAN','NerdMiner.io','Braiins','ViaBTC'];
+const families=[['all','famAll','All boards'],['esp32','famEsp32','ESP32'],['s3','famS3','ESP32-S3'],['s2c3','famS2c3','S2 / C3'],['asic','famAsic','ASIC']];
 
 export default function HomePage(){
  return <Layout>
 <section className="hero-band" id="top">
  <div className="wrap hero">
   <div className="hero-copy">
-   <p className="pill"><span className="pill-dot" aria-hidden="true"/><span data-t="heroPill">Open source · signed updates</span></p>
    <h1 data-h="title">Solo Bitcoin mining on a <b>pocket-sized</b> ESP32</h1>
    <p className="hero-lead" data-t="tagline">BDLMiner V2 is free, open-source firmware that turns an M5StickC Plus2 or another ESP32 board into a solo "lottery" Bitcoin miner, with a live screen, a web dashboard and automatic signed updates.</p>
-   <ul className="checks">
-    <li><Icon name="check" size={14}/><span data-t="check1">Hardware SHA-256 on ESP32, S2, S3 and C3</span></li>
-    <li><Icon name="check" size={14}/><span data-t="check2">Encrypted Stratum V1 and V2 (Noise)</span></li>
-    <li><Icon name="check" size={14}/><span data-t="check3">Bitaxe Gamma up to 800 MHz</span></li>
-   </ul>
    <div className="buttons">
     <a className="btn" href="flash.html" data-t="ctaInstall">Flash</a>
     <a className="btn ghost" href="https://github.com/bdlglua/BDLMinerV2/releases/download/v__VERSION__/BDLMiner-__VERSION__-Linux-kit.zip" data-t="ctaHub">Linux / Raspberry Pi hub</a>
    </div>
+   <div className="partners">
+    <span className="partners-label" data-t="worksWith">Works with solo pools</span>
+    <ul>{pools.map(p=><li key={p}>{p}</li>)}</ul>
+   </div>
    <div className="text-links">
     <a href="https://github.com/bdlglua/BDLMinerV2" aria-label="View BDLMinerV2 source code and stable release on GitHub">GitHub ↗</a>
     <a href="https://discord.gg/S8kSgD6Xe9">Discord ↗</a>
+    <span className="s" data-t="version">Firmware available: __VERSION__.</span>
    </div>
-   <p className="s" data-t="version">Firmware available: __VERSION__.</p>
   </div>
   <div className="hero-art">
    <Coin className="coin-a"/><Coin className="coin-b"/><Coin className="coin-c"/>
@@ -66,21 +65,31 @@ export default function HomePage(){
    </div>
   </div>
  </div>
- <div className="wrap partners">
-  <span className="partners-label" data-t="worksWith">Works with solo pools</span>
-  <ul>{pools.map(p=><li key={p}>{p}</li>)}</ul>
+ <div className="wrap">
+  <div className="ticker-panel">
+   <div className="family-tabs" role="group" aria-label="Board family" data-al="famGroup" data-target="cards">
+    {families.map(([key,tk,label],i)=><button type="button" key={key} data-family={key} aria-pressed={i===0?'true':'false'} data-t={tk}>{label}</button>)}
+   </div>
+   <div className="ticker-cards" id="hm-cards"><p className="ticker-empty">–</p></div>
+  </div>
  </div>
 </section>
 
 <section id="market"><div className="wrap">
  <div className="section-head">
-  <div><h2 data-t="marketTitle">The BDLMiner fleet, live</h2>
-   <p className="lead" data-t="marketLead">Miners sharing their hashrate anonymously, by board. Updated every 20 seconds.</p></div>
-  <a className="btn ghost" href="stats.html" data-t="marketAll">All statistics</a>
+  <h2 data-t="marketTitle">The BDLMiner fleet, live</h2>
+  <a href="stats.html" data-t="marketAll">All statistics</a>
  </div>
+ <div className="market-tools">
+  <div className="family-tabs" role="group" aria-label="Board family" data-al="famGroup" data-target="table">
+   {families.map(([key,tk,label],i)=><button type="button" key={key} data-family={key} aria-pressed={i===0?'true':'false'} data-t={tk}>{label}</button>)}
+  </div>
+  <label className="market-search"><span className="sr-only" data-t="searchLabel">Search a board</span><input type="search" id="hm-search" placeholder="Search a board" data-ph="searchBoard" autoComplete="off"/></label>
+ </div>
+ <p className="lead small" data-t="marketLead">Miners sharing their hashrate anonymously, by board. Updated every 20 seconds.</p>
  <div className="market-card">
   <table className="market" id="home-market">
-   <thead><tr><th className="rank">#</th><th data-t="colBoard">Board</th><th className="num col-miners" data-t="colMiners">Miners</th><th className="num" data-t="colHashrate">Hashrate</th><th className="col-share" data-t="colShare">Share of miners</th><th><span className="sr-only" data-t="navInstall">Flash</span></th></tr></thead>
+   <thead><tr><th className="rank">#</th><th data-t="colBoard">Board</th><th className="num" data-t="colHashrate">Hashrate</th><th className="num col-miners" data-t="colMiners">Miners</th><th className="col-share" data-t="colShare">Share of miners</th><th><span className="sr-only" data-t="navInstall">Flash</span></th></tr></thead>
    <tbody><tr><td colSpan={6} className="empty">–</td></tr></tbody>
   </table>
  </div>

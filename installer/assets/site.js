@@ -6,7 +6,7 @@ let poolNames={},poolLinks={};try{const data=JSON.parse(document.getElementById(
 const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Flasher',navStats:'Statistiques',navCommunity:'Communauté',
 navHome:'Accueil',navStart:'Bien démarrer',navDemo:'Démo',navMore:'Explorer',navFAQ:'FAQ',navNews:'Nouveautés',navSupport:'Soutenir',navPages:'Toutes les pages',
 navRemote:'Mes mineurs',
-heroPill:'Open source · mises à jour signées',check1:'SHA-256 matériel sur ESP32, S2, S3 et C3',check2:'Stratum V1 et V2 chiffré (Noise)',check3:'Bitaxe Gamma jusqu’à 800 MHz',
+heroPill:'Open source · mises à jour signées',famAll:'Toutes les cartes',famEsp32:'ESP32',famS3:'ESP32-S3',famS2c3:'S2 / C3',famAsic:'ASIC',famGroup:'Famille de cartes',searchLabel:'Rechercher une carte',searchBoard:'Rechercher une carte',cardMiners:'{n} miners',cardMiner:'{n} miner',check1:'SHA-256 matériel sur ESP32, S2, S3 et C3',check2:'Stratum V1 et V2 chiffré (Noise)',check3:'Bitaxe Gamma jusqu’à 800 MHz',
 worksWith:'Fonctionne avec les pools solo',marketTitle:'Le parc BDLMiner en direct',marketLead:'Les miners qui partagent anonymement leur hashrate, par carte. Mis à jour toutes les 20 secondes.',
 marketAll:'Toutes les statistiques',colShare:'Part des miners',liveFleet:'Parc en direct',heroMiners:'miners en ligne',heroRecord:'Meilleure heure',
 exploreTitle:'Découvrir BDLMiner',exploreLead:'Choisis ta carte, essaie l’interface ou trouve de l’aide pour la prochaine étape.',
@@ -68,7 +68,7 @@ altMining:'L\'écran du miner : 1,005 MH/s, 10827 shares, meilleure difficulté 
 altGlobal:'Écran du prix du Bitcoin et du réseau',altClock:'Écran de l\'horloge',screens:'Écrans',
 noStats:'Pas encore de rapport : les miners partagent leur hashrate à partir de la version 1.9.0.',statsDown:'Statistiques indisponibles pour le moment.',
 experimental:'expérimental',chartDay:'Hashrate total toutes les 5 minutes, 24 dernières heures',chartWeek:'Hashrate total par heure, 7 derniers jours',noChart:'La courbe se remplit au fil des rapports.'};
-const EN={colCoin:'Cryptocurrency',coinsTitle:'By cryptocurrency',poolOther:'Other / private pool',poolUnknown:'Not shared',colPool:'Pool',chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
+const EN={cardMiners:'{n} miners',cardMiner:'{n} miner',colCoin:'Cryptocurrency',coinsTitle:'By cryptocurrency',poolOther:'Other / private pool',poolUnknown:'Not shared',colPool:'Pool',chatUnread:'unread',devMore:'Show the {n} other supported boards',devFewer:'Hide the boards without a miner',chatYou:'(you)',chatGuests:'+ {n} visitor(s) without a name',chatNobody:'Nobody with a name yet.',chatWhen:'Changeable on {d}',chatNow:'Changeable now',chatNeedName:'Choose your name first.',chatSaved:'Name registered.',
 chatEmpty:'No message yet: say hello!',chatTeam:'team',chatEdited:'edited',chatEdit:'Edit',chatDelete:'Delete',chatSure:'Sure?',chatBan:'Ban',chatSaveEdit:'Save',chatCancel:'Cancel',
 chatOffline:'Connecting to the chat…',chatUploading:'Sending the file…',chatRecording:'Recording… {s} s (click 🎤 to stop)',chatVoice:'Voice message ({s} s)',chatPlay:'Play',chatPause:'Pause',chatPosition:'Position in the voice message',chatPhoto:'Photo',chatVideo:'Video',
 chatNoMic:'Microphone unavailable or refused.',chatQrHide:'Hide the QR code',chatLinkCopied:'Link copied: open it on your other device. Share it with no one.',chatQrFailed:'The QR code cannot be shown for now: use “Copy the link”.',chatCodeSet:'Your name followed you to this device.',
@@ -205,29 +205,52 @@ function sparkline(points){const values=points.map(p=>p.hashrate).filter(v=>v>=0
  const W=120,H=36,max=Math.max(...values),min=Math.min(...values),span=max-min||1;
  const d=values.map((v,i)=>(i?'L':'M')+(W*i/(values.length-1)).toFixed(1)+' '+(H-3-(H-6)*(v-min)/span).toFixed(1)).join(' ');
  return '<path class="spark-area" d="'+d+' L'+W+' '+H+' L0 '+H+' Z"/><path class="spark-line" d="'+d+'"/>'}
-// Home: the live fleet, by board, as a market table; its totals in the hero card.
+// Home: the live fleet by board, as exchange-style cards and a market table,
+// both filtered by board family (tabs), the table also by name (search).
+const FAMILY={'m5stickc-plus2':'esp32','m5stack-esp32':'esp32','lilygo-t-display':'esp32','esp32-2432s028r':'esp32','esp32-headless':'esp32',
+ 'm5stack-s3':'s3','lilygo-t-display-s3':'s3','esp32s3-headless':'s3','esp32s2-headless':'s2c3','esp32c3-headless':'s2c3','bitaxe-gamma-601':'asic','nerdnos':'asic'};
+const familyOf=env=>FAMILY[env]||(/gamma|bitaxe|nerdnos/.test(env)?'asic':/s3/.test(env)?'s3':/s2|c3/.test(env)?'s2c3':'esp32');
+const homeFilter={cards:'all',table:'all',query:''};
 function homeMarket(){const table=document.getElementById('home-market');if(!table)return;
- const locale=lang=='fr'?'fr-FR':'en-US',total=summary?.hashrate||0,set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
- set('hm-total',summary?rate(total):'–');set('hm-miners',summary?(summary.miners||0).toLocaleString(locale):'–');
- set('hm-record',summary?.record?rate(summary.record.hashrate):'–');
- for(const id of ['hm-spark','hm-spark2'])if(document.getElementById(id))document.getElementById(id).innerHTML=sparkline(summary?.recent||[]);
+ const locale=lang=='fr'?'fr-FR':'en-US',set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+ set('hm-total',summary?rate(summary.hashrate||0):'–');set('hm-miners',summary?(summary.miners||0).toLocaleString(locale):'–');
+ const spark=document.getElementById('hm-spark');if(spark)spark.innerHTML=sparkline(summary?.recent||[]);
+ const name=env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env};
+ const famLabel=f=>T({esp32:'famEsp32',s3:'famS3',s2c3:'famS2c3',asic:'famAsic'}[f]);
+ const minerTotal=summary?.miners||0,pct=x=>(x*100).toLocaleString(locale,{maximumFractionDigits:x<.1?2:1})+' %';
+ const all=(summary?.boards||[]).filter(b=>b.miners>0).map(b=>({...b,family:familyOf(b.name),label:name(b.name)})).sort((a,b)=>b.hashrate-a.hashrate);
+ const icon=r=>{const c=document.createElement('span');c.className='chip-icon';c.dataset.family=r.family;c.setAttribute('aria-hidden','true');
+  c.textContent=r.label.replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();return c};
+ // Cards: the four busiest boards of the chosen family.
+ const cards=document.getElementById('hm-cards');
+ if(cards){cards.innerHTML='';const list=all.filter(r=>homeFilter.cards==='all'||r.family===homeFilter.cards).slice(0,4);
+  if(!list.length){const p=document.createElement('p');p.className='ticker-empty';p.textContent=summary?T('noneNow'):'–';cards.appendChild(p)}
+  list.forEach((r,i)=>{const a=document.createElement('a'),head=document.createElement('span'),title=document.createElement('span'),tag=document.createElement('span');
+   a.className='ticker'+(i===1?' active':'');a.href=BOARDS.some(b=>b.env===r.name)?'flash.html?board='+encodeURIComponent(r.name):'stats.html';
+   head.className='ticker-head';title.className='ticker-name';title.textContent=r.label;tag.className='ticker-tag';tag.textContent=famLabel(r.family);
+   head.append(icon(r),title,tag);
+   const value=document.createElement('strong');value.className='ticker-value';value.textContent=rate(r.hashrate);
+   const foot=document.createElement('span'),count=document.createElement('span'),badge=document.createElement('span');foot.className='ticker-foot';
+   count.textContent=T(r.miners===1?'cardMiner':'cardMiners').replace('{n}',r.miners.toLocaleString(locale));badge.className='chg up';badge.textContent=pct(minerTotal?r.miners/minerTotal:0);
+   foot.append(count,badge);a.append(head,value,foot);cards.appendChild(a)})}
+ // Table: every board online in the chosen family that matches the search.
+ const q=homeFilter.query.trim().toLowerCase();
+ const rows=all.filter(r=>(homeFilter.table==='all'||r.family===homeFilter.table)&&(!q||r.label.toLowerCase().includes(q)||r.name.includes(q)));
  const body=table.tBodies[0];body.innerHTML='';
- const family=env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env};
- const rows=(summary?.boards||[]).filter(b=>b.miners>0).sort((a,b)=>b.hashrate-a.hashrate).slice(0,8);
  if(!rows.length){const td=body.insertRow().insertCell();td.colSpan=6;td.className='empty';td.textContent=summary?T('noneNow'):'–';return}
- const minerTotal=summary?.miners||0;
  rows.forEach((r,i)=>{const tr=body.insertRow(),share=minerTotal?r.miners/minerTotal:0;
   const rank=tr.insertCell();rank.className='rank';rank.textContent=i+1;
-  const name=tr.insertCell(),chip=document.createElement('span'),label=document.createElement('span');
-  chip.className='chip-icon';chip.setAttribute('aria-hidden','true');chip.textContent=family(r.name).replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
-  label.textContent=family(r.name);const wrap=document.createElement('span');wrap.className='board';wrap.append(chip,label);name.appendChild(wrap);
-  const miners=tr.insertCell();miners.className='num col-miners';miners.textContent=r.miners.toLocaleString(locale);
+  const cell=tr.insertCell(),wrap=document.createElement('span'),label=document.createElement('span'),tag=document.createElement('small');
+  label.textContent=r.label;tag.textContent=famLabel(r.family);wrap.className='board';wrap.append(icon(r),label,tag);cell.appendChild(wrap);
   const hash=tr.insertCell();hash.className='num strong';hash.textContent=rate(r.hashrate);
-  const part=tr.insertCell(),bar=document.createElement('span'),fill=document.createElement('i'),pct=document.createElement('span');
-  part.className='share col-share';bar.className='bar';fill.style.width=Math.max(2,share*100).toFixed(1)+'%';bar.appendChild(fill);
-  pct.textContent=(share*100).toLocaleString(locale,{maximumFractionDigits:share<.1?2:1})+' %';part.append(bar,pct);
+  const miners=tr.insertCell();miners.className='num col-miners';miners.textContent=r.miners.toLocaleString(locale);
+  const part=tr.insertCell(),bar=document.createElement('span'),fill=document.createElement('i'),value=document.createElement('span');
+  part.className='share col-share';bar.className='bar';fill.style.width=Math.max(2,share*100).toFixed(1)+'%';bar.appendChild(fill);value.textContent=pct(share);part.append(bar,value);
   const act=tr.insertCell();act.className='act';
   if(BOARDS.some(b=>b.env===r.name)){const a=document.createElement('a');a.className='btn-sm';a.href='flash.html?board='+encodeURIComponent(r.name);a.textContent=T('navInstall');act.appendChild(a)}})}
+document.querySelectorAll('.family-tabs').forEach(group=>group.addEventListener('click',e=>{const b=e.target.closest('button[data-family]');if(!b)return;
+ homeFilter[group.dataset.target]=b.dataset.family;group.querySelectorAll('button').forEach(o=>o.setAttribute('aria-pressed',o===b));homeMarket()}));
+if(document.getElementById('hm-search'))document.getElementById('hm-search').addEventListener('input',e=>{homeFilter.query=e.target.value;homeMarket()});
 function stats(){homeMarket();if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}
  set('st-hashrate',rate(summary.hashrate||0));set('st-miners',(summary.miners||0).toLocaleString(lang=='fr'?'fr-FR':'en-US'));
