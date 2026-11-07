@@ -6,6 +6,9 @@ let poolNames={},poolLinks={};try{const data=JSON.parse(document.getElementById(
 const FR={skip:'Aller au contenu',navFeatures:'Fonctions',navBoards:'Cartes',navInstall:'Flasher',navStats:'Statistiques',navCommunity:'Communauté',
 navHome:'Accueil',navStart:'Bien démarrer',navDemo:'Démo',navMore:'Explorer',navFAQ:'FAQ',navNews:'Nouveautés',navSupport:'Soutenir',navPages:'Toutes les pages',
 navRemote:'Mes mineurs',
+heroPill:'Open source · mises à jour signées',check1:'SHA-256 matériel sur ESP32, S2, S3 et C3',check2:'Stratum V1 et V2 chiffré (Noise)',check3:'Bitaxe Gamma jusqu’à 800 MHz',
+worksWith:'Fonctionne avec les pools solo',marketTitle:'Le parc BDLMiner en direct',marketLead:'Les miners qui partagent anonymement leur hashrate, par carte. Mis à jour toutes les 20 secondes.',
+marketAll:'Toutes les statistiques',colShare:'Part des miners',liveFleet:'Parc en direct',heroMiners:'miners en ligne',heroRecord:'Meilleure heure',
 exploreTitle:'Découvrir BDLMiner',exploreLead:'Choisis ta carte, essaie l’interface ou trouve de l’aide pour la prochaine étape.',
 exploreBoards:'Compare les puces, les écrans et les hashrates mesurés.',exploreDemo:'Essaie le dashboard et le hub sans posséder de miner.',
 exploreStart:'Première installation, mises à jour et passage depuis AxeOS.',exploreFAQ:'Dépannage USB, Wi-Fi, shares et performances.',
@@ -133,8 +136,8 @@ document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{range=b.data
  document.querySelectorAll('[data-range]').forEach(o=>o.setAttribute('aria-pressed',o==b));chart()});
 addEventListener('resize',()=>chart());
 let fetchedAt=0;
-setInterval(()=>{if(!fetchedAt)return;const s=Math.round((Date.now()-fetchedAt)/1000);
- document.getElementById('st-updated').textContent=T('updated').replace('{s}',s)},1000);
+setInterval(()=>{const el=document.getElementById('st-updated');if(!fetchedAt||!el)return;const s=Math.round((Date.now()-fetchedAt)/1000);
+ el.textContent=T('updated').replace('{s}',s)},1000);
 
 // Every supported board: green when some are online now, red when the only
 // ones seen went offline (the service estimates them: reports carry no
@@ -197,14 +200,42 @@ function breakdowns(){
  table('st-pools',pools,'colPool',key=>key==='unknown'?T('poolUnknown'):Object.hasOwn(poolNames,key)?poolNames[key]:T('poolOther'),
   key=>Object.hasOwn(poolNames,key)&&Object.hasOwn(poolLinks,key)?poolLinks[key]:null)}
 
-function stats(){if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
+// A small line of points (the total hashrate) for the cards of the home page.
+function sparkline(points){const values=points.map(p=>p.hashrate).filter(v=>v>=0);if(values.length<2)return'';
+ const W=120,H=36,max=Math.max(...values),min=Math.min(...values),span=max-min||1;
+ const d=values.map((v,i)=>(i?'L':'M')+(W*i/(values.length-1)).toFixed(1)+' '+(H-3-(H-6)*(v-min)/span).toFixed(1)).join(' ');
+ return '<path class="spark-area" d="'+d+' L'+W+' '+H+' L0 '+H+' Z"/><path class="spark-line" d="'+d+'"/>'}
+// Home: the live fleet, by board, as a market table; its totals in the hero card.
+function homeMarket(){const table=document.getElementById('home-market');if(!table)return;
+ const locale=lang=='fr'?'fr-FR':'en-US',total=summary?.hashrate||0,set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+ set('hm-total',summary?rate(total):'–');set('hm-miners',summary?(summary.miners||0).toLocaleString(locale):'–');
+ set('hm-record',summary?.record?rate(summary.record.hashrate):'–');
+ for(const id of ['hm-spark','hm-spark2'])if(document.getElementById(id))document.getElementById(id).innerHTML=sparkline(summary?.recent||[]);
+ const body=table.tBodies[0];body.innerHTML='';
+ const family=env=>{const n=SHORT[env];return n?(lang=='fr'&&n[1]||n[0]):env};
+ const rows=(summary?.boards||[]).filter(b=>b.miners>0).sort((a,b)=>b.hashrate-a.hashrate).slice(0,8);
+ if(!rows.length){const td=body.insertRow().insertCell();td.colSpan=6;td.className='empty';td.textContent=summary?T('noneNow'):'–';return}
+ const minerTotal=summary?.miners||0;
+ rows.forEach((r,i)=>{const tr=body.insertRow(),share=minerTotal?r.miners/minerTotal:0;
+  const rank=tr.insertCell();rank.className='rank';rank.textContent=i+1;
+  const name=tr.insertCell(),chip=document.createElement('span'),label=document.createElement('span');
+  chip.className='chip-icon';chip.setAttribute('aria-hidden','true');chip.textContent=family(r.name).replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
+  label.textContent=family(r.name);const wrap=document.createElement('span');wrap.className='board';wrap.append(chip,label);name.appendChild(wrap);
+  const miners=tr.insertCell();miners.className='num col-miners';miners.textContent=r.miners.toLocaleString(locale);
+  const hash=tr.insertCell();hash.className='num strong';hash.textContent=rate(r.hashrate);
+  const part=tr.insertCell(),bar=document.createElement('span'),fill=document.createElement('i'),pct=document.createElement('span');
+  part.className='share col-share';bar.className='bar';fill.style.width=Math.max(2,share*100).toFixed(1)+'%';bar.appendChild(fill);
+  pct.textContent=(share*100).toLocaleString(locale,{maximumFractionDigits:share<.1?2:1})+' %';part.append(bar,pct);
+  const act=tr.insertCell();act.className='act';
+  if(BOARDS.some(b=>b.env===r.name)){const a=document.createElement('a');a.className='btn-sm';a.href='flash.html?board='+encodeURIComponent(r.name);a.textContent=T('navInstall');act.appendChild(a)}})}
+function stats(){homeMarket();if(!document.getElementById('stats'))return;const set=(id,v)=>document.getElementById(id).textContent=v;fleet();breakdowns();
  if(!summary){chart();return}
  set('st-hashrate',rate(summary.hashrate||0));set('st-miners',(summary.miners||0).toLocaleString(lang=='fr'?'fr-FR':'en-US'));
  set('st-average',summary.miners?rate(summary.hashrate/summary.miners):'–');set('st-record',summary.record?rate(summary.record.hashrate):'–');
  chart();
  if(!summary.miners&&!summary.history?.length)document.getElementById('st-status').textContent=T('noStats')}
-async function refresh(){if(!document.getElementById('stats'))return;try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
- catch(e){if(!summary){chart();document.getElementById('st-status').textContent=T('statsDown')}}}
+async function refresh(){if(!document.getElementById('stats')&&!document.getElementById('home-market'))return;try{const r=await fetch(STATS,{cache:'no-store'});if(!r.ok)throw 0;summary=await r.json();fetchedAt=Date.now();stats()}
+ catch(e){if(!summary&&document.getElementById('stats')){chart();document.getElementById('st-status').textContent=T('statsDown')}}}
 
 function apply(){document.documentElement.lang=lang;
  document.querySelectorAll('[data-t]').forEach(e=>e.textContent=T(e.dataset.t));
