@@ -8,19 +8,19 @@
 <meta property="og:title" content="BDLMinerV2 | ESP32 Solo Bitcoin Miner for M5StickC Plus2">
 <meta property="og:description" content="Open-source ESP32 solo Bitcoin miner firmware for M5StickC Plus2 and other supported boards. Browser installation, live dashboard and stable updates.">
 <meta property="og:image" content="assets/screen-mining.png">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0e0f11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0e0f11">
+<script>try{if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
 <link rel="stylesheet" href="assets/discovery.css">
 <script id="site-data" type="application/json">__SITE_DATA__</script>
 <script defer src="assets/discovery.js"></script>
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <style>
-/* BDLMiner site. Neutral surfaces, one brand colour for actions, light or dark with the system. */
-:root{color-scheme:light dark;--bg:#fff;--panel:#f6f7f9;--panel2:#eef0f3;--border:#e2e5e9;--border-strong:#c8cdd4;--fg:#0f1115;--text:#30353d;--label:#5c636e;--muted:#5c636e;
- --accent:#f7931a;--accent-hover:#e5830c;--accent-ink:#a35300;--on-accent:#111;--good:#15803d;--bad:#c62828;--warn:#9a6700;--chart-grid:#e8eaee;--radius:6px;--wrap:1120px;
+/* BDLMiner site. Neutral surfaces, one brand colour for actions. Dark by default; light when chosen (#theme). */
+:root{color-scheme:dark;--bg:#0e0f11;--panel:#151619;--panel2:#1b1d21;--border:#272a30;--border-strong:#3a3e46;--fg:#f2f3f5;--text:#cfd3d9;--label:#959ba5;--muted:#959ba5;
+ --accent:#f7931a;--accent-hover:#e5830c;--accent-ink:#f5a54a;--on-accent:#111;--good:#4cb874;--bad:#ef6461;--warn:#e0a43d;--chart-grid:#24272c;--radius:6px;--wrap:1120px;
  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-@media (prefers-color-scheme:dark){:root{--bg:#0e0f11;--panel:#151619;--panel2:#1b1d21;--border:#272a30;--border-strong:#3a3e46;--fg:#f2f3f5;--text:#cfd3d9;--label:#959ba5;--muted:#959ba5;
- --accent-ink:#f5a54a;--good:#4cb874;--bad:#ef6461;--warn:#e0a43d;--chart-grid:#24272c}}
+:root[data-theme=light]{color-scheme:light;--bg:#fff;--panel:#f6f7f9;--panel2:#eef0f3;--border:#e2e5e9;--border-strong:#c8cdd4;--fg:#0f1115;--text:#30353d;--label:#5c636e;--muted:#5c636e;
+ --accent-ink:#a35300;--good:#15803d;--bad:#c62828;--warn:#9a6700;--chart-grid:#e8eaee}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
@@ -51,11 +51,13 @@ nav .wrap{display:flex;align-items:center;gap:20px;height:60px}
 .site-more-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;display:grid;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(15,17,21,.12);z-index:10}
 .site-more:not([open]) .site-more-menu{display:none}
 .links .site-more-menu a{display:block;padding:9px 12px;border-radius:4px;box-shadow:none}
+#theme{display:grid;place-items:center;width:34px;height:32px;padding:0;background:none;border:1px solid var(--border-strong);color:var(--fg);border-radius:var(--radius);cursor:pointer}
+#theme:hover{background:var(--panel)}#theme svg{width:16px;height:16px}#theme .sun,[data-theme=light] #theme .moon{display:none}[data-theme=light] #theme .sun{display:block}
 #lang{background:none;border:1px solid var(--border-strong);color:var(--fg);border-radius:var(--radius);padding:6px 10px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}
 #lang:hover{background:var(--panel)}
 #menu{display:none;background:none;border:1px solid var(--border-strong);color:var(--fg);border-radius:var(--radius);width:40px;height:36px;cursor:pointer;font-size:17px;line-height:1}
 /* Narrow screens: the links fold into a menu under the bar. */
-@media (max-width:1040px){#lang{margin-left:auto}#menu{display:block}
+@media (max-width:1040px){#theme{margin-left:auto}#menu{display:block}
  .links{display:none;position:absolute;top:60px;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;margin:0;background:var(--bg);border-bottom:1px solid var(--border);padding:8px 24px 16px;max-height:calc(100dvh - 60px);overflow:auto;box-shadow:0 12px 24px rgba(15,17,21,.1)}
  .links.open{display:flex}
  .links a,.site-more summary{padding:12px 4px;font-size:16px;border-bottom:1px solid var(--border);border-radius:0}
@@ -286,6 +288,7 @@ footer .footer-nav a[aria-current=page]{color:var(--fg);font-weight:600}
    </div></details>
    <a href="support.html" id="nav-support" data-t="navSupport">Support</a>
   </div>
+  <button id="theme" type="button" aria-pressed="false" data-al="themeLight" aria-label="Light theme"><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
   <button id="lang" type="button">Français</button>
   <button id="menu" type="button" aria-expanded="false" aria-controls="site-links" data-al="menu" aria-label="Menu">☰</button>
  </div>
@@ -402,7 +405,7 @@ poolOther:'Autre / pool privée',poolUnknown:'Pool non renseignée',byPool:'Par 
 devicesTitle:'Appareils',online:'en ligne',offline:'hors ligne',
 devOnline:'en ligne',devOffline:'hors ligne',devNone:'aucun pour l\'instant',devMore:'Voir les {n} autres cartes compatibles',devFewer:'Masquer les cartes sans miner',menu:'Menu',
 tHashrate:'Hashrate total',tMiners:'Miners',tAverage:'Moyenne par miner',tRecord:'Meilleure heure',
-chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',chatUnread:'non lus',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
+chatTitle:'Discussion',chatOpen:'Ouvrir la discussion',themeLight:'Thème clair',chatUnread:'non lus',chatClose:'Fermer la discussion',chatSettings:'Réglages',chatName:'Pseudo',chatNamePh:'Ton pseudo',
 chatSave:'Enregistrer',chatNameHint:'Modifiable tous les 30 jours',chatWhen:'Modifiable le {d}',chatNow:'Modifiable maintenant',
 chatCodeTitle:'Autre appareil',chatQrShow:'📱 Mon QR code',chatQrHide:'Masquer le QR code',chatQrAlt:'QR code pour ouvrir la discussion avec ton pseudo',chatLink:'Copier le lien',chatLinkCopied:'Lien copié : ouvre-le sur ton autre appareil. Ne le partage avec personne.',chatQrFailed:'Impossible d\'afficher le QR code pour l\'instant : utilise « Copier le lien ».',chatCodeHint:'🔒 Scanne-le avec ton téléphone. Ne le montre à personne.',
 chatBack:'Retour à la discussion',chatMembers:'Membres en ligne',chatYou:'(toi)',chatGuests:'+ {n} visiteur(s) sans pseudo',chatNobody:'Personne avec un pseudo pour l\'instant.',chatNeedName:'Choisis d\'abord ton pseudo.',chatSaved:'Pseudo enregistré.',
@@ -589,6 +592,9 @@ function apply(){document.documentElement.lang=lang;
  document.addEventListener('click',e=>{if(!e.target.closest('nav'))set(false);if(more&&!more.contains(e.target))more.open=false});
  document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(more?.open){more.open=false;more.querySelector('summary').focus();return}if(links.classList.contains('open')){set(false);menu.focus()}})}
 if(document.getElementById('st-more'))document.getElementById('st-more').onclick=()=>{fleetAll=!fleetAll;fleet()};
+{const theme=document.getElementById('theme'),root=document.documentElement;theme.setAttribute('aria-pressed',root.dataset.theme==='light');
+ theme.onclick=()=>{const light=root.dataset.theme!=='light';if(light)root.dataset.theme='light';else delete root.dataset.theme;theme.setAttribute('aria-pressed',light);
+  try{light?localStorage.setItem('theme','light'):localStorage.removeItem('theme')}catch(e){}}}
 document.getElementById('lang').onclick=()=>{lang=lang=='fr'?'en':'fr';try{localStorage.setItem('lang',lang)}catch(e){}apply()};
 
 const sel=document.getElementById('board'),btn=document.getElementById('installer');
